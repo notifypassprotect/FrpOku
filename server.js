@@ -17,7 +17,7 @@ if (SUPABASE_URL && SUPABASE_KEY) {
   supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 }
 
-// ── Nodemailer SMTP Transporter ─────────────────────────────
+// ── Nodemailer SMTP Transporter (Pooled & Persistent) ───────
 const SMTP_USER = process.env.SMTP_USER || 'notifypassprotect@gmail.com';
 const SMTP_PASS = (process.env.SMTP_PASS || 'pudmkitqegolfpkf').replace(/\s+/g, '');
 const SMTP_FROM = process.env.SMTP_FROM || `"FrpOku Cloud Portal" <${SMTP_USER}>`;
@@ -26,13 +26,16 @@ let mailTransporter = null;
 if (SMTP_USER && SMTP_PASS) {
   mailTransporter = nodemailer.createTransport({
     service: 'gmail',
+    pool: true,
+    maxConnections: 5,
+    maxMessages: 100,
     auth: {
       user: SMTP_USER,
       pass: SMTP_PASS
     },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000
+    connectionTimeout: 20000,
+    greetingTimeout: 20000,
+    socketTimeout: 25000
   });
 
   mailTransporter.verify((err, success) => {
@@ -387,7 +390,7 @@ app.post('/api/auth/register-request', async (req, res) => {
             'Importance': 'High'
           }
         }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('E-posta sunucusu yanıt vermedi (Zaman aşımı)')), 10000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('E-posta sunucusu yanıt vermedi (Zaman aşımı)')), 20000))
       ]);
       console.log(`✅ Kayıt OTP kodu gönderildi: ${cleanEmail} (MsgID: ${mailRes.messageId})`);
     } catch (mailErr) {
@@ -595,7 +598,7 @@ app.post('/api/auth/send-reset-code', async (req, res) => {
             text: `Merhaba ${user.full_name || user.username},\n\nFrpOku hesabınız için şifre sıfırlama doğrulama kodunuz: ${otpCode}\n\nBu kod 10 dakika boyunca geçerlidir.\n\nİyi çalışmalar,\nFrpOku Güvenlik Ekibi`,
             html: getOtpEmailHtml(user.full_name || user.username, otpCode)
           }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('E-posta sunucusu yanıt vermedi')), 10000))
+          new Promise((_, reject) => setTimeout(() => reject(new Error('E-posta sunucusu yanıt vermedi')), 20000))
         ]);
       } catch (mailErr) {
         console.warn('Mail send timeout/error:', mailErr.message);

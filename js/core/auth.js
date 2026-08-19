@@ -1097,7 +1097,7 @@
 
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000);
+        const timeoutId = setTimeout(() => controller.abort(), 22000);
 
         const res = await fetch('/api/auth/register-request', {
           method: 'POST',
@@ -1154,7 +1154,7 @@
 
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 12000);
+          const timeoutId = setTimeout(() => controller.abort(), 22000);
 
           const res = await fetch('/api/auth/register-verify', {
             method: 'POST',
@@ -1297,7 +1297,7 @@
 
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000);
+        const timeoutId = setTimeout(() => controller.abort(), 22000);
 
         const res = await fetch('/api/auth/send-reset-code', {
           method: 'POST',
@@ -1369,7 +1369,7 @@
 
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 12000);
+        const timeoutId = setTimeout(() => controller.abort(), 22000);
 
         const res = await fetch('/api/auth/verify-reset-code', {
           method: 'POST',
