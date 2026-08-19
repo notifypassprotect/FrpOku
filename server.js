@@ -369,21 +369,25 @@ app.post('/api/auth/register-request', async (req, res) => {
     otpCooldownStore.set(cleanEmail, Date.now());
 
     // 4. Doğrulama Kodunu E-Postaya Gönder
-    if (mailTransporter) {
-      try {
-        await Promise.race([
-          mailTransporter.sendMail({
-            from: SMTP_FROM,
-            to: cleanEmail,
-            subject: `FrpOku Kayit Dogrulama Kodu: ${otpCode}`,
-            text: `Merhaba ${cleanName},\n\nFrpOku hesabınızı oluşturmak için 6 haneli güvenlik kodunuz: ${otpCode}\n\nBu kod 10 dakika geçerlidir.\n\nFrpOku Cloud Portal`,
-            html: getRegisterOtpEmailHtml(cleanName, otpCode)
-          }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('E-posta zaman aşımı')), 10000))
-        ]);
-      } catch (mailErr) {
-        console.warn('Register mail send error:', mailErr.message);
-      }
+    if (!mailTransporter) {
+      return res.status(500).json({ success: false, reason: 'E-posta sunucusu (SMTP) aktif değil. Lütfen sistem yöneticinizle iletişime geçiniz.' });
+    }
+
+    try {
+      const mailRes = await Promise.race([
+        mailTransporter.sendMail({
+          from: SMTP_FROM,
+          to: cleanEmail,
+          subject: `FrpOku Kayit Dogrulama Kodu: ${otpCode}`,
+          text: `Merhaba ${cleanName},\n\nFrpOku hesabınızı oluşturmak için 6 haneli güvenlik kodunuz: ${otpCode}\n\nBu kod 10 dakika geçerlidir.\n\nFrpOku Cloud Portal`,
+          html: getRegisterOtpEmailHtml(cleanName, otpCode)
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('E-posta sunucusu yanıt vermedi (Zaman aşımı)')), 10000))
+      ]);
+      console.log(`✅ Kayıt OTP kodu gönderildi: ${cleanEmail} (MsgID: ${mailRes.messageId})`);
+    } catch (mailErr) {
+      console.error('❌ Register mail send error:', mailErr.message);
+      return res.status(500).json({ success: false, reason: 'Doğrulama e-postası gönderilemedi: ' + mailErr.message });
     }
 
     res.json({
