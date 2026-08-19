@@ -125,7 +125,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
       date: true,
       ...(livePrefs.visibleColumns || {})
     },
-    theme: FrpStore.getTheme() || 'dark'
+    theme: FrpStore.getTheme() || 'light'
   };
 
   const authUser = (typeof window.FrpAuth !== 'undefined' && window.FrpAuth.getUser) ? window.FrpAuth.getUser() : null;
@@ -436,6 +436,44 @@ window.openSettingsModal = function(initialTab = 'appearance') {
                 </div>
               `;
             })()}
+
+            <!-- Alt Kart: 🔒 Şifre ve Hesap Güvenliği -->
+            <div class="settings-card" style="grid-column: 1 / -1; display:flex; flex-direction:column; gap:.85rem; border: 1.5px solid var(--accent); background: var(--bg-surface); padding: 1.25rem; border-radius: 14px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-light); padding-bottom:.5rem;">
+                <div style="display:flex; align-items:center; gap:.5rem;">
+                  <span style="font-size:1.2rem;">🔒</span>
+                  <div>
+                    <div style="font-weight:800; font-size:.92rem; color:var(--text-primary);">Şifre ve Hesap Güvenliği</div>
+                    <div style="font-size:.74rem; color:var(--text-muted);">Giriş şifrenizi güvenli bir şekilde güncelleyin</div>
+                  </div>
+                </div>
+                <span class="badge" style="background:var(--accent-light); color:var(--accent); font-weight:700; font-size:.7rem;">🛡️ Uçtan Uca Şifreli</span>
+              </div>
+
+              <!-- Canlı Uyarı / Bilgi Kutusu -->
+              <div id="profilePassAlert" style="display:none; padding:.75rem 1rem; border-radius:10px; font-size:.82rem; font-weight:600;"></div>
+
+              <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:.85rem;">
+                <div>
+                  <label style="font-size:.75rem; font-weight:700; color:var(--text-secondary); margin-bottom:.3rem; display:block;">🔑 Mevcut Şifre</label>
+                  <input type="password" id="profOldPass" class="master-search-input" style="width:100%;" placeholder="Mevcut şifrenizi girin" />
+                </div>
+                <div>
+                  <label style="font-size:.75rem; font-weight:700; color:var(--text-secondary); margin-bottom:.3rem; display:block;">🔒 Yeni Şifre</label>
+                  <input type="password" id="profNewPass" class="master-search-input" style="width:100%;" placeholder="En az 4 karakter" />
+                </div>
+                <div>
+                  <label style="font-size:.75rem; font-weight:700; color:var(--text-secondary); margin-bottom:.3rem; display:block;">🔒 Yeni Şifre Tekrar</label>
+                  <input type="password" id="profNewPassConfirm" class="master-search-input" style="width:100%;" placeholder="Yeni şifreyi onaylayın" />
+                </div>
+              </div>
+
+              <div style="display:flex; justify-content:flex-end; margin-top:.3rem;">
+                <button type="button" id="btnUpdatePasswordProfile" class="btn btn-primary" style="padding:.6rem 1.4rem; font-weight:800; font-size:.85rem; border-radius:10px;">
+                  🔐 Şifremi Güncelle
+                </button>
+              </div>
+            </div>
 
           </div>
         </div>
@@ -848,15 +886,19 @@ window.openSettingsModal = function(initialTab = 'appearance') {
       const newPassConf = overlay.querySelector('#profNewPassConfirm')?.value;
 
       if (!oldPass) {
-        showStatus('Lütfen mevcut şifrenizi girin.', 'error');
+        showStatus('⚠️ Lütfen mevcut şifrenizi giriniz.', 'error');
         return;
       }
-      if (!newPass || newPass.length < 3) {
-        showStatus('Yeni şifreniz en az 3 karakter olmalıdır.', 'error');
+      if (!newPass || newPass.length < 4) {
+        showStatus('⚠️ Yeni şifreniz en az 4 karakter olmalıdır.', 'error');
+        return;
+      }
+      if (oldPass === newPass) {
+        showStatus('⚠️ Yeni şifreniz mevcut şifrenizle aynı olamaz.', 'error');
         return;
       }
       if (newPass !== newPassConf) {
-        showStatus('Yeni şifreler birbiriyle eşleşmiyor!', 'error');
+        showStatus('🔒 Yeni şifreler birbiriyle eşleşmiyor!', 'error');
         return;
       }
 
@@ -993,7 +1035,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
             columnOrder: ['reportName', 'fileName', 'fileSize', 'category', 'guid', 'tags', 'queries', 'date'],
             pageSize: 50,
             enableFirebirdFilter: true,
-            theme: 'dark'
+            theme: 'light'
           };
           FrpStore.setPreferences(stagedPrefs);
           toast('Ayarlar varsayılana sıfırlandı.', 'info');

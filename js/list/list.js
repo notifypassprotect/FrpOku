@@ -94,7 +94,60 @@ if (btnThemeToggle) {
 
 updateThemeBtn();
 
-// ── Dosya Yükleme ──────────────────────────────────────────
+// ── TOPBAR DROPDOWN KONTROLCÜSÜ (Gecikmeli Kapanma & Tıklama Desteği) ──
+function setupTopbarDropdowns() {
+  document.querySelectorAll('.topbar-dropdown').forEach(dropdown => {
+    let leaveTimeout = null;
+    const toggleBtn = dropdown.querySelector('.topbar-dropdown-toggle');
+    const menu = dropdown.querySelector('.topbar-dropdown-menu');
+
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = dropdown.classList.contains('open');
+        document.querySelectorAll('.topbar-dropdown.open').forEach(d => d.classList.remove('open'));
+        if (!isOpen) dropdown.classList.add('open');
+      });
+    }
+
+    dropdown.addEventListener('mouseenter', () => {
+      if (leaveTimeout) clearTimeout(leaveTimeout);
+      dropdown.classList.add('open');
+    });
+
+    dropdown.addEventListener('mouseleave', () => {
+      leaveTimeout = setTimeout(() => {
+        dropdown.classList.remove('open');
+      }, 350);
+    });
+
+    if (menu) {
+      menu.addEventListener('mouseenter', () => {
+        if (leaveTimeout) clearTimeout(leaveTimeout);
+        dropdown.classList.add('open');
+      });
+      menu.addEventListener('mouseleave', () => {
+        leaveTimeout = setTimeout(() => {
+          dropdown.classList.remove('open');
+        }, 350);
+      });
+      menu.querySelectorAll('.topbar-dropdown-item').forEach(item => {
+        item.addEventListener('click', () => {
+          dropdown.classList.remove('open');
+        });
+      });
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.topbar-dropdown')) {
+      document.querySelectorAll('.topbar-dropdown.open').forEach(d => d.classList.remove('open'));
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', setupTopbarDropdowns);
+setupTopbarDropdowns();
 // ── Dosya Yükleme (Sürükle-Bırak & Çoklu Dosya Yükleme) ──────
 async function handleFiles(fileList) {
   const files = Array.from(fileList).filter(f => f.name.toLowerCase().endsWith('.frp'));

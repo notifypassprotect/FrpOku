@@ -761,7 +761,7 @@
   }
 
   // ── 10. Tercihler, Tema, Son Açılanlar ─────────────────────────
-  function getTheme() { return localStorage.getItem(THEME_KEY) || 'dark'; }
+  function getTheme() { return localStorage.getItem(THEME_KEY) || 'light'; }
   function setTheme(theme) {
     localStorage.setItem(THEME_KEY, theme);
     document.documentElement.setAttribute('data-theme', theme);

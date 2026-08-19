@@ -12,6 +12,12 @@
   <link rel="stylesheet" href="css/compare.css" />
   <link rel="stylesheet" href="css/themes.css" />
   <link rel="stylesheet" href="css/designer.css" />
+  <script>
+    (function() {
+      const t = localStorage.getItem('frpoku_theme') || 'light';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
 
   <style>
     .detail-topbar-left { display:flex; align-items:center; gap:.75rem; }

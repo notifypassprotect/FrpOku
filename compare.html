@@ -11,6 +11,12 @@
   <link rel="stylesheet" href="css/list.css" />
   <link rel="stylesheet" href="css/compare.css" />
   <link rel="stylesheet" href="css/themes.css" />
+  <script>
+    (function() {
+      const t = localStorage.getItem('frpoku_theme') || 'light';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
 </head>
 <body>
 <div class="cmp-shell">
