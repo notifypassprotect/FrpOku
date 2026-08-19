@@ -1,0 +1,256 @@
+/* ============================================================
+   themes.css — 5 Kod Renk Teması
+   FrpOku Dark (varsayılan) | FrpOku Light | Dracula | GitHub Dark | Monokai
+   ============================================================ */
+
+/* ── TEMA SEÇİCİ UI ─────────────────────────────────────── */
+.theme-selector-wrap {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+}
+
+.theme-selector-label {
+  font-size: .75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.theme-selector-select {
+  padding: .28rem .55rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--text-primary);
+  font-size: .78rem;
+  font-family: var(--font);
+  cursor: pointer;
+  outline: none;
+  transition: border-color .15s;
+}
+.theme-selector-select:focus { border-color: var(--accent-bright); }
+
+/* ══════════════════════════════════════════════════════════
+   TEMA 1 — FrpOku Dark (varsayılan, zaten style.css'te)
+   ══════════════════════════════════════════════════════════ */
+.code-theme-frpoku-dark .code-scroll,
+.code-theme-frpoku-dark .code-editor-backdrop,
+.code-theme-frpoku-dark .code-editor-wrap {
+  background: #0b1325 !important;
+  color: #e2e8f0 !important;
+}
+.code-theme-frpoku-dark .line-src { color: #e2e8f0 !important; }
+.code-theme-frpoku-dark .sql-keyword,
+.code-theme-frpoku-dark .pas-keyword { color: #60a5fa; font-weight: 700; }
+
+.code-theme-frpoku-dark .sql-fn,
+.code-theme-frpoku-dark .pas-type    { color: #34d399; font-weight: 600; }
+
+.code-theme-frpoku-dark .sql-string,
+.code-theme-frpoku-dark .pas-string  { color: #fbbf24; }
+
+.code-theme-frpoku-dark .sql-comment,
+.code-theme-frpoku-dark .pas-comment { color: #64748b; font-style: italic; }
+
+.code-theme-frpoku-dark .sql-number,
+.code-theme-frpoku-dark .pas-number  { color: #f87171; }
+
+.code-theme-frpoku-dark .sql-param   { color: #f97316; font-weight: 700; }
+.code-theme-frpoku-dark .sql-operator,
+.code-theme-frpoku-dark .pas-special { color: #94a3b8; }
+
+/* ══════════════════════════════════════════════════════════
+   TEMA 2 — FrpOku Light
+   ══════════════════════════════════════════════════════════ */
+.code-theme-frpoku-light .code-scroll,
+.code-theme-frpoku-light .code-editor-backdrop,
+.code-theme-frpoku-light .code-editor-wrap {
+  background: #f8fafc !important;
+  color: #1e293b !important;
+}
+
+.code-theme-frpoku-light .line-src  { color: #1e293b !important; }
+.code-theme-frpoku-light .code-line { color: #1e293b; }
+.code-theme-frpoku-light .line-num  { background: #f1f5f9 !important; color: #94a3b8 !important; }
+
+.code-theme-frpoku-light .sql-keyword,
+.code-theme-frpoku-light .pas-keyword { color: #1d4ed8; font-weight: 700; }
+
+.code-theme-frpoku-light .sql-fn,
+.code-theme-frpoku-light .pas-type    { color: #059669; font-weight: 600; }
+
+.code-theme-frpoku-light .sql-string,
+.code-theme-frpoku-light .pas-string  { color: #b45309; }
+
+.code-theme-frpoku-light .sql-comment,
+.code-theme-frpoku-light .pas-comment { color: #6b7280; font-style: italic; }
+
+.code-theme-frpoku-light .sql-number,
+.code-theme-frpoku-light .pas-number  { color: #dc2626; }
+
+.code-theme-frpoku-light .sql-param   { color: #d97706; font-weight: 700; }
+.code-theme-frpoku-light .sql-operator,
+.code-theme-frpoku-light .pas-special { color: #6b7280; }
+
+/* ══════════════════════════════════════════════════════════
+   TEMA 3 — Dracula
+   ══════════════════════════════════════════════════════════ */
+.code-theme-dracula .code-scroll,
+.code-theme-dracula .code-editor-backdrop,
+.code-theme-dracula .code-editor-wrap {
+  background: #282a36 !important;
+  color: #f8f8f2 !important;
+}
+.code-theme-dracula .line-src   { color: #f8f8f2 !important; }
+.code-theme-dracula .code-line  { color: #f8f8f2; }
+.code-theme-dracula .line-num   { background: #21222c !important; color: #6272a4 !important; }
+
+.code-theme-dracula .sql-keyword,
+.code-theme-dracula .pas-keyword { color: #ff79c6; font-weight: 700; }
+
+.code-theme-dracula .sql-fn,
+.code-theme-dracula .pas-type    { color: #50fa7b; font-weight: 600; }
+
+.code-theme-dracula .sql-string,
+.code-theme-dracula .pas-string  { color: #f1fa8c; }
+
+.code-theme-dracula .sql-comment,
+.code-theme-dracula .pas-comment { color: #6272a4; font-style: italic; }
+
+.code-theme-dracula .sql-number,
+.code-theme-dracula .pas-number  { color: #bd93f9; }
+
+.code-theme-dracula .sql-param   { color: #ffb86c; font-weight: 700; }
+.code-theme-dracula .sql-operator,
+.code-theme-dracula .pas-special { color: #ff79c6; }
+
+/* ══════════════════════════════════════════════════════════
+   TEMA 4 — GitHub Dark
+   ══════════════════════════════════════════════════════════ */
+.code-theme-github-dark .code-scroll,
+.code-theme-github-dark .code-editor-backdrop,
+.code-theme-github-dark .code-editor-wrap {
+  background: #0d1117 !important;
+  color: #e6edf3 !important;
+}
+.code-theme-github-dark .line-src  { color: #e6edf3 !important; }
+.code-theme-github-dark .code-line { color: #e6edf3; }
+.code-theme-github-dark .line-num  { background: #0d1117 !important; color: #6e7681 !important;
+  border-right: 1px solid #21262d; }
+
+.code-theme-github-dark .sql-keyword,
+.code-theme-github-dark .pas-keyword { color: #ff7b72; font-weight: 700; }
+
+.code-theme-github-dark .sql-fn,
+.code-theme-github-dark .pas-type    { color: #d2a8ff; font-weight: 600; }
+
+.code-theme-github-dark .sql-string,
+.code-theme-github-dark .pas-string  { color: #a5d6ff; }
+
+.code-theme-github-dark .sql-comment,
+.code-theme-github-dark .pas-comment { color: #8b949e; font-style: italic; }
+
+.code-theme-github-dark .sql-number,
+.code-theme-github-dark .pas-number  { color: #79c0ff; }
+
+.code-theme-github-dark .sql-param   { color: #ffa657; font-weight: 700; }
+.code-theme-github-dark .sql-operator,
+.code-theme-github-dark .pas-special { color: #ff7b72; }
+
+/* ══════════════════════════════════════════════════════════
+   TEMA 5 — Monokai
+   ══════════════════════════════════════════════════════════ */
+.code-theme-monokai .code-scroll,
+.code-theme-monokai .code-editor-backdrop,
+.code-theme-monokai .code-editor-wrap {
+  background: #272822 !important;
+  color: #f8f8f2 !important;
+}
+.code-theme-monokai .line-src  { color: #f8f8f2 !important; }
+.code-theme-monokai .code-line { color: #f8f8f2; }
+.code-theme-monokai .line-num  { background: #1e1f1c !important; color: #75715e !important; }
+
+.code-theme-monokai .sql-keyword,
+.code-theme-monokai .pas-keyword { color: #f92672; font-weight: 700; }
+
+.code-theme-monokai .sql-fn,
+.code-theme-monokai .pas-type    { color: #66d9e8; font-weight: 600; }
+
+.code-theme-monokai .sql-string,
+.code-theme-monokai .pas-string  { color: #e6db74; }
+
+.code-theme-monokai .sql-comment,
+.code-theme-monokai .pas-comment { color: #75715e; font-style: italic; }
+
+.code-theme-monokai .sql-number,
+.code-theme-monokai .pas-number  { color: #ae81ff; }
+
+.code-theme-monokai .sql-param   { color: #fd971f; font-weight: 700; }
+.code-theme-monokai .sql-operator,
+.code-theme-monokai .pas-special { color: #f92672; }
+
+/* ══════════════════════════════════════════════════════════
+   TEMA 6 — Nord Frost (❄️)
+   ══════════════════════════════════════════════════════════ */
+.code-theme-nord .code-scroll,
+.code-theme-nord .code-editor-backdrop,
+.code-theme-nord .code-editor-wrap {
+  background: #2e3440 !important;
+  color: #eceff4 !important;
+}
+.code-theme-nord .line-src  { color: #eceff4 !important; }
+.code-theme-nord .code-line { color: #eceff4; }
+.code-theme-nord .line-num  { background: #242933 !important; color: #4c566a !important; border-right: 1px solid #3b4252; }
+
+.code-theme-nord .sql-keyword,
+.code-theme-nord .pas-keyword { color: #81a1c1; font-weight: 700; }
+
+.code-theme-nord .sql-fn,
+.code-theme-nord .pas-type    { color: #88c0d0; font-weight: 600; }
+
+.code-theme-nord .sql-string,
+.code-theme-nord .pas-string  { color: #a3be8c; }
+
+.code-theme-nord .sql-comment,
+.code-theme-nord .pas-comment { color: #616e88; font-style: italic; }
+
+.code-theme-nord .sql-number,
+.code-theme-nord .pas-number  { color: #b48ead; }
+
+.code-theme-nord .sql-param   { color: #d08770; font-weight: 700; }
+.code-theme-nord .sql-operator,
+.code-theme-nord .pas-special { color: #81a1c1; }
+
+/* ══════════════════════════════════════════════════════════
+   TEMA 7 — Tokyo Night (🌆)
+   ══════════════════════════════════════════════════════════ */
+.code-theme-tokyo-night .code-scroll,
+.code-theme-tokyo-night .code-editor-backdrop,
+.code-theme-tokyo-night .code-editor-wrap {
+  background: #1a1b26 !important;
+  color: #c0caf5 !important;
+}
+.code-theme-tokyo-night .line-src  { color: #c0caf5 !important; }
+.code-theme-tokyo-night .code-line { color: #c0caf5; }
+.code-theme-tokyo-night .line-num  { background: #16161e !important; color: #565f89 !important; border-right: 1px solid #292e42; }
+
+.code-theme-tokyo-night .sql-keyword,
+.code-theme-tokyo-night .pas-keyword { color: #bb9af7; font-weight: 700; }
+
+.code-theme-tokyo-night .sql-fn,
+.code-theme-tokyo-night .pas-type    { color: #7aa2f7; font-weight: 600; }
+
+.code-theme-tokyo-night .sql-string,
+.code-theme-tokyo-night .pas-string  { color: #9ece6a; }
+
+.code-theme-tokyo-night .sql-comment,
+.code-theme-tokyo-night .pas-comment { color: #565f89; font-style: italic; }
+
+.code-theme-tokyo-night .sql-number,
+.code-theme-tokyo-night .pas-number  { color: #ff9e64; }
+
+.code-theme-tokyo-night .sql-param   { color: #e0af68; font-weight: 700; }
+.code-theme-tokyo-night .sql-operator,
+.code-theme-tokyo-night .pas-special { color: #89ddff; }
+

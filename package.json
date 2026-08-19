@@ -1,0 +1,15 @@
+{
+  "name": "frpoku",
+  "version": "1.0.0",
+  "description": "FastReport FRP Okuyucu ve SQL Dogrulayici",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.3",
+    "dotenv": "^17.4.2",
+    "express": "^4.19.2",
+    "puppeteer": "^25.5.0"
+  }
+}

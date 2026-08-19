@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FrpOku — Rapor Karşılaştırma</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/list.css" />
+  <link rel="stylesheet" href="css/compare.css" />
+  <link rel="stylesheet" href="css/themes.css" />
+</head>
+<body>
+<div class="cmp-shell">
+
+  <!-- ═══════════════ TOPBAR ═══════════════ -->
+  <nav class="cmp-topbar">
+    <!-- Sol -->
+    <div class="cmp-topbar-left">
+      <button class="btn btn-sm btn-ghost" id="btnBack" style="gap:.4rem;">
+        <span>←</span><span>Listeye Dön</span>
+      </button>
+      <div class="cmp-brand">
+        <span class="cmp-brand-icon">🔀</span>
+        <div>
+          <div class="cmp-brand-title">Rapor Karşılaştırma</div>
+          <div class="cmp-brand-sub">Yan yana fark görünümü</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Orta — Sekmeler (Kaydırılabilir & Hızlı Seçim Menülü) -->
+    <div class="cmp-topbar-center">
+      <button class="btn btn-sm btn-ghost cmp-tab-scroll-btn" id="btnTabScrollLeft" title="Sola Kaydır">◀</button>
+      <div class="tab-bar-scroll-wrap" id="tabBarScrollWrap">
+        <div class="tab-bar" id="diffTabBar"></div>
+      </div>
+      <button class="btn btn-sm btn-ghost cmp-tab-scroll-btn" id="btnTabScrollRight" title="Sağa Kaydır">▶</button>
+      <select class="field-select cmp-query-dropdown" id="selectQueryJump" title="Hızlı Sorgu Seçimi" style="display:none;">
+        <option value="">▼ Sorgu Seç...</option>
+      </select>
+    </div>
+
+    <!-- Sağ — Araçlar -->
+    <div class="cmp-topbar-right">
+      <div class="cmp-diff-nav">
+        <button class="btn btn-sm btn-ghost" id="btnPrevDiff" title="Önceki Fark (Alt+P)">⬆</button>
+        <span id="diffCounterBadge" class="badge badge-gray" style="font-size:.72rem;min-width:64px;text-align:center;">—</span>
+        <button class="btn btn-sm btn-ghost" id="btnNextDiff" title="Sonraki Fark (Alt+N)">⬇</button>
+      </div>
+      <button class="btn btn-sm btn-ghost" id="btnToggleFold" title="Sadece Farkları Göster (değişmeyen satırlar katlanır)">👁 Sadece Farklar</button>
+      <button class="btn btn-sm btn-ghost" id="btnUndoTransfer" title="Son koda aktarımı geri al (Ctrl+Z)">↩ Geri Al</button>
+      <select class="field-select" id="selectDiffTheme" style="font-size:.78rem;padding:.28rem .5rem;border-radius:7px;" title="Diff Kod Teması">
+        <option value="default">🎨 Varsayılan</option>
+        <option value="vscode-dark">🌑 VS Code Dark</option>
+        <option value="github-light">☀️ GitHub Light</option>
+        <option value="monokai">🟣 Monokai</option>
+        <option value="solarized">🟡 Solarized</option>
+      </select>
+      <button class="theme-switch-pill" id="btnThemeToggle" title="Tema Değiştir">🌙 Koyu</button>
+    </div>
+  </nav>
+
+  <!-- ═══════════════ SELECTOR BAR ═══════════════ -->
+  <div class="cmp-selector-bar">
+    <!-- Rapor A -->
+    <div class="cmp-slot" id="slotA">
+      <div class="cmp-slot-label">
+        <span class="cmp-slot-num">1</span>
+        <span>Sol · Baz Rapor</span>
+      </div>
+      <button type="button" class="cmp-slot-btn" id="btnPickerA">
+        <span class="cmp-slot-name" id="titleFileA">Rapor seçilmedi...</span>
+        <span class="cmp-slot-change">Değiştir 🔍</span>
+      </button>
+    </div>
+
+    <!-- Ayraç -->
+    <div class="cmp-vs-badge">VS</div>
+
+    <!-- Rapor B -->
+    <div class="cmp-slot" id="slotB">
+      <div class="cmp-slot-label">
+        <span class="cmp-slot-num cmp-slot-num-b">2</span>
+        <span>Sağ · Karşılaştırılan</span>
+      </div>
+      <button type="button" class="cmp-slot-btn" id="btnPickerB">
+        <span class="cmp-slot-name" id="titleFileB">Rapor seçilmedi...</span>
+        <span class="cmp-slot-change">Değiştir 🔍</span>
+      </button>
+    </div>
+
+    <!-- 3. Panel -->
+    <div class="cmp-slot cmp-slot-c" id="slotC">
+      <div class="cmp-slot-label">
+        <span class="cmp-slot-num cmp-slot-num-c">3</span>
+        <span>Opsiyonel Panel</span>
+      </div>
+      <button type="button" class="cmp-slot-btn cmp-slot-btn-c" id="btnPickerC">
+        <span class="cmp-slot-name" id="titleFileC">+ Panel Ekle</span>
+        <span class="cmp-slot-change">Seç / Kaldır 🔍</span>
+      </button>
+    </div>
+
+    <!-- Özet -->
+    <div class="cmp-summary-pill" id="diffSummaryBar">
+      <span>İki rapor seçin...</span>
+    </div>
+
+    <!-- Hidden selects (backward compat) -->
+    <select id="selectFileA" style="display:none;"></select>
+    <select id="selectFileB" style="display:none;"></select>
+    <select id="selectFileC" style="display:none;"></select>
+  </div>
+
+  <!-- ═══════════════ DIFF VIEWPORT ═══════════════ -->
+  <div class="cmp-diff-container" style="position:relative;">
+    <div class="diff-grid" id="diffGrid">
+
+      <!-- Sol Pane (A) -->
+      <div class="diff-pane">
+        <div class="diff-pane-header">
+          <span id="labelPaneA" class="diff-pane-title">Rapor 1</span>
+          <div style="display:flex;align-items:center;gap:.4rem;">
+            <span class="badge badge-blue" id="badgePaneA" style="font-size:.68rem;">Baz</span>
+            <button class="btn btn-sm btn-ghost cmp-pane-change" onclick="document.getElementById('btnPickerA').click()" title="Raporu Değiştir" style="font-size:.72rem;padding:1px 7px;">🔄</button>
+          </div>
+        </div>
+        <div class="diff-scroll" id="scrollPaneA">
+          <div class="diff-table" id="tablePaneA"></div>
+        </div>
+      </div>
+
+      <!-- Sağ Pane (B) -->
+      <div class="diff-pane">
+        <div class="diff-pane-header">
+          <span id="labelPaneB" class="diff-pane-title">Rapor 2</span>
+          <div style="display:flex;align-items:center;gap:.4rem;">
+            <span class="badge badge-green" id="badgePaneB" style="font-size:.68rem;">Karşılaştırılan</span>
+            <button class="btn btn-sm btn-ghost cmp-pane-change" onclick="document.getElementById('btnPickerB').click()" title="Raporu Değiştir" style="font-size:.72rem;padding:1px 7px;">🔄</button>
+          </div>
+        </div>
+        <div class="diff-scroll" id="scrollPaneB">
+          <div class="diff-table" id="tablePaneB"></div>
+        </div>
+      </div>
+
+      <!-- 3. Pane (C) — Gizli -->
+      <div class="diff-pane" id="paneC" style="display:none;">
+        <div class="diff-pane-header">
+          <span id="labelPaneC" class="diff-pane-title">Rapor 3</span>
+          <div style="display:flex;align-items:center;gap:.4rem;">
+            <span class="badge badge-orange" id="badgePaneC" style="font-size:.68rem;">3. Panel</span>
+            <button class="btn btn-sm btn-ghost cmp-pane-change" onclick="document.getElementById('btnPickerC').click()" title="Raporu Değiştir" style="font-size:.72rem;padding:1px 7px;">🔄</button>
+          </div>
+        </div>
+        <div class="diff-scroll" id="scrollPaneC">
+          <div class="diff-table" id="tablePaneC"></div>
+        </div>
+      </div>
+
+    </div>
+    <!-- VS Code stili Minimap -->
+    <div class="diff-minimap" id="diffMinimap" title="Fark haritası — tıklayarak atla"></div>
+  </div>
+
+</div><!-- /cmp-shell -->
+
+<!-- Toast Stack -->
+<div id="toastCompare" class="toast-stack"></div>
+
+<!-- Scripts (Modüler Mimari) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/core/supabase.js?v=3.0"></script>
+<script src="js/core/auth.js?v=3.0"></script>
+<script src="js/core/dom.js?v=3.0"></script>
+<script src="js/core/highlight.js?v=3.0"></script>
+<script src="js/core/formatter.js?v=3.0"></script>
+<script src="js/core/themes.js?v=3.0"></script>
+<script src="js/core/modal.js?v=3.0"></script>
+<script src="js/core/palette.js?v=3.0"></script>
+<script src="js/analytics/complexity.js?v=3.0"></script>
+<script src="js/analytics/dependencies.js?v=3.0"></script>
+<script src="js/analytics/table_usage.js?v=3.0"></script>
+<script src="js/analytics/param_usage.js?v=3.0"></script>
+<script src="js/analytics/syntax_check.js?v=3.0"></script>
+<script src="js/store/store_tags.js?v=3.0"></script>
+<script src="js/store/store_main.js?v=3.0"></script>
+<script src="js/core/snippet_tools.js?v=3.0"></script>
+<script src="js/core/snippet_modal.js?v=3.0"></script>
+<script src="js/compare/diff.js?v=3.0"></script>
+<script src="js/compare/compare.js?v=3.0"></script>
+
+</body>
+</html>

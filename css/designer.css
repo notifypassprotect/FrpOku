@@ -1,0 +1,1037 @@
+/* ============================================================
+   designer.css — FastReport Görsel Tasarım & Önizleme Stilleri (v3.0)
+   FastReport Designer (Bantlar, Memolar, Formlar, Resizable Inspector)
+   ============================================================ */
+
+/* ── ANA KONTEYNER & YERLEŞİM ── */
+.designer-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: var(--bg-body, #0f172a);
+  color: var(--text-primary, #f8fafc);
+  overflow: hidden;
+  position: relative;
+  font-family: var(--font, 'Inter', sans-serif);
+}
+
+/* ── ÜST ARAÇ ÇUBUĞU (TOOLBAR) ── */
+.designer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.85rem;
+  background: var(--bg-surface, #1e293b);
+  border-bottom: 1px solid var(--border-light, rgba(255,255,255,0.08));
+  gap: 0.75rem;
+  z-index: 10;
+  flex-wrap: wrap;
+}
+
+.designer-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.designer-page-tabs {
+  display: flex;
+  gap: 0.35rem;
+  background: var(--bg-raised, #0b1120);
+  padding: 0.25rem;
+  border-radius: 8px;
+  border: 1px solid var(--border, rgba(255,255,255,0.1));
+}
+
+.designer-page-tab {
+  padding: 0.32rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, #94a3b8);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 0.15s ease;
+}
+
+.designer-page-tab:hover {
+  color: var(--text-primary, #f8fafc);
+  background: rgba(255,255,255,0.06);
+}
+
+.designer-page-tab.active {
+  background: var(--accent, #2563eb);
+  color: #ffffff;
+  box-shadow: 0 1px 4px rgba(37,99,235,0.3);
+}
+
+.designer-mode-toggle {
+  display: inline-flex;
+  background: var(--bg-raised, #0b1120);
+  border: 1px solid var(--border, rgba(255,255,255,0.1));
+  border-radius: 8px;
+  padding: 0.2rem;
+}
+
+.designer-mode-btn {
+  padding: 0.28rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, #94a3b8);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: all 0.15s ease;
+}
+
+.designer-mode-btn.active {
+  background: rgba(255,255,255,0.12);
+  color: var(--text-primary, #f8fafc);
+}
+
+/* Zoom Controls */
+.designer-zoom-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--bg-raised, #0b1120);
+  border: 1px solid var(--border, rgba(255,255,255,0.1));
+  border-radius: 8px;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.76rem;
+  color: var(--text-secondary, #94a3b8);
+}
+
+.designer-zoom-btn {
+  background: none;
+  border: none;
+  color: var(--text-primary, #f8fafc);
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.designer-zoom-btn:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+.designer-zoom-val {
+  min-width: 44px;
+  text-align: center;
+  font-weight: 700;
+  font-family: var(--mono, monospace);
+}
+
+/* ── ÇALIŞMA ALANI (VIEWPORT) ── */
+.designer-stage-wrap {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+.designer-canvas-viewport {
+  flex: 1;
+  overflow: auto;
+  padding: 2rem;
+  background-color: #1e2430; /* FastReport Sleek Dark Workstation */
+  background-image: 
+    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 20px 20px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  position: relative;
+}
+
+/* ── KAĞIT / RAPOR SAYFASI (REPORT PAGE) ── */
+.fr-report-page {
+  background: #ffffff;
+  color: #000000;
+  box-shadow: 0 14px 45px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,0,0,0.25);
+  position: relative;
+  transition: transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1);
+  transform-origin: top left;
+  margin: 0 auto 4rem auto;
+  user-select: none;
+  box-sizing: border-box;
+  padding: 12px 0 30px 0;
+  flex-shrink: 0;
+}
+
+.fr-report-page.designer-mode {
+  /* Hassas ve İnce Izgara Noktaları (Subtle Fine Dots) */
+  background-image: radial-gradient(rgba(100, 116, 139, 0.35) 0.65px, transparent 0.65px);
+  background-size: 8px 8px;
+  background-color: #ffffff;
+}
+
+.fr-report-page.preview-mode {
+  background-image: none !important;
+  background-color: #ffffff;
+  padding: 24px;
+}
+
+/* ── FASTREPORT BANTLARI (BANDS) ── */
+.fr-band-container {
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 3px;
+}
+
+.fr-report-page.preview-mode .fr-band-container {
+  margin-bottom: 0px;
+}
+
+/* Bant Başlık Çubuğu (Band Header Bar - Images 4 & 5) */
+.fr-band-header {
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.5rem;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1e293b;
+  position: relative;
+  user-select: none;
+  box-sizing: border-box;
+  border-top: 1px solid rgba(0,0,0,0.2);
+}
+
+.fr-band-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.fr-band-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 10px;
+}
+
+.badge-dataset-icon {
+  background: rgba(0,0,0,0.12);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 800;
+  font-size: 10px;
+}
+
+/* Bant Renkleri (FastReport Standartları) */
+.fr-band-reporttitle .fr-band-header {
+  background: #fca5a5;
+  border-bottom: 1.5px solid #ef4444;
+  color: #1e293b;
+}
+.fr-band-pageheader .fr-band-header {
+  background: #e2e8f0;
+  border-bottom: 1.5px solid #94a3b8;
+  color: #1e293b;
+}
+.fr-band-header-type .fr-band-header {
+  background: #e2e8f0;
+  border-bottom: 1.5px solid #94a3b8;
+  color: #1e293b;
+}
+.fr-band-masterdata .fr-band-header {
+  background: #f59e0b;
+  border-bottom: 1.5px solid #d97706;
+  color: #1e293b;
+  font-weight: 800;
+}
+.fr-band-detaildata .fr-band-header {
+  background: #fb923c;
+  border-bottom: 1.5px solid #ea580c;
+  color: #1e293b;
+  font-weight: 800;
+}
+.fr-band-groupheader .fr-band-header {
+  background: #86efac;
+  border-bottom: 1.5px solid #22c55e;
+  color: #1e293b;
+}
+.fr-band-groupfooter .fr-band-header {
+  background: #a7f3d0;
+  border-bottom: 1.5px solid #10b981;
+  color: #1e293b;
+}
+.fr-band-footer .fr-band-header {
+  background: #bae6fd;
+  border-bottom: 1.5px solid #38bdf8;
+  color: #1e293b;
+}
+.fr-band-pagefooter .fr-band-header {
+  background: #bae6fd;
+  border-bottom: 1.5px solid #38bdf8;
+  color: #1e293b;
+}
+.fr-band-reportsummary .fr-band-header {
+  background: #d8b4fe;
+  border-bottom: 1.5px solid #a855f7;
+  color: #1e293b;
+}
+
+.fr-band-body {
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Baskı Önizleme Modunda Bant Çubuklarını Gizle */
+.fr-report-page.preview-mode .fr-band-header {
+  display: none;
+}
+
+/* ── FASTREPORT VİEW BİLEŞENLERİ (COMPONENTS) ── */
+.fr-view-item {
+  position: absolute;
+  box-sizing: border-box;
+  overflow: hidden;
+  line-height: 1.25;
+  cursor: pointer;
+  transition: outline 0.1s;
+}
+
+.fr-report-page.designer-mode .fr-view-item:hover {
+  outline: 1.5px dashed #2563eb !important;
+}
+
+/* Seçim Çerçevesi YALNIZCA Tasarımcı Modunda Görünür! */
+.fr-report-page.designer-mode .fr-view-item.selected {
+  outline: 1.5px solid #000000 !important;
+  z-index: 50 !important;
+}
+
+/* 8 Seçim Tutamağı (FastReport 8 Selection Handles - Yalnızca Tasarımcı Modu) */
+.fr-report-page.designer-mode .fr-view-item.selected::before,
+.fr-report-page.designer-mode .fr-view-item.selected::after {
+  content: '';
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  background: #000000;
+  border: 1px solid #ffffff;
+  z-index: 60;
+}
+.fr-report-page.designer-mode .fr-view-item.selected::before {
+  top: -3px; left: -3px;
+}
+.fr-report-page.designer-mode .fr-view-item.selected::after {
+  bottom: -3px; right: -3px;
+}
+
+/* Baskı Önizleme Modunda Tertemiz Sayfa Çıktısı (Kareler & Tutamaçlar Asla Görünmez) */
+.fr-report-page.preview-mode .fr-view-item {
+  cursor: default !important;
+  outline: none !important;
+}
+.fr-report-page.preview-mode .fr-view-item::before,
+.fr-report-page.preview-mode .fr-view-item::after {
+  display: none !important;
+}
+
+.fr-memo-content {
+  width: 100%;
+  height: 100%;
+  padding: 1px 4px;
+  box-sizing: border-box;
+  word-break: break-word;
+  overflow: hidden;
+  display: flex;
+}
+
+/* Event olan bileşenlerin sol üst köşesindeki kırmızı ok/üçgen göstergesi (FastReport Event Flag - Image 3) */
+.fr-has-event::after {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  border-top: 7px solid #dc2626 !important;
+  border-right: 7px solid transparent !important;
+  border-bottom: none !important;
+  border-left: none !important;
+  background: transparent !important;
+  z-index: 35 !important;
+  pointer-events: none !important;
+}
+
+/* Döndürülmüş Metin (Rotation="90" - Images 3 & 5) */
+.fr-rotated-90 {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  text-orientation: mixed;
+  justify-content: center;
+  align-items: center;
+  white-space: nowrap;
+}
+
+/* Dikey Çapraz Bantlar (Vertical Cross-Tab Bands - Image 3) */
+.fr-vertical-band-overlay {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1.5px solid rgba(0, 210, 255, 0.6);
+  border-right: 1.5px solid rgba(0, 210, 255, 0.6);
+  pointer-events: none;
+  z-index: 15;
+  box-sizing: border-box;
+}
+
+.fr-vertical-band-header {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 18px;
+  background: #00d2ff;
+  color: #082f49;
+  font-weight: 800;
+  font-size: 10.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  user-select: none;
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: 1px 0 4px rgba(0,0,0,0.2);
+  letter-spacing: 0.5px;
+}
+
+.fr-vertical-band-header.fr-band-header-type {
+  background: #bae6fd;
+  color: #0369a1;
+}
+
+.fr-vertical-band-header.fr-band-masterdata {
+  background: #00d2ff;
+  color: #082f49;
+}
+
+.fr-vertical-band-header.fr-band-footer {
+  background: #bae6fd;
+  color: #0369a1;
+}
+
+/* Resim / Logo Görünümü */
+.fr-picture-view {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.03);
+  border: 1px dashed #94a3b8;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  padding: 2px;
+}
+
+/* Çizgi Görünümü */
+.fr-line-view {
+  pointer-events: none;
+}
+
+/* Grafik / Chart Görünümü (TfrxChartView) */
+.fr-chart-view {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  user-select: none;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.fr-chart-view:hover {
+  box-shadow: 0 4px 12px rgba(37,99,235,0.12);
+  border-color: #93c5fd;
+}
+.fr-chart-header {
+  height: 28px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  box-sizing: border-box;
+}
+
+/* ── DİALOG FORMU (DIALOGPAGE / PARAMETRE FORMU - Images 1 & 2 & 4) ── */
+.fr-dialog-window {
+  border: 2px solid #0055ea;
+  border-radius: 4px;
+  box-shadow: 0 14px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,0,0,0.3);
+  position: relative;
+  overflow: hidden;
+  user-select: none;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  color: #000000;
+  transition: transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1);
+  transform-origin: top left;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+/* Windows XP / 7 / 8 Style Form Titlebar */
+.fr-dialog-titlebar {
+  background: linear-gradient(90deg, #0a246a 0%, #3a93ff 100%);
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  border-bottom: 1px solid rgba(0,0,0,0.2);
+}
+
+.fr-dialog-title-left {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.fr-dialog-buttons {
+  display: flex;
+  gap: 2px;
+}
+
+.fr-dialog-btn-sys {
+  width: 16px;
+  height: 14px;
+  background: #ece9d8;
+  border: 1px solid #707070;
+  font-size: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000000;
+  cursor: pointer;
+  border-radius: 2px;
+  font-family: monospace;
+}
+
+.fr-dialog-client {
+  position: relative;
+  width: 100%;
+  height: calc(100% - 26px);
+  /* Delphi Form İnce ve Yumuşak Izgara Noktaları */
+  background-image: radial-gradient(rgba(0, 0, 0, 0.12) 0.65px, transparent 0.65px);
+  background-size: 8px 8px;
+  box-sizing: border-box;
+}
+
+/* Delphi VCL Kontrolleri */
+.fr-ctrl-item {
+  position: absolute !important;
+  box-sizing: border-box;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.fr-ctrl-item.selected {
+  outline: 1.5px solid #000000 !important;
+  z-index: 40 !important;
+}
+.fr-ctrl-item.selected::before,
+.fr-ctrl-item.selected::after {
+  content: '';
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  background: #000000;
+  border: 1px solid #ffffff;
+  z-index: 50;
+}
+.fr-ctrl-item.selected::before {
+  top: -3px; left: -3px;
+}
+.fr-ctrl-item.selected::after {
+  bottom: -3px; right: -3px;
+}
+
+.fr-ctrl-label {
+  display: flex;
+  align-items: center;
+  color: #000000;
+  font-weight: 700;
+  white-space: nowrap !important;
+  word-break: normal !important;
+  overflow: visible;
+}
+
+/* Event olan Dialog Kontrollerinde Kırmızı Ok/Üçgen (FastReport Event Flag - Image 3 & 4) */
+.fr-ctrl-item.fr-has-event::after {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  border-top: 7px solid #dc2626 !important;
+  border-right: 7px solid transparent !important;
+  border-bottom: none !important;
+  border-left: none !important;
+  background: transparent !important;
+  z-index: 45 !important;
+  pointer-events: none !important;
+}
+
+/* GroupBox (Form Seçimi, Tarih Aralığı vb.) */
+.fr-ctrl-groupbox {
+  border: 1px solid #707070 !important;
+  border-radius: 4px;
+  background: transparent;
+  padding: 0 !important;
+  margin: 0 !important;
+  position: absolute !important;
+  box-sizing: border-box;
+}
+.fr-ctrl-groupbox legend {
+  font-size: 11px;
+  font-weight: 700;
+  color: #000000;
+  padding: 0 4px;
+  margin-left: 8px;
+  line-height: 1;
+  float: none;
+  width: auto;
+}
+
+.fr-ctrl-groupbox-body {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+/* RadioButton (Braden Skalası, Norton Skalası vb. - Image 2) */
+.fr-ctrl-radio {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #000000;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.fr-ctrl-radio input {
+  margin: 0;
+  cursor: pointer;
+}
+
+/* Butonlar (Hazırla, İptal, Vazgeç vb. - Mutlak Konumlu & Hizalı) */
+.fr-ctrl-button {
+  background: linear-gradient(180deg, #ffffff 0%, #ece9d8 100%);
+  border: 1px solid #707070;
+  border-radius: 3px;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-weight: 700;
+  font-size: 11px !important;
+  color: #000000;
+  white-space: nowrap !important;
+  box-shadow: 1px 1px 2px rgba(0,0,0,0.25);
+  box-sizing: border-box;
+  padding: 0 4px !important;
+  cursor: pointer;
+}
+.fr-ctrl-button:hover {
+  background: linear-gradient(180deg, #f0f0f0 0%, #dfdcce 100%);
+}
+
+/* PageControl & TabSheet (Sekmeli Dialog Kontrolü - ISIM_PANATES vb.) */
+.fr-ctrl-pagecontrol {
+  background: transparent;
+  user-select: none;
+  box-sizing: border-box;
+}
+.fr-tab-headers-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  padding-left: 2px;
+  position: relative;
+  z-index: 2;
+  margin-bottom: -1px;
+}
+.fr-tab-btn {
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #334155;
+  background: #d8d4c4;
+  border: 1px solid #707070;
+  border-bottom: 1px solid #707070;
+  border-radius: 3px 3px 0 0;
+  cursor: pointer;
+  transition: background 0.12s ease;
+  user-select: none;
+}
+.fr-tab-btn:hover {
+  background: #e8e4d4;
+  color: #000000;
+}
+.fr-tab-btn.active {
+  background: #ece9d8;
+  color: #000000;
+  font-weight: 700;
+  border-color: #707070;
+  border-bottom-color: #ece9d8;
+  padding-top: 4px;
+}
+.fr-tab-sheet-panel {
+  background: #ece9d8;
+  border: 1px solid #707070;
+  border-radius: 0 3px 3px 3px;
+  box-shadow: 1px 1px 3px rgba(0,0,0,0.1);
+  position: relative;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.fr-ctrl-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #000000;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.fr-ctrl-checkbox input {
+  margin: 0;
+  cursor: pointer;
+}
+
+.fr-ctrl-checklistbox {
+  background: #ffffff;
+  border: 1px solid #7f9db9;
+  box-shadow: inset 1px 1px 2px rgba(0,0,0,0.15);
+  overflow: auto;
+  padding: 4px;
+}
+
+.fr-ctrl-edit {
+  background: #ffffff;
+  border: 1px solid #7f9db9;
+  box-shadow: inset 1px 1px 2px rgba(0,0,0,0.15);
+  border-radius: 2px;
+  padding: 2px 4px;
+  display: flex;
+  align-items: center;
+  color: #000000;
+}
+
+/* DateEdit Control (Tarih Seçici - Ekran Görüntüsü 1, 2) */
+.fr-ctrl-dateedit {
+  background: #ffffff;
+  border: 1px solid #7f9db9;
+  box-shadow: inset 1px 1px 2px rgba(0,0,0,0.15);
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 0 4px;
+  color: #000000;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+}
+.fr-ctrl-dateedit-val {
+  flex: 1;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.fr-ctrl-dateedit-btn {
+  width: 18px;
+  height: 100%;
+  background: #ece9d8;
+  border-left: 1px solid #7f9db9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+/* ComboBox Control */
+.fr-ctrl-combobox {
+  background: #ffffff;
+  border: 1px solid #7f9db9;
+  box-shadow: inset 1px 1px 2px rgba(0,0,0,0.15);
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 0 4px;
+  color: #000000;
+}
+
+/* ── FASTREPORT ALT DURUM ÇUBUĞU (STATUS BAR - Ekran Görüntüsü 3) ── */
+.designer-statusbar {
+  height: 22px;
+  background: var(--bg-surface, #1e293b);
+  border-top: 1px solid var(--border-light, rgba(255,255,255,0.08));
+  display: flex;
+  align-items: center;
+  padding: 0 0.75rem;
+  font-size: 11px;
+  color: var(--text-secondary, #94a3b8);
+  font-family: 'Segoe UI', sans-serif;
+  gap: 1rem;
+  z-index: 10;
+  user-select: none;
+}
+.designer-status-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-right: 1px solid var(--border-light, rgba(255,255,255,0.08));
+  padding-right: 0.75rem;
+}
+.designer-status-cell:last-child {
+  border-right: none;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── SAĞ PANEL: GENİŞLETİLEBİLİR OBJECT INSPECTOR & DATA TREE ── */
+.designer-inspector {
+  background: #1e293b;
+  border-left: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  flex-direction: column;
+  z-index: 20;
+  font-size: 11px;
+  user-select: none;
+  color: #f8fafc;
+  position: relative;
+  box-shadow: -4px 0 18px rgba(0,0,0,0.25);
+}
+
+.designer-inspector.collapsed {
+  display: none;
+}
+
+/* Sürükle-Genişlet Tutamacı (Resize Handle) */
+.designer-inspector-resizer {
+  position: absolute;
+  left: -4px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+  z-index: 50;
+  background: transparent;
+}
+.designer-inspector-resizer:hover {
+  background: rgba(37,99,235,0.4);
+}
+
+.designer-inspector-header {
+  padding: 0.5rem 0.75rem;
+  background: #0f172a;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.designer-inspector-title {
+  font-weight: 800;
+  font-size: 0.82rem;
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.designer-inspector-close-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+}
+.designer-inspector-close-btn:hover {
+  color: #ffffff;
+  background: rgba(255,255,255,0.1);
+}
+
+/* Subtabs (Properties, Events, Favorites - Image 5) */
+.designer-inspector-subtabs {
+  display: flex;
+  background: #0b1120;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding: 0.2rem 0.4rem;
+  gap: 0.25rem;
+}
+
+.designer-subtab {
+  flex: 1;
+  padding: 0.25rem 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  border-radius: 4px;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.designer-subtab.active {
+  background: rgba(255,255,255,0.12);
+  color: #38bdf8;
+}
+
+.designer-prop-search {
+  padding: 0.4rem 0.6rem;
+  background: #1e293b;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.designer-prop-search input {
+  width: 100%;
+  background: #0b1120;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 6px;
+  padding: 0.25rem 0.5rem;
+  color: #f8fafc;
+  font-size: 0.75rem;
+  outline: none;
+}
+
+.designer-prop-table {
+  flex: 1;
+  overflow: auto;
+  background: #1e293b;
+}
+
+.designer-prop-row {
+  display: flex;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-family: var(--mono, monospace);
+  font-size: 11px;
+}
+
+.designer-prop-row:nth-child(even) {
+  background: rgba(255,255,255,0.02);
+}
+
+.designer-prop-row:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+.designer-prop-name {
+  width: 44%;
+  padding: 0.35rem 0.5rem;
+  color: #94a3b8 !important;
+  font-weight: 700;
+  border-right: 1px solid rgba(255,255,255,0.06);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-prop-val {
+  flex: 1;
+  padding: 0.35rem 0.5rem;
+  color: #38bdf8 !important;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Light Theme için Object Inspector Stilleri */
+[data-theme="light"] .designer-inspector,
+body.theme-light .designer-inspector {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-left: 1px solid #cbd5e1 !important;
+}
+[data-theme="light"] .designer-inspector-header,
+body.theme-light .designer-inspector-header {
+  background: #f1f5f9 !important;
+  border-bottom: 1px solid #cbd5e1 !important;
+}
+[data-theme="light"] .designer-inspector-title,
+body.theme-light .designer-inspector-title {
+  color: #0f172a !important;
+}
+[data-theme="light"] .designer-inspector-subtabs,
+body.theme-light .designer-inspector-subtabs {
+  background: #f8fafc !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+[data-theme="light"] .designer-subtab,
+body.theme-light .designer-subtab {
+  color: #64748b !important;
+}
+[data-theme="light"] .designer-subtab.active,
+body.theme-light .designer-subtab.active {
+  background: #e2e8f0 !important;
+  color: #0284c7 !important;
+}
+[data-theme="light"] .designer-prop-search,
+body.theme-light .designer-prop-search {
+  background: #ffffff !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+[data-theme="light"] .designer-prop-search input,
+body.theme-light .designer-prop-search input {
+  background: #f8fafc !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+}
+[data-theme="light"] .designer-prop-table,
+body.theme-light .designer-prop-table {
+  background: #ffffff !important;
+}
+[data-theme="light"] .designer-prop-row,
+body.theme-light .designer-prop-row {
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+[data-theme="light"] .designer-prop-row:nth-child(even),
+body.theme-light .designer-prop-row:nth-child(even) {
+  background: #f8fafc !important;
+}
+[data-theme="light"] .designer-prop-name,
+body.theme-light .designer-prop-name {
+  color: #334155 !important;
+  border-right: 1px solid #e2e8f0 !important;
+}
+[data-theme="light"] .designer-prop-val,
+body.theme-light .designer-prop-val {
+  color: #0284c7 !important;
+}

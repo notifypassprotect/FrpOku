@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FrpOku — Rapor Listesi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Open+Sans:wght@400;600;700&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/list.css" />
+</head>
+<body>
+  <!-- SPLASH SCREEN LOADING AREA (PREMIUM GLASS DESIGN) -->
+  <div id="splashScreen" class="splash-screen" style="position:fixed;inset:0;background:radial-gradient(circle at 50% 40%, #1e293b, #090d16);z-index:999999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);transition:opacity .4s cubic-bezier(0.4, 0, 0.2, 1), visibility .4s ease;">
+    <div class="splash-content" style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:1.1rem;animation:fadeIn .35s ease-out;">
+      <div style="position:relative;">
+        <div class="splash-logo" style="width:80px;height:80px;background:linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);border-radius:24px;display:flex;align-items:center;justify-content:center;font-size:2.5rem;box-shadow:0 0 45px rgba(59,130,246,.55), 0 12px 28px rgba(0,0,0,.4);animation:pulse 2s infinite ease-in-out;">📋</div>
+        <div style="position:absolute;inset:-4px;border-radius:28px;border:1.5px solid rgba(255,255,255,.2);animation:spinGlow 8s linear infinite;pointer-events:none;"></div>
+      </div>
+      <div style="font-size:1.8rem;font-weight:900;letter-spacing:-0.5px;color:#f8fafc;font-family:var(--font);text-shadow:0 2px 10px rgba(0,0,0,.3);">FrpOku</div>
+      <div style="font-size:.85rem;font-weight:600;color:#94a3b8;letter-spacing:.3px;">FastReport Rapor & Sorgu Analiz Merkezi</div>
+      <div style="width:220px;height:5px;background:rgba(255,255,255,.08);border-radius:6px;overflow:hidden;margin-top:.4rem;position:relative;border:1px solid rgba(255,255,255,.06);">
+        <div style="position:absolute;top:0;left:0;bottom:0;width:50%;background:linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);border-radius:6px;box-shadow:0 0 12px rgba(139,92,246,.8);animation:splashProgress 1.3s infinite cubic-bezier(0.4, 0, 0.2, 1);"></div>
+      </div>
+    </div>
+  </div>
+  <style>
+    @keyframes splashProgress { 0% { left:-50%; width:45%; } 50% { left:25%; width:65%; } 100% { left:100%; width:45%; } }
+    @keyframes pulse { 0%, 100% { transform:scale(1); box-shadow:0 0 45px rgba(59,130,246,.55); } 50% { transform:scale(1.06); box-shadow:0 0 65px rgba(139,92,246,.7); } }
+    @keyframes spinGlow { 0% { transform:rotate(0deg); opacity:.4; } 50% { opacity:.9; } 100% { transform:rotate(360deg); opacity:.4; } }
+  </style>
+  <script>
+    setTimeout(function() {
+      var s = document.getElementById('splashScreen');
+      if (s) {
+        s.style.pointerEvents = 'none';
+        s.style.opacity = '0';
+        s.style.visibility = 'hidden';
+        setTimeout(function() { if (s && s.parentNode) s.parentNode.removeChild(s); }, 420);
+      }
+    }, 450);
+  </script>
+
+  <!-- DRAG AND DROP OVERLAY -->
+  <div id="dragOverlay" class="drag-overlay">
+    <div class="drag-overlay-content">
+      <div class="drag-overlay-icon">⚡</div>
+      <div class="drag-overlay-title">FRP Dosyalarını Buraya Bırakın</div>
+      <div class="drag-overlay-sub">Tek tek ya da toplu olarak ekleyebilirsiniz</div>
+    </div>
+  </div>
+
+<div class="app-wrap">
+
+  <!-- ═══════════════ TOP BAR ═══════════════ -->
+  <nav class="topbar">
+    <div class="brand">
+      <div class="brand-icon">📋</div>
+      <div>
+        <div style="display:flex;align-items:center;gap:.45rem;">
+          <span>FrpOku</span>
+          <span style="font-size:.68rem;font-weight:700;padding:.15rem .45rem;border-radius:999px;background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.3);display:inline-flex;align-items:center;gap:.3rem;">
+            <span style="width:6px;height:6px;border-radius:50%;background:#10b981;box-shadow:0 0 6px #10b981;"></span>
+            <span>Cloud DB</span>
+          </span>
+        </div>
+        <div class="brand-sub">FastReport Kod Görüntüleyici</div>
+      </div>
+    </div>
+
+    <div class="topbar-right" style="display:flex;align-items:center;gap:.45rem;flex-wrap:wrap;">
+      <!-- Kullanıcı Profil / Giriş Butonu -->
+      <button class="btn btn-sm" id="btnUserProfile" data-auth-badge style="font-weight:700;border:1px solid var(--border);background:var(--bg-surface);" title="Kullanıcı Giriş & Profil">👤 Giriş Yap</button>
+
+      <!-- Son Açılanlar -->
+      <button class="btn btn-sm" id="btnOpenRecentModal" style="font-weight:700;" title="Son İncelenen Raporlar">🕒 Son Açılanlar</button>
+
+      <!-- Panel & Analizler -->
+      <button class="btn btn-sm btn-primary" onclick="window.location.href='dashboard.html'" title="İstatistik Paneli">📊 Panel</button>
+      <button class="btn btn-sm" id="btnComplexityCenter" style="background:linear-gradient(135deg, #f59e0b, #ef4444);color:#fff;font-weight:700;border:none;" title="Tüm Raporların SQL Karmaşıklık ve Statik Anti-Pattern Analizi">🧠 Karmaşıklık Analizi</button>
+      <button class="btn btn-sm" id="btnDependencies" title="Tablo Bağımlılık Haritası">🕸️ Bağımlılık</button>
+      <button class="btn btn-sm" id="btnParams" title="Tüm Raporlardaki Parametreler">⚙️ Parametreler</button>
+      <button class="btn btn-sm" id="btnSnippets" title="Kaydedilmiş SQL Sorgu Kütüphanesi">📌 Sorgular</button>
+      <button class="btn btn-sm" id="btnTableAnalysis" title="Veritabanı Tablo Kullanım Analizi">📊 Tablolar</button>
+
+      <span style="width:1px;height:22px;background:var(--border-light);margin:0 .2rem;"></span>
+
+      <!-- Dosya ekleme -->
+      <button class="btn btn-sm btn-primary" id="btnAddSingle" title="Tek .frp dosyası seç">➕ Dosya Ekle</button>
+      <button class="btn btn-sm" id="btnAddMulti"  title="Birden fazla .frp seç">📋 Çoklu Ekle</button>
+      <button class="btn btn-sm" id="btnAddFolder" title="Klasördeki tüm .frp dosyaları">📂 Klasör Ekle</button>
+
+      <span style="width:1px;height:22px;background:var(--border-light);margin:0 .2rem;"></span>
+
+      <!-- Tema Butonu -->
+      <button class="theme-switch-pill" id="btnThemeToggle" title="Gece / Gündüz Teması">🌙 Koyu Mod</button>
+
+      <!-- Ayarlar Butonu -->
+      <button class="btn btn-sm" id="btnOpenSettingsModal" style="font-weight:700;background:var(--bg-surface);border:1.5px solid var(--border);" title="Görünüm, Kategoriler, Sütunlar, Çöp Kutusu, Yedekleme">⚙️ Ayarlar</button>
+    </div>
+  </nav>
+
+
+  <!-- Gizli file input'lar -->
+  <input type="file" id="fileInputSingle" accept=".frp" style="display:none" />
+  <input type="file" id="fileInputMulti"  accept=".frp" style="display:none" multiple />
+  <input type="file" id="fileInputFolder" accept=".frp" style="display:none" multiple webkitdirectory />
+
+  <!-- ═══════════════ ANA İÇERİK ═══════════════ -->
+  <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;">
+
+    <!-- ARAÇ ÇUBUĞU -->
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <!-- Arama -->
+        <div class="search-wrap" id="searchWrap">
+          <span class="search-icon">🔍</span>
+          <input type="text" class="search-input" id="searchInput"
+                 placeholder="Rapor ara... (Ctrl+F)" autocomplete="off" />
+          <button class="regex-btn" id="regexBtn" title=".* Regex Arama Modu (Tıklayınca bilgi verir)">.* Regex</button>
+        </div>
+        <div class="regex-error-msg" id="regexErrMsg">⚠️ Geçersiz Regex İfadesi</div>
+
+        <!-- Arama alanı seçici -->
+        <select class="select-field" id="fieldSelect" title="Arama Alanı">
+          <option value="all">Tümünde Ara</option>
+          <option value="name">Rapor Adı</option>
+          <option value="guid">GUID</option>
+          <option value="sql">SQL Kodları</option>
+          <option value="pascal">Pascal Script</option>
+          <option value="tables">Tablo Adları</option>
+          <option value="notes">Kullanıcı Notları</option>
+        </select>
+
+        <!-- Etiket filtresi -->
+        <select class="select-field" id="tagSelect" title="Etikete göre filtrele">
+          <option value="">Tüm Etiketler</option>
+        </select>
+
+        <!-- Kategori filtresi -->
+        <select class="select-field" id="catSelect" title="Kategoriye göre filtrele">
+          <option value="">Tüm Kategoriler</option>
+        </select>
+
+        <!-- Hızlı Filtre Butonları -->
+        <button class="filter-chip" id="btnFavOnly" title="Sadece favorileri göster">⭐ Favoriler</button>
+        <button class="filter-chip" id="btnPinnedOnly" title="Sadece sabitlenmişleri göster">📌 Sabitlenmişler</button>
+        <button class="filter-chip" id="btnNotesOnly" title="Sadece not girilen raporları göster">📝 Notlular</button>
+
+        <!-- Filtreleri Temizle Butonu -->
+        <button class="btn btn-sm btn-ghost" id="btnResetFilters" style="display:none;color:var(--text-muted);font-size:.78rem;" title="Tüm filtreleri ve aramayı sıfırla">
+          ✕ Filtreleri Temizle
+        </button>
+      </div>
+
+      <div class="toolbar-right">
+        <!-- Görünüm Seçici -->
+        <div class="view-mode-toggle" id="viewModeToggle">
+          <button class="view-btn active" data-view="table" id="btnViewTable" title="Tablo Görünümü (F6)">📋 Tablo</button>
+          <button class="view-btn" data-view="cards" id="btnViewCards" title="Kart Görünümü (F6)">🎴 Kart</button>
+          <button class="view-btn" data-view="timeline" id="btnViewTimeline" title="Zaman Çizelgesi (F6)">⏳ Zaman Çizelgesi</button>
+        </div>
+
+        <div class="result-count" id="resultCount">0 sonuç</div>
+      </div>
+    </div>
+
+
+    <!-- TOPLU İŞLEM ÇUBUĞU (BULK BAR) -->
+    <div class="bulk-bar" id="bulkBar">
+      <span class="bulk-count" id="bulkInfo">0 rapor seçildi</span>
+      <div class="bulk-actions">
+        <button class="btn btn-sm btn-ghost" id="btnBulkFav">⭐ Favorilere Ekle</button>
+        <button class="btn btn-sm btn-ghost" id="btnBulkTag">🏷️ Etiket Ekle</button>
+        <button class="btn btn-sm btn-ghost" id="btnBulkCategory">📁 Kategori Ata</button>
+        <button class="btn btn-sm btn-ghost" id="btnDownloadSelected">📥 Toplu İndir</button>
+        <button class="btn btn-sm btn-ghost" id="btnCompareSelected" style="display:none;">🔀 Karşılaştır</button>
+        <button class="btn btn-sm btn-danger" id="btnDeleteBulk">🗑️ Seçilenleri Sil</button>
+        <button class="btn btn-sm btn-ghost" id="btnClearSelection">✕ Seçimi Kaldır</button>
+      </div>
+    </div>
+
+    <!-- TABLO ALANI -->
+    <div class="table-area" id="tableArea">
+
+      <!-- Rapor tablosu -->
+      <table class="report-table" id="reportTable">
+        <thead>
+          <tr id="tableHeaderRow">
+            <th style="width:40px;"><input type="checkbox" class="row-checkbox" id="selectAll" title="Tümünü Seç/Kaldır" /></th>
+            <th style="width:58px;text-align:center;">⭐ 📌</th>
+            <th class="sortable sort-asc col-reportName" data-sort="name">Rapor Adı</th>
+            <th class="sortable col-fileName" data-sort="fileName">Dosya Adı</th>
+            <th class="sortable col-fileSize" data-sort="sizeBytes" style="width:95px;text-align:right;">Boyut</th>
+            <th class="col-category">Kategori</th>
+            <th class="sortable col-guid" data-sort="guid" style="min-width:280px;">GUID</th>
+            <th class="col-tags">Etiketler</th>
+            <th class="sortable col-queries" data-sort="queries" style="text-align:center;width:95px;">SQL</th>
+            <th class="sortable col-date" data-sort="loadedAt" style="width:145px;">Yüklenme</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+
+    <!-- SAĞ TIK CONTEXT MENÜSÜ -->
+    <div id="tableContextMenu" class="table-context-menu" style="display:none;">
+      <div class="ctx-header" id="ctxMenuReportTitle">📋 Rapor</div>
+      <button class="ctx-item" data-action="view"><span class="ctx-icon">👁️</span><span>Görüntüle (Detay)</span></button>
+      <button class="ctx-item" data-action="rename"><span class="ctx-icon">✏️</span><span>Adını Düzenle</span></button>
+      <button class="ctx-item" data-action="download"><span class="ctx-icon">📥</span><span>FRP Olarak İndir</span></button>
+      <div class="ctx-divider"></div>
+      <button class="ctx-item" data-action="fav"><span class="ctx-icon">⭐</span><span>Favorilere Ekle / Kaldır</span></button>
+      <button class="ctx-item" data-action="pin"><span class="ctx-icon">📌</span><span>Üste Sabitle / Kaldır</span></button>
+      <button class="ctx-item" data-action="category"><span class="ctx-icon">🏷️</span><span>Kategori Ata</span></button>
+      <div class="ctx-divider"></div>
+      <button class="ctx-item ctx-danger" data-action="delete"><span class="ctx-icon">🗑️</span><span>Raporu Sil</span></button>
+    </div>
+
+  </div><!-- /flex wrapper -->
+
+</div><!-- /app-wrap -->
+
+<!-- YÜKLEME VE İLERLEME PENCERESİ (PROGRESS MODAL) -->
+<div class="modal-overlay" id="progressModal" style="display:none;z-index:99999;backdrop-filter:blur(12px);background:rgba(0,0,0,.6);">
+  <div class="modal" style="max-width:440px;width:90vw;text-align:center;padding:1.8rem;border-radius:20px;box-shadow:0 24px 60px rgba(0,0,0,.45);border:1.5px solid var(--border);background:var(--bg-surface);">
+    <div style="position:relative;display:inline-flex;align-items:center;justify-content:center;width:64px;height:64px;border-radius:20px;background:var(--bg-raised);border:1.5px solid var(--border);margin-bottom:.8rem;box-shadow:var(--shadow-sm);">
+      <span style="font-size:2rem;animation:pulse 1.8s infinite;" id="progressIcon">⚡</span>
+    </div>
+    <div class="modal-title" id="progressTitle" style="font-size:1.15rem;font-weight:800;margin-bottom:.35rem;color:var(--text-primary);">İşlem Yapılıyor...</div>
+    <div style="font-size:.82rem;color:var(--text-muted);margin-bottom:1.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;padding:0 .5rem;" id="progressSub">Lütfen bekleyin</div>
+    <div style="background:var(--bg-raised);border-radius:12px;height:10px;overflow:hidden;border:1px solid var(--border-light);margin-bottom:.85rem;position:relative;">
+      <div id="progressBarFill" style="background:linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);height:100%;width:0%;transition:width .18s cubic-bezier(0.4, 0, 0.2, 1);box-shadow:0 0 12px rgba(139,92,246,.6);border-radius:12px;"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:.78rem;font-weight:700;color:var(--text-secondary);font-family:var(--mono);">
+      <span id="progressCountText">0 / 0 dosya</span>
+      <span id="progressPercentText" style="color:var(--accent);font-weight:800;">0%</span>
+    </div>
+  </div>
+</div>
+
+<!-- Toast stack -->
+<div class="toast-stack" id="toastStack"></div>
+
+<!-- SCRIPTS (MODÜLER MİMARİ) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- 1. Çekirdek & Ortak Araçlar -->
+<script src="js/core/supabase.js?v=3.0"></script>
+<script src="js/core/auth.js?v=3.0"></script>
+<script src="js/core/dom.js?v=3.0"></script>
+<script src="js/core/formatter.js?v=3.0"></script>
+<script src="js/core/themes.js?v=3.0"></script>
+<script src="js/core/text_helpers.js?v=3.0"></script>
+<script src="js/core/param_helpers.js?v=3.0"></script>
+<script src="js/core/sql_helpers.js?v=3.0"></script>
+<script src="js/core/palette.js?v=3.0"></script>
+<script src="js/core/modal.js?v=3.0"></script>
+<script src="js/core/outline.js?v=3.0"></script>
+<script src="js/core/parser.js?v=3.0"></script>
+<script src="js/core/zip.js?v=3.0"></script>
+
+<!-- 2. İleri Analiz Motorları -->
+<script src="js/analytics/complexity.js?v=3.0"></script>
+<script src="js/analytics/dependencies.js?v=3.0"></script>
+<script src="js/analytics/table_usage.js?v=3.0"></script>
+<script src="js/analytics/param_usage.js?v=3.0"></script>
+<script src="js/analytics/syntax_check.js?v=3.0"></script>
+
+<!-- 3. Veri Katmanı & Depolama -->
+<script src="js/store/store_tags.js?v=3.0"></script>
+<script src="js/store/store_main.js?v=3.0"></script>
+
+<!-- 4. Sorgu Kütüphanesi & Ayarlar -->
+<script src="js/core/snippet_tools.js?v=3.0"></script>
+<script src="js/core/snippet_modal.js?v=3.0"></script>
+<script src="js/settings/settings_modal.js?v=3.0"></script>
+
+<!-- 5. Liste Sayfası Modülleri -->
+<script src="js/list/code_search_tools.js?v=3.0"></script>
+<script src="js/list/list_actions.js?v=3.0"></script>
+<script src="js/list/list_ui_helpers.js?v=3.0"></script>
+<script src="js/list/list.js?v=3.0"></script>
+
+<script>
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f' && !['TEXTAREA', 'INPUT'].includes(e.target.tagName)) {
+      e.preventDefault();
+      document.getElementById('searchInput')?.focus();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'e') {
+      e.preventDefault();
+      if (typeof window.exportReportListExcel === 'function') {
+        window.exportReportListExcel();
+      }
+    }
+  });
+</script>
+
+</body>
+</html>
