@@ -316,7 +316,8 @@ app.post('/api/auth/send-reset-code', async (req, res) => {
           mailTransporter.sendMail({
             from: SMTP_FROM,
             to: user.email,
-            subject: `🔑 ${otpCode} - FrpOku Şifre Sıfırlama Doğrulama Kodu`,
+            subject: `FrpOku Sifre Sifirlama Dogrulama Kodu: ${otpCode}`,
+            text: `Merhaba ${user.full_name || user.username},\n\nFrpOku hesabınız için şifre sıfırlama doğrulama kodunuz: ${otpCode}\n\nBu kod 10 dakika boyunca geçerlidir.\n\nİyi çalışmalar,\nFrpOku Güvenlik Ekibi`,
             html: getOtpEmailHtml(user.full_name || user.username, otpCode)
           }),
           new Promise((_, reject) => setTimeout(() => reject(new Error('E-posta sunucusu yanıt vermedi')), 10000))
