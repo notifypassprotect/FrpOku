@@ -128,14 +128,20 @@ window.openSettingsModal = function(initialTab = 'appearance') {
     theme: FrpStore.getTheme() || 'dark'
   };
 
+  const authUser = (typeof window.FrpAuth !== 'undefined' && window.FrpAuth.getUser) ? window.FrpAuth.getUser() : null;
+  const nameParts = (authUser?.full_name || '').split(' ');
+  const authFirstName = nameParts[0] || '';
+  const authLastName = nameParts.slice(1).join(' ') || '';
+
   const liveProfile = FrpStore.getUserProfile();
   let stagedProfile = {
     ...liveProfile,
-    firstName: liveProfile.firstName || '',
-    lastName: liveProfile.lastName || '',
-    username: liveProfile.username || '',
-    phone: liveProfile.phone || '',
-    email: liveProfile.email || ''
+    firstName: liveProfile.firstName || authFirstName,
+    lastName: liveProfile.lastName || authLastName,
+    username: authUser?.username || liveProfile.username || '',
+    phone: authUser?.phone || liveProfile.phone || '',
+    email: authUser?.email || liveProfile.email || '',
+    department: authUser?.department || liveProfile.department || ''
   };
 
   const overlay = document.createElement('div');
@@ -893,8 +899,59 @@ window.openSettingsModal = function(initialTab = 'appearance') {
     overlay.querySelector('#btnCloseSettingsModal')?.addEventListener('click', () => overlay.remove());
 
     // 💾 TÜM DEĞİŞİKLİKLERİ KAYDET BUTONU
-    overlay.querySelector('#btnSaveAllSettingsChanges')?.addEventListener('click', () => {
+    overlay.querySelector('#btnSaveAllSettingsChanges')?.addEventListener('click', async () => {
       captureProfileInputs();
+
+      const saveBtn = overlay.querySelector('#btnSaveAllSettingsChanges');
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Kaydediliyor... ⏳';
+      }
+
+      // E-Posta format kontrolü
+      const email = (stagedProfile.email || '').trim().toLowerCase();
+      if (email && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}$/.test(email)) {
+        if (typeof window.toast === 'function') window.toast('⚠️ Lütfen geçerli bir e-posta adresi giriniz (Örn: ad.soyad@kurum.com).', 'warning');
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = '💾 Tüm Değişiklikleri Kaydet';
+        }
+        return;
+      }
+
+      // Bulut & Auth Veritabanı ile Senkronizasyon
+      const authUser = (typeof window.FrpAuth !== 'undefined' && window.FrpAuth.getUser) ? window.FrpAuth.getUser() : null;
+      if (authUser && authUser.id) {
+        try {
+          const fullName = `${stagedProfile.firstName || ''} ${stagedProfile.lastName || ''}`.trim();
+          const res = await fetch('/api/auth/update-profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: authUser.id,
+              fullName: fullName || authUser.full_name,
+              username: stagedProfile.username || authUser.username,
+              email: email || authUser.email,
+              phone: stagedProfile.phone || authUser.phone,
+              department: stagedProfile.department || authUser.department
+            })
+          });
+
+          const data = await res.json();
+          if (data.success && data.user) {
+            window.FrpAuth.updateSession(data.user);
+          } else if (!data.success) {
+            if (typeof window.toast === 'function') window.toast(data.reason || 'Profil güncellenemedi.', 'error');
+            if (saveBtn) {
+              saveBtn.disabled = false;
+              saveBtn.textContent = '💾 Tüm Değişiklikleri Kaydet';
+            }
+            return;
+          }
+        } catch (syncErr) {
+          console.warn('Profile sync error:', syncErr.message);
+        }
+      }
 
       FrpStore.setUserProfile(stagedProfile);
       FrpStore.setPreferences(stagedPrefs);
@@ -902,10 +959,11 @@ window.openSettingsModal = function(initialTab = 'appearance') {
         FrpStore.setTheme(stagedPrefs.theme);
       }
 
-      toast('Tüm ayarlar ve tercihler başarıyla kaydedildi! 💾', 'success');
+      toast('Tüm ayarlar ve profil bilgileri başarıyla kaydedildi! 💾', 'success');
       if (typeof window.refreshAll === 'function') window.refreshAll();
       if (typeof window.updateStats === 'function') window.updateStats();
       if (typeof window._refreshUserTopbarBadge === 'function') window._refreshUserTopbarBadge();
+      if (typeof window.FrpAuth?.updateNavbarUserBadge === 'function') window.FrpAuth.updateNavbarUserBadge();
       overlay.remove();
     });
 

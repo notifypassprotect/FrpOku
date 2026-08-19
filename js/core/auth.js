@@ -1303,6 +1303,15 @@
     setTimeout(() => document.addEventListener('click', closeHandler), 10);
   }
 
+  function updateSession(newUserData) {
+    if (!newUserData) return;
+    const current = getSession() || {};
+    const merged = { ...current, ...newUserData };
+    delete merged.password_hash;
+    currentUser = merged;
+    setSession(merged, localStorage.getItem(REMEMBER_KEY) === '1');
+  }
+
   // ── Public Auth API ──────────────────────────────────────────
   window.FrpAuth = {
     register,
@@ -1312,6 +1321,7 @@
     getSession,
     getUser,
     isLoggedIn,
+    updateSession,
     showAuthModal: showAuthFullScreenPortal,
     showAuthFullScreenPortal,
     updateNavbarUserBadge

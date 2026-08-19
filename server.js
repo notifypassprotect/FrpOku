@@ -501,6 +501,106 @@ app.post('/api/auth/change-password', async (req, res) => {
   }
 });
 
+// ── 5. KULLANICI PROFİLİ GÜNCELLEME (E-Posta, İsim, Telefon) ──
+app.post('/api/auth/update-profile', async (req, res) => {
+  const { userId, fullName, username, email, phone, department } = req.body;
+  const cleanEmail = (email || '').trim().toLowerCase();
+  const cleanUser = (username || '').trim().toLowerCase();
+  const cleanName = (fullName || '').trim();
+  const cleanPhone = (phone || '').trim();
+
+  if (!userId) {
+    return res.status(400).json({ success: false, reason: 'Kullanıcı kimliği bulunamadı.' });
+  }
+
+  if (cleanEmail && !EMAIL_REGEX.test(cleanEmail)) {
+    return res.status(400).json({ success: false, reason: '⚠️ Lütfen geçerli bir e-posta formatı giriniz.' });
+  }
+
+  if (!supabase) {
+    return res.status(500).json({ success: false, reason: '❌ Veritabanı bağlantısı kurulamadı.' });
+  }
+
+  try {
+    // Mevcut kullanıcıyı çek
+    const { data: users, error: fetchErr } = await supabase
+      .from('app_users')
+      .select('*')
+      .eq('id', userId)
+      .limit(1);
+
+    if (fetchErr || !users || users.length === 0) {
+      return res.status(404).json({ success: false, reason: 'Kullanıcı hesabı bulunamadı.' });
+    }
+
+    const currentUser = users[0];
+    const oldEmail = currentUser.email;
+
+    // Eğer e-posta değiştiyse başka bir hesapta kayıtlı mı kontrol et
+    if (cleanEmail && cleanEmail !== (oldEmail || '').toLowerCase()) {
+      const { data: existingEmail } = await supabase
+        .from('app_users')
+        .select('id')
+        .eq('email', cleanEmail)
+        .neq('id', userId)
+        .limit(1);
+
+      if (existingEmail && existingEmail.length > 0) {
+        return res.status(400).json({ success: false, reason: `⚠️ '${cleanEmail}' e-posta adresi başka bir hesapta kayıtlı.` });
+      }
+    }
+
+    const updates = {
+      full_name: cleanName || currentUser.full_name,
+      email: cleanEmail || currentUser.email,
+      phone: cleanPhone || currentUser.phone,
+      department: department || currentUser.department
+    };
+
+    const { data: updatedData, error: updateErr } = await supabase
+      .from('app_users')
+      .update(updates)
+      .eq('id', userId)
+      .select();
+
+    if (updateErr) throw updateErr;
+
+    const updatedUser = updatedData && updatedData.length > 0 ? updatedData[0] : { ...currentUser, ...updates };
+
+    // Eğer e-posta adresi değiştiyse:
+    // 1. Yeni e-postaya Hoş Geldiniz & Doğrulama maili at
+    // 2. Eski e-postaya Güvenlik Uyarısı at
+    if (cleanEmail && oldEmail && cleanEmail !== oldEmail.toLowerCase() && mailTransporter) {
+      // Yeni e-postaya onay ve hoş geldiniz
+      mailTransporter.sendMail({
+        from: SMTP_FROM,
+        to: cleanEmail,
+        subject: 'FrpOku E-Posta Adresiniz Güncellendi! 🚀',
+        text: `Merhaba ${updatedUser.full_name || updatedUser.username},\n\nFrpOku hesabınızın yeni e-posta adresi ${cleanEmail} olarak kaydedilmiştir.\n\nArtık şifre sıfırlama ve sistem bildirimleri bu adrese gelecektir.\n\nFrpOku Cloud Portal`,
+        html: getWelcomeEmailHtml(updatedUser.full_name, updatedUser.username)
+      }).catch(e => console.warn('New email notify error:', e.message));
+
+      // Eski e-postaya güvenlik uyarısı
+      mailTransporter.sendMail({
+        from: SMTP_FROM,
+        to: oldEmail,
+        subject: '🛡️ FrpOku Hesabınızın E-Posta Adresi Değiştirildi',
+        text: `Merhaba,\n\nFrpOku hesabınızın kayıtlı e-posta adresi ${cleanEmail} olarak güncellendi.\n\nBu işlemi siz yapmadıysanız lütfen derhal yöneticinizle iletişime geçiniz.`,
+        html: `<div style="font-family:sans-serif;padding:24px;background:#0f172a;color:#fff;border-radius:12px;">
+          <h2 style="color:#f59e0b;">🛡️ Güvenlik Bilgilendirmesi</h2>
+          <p>FrpOku hesabınızın kayıtlı e-posta adresi <strong>${cleanEmail}</strong> olarak değiştirildi.</p>
+          <p style="color:#94a3b8;font-size:13px;">Bu işlemi siz yapmadıysanız lütfen derhal sistem yöneticinize başvurunuz.</p>
+        </div>`
+      }).catch(e => console.warn('Old email notify error:', e.message));
+    }
+
+    res.json({ success: true, user: updatedUser });
+  } catch (err) {
+    console.error('Update profile error:', err.message);
+    res.status(500).json({ success: false, reason: 'Profil güncellenirken hata oluştu: ' + err.message });
+  }
+});
+
 // ── RAPOR DEPOLAMA VE YÖNETİM ENDPOINTLERİ ──────────────────
 // Load all reports from Supabase (with fallback to local store.json)
 app.get('/api/store/load', async (req, res) => {
