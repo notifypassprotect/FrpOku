@@ -1,7 +1,9 @@
 /**
- * FrpOku - Güvenli Kullanıcı Oturum & Kimlik Doğrulama Katmanı (Auth Module v3)
- * Bağımsız Tam Ekran Portal (Giriş Yapılmadan Ana Liste Görünmez),
- * Splash Screen Geçişi, Modern Onay Modalları, Katı Format Doğrulaması
+ * FrpOku - Güvenli Kullanıcı Oturum & Kimlik Doğrulama Katmanı (Auth Module v4)
+ * - Beni Hatırla & Giriş Bilgileri Kalıcılığı
+ * - 6 Haneli OTP Kodlu Şifremi Unuttum Akışı (Gmail SMTP)
+ * - Otomatik Hoş Geldiniz & Güvenlik Bildirim E-postaları
+ * - Responsive Tam Ekran Portal & Akıllı Dropdown Konumlandırması
  */
 
 (function () {
@@ -9,11 +11,13 @@
 
   const AUTH_STORAGE_KEY = 'frpoku_auth_session';
   const REMEMBER_KEY = 'frpoku_remember_flag';
+  const SAVED_IDENTIFIER_KEY = 'frpoku_saved_identifier';
   const SUPABASE_REST_URL = 'https://wxlmbpognkjlwyksmosd.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_ASaLwO7-3T7nRqneM0GW6g_8cgCNzQJ';
 
   let currentUser = null;
   let currentCaptchaText = '';
+  let activeResetEmail = '';
 
   // ── 1. Hızlı ve Güvenli SHA-256 Hash Fonksiyonu ────────────────
   async function hashPassword(plainText) {
@@ -34,7 +38,7 @@
     }
   }
 
-  // ── 2. Akıllı Görsel CAPTCHA Motoru (Aydınlık Tema) ────────────
+  // ── 2. Akıllı Görsel CAPTCHA Motoru (Aydınlık & Kontrastlı) ─────
   function generateCaptcha(canvasId) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return '';
@@ -49,7 +53,7 @@
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Beyaz / Açık Gri Gradyan
+    // Açık Gradyan Arka Plan
     const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
     grad.addColorStop(0, '#f8fafc');
     grad.addColorStop(1, '#e2e8f0');
@@ -94,7 +98,7 @@
     return code;
   }
 
-  // ── 3. Doğrudan & Kesintisiz REST API İstek Motoru ──────────
+  // ── 3. REST API İstek Motoru ──────────────────────────────────
   async function fetchUsersFromRest(queryString = '') {
     const res = await fetch(`${SUPABASE_REST_URL}/rest/v1/app_users${queryString}`, {
       headers: {
@@ -125,29 +129,29 @@
     return await res.json();
   }
 
-  // ── 4. Kayıt Ol (Register - Katı Güvenlik ve Format Denetimi) ──
+  // ── 4. Kayıt Ol (Register) ────────────────────────────────────
   async function register({ fullName, username, email, phone, department, password }) {
     const cleanUser = (username || '').trim().toLowerCase();
     const cleanEmail = (email || '').trim().toLowerCase();
     const cleanName = (fullName || '').trim().replace(/\s+/g, ' ');
     const rawPhone = (phone || '').replace(/\D/g, '');
 
-    // 1. Ad & Soyad Doğrulaması (Yalnızca Türkçe/İngilizce harfler ve boşluk, min 3 karakter, rakam yasak)
+    // 1. Ad & Soyad Doğrulaması
     const nameRegex = /^[a-zA-ZçğıöşüÇĞİÖŞÜ\s]{3,50}$/;
     if (!cleanName || !nameRegex.test(cleanName)) {
-      return { success: false, reason: '⚠️ Ad ve Soyad yalnızca harflerden oluşmalıdır (Rakam veya özel karakter girilemez, en az 3 harf).' };
+      return { success: false, reason: '⚠️ Ad ve Soyad yalnızca harflerden oluşmalıdır (en az 3 harf).' };
     }
 
-    // 2. Kullanıcı Adı Doğrulaması (Harf, rakam, alt çizgi, boşluksuz, 3-25 karakter)
+    // 2. Kullanıcı Adı Doğrulaması
     const userRegex = /^[a-zA-Z0-9_çğıöşüÇĞİÖŞÜ]{3,25}$/;
     if (!cleanUser || !userRegex.test(cleanUser)) {
-      return { success: false, reason: '⚠️ Kullanıcı adı 3-25 karakter arasında olmalı, boşluk veya özel karakter (@, %, / vb.) içermemelidir.' };
+      return { success: false, reason: '⚠️ Kullanıcı adı 3-25 karakter arasında olmalı, boşluk veya özel karakter içermemelidir.' };
     }
 
-    // 3. E-Posta Format Doğrulaması (@ ve .uzantı şart)
+    // 3. E-Posta Format Doğrulaması
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!cleanEmail || !emailRegex.test(cleanEmail)) {
-      return { success: false, reason: '⚠️ Lütfen geçerli bir e-posta adresi giriniz (Örnek: ad.soyad@kurum.gov.tr).' };
+      return { success: false, reason: '⚠️ Lütfen geçerli bir e-posta adresi giriniz (Örnek: ad.soyad@kurum.com).' };
     }
 
     // 4. Türkiye Cep Telefonu Doğrulaması
@@ -169,7 +173,7 @@
     }
 
     try {
-      // 6. Mükerrer Kontrolü (REST API)
+      // 6. Mükerrer Kontrolü
       let existingUsers = [];
       try {
         existingUsers = await fetchUsersFromRest(`?or=(username.eq.${cleanUser},email.eq.${cleanEmail})&limit=1`);
@@ -204,6 +208,18 @@
 
       await insertUserToRest(newRecord);
       setSession(newRecord, true);
+
+      // Kayıt Sonrası Hoş Geldiniz E-Postası Gönder (Arka Planda)
+      fetch('/api/auth/send-welcome', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: cleanEmail,
+          fullName: cleanName,
+          username: cleanUser
+        })
+      }).catch(err => console.warn('Welcome email error:', err));
+
       return { success: true, user: newRecord };
     } catch (err) {
       return { success: false, reason: 'Kayıt sırasında hata oluştu: ' + (err.message || err) };
@@ -246,6 +262,7 @@
         return { success: false, reason: '🚫 Hesabınız pasif duruma getirilmiştir. Yöneticinizle iletişime geçin.' };
       }
 
+      // Son giriş zamanını güncelle
       fetch(`${SUPABASE_REST_URL}/rest/v1/app_users?id=eq.${user.id}`, {
         method: 'PATCH',
         headers: {
@@ -256,15 +273,21 @@
         body: JSON.stringify({ last_login: new Date().toISOString() })
       }).catch(() => {});
 
-      setSession(user, rememberMe);
+      // Giriş bilgisini hatırla (Identifier)
+      if (rememberMe) {
+        localStorage.setItem(SAVED_IDENTIFIER_KEY, ident);
+      } else {
+        localStorage.removeItem(SAVED_IDENTIFIER_KEY);
+      }
 
+      setSession(user, rememberMe);
       return { success: true, user };
     } catch (err) {
       return { success: false, reason: 'Bulut bağlantı hatası: ' + (err.message || err) };
     }
   }
 
-  // ── 6. Oturum Yönetimi ──────────────────────────────────────
+  // ── 6. Oturum Yönetimi (Beni Hatırla & Kalıcılık) ───────────
   function setSession(user, rememberMe) {
     currentUser = user;
     const safeData = { ...user };
@@ -329,7 +352,7 @@
   function isLoggedIn() { return !!getSession(); }
   function getUser() { return getSession(); }
 
-  // ── 7. Modern Çıkış Onay Modalı (Sıfır Browser Alert/Confirm) ──
+  // ── 7. Modern Çıkış Onay Modalı ───────────────────────────────
   function confirmLogout() {
     if (typeof window.showConfirmDialog === 'function') {
       window.showConfirmDialog({
@@ -350,7 +373,7 @@
     }
   }
 
-  // ── 8. Navbar Rozeti & En Sağdaki Çıkış Butonu ───────────────
+  // ── 8. Navbar Rozeti & Hızlı Çıkış Butonu ────────────────────
   function updateNavbarUserBadge() {
     const user = getSession();
     const btnProfile = document.getElementById('btnUserProfile') || document.querySelector('[data-auth-badge]');
@@ -373,14 +396,14 @@
       if (topbarRight && !quickLogoutBtn) {
         quickLogoutBtn = document.createElement('button');
         quickLogoutBtn.id = 'btnQuickLogout';
-        quickLogoutBtn.className = 'btn btn-sm';
+        quickLogoutBtn.className = 'btn btn-sm btn-logout-compact';
         quickLogoutBtn.style.cssText = `
           font-weight: 800; font-size: .82rem; padding: .4rem .75rem; border-radius: 9px;
           background: rgba(239, 68, 68, 0.08); color: #ef4444; border: 1.5px solid rgba(239, 68, 68, 0.3);
           display: inline-flex; align-items: center; gap: .35rem; cursor: pointer; transition: all .2s;
           box-shadow: 0 2px 6px rgba(239,68,68,0.1); margin-left: .2rem;
         `;
-        quickLogoutBtn.innerHTML = `<span>🚪</span> <span>Çıkış Yap</span>`;
+        quickLogoutBtn.innerHTML = `<span>🚪</span> <span class="btn-text">Çıkış</span>`;
         quickLogoutBtn.title = 'Oturumu Kapat';
         quickLogoutBtn.onclick = confirmLogout;
         topbarRight.appendChild(quickLogoutBtn);
@@ -403,7 +426,7 @@
     return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  // ── 9. Oturum Açılış Animasyonlu Splash Screen Geçişi ────────
+  // ── 9. Oturum Açılış Splash Screen ───────────────────────────
   function showLoginTransitionSplash(user, onComplete) {
     const splash = document.createElement('div');
     splash.id = 'loginTransitionSplash';
@@ -439,17 +462,19 @@
         splash.remove();
         if (typeof onComplete === 'function') onComplete();
       }, 360);
-    }, 900);
+    }, 850);
   }
 
-  // ── 10. BAĞIMSIZ TAM EKRAN AUTH PORTAL (Aydınlık & Tamamen Ayrı) ─
+  // ── 10. BAĞIMSIZ TAM EKRAN AUTH PORTAL (Aydınlık & Responsive) ─
   function showAuthFullScreenPortal(initialTab = 'login') {
     const existing = document.getElementById('authFullScreenPortal');
     if (existing) existing.remove();
 
-    // Ana uygulama kapsayıcısını gizle (Arka plan asla görünmez)
+    // Ana uygulama kapsayıcısını gizle
     const appWrap = document.querySelector('.app-wrap');
     if (appWrap) appWrap.style.display = 'none';
+
+    const savedIdentifier = localStorage.getItem(SAVED_IDENTIFIER_KEY) || '';
 
     const portal = document.createElement('div');
     portal.id = 'authFullScreenPortal';
@@ -458,17 +483,17 @@
       background: radial-gradient(circle at 50% 30%, #1e293b 0%, #0f172a 60%, #020617 100%);
       z-index: 1000000;
       display: flex; align-items: center; justify-content: center;
-      padding: 1.5rem; overflow-y: auto; font-family: inherit;
+      padding: 1.25rem; overflow-y: auto; font-family: inherit;
     `;
 
     portal.innerHTML = `
       <div class="auth-card" style="
-        max-width: 470px; width: 100%;
+        max-width: 480px; width: 100%;
         background: #ffffff;
         border: 1px solid #e2e8f0;
         border-radius: 26px;
         box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
-        padding: 2.4rem 2.4rem 2rem;
+        padding: 2.2rem 2.2rem 1.8rem;
         position: relative; overflow: hidden;
         color: #0f172a;
       ">
@@ -476,10 +501,10 @@
         <div style="position:absolute;top:0;left:0;right:0;height:6px;background:linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);"></div>
 
         <!-- Logo & Başlık -->
-        <div style="text-align:center;margin-bottom:1.5rem;">
-          <div style="width:64px;height:64px;margin:0 auto .8rem;background:linear-gradient(135deg, #3b82f6, #8b5cf6);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:2.2rem;box-shadow:0 8px 24px rgba(59,130,246,0.35);">⚡</div>
-          <h1 style="font-size:1.5rem;font-weight:900;letter-spacing:-.02em;margin:0 0 .25rem;color:#0f172a;">FrpOku Cloud Portal</h1>
-          <p id="authSubtitle" style="font-size:.84rem;color:#64748b;margin:0;">Kurumsal FastReport Rapor & Kod Havuzu</p>
+        <div style="text-align:center;margin-bottom:1.35rem;">
+          <div style="width:62px;height:62px;margin:0 auto .75rem;background:linear-gradient(135deg, #3b82f6, #8b5cf6);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:2.2rem;box-shadow:0 8px 24px rgba(59,130,246,0.35);">⚡</div>
+          <h1 style="font-size:1.45rem;font-weight:900;letter-spacing:-.02em;margin:0 0 .25rem;color:#0f172a;">FrpOku Cloud Portal</h1>
+          <p id="authSubtitle" style="font-size:.82rem;color:#64748b;margin:0;">Kurumsal FastReport Rapor & Kod Havuzu</p>
         </div>
 
         <!-- Canlı Hata / Uyarı Bildirim Kutusu -->
@@ -491,7 +516,7 @@
         <!-- Sekmeler (Tab Switcher) -->
         <div id="authTabSwitcher" style="
           display: flex; background: #f1f5f9;
-          border-radius: 12px; padding: 4px; margin-bottom: 1.4rem;
+          border-radius: 12px; padding: 4px; margin-bottom: 1.35rem;
           border: 1px solid #e2e8f0;
         ">
           <button type="button" id="tabLoginBtn" style="
@@ -512,27 +537,27 @@
 
         <!-- ── 1. GİRİŞ FORMU ── -->
         <form id="authLoginForm" style="display: ${initialTab === 'login' ? 'block' : 'none'};">
-          <div style="margin-bottom: 1rem;">
+          <div style="margin-bottom: .95rem;">
             <label style="display:block;font-size:.78rem;font-weight:700;color:#334155;margin-bottom:.35rem;">
               👤 E-Posta / Kullanıcı Adı / Telefon No
             </label>
-            <input type="text" id="loginIdentifier" required placeholder="ör: deneme, ilker veya 0534..." style="
-              width: 100%; padding: .75rem 1rem; border-radius: 12px;
+            <input type="text" id="loginIdentifier" required value="${escHtml(savedIdentifier)}" placeholder="ör: deneme, ilker veya 0534..." style="
+              width: 100%; padding: .72rem 1rem; border-radius: 12px;
               background: #f8fafc; border: 1.5px solid #cbd5e1;
-              color: #0f172a; font-size: .9rem; outline: none; transition: all .2s;
+              color: #0f172a; font-size: .9rem; outline: none; transition: all .2s; box-sizing: border-box;
             " />
           </div>
 
-          <div style="margin-bottom: 1rem;">
+          <div style="margin-bottom: .95rem;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem;">
               <label style="font-size:.78rem;font-weight:700;color:#334155;">🔒 Şifre</label>
               <a href="#" id="linkForgotPassword" style="font-size:.75rem;color:#2563eb;text-decoration:none;font-weight:700;">Şifremi Unuttum?</a>
             </div>
             <div style="position:relative;">
               <input type="password" id="loginPassword" required placeholder="Şifrenizi girin" style="
-                width: 100%; padding: .75rem 2.5rem .75rem 1rem; border-radius: 12px;
+                width: 100%; padding: .72rem 2.5rem .72rem 1rem; border-radius: 12px;
                 background: #f8fafc; border: 1.5px solid #cbd5e1;
-                color: #0f172a; font-size: .9rem; outline: none; transition: all .2s;
+                color: #0f172a; font-size: .9rem; outline: none; transition: all .2s; box-sizing: border-box;
               " />
               <button type="button" id="toggleLoginPass" style="
                 position:absolute;right:.75rem;top:50%;transform:translateY(-50%);
@@ -542,8 +567,8 @@
           </div>
 
           <!-- CAPTCHA -->
-          <div style="margin-bottom: 1.1rem; background: #f8fafc; padding:.75rem; border-radius: 12px; border: 1.5px solid #e2e8f0;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.45rem;">
+          <div style="margin-bottom: 1rem; background: #f8fafc; padding:.7rem; border-radius: 12px; border: 1.5px solid #e2e8f0;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem;">
               <span style="font-size:.75rem;font-weight:700;color:#334155;">🛡️ Güvenlik Doğrulaması</span>
               <button type="button" id="btnRefreshCaptchaLogin" style="background:none;border:none;color:#2563eb;font-size:.75rem;font-weight:700;cursor:pointer;">🔄 Yeni Kod</button>
             </div>
@@ -557,9 +582,9 @@
           </div>
 
           <!-- Beni Hatırla -->
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.3rem;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem;">
             <label style="display:flex;align-items:center;gap:.5rem;font-size:.82rem;color:#475569;cursor:pointer;font-weight:600;">
-              <input type="checkbox" id="loginRememberMe" checked style="width:16px;height:16px;accent-color:#2563eb;cursor:pointer;" />
+              <input type="checkbox" id="loginRememberMe" ${localStorage.getItem(REMEMBER_KEY) !== '0' ? 'checked' : ''} style="width:16px;height:16px;accent-color:#2563eb;cursor:pointer;" />
               Beni Hatırla (Oturumu Açık Tut)
             </label>
           </div>
@@ -580,7 +605,7 @@
               <input type="text" id="regFullName" required placeholder="İlker Diner" style="
                 width: 100%; padding: .65rem .85rem; border-radius: 10px;
                 background: #f8fafc; border: 1.5px solid #cbd5e1;
-                color: #0f172a; font-size: .85rem; outline: none;
+                color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
               " />
             </div>
             <div>
@@ -588,7 +613,7 @@
               <input type="text" id="regUsername" required placeholder="ilker" style="
                 width: 100%; padding: .65rem .85rem; border-radius: 10px;
                 background: #f8fafc; border: 1.5px solid #cbd5e1;
-                color: #0f172a; font-size: .85rem; outline: none;
+                color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
               " />
             </div>
           </div>
@@ -599,7 +624,7 @@
               <input type="email" id="regEmail" required placeholder="ornek@kurum.com" style="
                 width: 100%; padding: .65rem .85rem; border-radius: 10px;
                 background: #f8fafc; border: 1.5px solid #cbd5e1;
-                color: #0f172a; font-size: .85rem; outline: none;
+                color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
               " />
             </div>
             <div>
@@ -607,7 +632,7 @@
               <input type="tel" id="regPhone" placeholder="0534..." style="
                 width: 100%; padding: .65rem .85rem; border-radius: 10px;
                 background: #f8fafc; border: 1.5px solid #cbd5e1;
-                color: #0f172a; font-size: .85rem; outline: none;
+                color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
               " />
             </div>
           </div>
@@ -617,7 +642,7 @@
             <input type="text" id="regDepartment" placeholder="ör: Şehir Hastanesi Bilgi İşlem" style="
               width: 100%; padding: .65rem .85rem; border-radius: 10px;
               background: #f8fafc; border: 1.5px solid #cbd5e1;
-              color: #0f172a; font-size: .85rem; outline: none;
+              color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
             " />
           </div>
 
@@ -627,7 +652,7 @@
               <input type="password" id="regPassword" required placeholder="Şifreniz" style="
                 width: 100%; padding: .65rem .85rem; border-radius: 10px;
                 background: #f8fafc; border: 1.5px solid #cbd5e1;
-                color: #0f172a; font-size: .85rem; outline: none;
+                color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
               " />
             </div>
             <div>
@@ -635,7 +660,7 @@
               <input type="password" id="regPasswordConfirm" required placeholder="Tekrar girin" style="
                 width: 100%; padding: .65rem .85rem; border-radius: 10px;
                 background: #f8fafc; border: 1.5px solid #cbd5e1;
-                color: #0f172a; font-size: .85rem; outline: none;
+                color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
               " />
             </div>
           </div>
@@ -663,24 +688,71 @@
           ">✨ Hesabımı Oluştur</button>
         </form>
 
-        <!-- ── 3. ŞİFREMİ UNUTTUM FORMU ── -->
+        <!-- ── 3. ŞİFREMİ UNUTTUM FORMU (6 HANELİ OTP AKIŞI) ── -->
         <div id="authForgotPanel" style="display: none; text-align: left;">
-          <div style="font-size: 1.1rem; font-weight: 800; color: #0f172a; margin-bottom: .3rem;">🔑 Şifre Sıfırlama</div>
-          <p style="font-size: .82rem; color: #64748b; margin-bottom: 1.2rem; line-height: 1.4;">
-            Kayıtlı e-posta adresinizi girin. Güvenli sıfırlama bağlantısı gönderilecektir.
-          </p>
-          <div style="margin-bottom: 1.2rem;">
-            <label style="display:block;font-size:.78rem;font-weight:700;color:#334155;margin-bottom:.35rem;">📧 E-Posta Adresi</label>
-            <input type="email" id="forgotEmailInput" placeholder="ornek@kurum.com" style="
-              width: 100%; padding: .75rem 1rem; border-radius: 12px;
-              background: #f8fafc; border: 1.5px solid #cbd5e1;
-              color: #0f172a; font-size: .9rem; outline: none;
-            " />
+          <!-- Adım 1: E-Posta / Kullanıcı Adı Girme -->
+          <div id="forgotStep1">
+            <div style="font-size: 1.1rem; font-weight: 800; color: #0f172a; margin-bottom: .3rem;">🔑 Şifre Sıfırlama</div>
+            <p style="font-size: .82rem; color: #64748b; margin-bottom: 1.2rem; line-height: 1.4;">
+              Kayıtlı e-posta adresinizi veya kullanıcı adınızı girin. 6 haneli doğrulama kodu gönderilecektir.
+            </p>
+            <div style="margin-bottom: 1.2rem;">
+              <label style="display:block;font-size:.78rem;font-weight:700;color:#334155;margin-bottom:.35rem;">👤 E-Posta veya Kullanıcı Adı</label>
+              <input type="text" id="forgotIdentInput" placeholder="ornek@kurum.com veya kullanıcı adı" style="
+                width: 100%; padding: .75rem 1rem; border-radius: 12px;
+                background: #f8fafc; border: 1.5px solid #cbd5e1;
+                color: #0f172a; font-size: .9rem; outline: none; box-sizing: border-box;
+              " />
+            </div>
+            <button type="button" id="btnSendForgotOtp" style="
+              width: 100%; padding: .85rem; border: none; border-radius: 12px;
+              background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; font-weight: 800; font-size: .92rem; cursor: pointer; margin-bottom: .8rem;
+              box-shadow: 0 4px 14px rgba(37,99,235,0.3);
+            ">📨 6 Haneli Doğrulama Kodu Gönder</button>
           </div>
-          <button type="button" id="btnSendForgotEmail" style="
-            width: 100%; padding: .8rem; border: none; border-radius: 12px;
-            background: #2563eb; color: #fff; font-weight: 800; font-size: .9rem; cursor: pointer; margin-bottom: .8rem;
-          ">📨 Sıfırlama Bağlantısı Gönder</button>
+
+          <!-- Adım 2: OTP ve Yeni Şifre Belirleme -->
+          <div id="forgotStep2" style="display: none;">
+            <div style="font-size: 1.1rem; font-weight: 800; color: #0f172a; margin-bottom: .3rem;">🛡️ Kodu Girin & Şifrenizi Yenileyin</div>
+            <p id="forgotOtpNotice" style="font-size: .82rem; color: #64748b; margin-bottom: 1.2rem; line-height: 1.4;">
+              E-posta adresinize 6 haneli bir güvenlik kodu gönderildi.
+            </p>
+
+            <div style="margin-bottom: 1rem;">
+              <label style="display:block;font-size:.78rem;font-weight:700;color:#334155;margin-bottom:.35rem;">🔢 6 Haneli Güvenlik Kodu</label>
+              <input type="text" id="forgotOtpCodeInput" maxlength="6" placeholder="______" style="
+                width: 100%; padding: .75rem 1rem; border-radius: 12px; letter-spacing: 8px; font-weight: 900; font-family: monospace;
+                background: #eff6ff; border: 2px dashed #3b82f6; text-align: center;
+                color: #1e40af; font-size: 1.4rem; outline: none; box-sizing: border-box;
+              " />
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1.1rem;">
+              <div>
+                <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">🔒 Yeni Şifre</label>
+                <input type="password" id="forgotNewPass" placeholder="Yeni şifreniz" style="
+                  width: 100%; padding: .65rem .85rem; border-radius: 10px;
+                  background: #f8fafc; border: 1.5px solid #cbd5e1;
+                  color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
+                " />
+              </div>
+              <div>
+                <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">🔒 Yeni Şifre Tekrar</label>
+                <input type="password" id="forgotNewPassConfirm" placeholder="Tekrar girin" style="
+                  width: 100%; padding: .65rem .85rem; border-radius: 10px;
+                  background: #f8fafc; border: 1.5px solid #cbd5e1;
+                  color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
+                " />
+              </div>
+            </div>
+
+            <button type="button" id="btnVerifyOtpAndReset" style="
+              width: 100%; padding: .85rem; border: none; border-radius: 12px;
+              background: linear-gradient(135deg, #10b981, #059669); color: #fff; font-weight: 800; font-size: .92rem; cursor: pointer; margin-bottom: .8rem;
+              box-shadow: 0 4px 14px rgba(16,185,129,0.3);
+            ">✅ Şifremi Güncelle ve Giriş Yap</button>
+          </div>
+
           <button type="button" id="btnBackToLoginFromForgot" style="
             width: 100%; padding: .65rem; border: 1px solid #cbd5e1; border-radius: 12px;
             background: #f1f5f9; color: #475569; font-weight: 700; font-size: .82rem; cursor: pointer;
@@ -688,7 +760,7 @@
         </div>
 
         <!-- Alt Bilgi / Geri Dönüş Linkleri -->
-        <div id="authFooterNote" style="margin-top: 1.3rem; text-align: center; font-size: .82rem; color: #64748b;">
+        <div id="authFooterNote" style="margin-top: 1.25rem; text-align: center; font-size: .82rem; color: #64748b;">
           ${initialTab === 'login' ? `Hesabınız yok mu? <a href="#" id="linkGoToRegister" style="color:#2563eb;font-weight:800;text-decoration:none;">Hemen Kayıt Olun</a>` : `Zaten hesabınız var mı? <a href="#" id="linkGoToLogin" style="color:#2563eb;font-weight:800;text-decoration:none;">Giriş Yapın</a>`}
         </div>
       </div>
@@ -732,6 +804,8 @@
       const tabLogin = portal.querySelector('#tabLoginBtn');
       const tabReg = portal.querySelector('#tabRegisterBtn');
       const footerNote = portal.querySelector('#authFooterNote');
+      const forgotStep1 = portal.querySelector('#forgotStep1');
+      const forgotStep2 = portal.querySelector('#forgotStep2');
 
       tabSwitcher.style.display = 'flex';
       forgotPanel.style.display = 'none';
@@ -765,6 +839,8 @@
         regForm.style.display = 'none';
         tabSwitcher.style.display = 'none';
         forgotPanel.style.display = 'block';
+        forgotStep1.style.display = 'block';
+        forgotStep2.style.display = 'none';
         footerNote.innerHTML = '';
       }
     };
@@ -898,7 +974,7 @@
           if (window.FrpStore && typeof window.FrpStore.refreshFromCloud === 'function') {
             window.FrpStore.refreshFromCloud();
           }
-          if (typeof window.toast === 'function') window.toast(`Hesabınız oluşturuldu! Hoş geldiniz, ${res.user.full_name}! 🎉`, 'success');
+          if (typeof window.toast === 'function') window.toast(`Hesabınız oluşturuldu! Hoş geldiniz, ${res.user.full_name}! 🎉 (Bilgilendirme e-postanız gönderildi)`, 'success');
         });
       } else {
         showAlert(res.reason || 'Kayıt işlemi başarısız oldu.', 'error');
@@ -906,16 +982,106 @@
       }
     };
 
-    // ── ŞİFREMİ UNUTTUM SUBMIT ──
-    const forgotBtn = portal.querySelector('#btnSendForgotEmail');
-    forgotBtn.onclick = () => {
-      const email = portal.querySelector('#forgotEmailInput').value.trim();
-      if (!email || !email.includes('@')) {
-        showAlert('Lütfen geçerli bir e-posta adresi girin.', 'warning');
+    // ── ŞİFREMİ UNUTTUM 1. ADIM: KOD GÖNDER ──
+    const btnSendOtp = portal.querySelector('#btnSendForgotOtp');
+    btnSendOtp.onclick = async () => {
+      hideAlert();
+      const ident = portal.querySelector('#forgotIdentInput').value.trim();
+      if (!ident) {
+        showAlert('Lütfen e-posta adresinizi veya kullanıcı adınızı girin.', 'warning');
         return;
       }
-      showAlert(`✅ '${email}' adresine şifre sıfırlama talimatı gönderildi.`, 'success');
-      setTimeout(() => switchTab('login'), 2000);
+
+      btnSendOtp.disabled = true;
+      btnSendOtp.textContent = 'Kod Gönderiliyor... ⏳';
+
+      try {
+        const res = await fetch('/api/auth/send-reset-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier: ident })
+        });
+
+        const data = await res.json();
+        btnSendOtp.disabled = false;
+        btnSendOtp.textContent = '📨 6 Haneli Doğrulama Kodu Gönder';
+
+        if (data.success) {
+          activeResetEmail = data.email;
+          portal.querySelector('#forgotStep1').style.display = 'none';
+          portal.querySelector('#forgotStep2').style.display = 'block';
+          portal.querySelector('#forgotOtpNotice').innerHTML = `
+            <strong>${data.maskedEmail}</strong> adresine 6 haneli güvenlik kodu gönderildi. Kodunuzu aşağıya giriniz:
+          `;
+          showAlert('✅ Doğrulama kodu e-posta adresinize gönderildi!', 'success');
+          portal.querySelector('#forgotOtpCodeInput').focus();
+        } else {
+          showAlert(data.reason || 'Kod gönderilemedi.', 'error');
+        }
+      } catch (err) {
+        btnSendOtp.disabled = false;
+        btnSendOtp.textContent = '📨 6 Haneli Doğrulama Kodu Gönder';
+        showAlert('Sunucu bağlantı hatası: ' + err.message, 'error');
+      }
+    };
+
+    // ── ŞİFREMİ UNUTTUM 2. ADIM: OTP DOĞRULA VE ŞİFRE GÜNCELLE ──
+    const btnVerifyOtp = portal.querySelector('#btnVerifyOtpAndReset');
+    btnVerifyOtp.onclick = async () => {
+      hideAlert();
+      const code = portal.querySelector('#forgotOtpCodeInput').value.trim();
+      const newPass = portal.querySelector('#forgotNewPass').value;
+      const newPassConf = portal.querySelector('#forgotNewPassConfirm').value;
+
+      if (!code || code.length !== 6) {
+        showAlert('Lütfen 6 haneli güvenlik kodunu eksiksiz girin.', 'warning');
+        return;
+      }
+
+      if (!newPass || newPass.length < 3) {
+        showAlert('Yeni şifreniz en az 3 karakter olmalıdır.', 'warning');
+        return;
+      }
+
+      if (newPass !== newPassConf) {
+        showAlert('Yeni şifreler eşleşmiyor! İki kutuya da aynı şifreyi yazın.', 'warning');
+        return;
+      }
+
+      btnVerifyOtp.disabled = true;
+      btnVerifyOtp.textContent = 'Şifre Güncelleniyor... ⏳';
+
+      try {
+        const res = await fetch('/api/auth/verify-reset-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: activeResetEmail,
+            code,
+            newPassword: newPass
+          })
+        });
+
+        const data = await res.json();
+        btnVerifyOtp.disabled = false;
+        btnVerifyOtp.textContent = '✅ Şifremi Güncelle ve Giriş Yap';
+
+        if (data.success) {
+          showAlert('🎉 Şifreniz başarıyla güncellendi! Giriş ekranına yönlendiriliyorsunuz...', 'success');
+          setTimeout(() => {
+            switchTab('login');
+            portal.querySelector('#loginIdentifier').value = activeResetEmail;
+            portal.querySelector('#loginPassword').value = '';
+            portal.querySelector('#loginPassword').focus();
+          }, 1800);
+        } else {
+          showAlert(data.reason || 'Doğrulama başarısız oldu.', 'error');
+        }
+      } catch (err) {
+        btnVerifyOtp.disabled = false;
+        btnVerifyOtp.textContent = '✅ Şifremi Güncelle ve Giriş Yap';
+        showAlert('Sunucu hatası: ' + err.message, 'error');
+      }
     };
   }
 
@@ -931,7 +1097,8 @@
 
     const btnProfile = document.getElementById('btnUserProfile') || document.querySelector('[data-auth-badge]');
     if (btnProfile) {
-      btnProfile.addEventListener('click', () => {
+      btnProfile.addEventListener('click', (e) => {
+        e.stopPropagation();
         if (isLoggedIn()) {
           showUserDropdown(btnProfile);
         } else {
@@ -941,7 +1108,7 @@
     }
   });
 
-  // ── Kullanıcı Dropdown Menüsü ─────────────────────────────────
+  // ── Kullanıcı Dropdown Menüsü (Akıllı Konumlandırma) ─────────
   function showUserDropdown(anchorEl) {
     const user = getUser();
     if (!user) { showAuthFullScreenPortal('login'); return; }
@@ -949,10 +1116,15 @@
     const existing = document.getElementById('userMenuDropdown');
     if (existing) { existing.remove(); return; }
 
+    const rect = anchorEl.getBoundingClientRect();
     const drop = document.createElement('div');
     drop.id = 'userMenuDropdown';
+    
+    // Sağdan taşmayı önleme
+    const rightOffset = Math.max(16, window.innerWidth - rect.right);
+
     drop.style.cssText = `
-      position: absolute; top: ${anchorEl.getBoundingClientRect().bottom + 8}px; right: 24px;
+      position: fixed; top: ${rect.bottom + 8}px; right: ${rightOffset}px;
       background: #ffffff; border: 1px solid #e2e8f0;
       border-radius: 18px; padding: 1.2rem; min-width: 270px; z-index: 100000;
       box-shadow: 0 20px 40px -10px rgba(0,0,0,0.25); animation: fadeIn .15s ease-out;
@@ -969,10 +1141,13 @@
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:.4rem;">
-        <button type="button" id="btnMenuProfile" class="btn btn-sm btn-ghost" style="width:100%;justify-content:flex-start;padding:.6rem .8rem;font-weight:700;color:#334155;">
+        <button type="button" id="btnMenuProfile" class="btn btn-sm btn-ghost" style="width:100%;justify-content:flex-start;padding:.6rem .8rem;font-weight:700;color:#334155;border-radius:8px;">
           ⚙️ Profil & Ayarlar
         </button>
-        <button type="button" id="btnMenuLogout" class="btn btn-sm btn-ghost" style="width:100%;justify-content:flex-start;padding:.6rem .8rem;font-weight:700;color:#ef4444;">
+        <button type="button" id="btnMenuChangePass" class="btn btn-sm btn-ghost" style="width:100%;justify-content:flex-start;padding:.6rem .8rem;font-weight:700;color:#2563eb;border-radius:8px;">
+          🔒 Şifre Değiştir
+        </button>
+        <button type="button" id="btnMenuLogout" class="btn btn-sm btn-ghost" style="width:100%;justify-content:flex-start;padding:.6rem .8rem;font-weight:700;color:#ef4444;border-radius:8px;">
           🚪 Güvenli Çıkış Yap
         </button>
       </div>
@@ -984,8 +1159,13 @@
       drop.remove();
       if (typeof window.openSettingsModal === 'function') {
         window.openSettingsModal('profile');
-      } else if (typeof window.renderSettingsModal === 'function') {
-        window.renderSettingsModal('profile');
+      }
+    };
+
+    drop.querySelector('#btnMenuChangePass').onclick = () => {
+      drop.remove();
+      if (typeof window.openSettingsModal === 'function') {
+        window.openSettingsModal('profile');
       }
     };
 

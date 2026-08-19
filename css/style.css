@@ -147,7 +147,107 @@ body {
 .topbar-right {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.45rem;
+  flex-wrap: nowrap;
+}
+
+/* ── TOPBAR DROPDOWN MENUS (RESPONSIVE & CLEAN) ──────────── */
+.topbar-dropdown {
+  position: relative;
+  display: inline-flex;
+}
+
+.topbar-dropdown-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.topbar-dropdown-toggle::after {
+  content: '▾';
+  font-size: 0.75rem;
+  opacity: 0.7;
+  transition: transform 0.2s ease;
+}
+
+.topbar-dropdown:hover .topbar-dropdown-toggle::after,
+.topbar-dropdown.open .topbar-dropdown-toggle::after {
+  transform: rotate(180deg);
+}
+
+.topbar-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 210px;
+  padding: 0.45rem;
+  display: none;
+  flex-direction: column;
+  gap: 0.2rem;
+  z-index: 10000;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  animation: dropdownFadeIn 0.14s ease-out;
+}
+
+@keyframes dropdownFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.topbar-dropdown:hover .topbar-dropdown-menu,
+.topbar-dropdown.open .topbar-dropdown-menu {
+  display: flex;
+}
+
+.topbar-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.5rem 0.8rem;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.topbar-dropdown-item:hover {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+/* Responsive Topbar Button Text Collapse */
+@media (max-width: 1350px) {
+  .btn-collapse-text .btn-label {
+    display: none;
+  }
+}
+
+@media (max-width: 1024px) {
+  .topbar {
+    padding: 0 0.85rem;
+    height: 52px;
+  }
+  .brand-sub {
+    display: none;
+  }
+  .topbar-right {
+    gap: 0.3rem;
+  }
 }
 
 .topbar-meta {

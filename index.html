@@ -69,29 +69,59 @@
       </div>
     </div>
 
-    <div class="topbar-right" style="display:flex;align-items:center;gap:.45rem;flex-wrap:wrap;">
+    <div class="topbar-right">
       <!-- Kullanıcı Profil / Giriş Butonu -->
       <button class="btn btn-sm" id="btnUserProfile" data-auth-badge style="font-weight:700;border:1px solid var(--border);background:var(--bg-surface);" title="Kullanıcı Giriş & Profil">👤 Giriş Yap</button>
 
       <!-- Son Açılanlar -->
       <button class="btn btn-sm" id="btnOpenRecentModal" style="font-weight:700;" title="Son İncelenen Raporlar">🕒 Son Açılanlar</button>
 
-      <!-- Panel & Analizler -->
+      <!-- Panel -->
       <button class="btn btn-sm btn-primary" onclick="window.location.href='dashboard.html'" title="İstatistik Paneli">📊 Panel</button>
-      <button class="btn btn-sm" id="btnComplexityCenter" style="background:linear-gradient(135deg, #f59e0b, #ef4444);color:#fff;font-weight:700;border:none;" title="Tüm Raporların SQL Karmaşıklık ve Statik Anti-Pattern Analizi">🧠 Karmaşıklık Analizi</button>
-      <button class="btn btn-sm" id="btnDependencies" title="Tablo Bağımlılık Haritası">🕸️ Bağımlılık</button>
-      <button class="btn btn-sm" id="btnParams" title="Tüm Raporlardaki Parametreler">⚙️ Parametreler</button>
-      <button class="btn btn-sm" id="btnSnippets" title="Kaydedilmiş SQL Sorgu Kütüphanesi">📌 Sorgular</button>
-      <button class="btn btn-sm" id="btnTableAnalysis" title="Veritabanı Tablo Kullanım Analizi">📊 Tablolar</button>
 
-      <span style="width:1px;height:22px;background:var(--border-light);margin:0 .2rem;"></span>
+      <!-- 🧠 Analizler Menüsü (Dropdown) -->
+      <div class="topbar-dropdown" id="dropdownAnalytics">
+        <button class="btn btn-sm topbar-dropdown-toggle" style="background:linear-gradient(135deg, #f59e0b, #ef4444);color:#fff;font-weight:700;border:none;" title="SQL & Rapor Analiz Araçları">
+          🧠 Analizler
+        </button>
+        <div class="topbar-dropdown-menu">
+          <button class="topbar-dropdown-item" id="btnComplexityCenter" title="Tüm Raporların SQL Karmaşıklık ve Statik Anti-Pattern Analizi">
+            <span>🧠</span> <span>Karmaşıklık Analizi</span>
+          </button>
+          <button class="topbar-dropdown-item" id="btnDependencies" title="Tablo Bağımlılık Haritası">
+            <span>🕸️</span> <span>Bağımlılık Haritası</span>
+          </button>
+          <button class="topbar-dropdown-item" id="btnParams" title="Tüm Raporlardaki Parametreler">
+            <span>⚙️</span> <span>Parametreler</span>
+          </button>
+          <button class="topbar-dropdown-item" id="btnSnippets" title="Kaydedilmiş SQL Sorgu Kütüphanesi">
+            <span>📌</span> <span>Kayıtlı Sorgular</span>
+          </button>
+          <button class="topbar-dropdown-item" id="btnTableAnalysis" title="Veritabanı Tablo Kullanım Analizi">
+            <span>📊</span> <span>Tablo Kullanım Analizi</span>
+          </button>
+        </div>
+      </div>
 
-      <!-- Dosya ekleme -->
-      <button class="btn btn-sm btn-primary" id="btnAddSingle" title="Tek .frp dosyası seç">➕ Dosya Ekle</button>
-      <button class="btn btn-sm" id="btnAddMulti"  title="Birden fazla .frp seç">📋 Çoklu Ekle</button>
-      <button class="btn btn-sm" id="btnAddFolder" title="Klasördeki tüm .frp dosyaları">📂 Klasör Ekle</button>
+      <!-- ➕ Rapor Ekle (Dropdown) -->
+      <div class="topbar-dropdown" id="dropdownAddReports">
+        <button class="btn btn-sm btn-primary topbar-dropdown-toggle" title="Rapor Dosyası Yükle">
+          ➕ Rapor Ekle
+        </button>
+        <div class="topbar-dropdown-menu">
+          <button class="topbar-dropdown-item" id="btnAddSingle" title="Tek .frp dosyası seç">
+            <span>📄</span> <span>Tek Dosya Ekle</span>
+          </button>
+          <button class="topbar-dropdown-item" id="btnAddMulti" title="Birden fazla .frp seç">
+            <span>📋</span> <span>Çoklu Dosya Ekle</span>
+          </button>
+          <button class="topbar-dropdown-item" id="btnAddFolder" title="Klasördeki tüm .frp dosyaları">
+            <span>📂</span> <span>Klasör Ekle</span>
+          </button>
+        </div>
+      </div>
 
-      <span style="width:1px;height:22px;background:var(--border-light);margin:0 .2rem;"></span>
+      <span style="width:1px;height:22px;background:var(--border-light);margin:0 .15rem;"></span>
 
       <!-- Tema Butonu -->
       <button class="theme-switch-pill" id="btnThemeToggle" title="Gece / Gündüz Teması">🌙 Koyu Mod</button>

@@ -378,31 +378,25 @@ window.openSettingsModal = function(initialTab = 'appearance') {
               
               let storageFormatted = '1.4 MB';
               try {
-                const totalBytes = new Blob([JSON.stringify(localStorage || {})]).size;
-                storageFormatted = totalBytes > 1024 * 1024 ? `${(totalBytes / (1024 * 1024)).toFixed(2)} MB` : `${Math.round(totalBytes / 1024)} KB`;
+                const totalBytes = new Blob([localStorage.getItem('frpoku_store_v2') || '']).size;
+                storageFormatted = (totalBytes / 1024).toFixed(1) + ' KB';
               } catch {}
 
-              const protocol = typeof window !== 'undefined' ? (window.location.protocol.replace(':', '').toUpperCase()) : 'HTTP';
-              const host = typeof window !== 'undefined' ? (window.location.host || 'localhost:3000') : 'localhost:3000';
-              let tz = 'Europe/Istanbul';
-              try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Istanbul'; } catch {}
+              const host = typeof window !== 'undefined' && window.location ? window.location.host : 'localhost';
+              const protocol = typeof window !== 'undefined' && window.location ? window.location.protocol.replace(':', '').toUpperCase() : 'HTTP';
+              const tz = typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'Europe/Istanbul';
 
               return `
-                <div class="settings-card" style="display:flex;flex-direction:column;gap:.85rem;">
-                  <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border-light);padding-bottom:.5rem;">
-                    <div>
-                      <div style="font-weight:800;font-size:.88rem;color:var(--text-primary);display:flex;align-items:center;gap:.4rem;">
-                        🖥️ İstemci & Sistem Ortamı
-                      </div>
-                      <div style="font-size:.72rem;color:var(--text-muted);margin-top:.1rem;">Gerçek zamanlı tarayıcı, ekran ve sunucu parametreleri</div>
-                    </div>
-                    <span class="badge badge-green" style="font-size:.72rem;padding:.2rem .6rem;">🟢 Aktif &amp; Hazır</span>
+                <div class="settings-card" style="display:flex;flex-direction:column;gap:.75rem;">
+                  <div style="font-weight:800;font-size:.88rem;color:var(--text-primary);border-bottom:1px solid var(--border-light);padding-bottom:.4rem;display:flex;align-items:center;justify-content:space-between;">
+                    <span>🖥️ İstemci & Sistem Ortamı</span>
+                    <span class="badge badge-green" style="font-size:.68rem;">🟢 Aktif & Hazır</span>
                   </div>
 
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;">
+                  <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:.55rem;font-size:.78rem;">
                     
                     <div style="background:var(--bg-surface);padding:.55rem .75rem;border-radius:9px;border:1px solid var(--border-light);">
-                      <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">🌐 Tarayıcı &amp; Motor</div>
+                      <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">🌐 Tarayıcı & Motor</div>
                       <div style="font-size:.8rem;font-weight:700;color:var(--text-primary);margin-top:.15rem;">${escHtml(browser)}</div>
                     </div>
 
@@ -412,40 +406,25 @@ window.openSettingsModal = function(initialTab = 'appearance') {
                     </div>
 
                     <div style="background:var(--bg-surface);padding:.55rem .75rem;border-radius:9px;border:1px solid var(--border-light);">
-                      <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">🖥️ Ekran &amp; Çözünürlük</div>
-                      <div style="font-size:.8rem;font-weight:700;color:var(--accent);margin-top:.15rem;font-family:var(--mono);">${escHtml(resolution)}</div>
+                      <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">🖥️ Ekran & Çözünürlük</div>
+                      <div style="font-size:.8rem;font-weight:700;color:var(--accent);margin-top:.15rem;">${escHtml(resolution)}</div>
                     </div>
 
                     <div style="background:var(--bg-surface);padding:.55rem .75rem;border-radius:9px;border:1px solid var(--border-light);">
-                      <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">⚡ CPU / Donanım İş Parçacığı</div>
+                      <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">⚡ CPU / Donanım</div>
                       <div style="font-size:.8rem;font-weight:700;color:var(--text-primary);margin-top:.15rem;">${escHtml(cores)}</div>
                     </div>
 
                     <div style="background:var(--bg-surface);padding:.55rem .75rem;border-radius:9px;border:1px solid var(--border-light);">
-                      <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">💾 Yerel Veri Depolama (Store)</div>
-                      <div style="font-size:.8rem;font-weight:700;color:var(--text-primary);margin-top:.15rem;">${escHtml(storageFormatted)} / LocalStorage + JSON</div>
+                      <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">💾 Depolama (Store)</div>
+                      <div style="font-size:.8rem;font-weight:700;color:var(--text-primary);margin-top:.15rem;">${escHtml(storageFormatted)}</div>
                     </div>
 
                     <div style="background:var(--bg-surface);padding:.55rem .75rem;border-radius:9px;border:1px solid var(--border-light);">
-                      <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">🚀 Sunucu Modu &amp; Port</div>
+                      <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">🚀 Sunucu Modu & Port</div>
                       <div style="font-size:.8rem;font-weight:700;color:var(--text-primary);margin-top:.15rem;font-family:var(--mono);">${escHtml(protocol)} · ${escHtml(host)}</div>
                     </div>
 
-                    <div style="background:var(--bg-surface);padding:.55rem .75rem;border-radius:9px;border:1px solid var(--border-light);">
-                      <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">🌍 Dil &amp; Saat Dilimi</div>
-                      <div style="font-size:.8rem;font-weight:700;color:var(--text-primary);margin-top:.15rem;">${typeof navigator !== 'undefined' ? navigator.language : 'tr-TR'} · ${escHtml(tz)}</div>
-                    </div>
-
-                    <div style="background:var(--bg-surface);padding:.55rem .75rem;border-radius:9px;border:1px solid var(--border-light);">
-                      <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">🛡️ Uygulama Sürümü</div>
-                      <div style="font-size:.8rem;font-weight:700;color:var(--text-primary);margin-top:.15rem;">FrpOku v2.4 Enterprise</div>
-                    </div>
-
-                  </div>
-
-                  <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg-raised);padding:.55rem .85rem;border-radius:8px;font-size:.75rem;border:1px solid var(--border-light);margin-top:.2rem;">
-                    <div style="color:var(--text-secondary);font-weight:600;">Bağlantı &amp; Çalışma Durumu:</div>
-                    <div style="font-weight:800;color:var(--accent);">${typeof navigator !== 'undefined' && navigator.onLine ? '🟢 Çevrimiçi · Kesintisiz Yerel Oturum' : '⚪ Çevrimdışı Mod'}</div>
                   </div>
 
                 </div>
@@ -837,6 +816,78 @@ window.openSettingsModal = function(initialTab = 'appearance') {
       if (phone !== undefined) stagedProfile.phone = phone;
       if (email !== undefined) stagedProfile.email = email;
     }
+
+    // 🔒 PROFİL İÇİNDEN ŞİFRE GÜNCELLEME
+    overlay.querySelector('#btnUpdatePasswordProfile')?.addEventListener('click', async () => {
+      const alertBox = overlay.querySelector('#profPassAlertBox');
+      const showStatus = (msg, type = 'error') => {
+        if (!alertBox) return;
+        alertBox.style.display = 'block';
+        if (type === 'error') {
+          alertBox.style.background = '#fef2f2'; alertBox.style.border = '1px solid #fecaca'; alertBox.style.color = '#b91c1c';
+        } else {
+          alertBox.style.background = '#f0fdf4'; alertBox.style.border = '1px solid #bbf7d0'; alertBox.style.color = '#15803d';
+        }
+        alertBox.textContent = msg;
+      };
+
+      const user = window.FrpAuth?.getUser();
+      if (!user || !user.id) {
+        showStatus('Şifre değiştirmek için oturum açmış olmanız gerekmektedir.', 'error');
+        return;
+      }
+
+      const oldPass = overlay.querySelector('#profOldPass')?.value;
+      const newPass = overlay.querySelector('#profNewPass')?.value;
+      const newPassConf = overlay.querySelector('#profNewPassConfirm')?.value;
+
+      if (!oldPass) {
+        showStatus('Lütfen mevcut şifrenizi girin.', 'error');
+        return;
+      }
+      if (!newPass || newPass.length < 3) {
+        showStatus('Yeni şifreniz en az 3 karakter olmalıdır.', 'error');
+        return;
+      }
+      if (newPass !== newPassConf) {
+        showStatus('Yeni şifreler birbiriyle eşleşmiyor!', 'error');
+        return;
+      }
+
+      const btn = overlay.querySelector('#btnUpdatePasswordProfile');
+      btn.disabled = true;
+      btn.textContent = 'Güncelleniyor... ⏳';
+
+      try {
+        const res = await fetch('/api/auth/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.id,
+            oldPassword: oldPass,
+            newPassword: newPass
+          })
+        });
+
+        const data = await res.json();
+        btn.disabled = false;
+        btn.textContent = '🔐 Şifremi Güncelle';
+
+        if (data.success) {
+          showStatus('✅ Şifreniz başarıyla güncellendi! Bilgilendirme e-postası gönderildi.', 'success');
+          overlay.querySelector('#profOldPass').value = '';
+          overlay.querySelector('#profNewPass').value = '';
+          overlay.querySelector('#profNewPassConfirm').value = '';
+          if (typeof window.toast === 'function') window.toast('Şifreniz başarıyla güncellendi! 🛡️', 'success');
+        } else {
+          showStatus(data.reason || 'Şifre güncellenemedi.', 'error');
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = '🔐 Şifremi Güncelle';
+        showStatus('Sunucu hatası: ' + err.message, 'error');
+      }
+    });
 
     // Kapatma
     overlay.querySelector('#btnCloseSettingsModal')?.addEventListener('click', () => overlay.remove());
