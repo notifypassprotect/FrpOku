@@ -378,9 +378,14 @@ app.post('/api/auth/register-request', async (req, res) => {
         mailTransporter.sendMail({
           from: SMTP_FROM,
           to: cleanEmail,
-          subject: `FrpOku Kayit Dogrulama Kodu: ${otpCode}`,
-          text: `Merhaba ${cleanName},\n\nFrpOku hesabınızı oluşturmak için 6 haneli güvenlik kodunuz: ${otpCode}\n\nBu kod 10 dakika geçerlidir.\n\nFrpOku Cloud Portal`,
-          html: getRegisterOtpEmailHtml(cleanName, otpCode)
+          subject: `FrpOku Hesap Dogrulama Kodu: ${otpCode}`,
+          text: `Merhaba ${cleanName},\n\nFrpOku hesabınızı oluşturmak için 6 haneli güvenlik kodunuz: ${otpCode}\n\nBu kod 10 dakika boyunca geçerlidir.\n\nİyi çalışmalar,\nFrpOku Güvenlik Ekibi`,
+          html: getRegisterOtpEmailHtml(cleanName, otpCode),
+          headers: {
+            'X-Entity-Ref-ID': `reg-${cleanEmail}-${Date.now()}`,
+            'X-Priority': '1 (Highest)',
+            'Importance': 'High'
+          }
         }),
         new Promise((_, reject) => setTimeout(() => reject(new Error('E-posta sunucusu yanıt vermedi (Zaman aşımı)')), 10000))
       ]);
