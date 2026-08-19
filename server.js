@@ -44,8 +44,9 @@ if (SMTP_USER && SMTP_PASS) {
   });
 }
 
-// In-Memory OTP Store: identifier -> { code, expiresAt, email, userId }
-const otpStore = new Map();
+// In-Memory OTP & Cooldown Stores
+const otpStore = new Map(); // email -> { code, expiresAt, userId, name, attempts }
+const otpCooldownStore = new Map(); // email -> lastRequestTimestamp
 
 function hashPassword(plainText) {
   if (!plainText) return '';
@@ -58,6 +59,8 @@ function maskEmail(email) {
   const maskedUser = user.length > 2 ? user[0] + '*'.repeat(user.length - 2) + user[user.length - 1] : user[0] + '*';
   return `${maskedUser}@${domain}`;
 }
+
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}$/;
 
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
@@ -271,11 +274,16 @@ app.post('/api/auth/send-reset-code', async (req, res) => {
   const ident = (identifier || '').trim().toLowerCase();
 
   if (!ident) {
-    return res.status(400).json({ success: false, reason: 'Lütfen kullanıcı adı veya e-posta girin.' });
+    return res.status(400).json({ success: false, reason: '⚠️ Lütfen kullanıcı adı veya e-posta adresinizi giriniz.' });
+  }
+
+  // E-Posta format kontrolü (@ içeriyorsa geçerli format olmalı)
+  if (ident.includes('@') && !EMAIL_REGEX.test(ident)) {
+    return res.status(400).json({ success: false, reason: '⚠️ Lütfen geçerli bir e-posta formatı giriniz (Örn: ad.soyad@kurum.com).' });
   }
 
   if (!supabase) {
-    return res.status(500).json({ success: false, reason: 'Veritabanı bağlantısı yok.' });
+    return res.status(500).json({ success: false, reason: '❌ Veritabanı bağlantısı kurulamadı.' });
   }
 
   try {
@@ -289,12 +297,30 @@ app.post('/api/auth/send-reset-code', async (req, res) => {
 
     const { data: users, error } = await query.limit(1);
     if (error || !users || users.length === 0) {
-      return res.status(404).json({ success: false, reason: 'Girdiğiniz bilgilere ait bir kullanıcı hesabı bulunamadı.' });
+      return res.status(404).json({ 
+        success: false, 
+        reason: `❌ '${ident}' bilgisine ait kayıtlı bir kullanıcı hesabı bulunamadı. Lütfen bilgilerinizi kontrol ediniz.` 
+      });
     }
 
     const user = users[0];
-    if (!user.email) {
-      return res.status(400).json({ success: false, reason: 'Bu hesaba ait kayıtlı bir e-posta adresi bulunmuyor.' });
+    if (!user.email || !EMAIL_REGEX.test(user.email)) {
+      return res.status(400).json({ 
+        success: false, 
+        reason: '⚠️ Bu kullanıcı hesabına bağlı geçerli bir e-posta adresi bulunmuyor. Lütfen sistem yöneticinizle iletişime geçiniz.' 
+      });
+    }
+
+    const userEmailKey = user.email.toLowerCase();
+
+    // 60 Saniye Spam & Cooldown Denetimi
+    const lastSent = otpCooldownStore.get(userEmailKey);
+    if (lastSent && Date.now() - lastSent < 60000) {
+      const waitSeconds = Math.ceil((60000 - (Date.now() - lastSent)) / 1000);
+      return res.status(429).json({
+        success: false,
+        reason: `⏱️ Yeni bir kod talep etmek için lütfen ${waitSeconds} saniye bekleyiniz.`
+      });
     }
 
     // 6 Haneli Rastgele Sayısal OTP Üret
@@ -302,12 +328,15 @@ app.post('/api/auth/send-reset-code', async (req, res) => {
     const expiresAt = Date.now() + 10 * 60 * 1000; // 10 dakika
 
     // Store in memory
-    otpStore.set(user.email.toLowerCase(), {
+    otpStore.set(userEmailKey, {
       code: otpCode,
       expiresAt,
       userId: user.id,
-      name: user.full_name || user.username
+      name: user.full_name || user.username,
+      attempts: 0
     });
+
+    otpCooldownStore.set(userEmailKey, Date.now());
 
     // E-Posta Gönder (Timeout korumalı)
     if (mailTransporter) {
@@ -342,28 +371,41 @@ app.post('/api/auth/send-reset-code', async (req, res) => {
 app.post('/api/auth/verify-reset-code', async (req, res) => {
   const { email, code, newPassword } = req.body;
   const cleanEmail = (email || '').trim().toLowerCase();
-  const cleanCode = (code || '').trim();
+  const cleanCode = (code || '').trim().replace(/\D/g, ''); // Sadece rakamlar
 
   if (!cleanEmail || !cleanCode || !newPassword) {
-    return res.status(400).json({ success: false, reason: 'Lütfen tüm alanları doldurun.' });
+    return res.status(400).json({ success: false, reason: '⚠️ Lütfen tüm alanları eksiksiz doldurunuz.' });
   }
 
-  if (newPassword.length < 3) {
-    return res.status(400).json({ success: false, reason: 'Yeni şifre en az 3 karakter olmalıdır.' });
+  if (cleanCode.length !== 6) {
+    return res.status(400).json({ success: false, reason: '⚠️ Güvenlik kodu 6 haneli olmalıdır.' });
+  }
+
+  if (newPassword.length < 4) {
+    return res.status(400).json({ success: false, reason: '⚠️ Yeni şifreniz en az 4 karakter olmalıdır.' });
   }
 
   const record = otpStore.get(cleanEmail);
   if (!record) {
-    return res.status(400).json({ success: false, reason: 'Geçersiz veya süresi dolmuş kod talebi. Lütfen tekrar kod isteyin.' });
+    return res.status(400).json({ success: false, reason: '❌ Geçersiz veya süresi dolmuş kod talebi. Lütfen tekrar kod isteyiniz.' });
   }
 
   if (Date.now() > record.expiresAt) {
     otpStore.delete(cleanEmail);
-    return res.status(400).json({ success: false, reason: 'Doğrulama kodunun süresi doldu (10 dakika). Lütfen yeni kod isteyin.' });
+    return res.status(400).json({ success: false, reason: '⏱️ Doğrulama kodunun süresi doldu (10 dakika). Lütfen yeni kod talep ediniz.' });
+  }
+
+  record.attempts = (record.attempts || 0) + 1;
+  if (record.attempts > 5) {
+    otpStore.delete(cleanEmail);
+    return res.status(400).json({ success: false, reason: '⛔ Çok fazla hatalı deneme yapıldı. Güvenliğiniz için lütfen yeni kod talep ediniz.' });
   }
 
   if (record.code !== cleanCode) {
-    return res.status(400).json({ success: false, reason: 'Girdiğiniz 6 haneli güvenlik kodu hatalı!' });
+    return res.status(400).json({ 
+      success: false, 
+      reason: `❌ Girdiğiniz 6 haneli güvenlik kodu hatalı! (Kalan deneme hakkı: ${5 - record.attempts})` 
+    });
   }
 
   try {
@@ -379,13 +421,15 @@ app.post('/api/auth/verify-reset-code', async (req, res) => {
 
     // Kod temizle
     otpStore.delete(cleanEmail);
+    otpCooldownStore.delete(cleanEmail);
 
     // Güvenlik e-postası gönder
     if (mailTransporter) {
       mailTransporter.sendMail({
         from: SMTP_FROM,
         to: cleanEmail,
-        subject: '🛡️ FrpOku Şifreniz Güncellendi',
+        subject: 'FrpOku Hesabinizin Sifresi Guncellendi',
+        text: `Merhaba ${record.name},\n\nFrpOku hesabınızın şifresi başarıyla değiştirildi.\n\nEğer bu işlemi siz yapmadıysanız lütfen yöneticinizle görüşün.`,
         html: getPasswordChangedEmailHtml(record.name)
       }).catch(() => {});
     }
@@ -402,15 +446,19 @@ app.post('/api/auth/change-password', async (req, res) => {
   const { userId, oldPassword, newPassword } = req.body;
 
   if (!userId || !oldPassword || !newPassword) {
-    return res.status(400).json({ success: false, reason: 'Lütfen mevcut ve yeni şifrenizi girin.' });
+    return res.status(400).json({ success: false, reason: '⚠️ Lütfen mevcut ve yeni şifrenizi giriniz.' });
   }
 
-  if (newPassword.length < 3) {
-    return res.status(400).json({ success: false, reason: 'Yeni şifre en az 3 karakter olmalıdır.' });
+  if (newPassword.length < 4) {
+    return res.status(400).json({ success: false, reason: '⚠️ Yeni şifre en az 4 karakter olmalıdır.' });
+  }
+
+  if (oldPassword === newPassword) {
+    return res.status(400).json({ success: false, reason: '⚠️ Yeni şifreniz mevcut şifrenizle aynı olamaz. Lütfen farklı bir şifre seçiniz.' });
   }
 
   if (!supabase) {
-    return res.status(500).json({ success: false, reason: 'Veritabanı bağlantısı kurulamadı.' });
+    return res.status(500).json({ success: false, reason: '❌ Veritabanı bağlantısı kurulamadı.' });
   }
 
   try {
@@ -421,14 +469,14 @@ app.post('/api/auth/change-password', async (req, res) => {
       .limit(1);
 
     if (error || !users || users.length === 0) {
-      return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
+      return res.status(404).json({ success: false, reason: 'Kullanıcı hesabı bulunamadı.' });
     }
 
     const user = users[0];
     const oldHash = hashPassword(oldPassword);
 
     if (user.password_hash !== oldHash && user.password_hash !== oldPassword) {
-      return res.status(400).json({ success: false, reason: 'Mevcut şifrenizi hatalı girdiniz!' });
+      return res.status(400).json({ success: false, reason: '🔒 Mevcut şifrenizi hatalı girdiniz!' });
     }
 
     const newHash = hashPassword(newPassword);
@@ -441,7 +489,8 @@ app.post('/api/auth/change-password', async (req, res) => {
       mailTransporter.sendMail({
         from: SMTP_FROM,
         to: user.email,
-        subject: '🛡️ FrpOku Şifreniz Güncellendi',
+        subject: 'FrpOku Sifreniz Basariyla Guncellendi',
+        text: `Merhaba ${user.full_name || user.username},\n\nFrpOku hesabınızın şifresi güncellendi.`,
         html: getPasswordChangedEmailHtml(user.full_name || user.username)
       }).catch(() => {});
     }

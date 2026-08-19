@@ -751,6 +751,13 @@
               background: linear-gradient(135deg, #10b981, #059669); color: #fff; font-weight: 800; font-size: .92rem; cursor: pointer; margin-bottom: .8rem;
               box-shadow: 0 4px 14px rgba(16,185,129,0.3);
             ">✅ Şifremi Güncelle ve Giriş Yap</button>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.8rem; padding: 0 .2rem;">
+              <span style="font-size:.75rem; color:#64748b;">Kodu alamadınız mı?</span>
+              <button type="button" id="btnResendForgotOtp" style="background:none; border:none; color:#2563eb; font-weight:700; font-size:.78rem; cursor:pointer;">
+                ⏱️ Tekrar Gönder (60s)
+              </button>
+            </div>
           </div>
 
           <button type="button" id="btnBackToLoginFromForgot" style="
@@ -891,9 +898,30 @@
       e.preventDefault();
       hideAlert();
 
+      const ident = (portal.querySelector('#loginIdentifier').value || '').trim();
+      const pass = portal.querySelector('#loginPassword').value;
+
+      if (!ident) {
+        showAlert('⚠️ Lütfen e-posta adresinizi veya kullanıcı adınızı giriniz.', 'warning');
+        portal.querySelector('#loginIdentifier').focus();
+        return;
+      }
+
+      if (ident.includes('@') && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}$/.test(ident)) {
+        showAlert('⚠️ Lütfen geçerli bir e-posta formatı giriniz (Örn: ad.soyad@kurum.com).', 'warning');
+        portal.querySelector('#loginIdentifier').focus();
+        return;
+      }
+
+      if (!pass) {
+        showAlert('⚠️ Lütfen şifrenizi giriniz.', 'warning');
+        portal.querySelector('#loginPassword').focus();
+        return;
+      }
+
       const captchaInput = portal.querySelector('#loginCaptchaInput').value.trim().toUpperCase();
       if (captchaInput !== currentCaptchaText.toUpperCase()) {
-        showAlert('🛡️ Güvenlik kodu (CAPTCHA) hatalı! Lütfen görseldeki kodu tekrar girin.', 'warning');
+        showAlert('🛡️ Güvenlik kodu (CAPTCHA) hatalı! Lütfen görseldeki kodu tekrar giriniz.', 'warning');
         generateCaptcha('captchaCanvasLogin');
         portal.querySelector('#loginCaptchaInput').value = '';
         portal.querySelector('#loginCaptchaInput').focus();
@@ -904,8 +932,6 @@
       submitBtn.disabled = true;
       submitBtn.textContent = 'Giriş Yapılıyor... ⏳';
 
-      const ident = portal.querySelector('#loginIdentifier').value;
-      const pass = portal.querySelector('#loginPassword').value;
       const remember = portal.querySelector('#loginRememberMe').checked;
 
       const res = await login({ identifier: ident, password: pass, rememberMe: remember });
@@ -934,17 +960,45 @@
       e.preventDefault();
       hideAlert();
 
+      const fullName = (portal.querySelector('#regFullName').value || '').trim();
+      const username = (portal.querySelector('#regUsername').value || '').trim();
+      const email = (portal.querySelector('#regEmail').value || '').trim().toLowerCase();
       const pass = portal.querySelector('#regPassword').value;
       const passConf = portal.querySelector('#regPasswordConfirm').value;
 
+      if (!/^[a-zA-ZçğıöşüÇĞİÖŞÜ\s]{3,50}$/.test(fullName)) {
+        showAlert('⚠️ Ad ve Soyad yalnızca harflerden oluşmalıdır (en az 3 harf).', 'warning');
+        portal.querySelector('#regFullName').focus();
+        return;
+      }
+
+      if (!/^[a-zA-Z0-9_]{3,25}$/.test(username)) {
+        showAlert('⚠️ Kullanıcı adı 3-25 karakter arasında olmalı, Türkçe karakter veya boşluk içermemelidir.', 'warning');
+        portal.querySelector('#regUsername').focus();
+        return;
+      }
+
+      if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}$/.test(email)) {
+        showAlert('⚠️ Lütfen geçerli bir e-posta formatı giriniz (Örn: ad.soyad@kurum.com).', 'warning');
+        portal.querySelector('#regEmail').focus();
+        return;
+      }
+
+      if (pass.length < 4) {
+        showAlert('⚠️ Şifreniz en az 4 karakter olmalıdır.', 'warning');
+        portal.querySelector('#regPassword').focus();
+        return;
+      }
+
       if (pass !== passConf) {
-        showAlert('🔒 Girdiğiniz şifreler birbiriyle eşleşmiyor. İki kutuya da aynı şifreyi yazın.', 'warning');
+        showAlert('🔒 Girdiğiniz şifreler birbiriyle eşleşmiyor. İki kutuya da aynı şifreyi yazınız.', 'warning');
+        portal.querySelector('#regPasswordConfirm').focus();
         return;
       }
 
       const captchaInput = portal.querySelector('#regCaptchaInput').value.trim().toUpperCase();
       if (captchaInput !== currentCaptchaText.toUpperCase()) {
-        showAlert('🛡️ Güvenlik kodu (CAPTCHA) hatalı! Görseldeki kodu doğru girin.', 'warning');
+        showAlert('🛡️ Güvenlik kodu (CAPTCHA) hatalı! Görseldeki kodu doğru giriniz.', 'warning');
         generateCaptcha('captchaCanvasReg');
         portal.querySelector('#regCaptchaInput').value = '';
         return;
@@ -955,9 +1009,9 @@
       submitBtn.textContent = 'Hesap Oluşturuluyor... ⏳';
 
       const res = await register({
-        fullName: portal.querySelector('#regFullName').value,
-        username: portal.querySelector('#regUsername').value,
-        email: portal.querySelector('#regEmail').value,
+        fullName,
+        username,
+        email,
         phone: portal.querySelector('#regPhone').value,
         department: portal.querySelector('#regDepartment').value,
         password: pass
@@ -982,13 +1036,55 @@
       }
     };
 
+    // ── OTP KODU İÇİN SADECE RAKAM FİLTRESİ ──
+    const otpInput = portal.querySelector('#forgotOtpCodeInput');
+    if (otpInput) {
+      otpInput.addEventListener('input', () => {
+        otpInput.value = otpInput.value.replace(/\D/g, '').slice(0, 6);
+      });
+    }
+
+    let cooldownInterval = null;
+    function startResendCooldown(seconds = 60) {
+      const resendBtn = portal.querySelector('#btnResendForgotOtp');
+      if (!resendBtn) return;
+      let remaining = seconds;
+      resendBtn.disabled = true;
+      resendBtn.style.opacity = '0.6';
+      resendBtn.style.cursor = 'not-allowed';
+
+      if (cooldownInterval) clearInterval(cooldownInterval);
+      cooldownInterval = setInterval(() => {
+        remaining--;
+        if (remaining <= 0) {
+          clearInterval(cooldownInterval);
+          resendBtn.disabled = false;
+          resendBtn.style.opacity = '1';
+          resendBtn.style.cursor = 'pointer';
+          resendBtn.textContent = '🔄 Kodu Tekrar Gönder';
+        } else {
+          resendBtn.textContent = `⏱️ Tekrar Gönder (${remaining}s)`;
+        }
+      }, 1000);
+      resendBtn.textContent = `⏱️ Tekrar Gönder (${remaining}s)`;
+    }
+
     // ── ŞİFREMİ UNUTTUM 1. ADIM: KOD GÖNDER ──
     const btnSendOtp = portal.querySelector('#btnSendForgotOtp');
-    btnSendOtp.onclick = async () => {
+    const handleSendOtp = async () => {
       hideAlert();
-      const ident = portal.querySelector('#forgotIdentInput').value.trim();
+      const ident = (portal.querySelector('#forgotIdentInput').value || '').trim();
+
       if (!ident) {
-        showAlert('Lütfen e-posta adresinizi veya kullanıcı adınızı girin.', 'warning');
+        showAlert('⚠️ Lütfen e-posta adresinizi veya kullanıcı adınızı giriniz.', 'warning');
+        portal.querySelector('#forgotIdentInput').focus();
+        return;
+      }
+
+      // Geçersiz format engeli (asdasdas gibi)
+      if (ident.includes('@') && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}$/.test(ident)) {
+        showAlert('⚠️ Lütfen geçerli bir e-posta formatı giriniz (Örn: ad.soyad@kurum.com).', 'warning');
+        portal.querySelector('#forgotIdentInput').focus();
         return;
       }
 
@@ -1016,14 +1112,15 @@
           portal.querySelector('#forgotOtpNotice').innerHTML = `
             <strong>${data.maskedEmail}</strong> adresine 6 haneli güvenlik kodu gönderildi. Kodunuzu aşağıya giriniz:
           `;
-          showAlert('✅ Doğrulama kodu e-posta adresinize gönderildi!', 'success');
+          showAlert('✅ Doğrulama kodu e-posta adresinize gönderildi! (Spam klasörünü de kontrol ediniz)', 'success');
+          startResendCooldown(60);
           portal.querySelector('#forgotOtpCodeInput').focus();
         } else {
-          showAlert(data.reason || 'Kod gönderilemedi.', 'error');
+          showAlert(data.reason || '❌ Kod gönderilemedi.', 'error');
         }
       } catch (err) {
         if (err.name === 'AbortError') {
-          showAlert('E-posta sunucusu yanıt vermedi. Lütfen internetinizi kontrol edip tekrar deneyin.', 'error');
+          showAlert('⏱️ E-posta sunucusu yanıt vermedi. Lütfen internetinizi kontrol edip tekrar deneyiniz.', 'error');
         } else {
           showAlert('Sunucu bağlantı hatası: ' + err.message, 'error');
         }
@@ -1033,26 +1130,33 @@
       }
     };
 
+    btnSendOtp.onclick = handleSendOtp;
+    const btnResend = portal.querySelector('#btnResendForgotOtp');
+    if (btnResend) btnResend.onclick = handleSendOtp;
+
     // ── ŞİFREMİ UNUTTUM 2. ADIM: OTP DOĞRULA VE ŞİFRE GÜNCELLE ──
     const btnVerifyOtp = portal.querySelector('#btnVerifyOtpAndReset');
     btnVerifyOtp.onclick = async () => {
       hideAlert();
-      const code = portal.querySelector('#forgotOtpCodeInput').value.trim();
+      const code = (portal.querySelector('#forgotOtpCodeInput').value || '').trim().replace(/\D/g, '');
       const newPass = portal.querySelector('#forgotNewPass').value;
       const newPassConf = portal.querySelector('#forgotNewPassConfirm').value;
 
       if (!code || code.length !== 6) {
-        showAlert('Lütfen 6 haneli güvenlik kodunu eksiksiz girin.', 'warning');
+        showAlert('⚠️ Lütfen 6 haneli güvenlik kodunu eksiksiz giriniz.', 'warning');
+        portal.querySelector('#forgotOtpCodeInput').focus();
         return;
       }
 
-      if (!newPass || newPass.length < 3) {
-        showAlert('Yeni şifreniz en az 3 karakter olmalıdır.', 'warning');
+      if (!newPass || newPass.length < 4) {
+        showAlert('⚠️ Yeni şifreniz en az 4 karakter olmalıdır.', 'warning');
+        portal.querySelector('#forgotNewPass').focus();
         return;
       }
 
       if (newPass !== newPassConf) {
-        showAlert('Yeni şifreler eşleşmiyor! İki kutuya da aynı şifreyi yazın.', 'warning');
+        showAlert('🔒 Yeni şifreler eşleşmiyor! İki kutuya da aynı şifreyi yazınız.', 'warning');
+        portal.querySelector('#forgotNewPassConfirm').focus();
         return;
       }
 
@@ -1086,11 +1190,11 @@
             portal.querySelector('#loginPassword').focus();
           }, 1800);
         } else {
-          showAlert(data.reason || 'Doğrulama başarısız oldu.', 'error');
+          showAlert(data.reason || '❌ Doğrulama başarısız oldu.', 'error');
         }
       } catch (err) {
         if (err.name === 'AbortError') {
-          showAlert('İstek zaman aşımına uğradı. Lütfen tekrar deneyin.', 'error');
+          showAlert('⏱️ İstek zaman aşımına uğradı. Lütfen tekrar deneyiniz.', 'error');
         } else {
           showAlert('Sunucu hatası: ' + err.message, 'error');
         }
