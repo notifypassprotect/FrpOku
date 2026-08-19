@@ -599,93 +599,131 @@
 
         <!-- ── 2. KAYIT FORMU ── -->
         <form id="authRegisterForm" style="display: ${initialTab === 'register' ? 'block' : 'none'};">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem;">
-            <div>
-              <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">👤 Ad Soyad *</label>
-              <input type="text" id="regFullName" required placeholder="İlker Diner" style="
+          <!-- Kayıt Adım 1: Bilgileri Girme -->
+          <div id="regStep1">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem;">
+              <div>
+                <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">👤 Ad Soyad *</label>
+                <input type="text" id="regFullName" required placeholder="İlker Diner" style="
+                  width: 100%; padding: .65rem .85rem; border-radius: 10px;
+                  background: #f8fafc; border: 1.5px solid #cbd5e1;
+                  color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
+                " />
+              </div>
+              <div>
+                <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">🏷️ Kullanıcı Adı *</label>
+                <input type="text" id="regUsername" required placeholder="ilker" style="
+                  width: 100%; padding: .65rem .85rem; border-radius: 10px;
+                  background: #f8fafc; border: 1.5px solid #cbd5e1;
+                  color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
+                " />
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem;">
+              <div>
+                <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">📧 E-Posta *</label>
+                <input type="email" id="regEmail" required placeholder="ornek@kurum.com" style="
+                  width: 100%; padding: .65rem .85rem; border-radius: 10px;
+                  background: #f8fafc; border: 1.5px solid #cbd5e1;
+                  color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
+                " />
+              </div>
+              <div>
+                <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">📱 Telefon No</label>
+                <input type="tel" id="regPhone" placeholder="0534..." style="
+                  width: 100%; padding: .65rem .85rem; border-radius: 10px;
+                  background: #f8fafc; border: 1.5px solid #cbd5e1;
+                  color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
+                " />
+              </div>
+            </div>
+
+            <div style="margin-bottom:.75rem;">
+              <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">🏢 Kurum / Birim</label>
+              <input type="text" id="regDepartment" placeholder="ör: Şehir Hastanesi Bilgi İşlem" style="
                 width: 100%; padding: .65rem .85rem; border-radius: 10px;
                 background: #f8fafc; border: 1.5px solid #cbd5e1;
                 color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
               " />
             </div>
-            <div>
-              <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">🏷️ Kullanıcı Adı *</label>
-              <input type="text" id="regUsername" required placeholder="ilker" style="
-                width: 100%; padding: .65rem .85rem; border-radius: 10px;
-                background: #f8fafc; border: 1.5px solid #cbd5e1;
-                color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
-              " />
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem;">
+              <div>
+                <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">🔒 Şifre *</label>
+                <input type="password" id="regPassword" required placeholder="Şifreniz" style="
+                  width: 100%; padding: .65rem .85rem; border-radius: 10px;
+                  background: #f8fafc; border: 1.5px solid #cbd5e1;
+                  color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
+                " />
+              </div>
+              <div>
+                <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">🔒 Şifre Tekrar *</label>
+                <input type="password" id="regPasswordConfirm" required placeholder="Tekrar girin" style="
+                  width: 100%; padding: .65rem .85rem; border-radius: 10px;
+                  background: #f8fafc; border: 1.5px solid #cbd5e1;
+                  color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
+                " />
+              </div>
             </div>
+
+            <!-- CAPTCHA (Kayıt) -->
+            <div style="margin-bottom: 1rem; background: #f8fafc; padding:.65rem; border-radius: 10px; border: 1.5px solid #e2e8f0;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.35rem;">
+                <span style="font-size:.72rem;font-weight:700;color:#334155;">🛡️ Güvenlik Doğrulaması</span>
+                <button type="button" id="btnRefreshCaptchaReg" style="background:none;border:none;color:#2563eb;font-size:.72rem;font-weight:700;cursor:pointer;">🔄 Yeni Kod</button>
+              </div>
+              <div style="display:flex;gap:.65rem;align-items:center;">
+                <canvas id="captchaCanvasReg" width="120" height="34" style="border-radius:6px;border:1px solid #cbd5e1;cursor:pointer;background:#fff;"></canvas>
+                <input type="text" id="regCaptchaInput" maxlength="5" required placeholder="Kodu girin" style="
+                  flex:1; padding:.5rem .7rem; border-radius:6px; text-transform:uppercase; font-family:monospace; font-weight:800;
+                  background:#ffffff; border:1.5px solid #cbd5e1; color:#0f172a; font-size:.9rem; outline:none; text-align:center;
+                " />
+              </div>
+            </div>
+
+            <button type="submit" id="btnRegisterSubmit" style="
+              width: 100%; padding: .85rem; border: none; border-radius: 12px;
+              background: linear-gradient(135deg, #10b981, #059669);
+              color: #ffffff; font-weight: 800; font-size: .95rem; cursor: pointer;
+              box-shadow: 0 4px 14px rgba(16,185,129,0.3); transition: all .2s;
+            ">✨ Doğrulama Kodu Gönder & Kayıt Ol</button>
           </div>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem;">
-            <div>
-              <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">📧 E-Posta *</label>
-              <input type="email" id="regEmail" required placeholder="ornek@kurum.com" style="
-                width: 100%; padding: .65rem .85rem; border-radius: 10px;
-                background: #f8fafc; border: 1.5px solid #cbd5e1;
-                color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
-              " />
-            </div>
-            <div>
-              <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">📱 Telefon No</label>
-              <input type="tel" id="regPhone" placeholder="0534..." style="
-                width: 100%; padding: .65rem .85rem; border-radius: 10px;
-                background: #f8fafc; border: 1.5px solid #cbd5e1;
-                color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
-              " />
-            </div>
-          </div>
+          <!-- Kayıt Adım 2: E-Posta OTP Doğrulama -->
+          <div id="regStep2" style="display: none; text-align: left;">
+            <div style="font-size: 1.1rem; font-weight: 800; color: #0f172a; margin-bottom: .3rem;">📬 E-Posta Adresinizi Doğrulayın</div>
+            <p id="regOtpNotice" style="font-size: .82rem; color: #64748b; margin-bottom: 1.2rem; line-height: 1.4;">
+              E-posta adresinize 6 haneli güvenlik kodu gönderildi.
+            </p>
 
-          <div style="margin-bottom:.75rem;">
-            <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">🏢 Kurum / Birim</label>
-            <input type="text" id="regDepartment" placeholder="ör: Şehir Hastanesi Bilgi İşlem" style="
-              width: 100%; padding: .65rem .85rem; border-radius: 10px;
-              background: #f8fafc; border: 1.5px solid #cbd5e1;
-              color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
-            " />
-          </div>
-
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem;">
-            <div>
-              <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">🔒 Şifre *</label>
-              <input type="password" id="regPassword" required placeholder="Şifreniz" style="
-                width: 100%; padding: .65rem .85rem; border-radius: 10px;
-                background: #f8fafc; border: 1.5px solid #cbd5e1;
-                color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
+            <div style="margin-bottom: 1.2rem;">
+              <label style="display:block;font-size:.78rem;font-weight:700;color:#334155;margin-bottom:.35rem;">🔢 6 Haneli Güvenlik Kodu</label>
+              <input type="text" id="regOtpCodeInput" maxlength="6" placeholder="______" style="
+                width: 100%; padding: .75rem 1rem; border-radius: 12px; letter-spacing: 8px; font-weight: 900; font-family: monospace;
+                background: #ecfdf5; border: 2px dashed #10b981; text-align: center;
+                color: #065f46; font-size: 1.4rem; outline: none; box-sizing: border-box;
               " />
             </div>
-            <div>
-              <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">🔒 Şifre Tekrar *</label>
-              <input type="password" id="regPasswordConfirm" required placeholder="Tekrar girin" style="
-                width: 100%; padding: .65rem .85rem; border-radius: 10px;
-                background: #f8fafc; border: 1.5px solid #cbd5e1;
-                color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
-              " />
-            </div>
-          </div>
 
-          <!-- CAPTCHA (Kayıt) -->
-          <div style="margin-bottom: 1rem; background: #f8fafc; padding:.65rem; border-radius: 10px; border: 1.5px solid #e2e8f0;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.35rem;">
-              <span style="font-size:.72rem;font-weight:700;color:#334155;">🛡️ Güvenlik Doğrulaması</span>
-              <button type="button" id="btnRefreshCaptchaReg" style="background:none;border:none;color:#2563eb;font-size:.72rem;font-weight:700;cursor:pointer;">🔄 Yeni Kod</button>
-            </div>
-            <div style="display:flex;gap:.65rem;align-items:center;">
-              <canvas id="captchaCanvasReg" width="120" height="34" style="border-radius:6px;border:1px solid #cbd5e1;cursor:pointer;background:#fff;"></canvas>
-              <input type="text" id="regCaptchaInput" maxlength="5" required placeholder="Kodu girin" style="
-                flex:1; padding:.5rem .7rem; border-radius:6px; text-transform:uppercase; font-family:monospace; font-weight:800;
-                background:#ffffff; border:1.5px solid #cbd5e1; color:#0f172a; font-size:.9rem; outline:none; text-align:center;
-              " />
-            </div>
-          </div>
+            <button type="button" id="btnVerifyRegOtp" style="
+              width: 100%; padding: .85rem; border: none; border-radius: 12px;
+              background: linear-gradient(135deg, #10b981, #059669); color: #fff; font-weight: 800; font-size: .92rem; cursor: pointer; margin-bottom: .8rem;
+              box-shadow: 0 4px 14px rgba(16,185,129,0.3);
+            ">✅ Hesabımı Aktifleştir ve Giriş Yap</button>
 
-          <button type="submit" id="btnRegisterSubmit" style="
-            width: 100%; padding: .85rem; border: none; border-radius: 12px;
-            background: linear-gradient(135deg, #10b981, #059669);
-            color: #ffffff; font-weight: 800; font-size: .95rem; cursor: pointer;
-            box-shadow: 0 4px 14px rgba(16,185,129,0.3); transition: all .2s;
-          ">✨ Hesabımı Oluştur</button>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.8rem; padding: 0 .2rem;">
+              <span style="font-size:.75rem; color:#64748b;">Kodu alamadınız mı?</span>
+              <button type="button" id="btnResendRegOtp" style="background:none; border:none; color:#2563eb; font-weight:700; font-size:.78rem; cursor:pointer;">
+                ⏱️ Tekrar Gönder (60s)
+              </button>
+            </div>
+
+            <button type="button" id="btnBackToRegStep1" style="
+              width: 100%; padding: .65rem; border: 1px solid #cbd5e1; border-radius: 12px;
+              background: #f1f5f9; color: #475569; font-weight: 700; font-size:.82rem; cursor: pointer;
+            ">← Bilgileri Değiştir</button>
+          </div>
         </form>
 
         <!-- ── 3. ŞİFREMİ UNUTTUM FORMU (6 HANELİ OTP AKIŞI) ── -->
@@ -832,6 +870,10 @@
       } else if (tab === 'register') {
         loginForm.style.display = 'none';
         regForm.style.display = 'block';
+        const regStep1 = portal.querySelector('#regStep1');
+        const regStep2 = portal.querySelector('#regStep2');
+        if (regStep1) regStep1.style.display = 'block';
+        if (regStep2) regStep2.style.display = 'none';
         tabReg.style.background = '#ffffff';
         tabReg.style.color = '#2563eb';
         tabReg.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
@@ -954,8 +996,44 @@
       }
     };
 
-    // ── KAYIT SUBMIT ──
+    // ── KAYIT DEĞİŞKENLERİ VE SUBMIT ──
+    let pendingRegEmail = '';
+    let pendingRegPayload = null;
+    let regCooldownInterval = null;
+
     const regForm = portal.querySelector('#authRegisterForm');
+    const regOtpInput = portal.querySelector('#regOtpCodeInput');
+    if (regOtpInput) {
+      regOtpInput.addEventListener('input', () => {
+        regOtpInput.value = regOtpInput.value.replace(/\D/g, '').slice(0, 6);
+      });
+    }
+
+    function startResendCooldownReg(seconds = 60) {
+      const resendBtn = portal.querySelector('#btnResendRegOtp');
+      if (!resendBtn) return;
+      let remaining = seconds;
+      resendBtn.disabled = true;
+      resendBtn.style.opacity = '0.6';
+      resendBtn.style.cursor = 'not-allowed';
+
+      if (regCooldownInterval) clearInterval(regCooldownInterval);
+      regCooldownInterval = setInterval(() => {
+        remaining--;
+        if (remaining <= 0) {
+          clearInterval(regCooldownInterval);
+          resendBtn.disabled = false;
+          resendBtn.style.opacity = '1';
+          resendBtn.style.cursor = 'pointer';
+          resendBtn.textContent = '🔄 Kodu Tekrar Gönder';
+        } else {
+          resendBtn.textContent = `⏱️ Tekrar Gönder (${remaining}s)`;
+        }
+      }, 1000);
+      resendBtn.textContent = `⏱️ Tekrar Gönder (${remaining}s)`;
+    }
+
+    // 1. ADIM: KAYIT FORMUNU DOĞRULA VE DOĞRULAMA KODU İSTE
     regForm.onsubmit = async (e) => {
       e.preventDefault();
       hideAlert();
@@ -1006,35 +1084,161 @@
 
       const submitBtn = portal.querySelector('#btnRegisterSubmit');
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Hesap Oluşturuluyor... ⏳';
+      submitBtn.textContent = 'Doğrulama Kodu Gönderiliyor... ⏳';
 
-      const res = await register({
+      pendingRegPayload = {
         fullName,
         username,
         email,
         phone: portal.querySelector('#regPhone').value,
         department: portal.querySelector('#regDepartment').value,
         password: pass
-      });
+      };
 
-      submitBtn.disabled = false;
-      submitBtn.textContent = '✨ Hesabımı Oluştur';
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
 
-      if (res.success) {
-        portal.remove();
-        showLoginTransitionSplash(res.user, () => {
-          if (appWrap) appWrap.style.display = 'flex';
-          updateNavbarUserBadge();
-          if (window.FrpStore && typeof window.FrpStore.refreshFromCloud === 'function') {
-            window.FrpStore.refreshFromCloud();
-          }
-          if (typeof window.toast === 'function') window.toast(`Hesabınız oluşturuldu! Hoş geldiniz, ${res.user.full_name}! 🎉 (Bilgilendirme e-postanız gönderildi)`, 'success');
+        const res = await fetch('/api/auth/register-request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(pendingRegPayload),
+          signal: controller.signal
         });
-      } else {
-        showAlert(res.reason || 'Kayıt işlemi başarısız oldu.', 'error');
-        generateCaptcha('captchaCanvasReg');
+        clearTimeout(timeoutId);
+
+        const data = await res.json();
+        submitBtn.disabled = false;
+        submitBtn.textContent = '✨ Doğrulama Kodu Gönder & Kayıt Ol';
+
+        if (data.success) {
+          pendingRegEmail = data.email;
+          portal.querySelector('#regStep1').style.display = 'none';
+          portal.querySelector('#regStep2').style.display = 'block';
+          portal.querySelector('#regOtpNotice').innerHTML = `
+            <strong>${data.maskedEmail}</strong> adresine 6 haneli doğrulama kodu gönderildi. Kodunuzu aşağıya giriniz:
+          `;
+          showAlert('✅ Doğrulama kodu e-posta adresinize gönderildi! (Spam klasörünü de kontrol ediniz)', 'success');
+          startResendCooldownReg(60);
+          portal.querySelector('#regOtpCodeInput').focus();
+        } else {
+          showAlert(data.reason || 'Kayıt işlemi başlatılamadı.', 'error');
+          generateCaptcha('captchaCanvasReg');
+        }
+      } catch (err) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '✨ Doğrulama Kodu Gönder & Kayıt Ol';
+        if (err.name === 'AbortError') {
+          showAlert('⏱️ E-posta sunucusu yanıt vermedi. Lütfen internetinizi kontrol edip tekrar deneyiniz.', 'error');
+        } else {
+          showAlert('Sunucu bağlantı hatası: ' + err.message, 'error');
+        }
       }
     };
+
+    // 2. ADIM: OTP KODUNU DOĞRULA VE HESABI OLUŞTUR
+    const btnVerifyRegOtp = portal.querySelector('#btnVerifyRegOtp');
+    if (btnVerifyRegOtp) {
+      btnVerifyRegOtp.onclick = async () => {
+        hideAlert();
+        const code = (portal.querySelector('#regOtpCodeInput').value || '').trim().replace(/\D/g, '');
+
+        if (!code || code.length !== 6) {
+          showAlert('⚠️ Lütfen 6 haneli güvenlik kodunu eksiksiz giriniz.', 'warning');
+          portal.querySelector('#regOtpCodeInput').focus();
+          return;
+        }
+
+        btnVerifyRegOtp.disabled = true;
+        btnVerifyRegOtp.textContent = 'Hesap Aktifleştiriliyor... ⏳';
+
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+          const res = await fetch('/api/auth/register-verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: pendingRegEmail,
+              code
+            }),
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+
+          const data = await res.json();
+          btnVerifyRegOtp.disabled = false;
+          btnVerifyRegOtp.textContent = '✅ Hesabımı Aktifleştir ve Giriş Yap';
+
+          if (data.success) {
+            currentUser = data.user;
+            setSession(data.user, true);
+            portal.remove();
+            showLoginTransitionSplash(data.user, () => {
+              if (appWrap) appWrap.style.display = 'flex';
+              updateNavbarUserBadge();
+              if (window.FrpStore && typeof window.FrpStore.refreshFromCloud === 'function') {
+                window.FrpStore.refreshFromCloud();
+              }
+              if (typeof window.toast === 'function') window.toast(`🎉 Tebrikler! Hesabınız başarıyla doğrulandı ve aktifleştirildi. Hoş geldiniz, ${data.user.full_name}!`, 'success');
+            });
+          } else {
+            showAlert(data.reason || 'Doğrulama başarısız oldu.', 'error');
+          }
+        } catch (err) {
+          btnVerifyRegOtp.disabled = false;
+          btnVerifyRegOtp.textContent = '✅ Hesabımı Aktifleştir ve Giriş Yap';
+          if (err.name === 'AbortError') {
+            showAlert('⏱️ İstek zaman aşımına uğradı. Lütfen tekrar deneyiniz.', 'error');
+          } else {
+            showAlert('Sunucu hatası: ' + err.message, 'error');
+          }
+        }
+      };
+    }
+
+    // KAYIT OTP YENİDEN GÖNDER
+    const btnResendRegOtp = portal.querySelector('#btnResendRegOtp');
+    if (btnResendRegOtp) {
+      btnResendRegOtp.onclick = async () => {
+        if (!pendingRegPayload) return;
+        hideAlert();
+        btnResendRegOtp.disabled = true;
+        btnResendRegOtp.textContent = 'Kod Gönderiliyor... ⏳';
+
+        try {
+          const res = await fetch('/api/auth/register-request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(pendingRegPayload)
+          });
+          const data = await res.json();
+          if (data.success) {
+            showAlert('✅ Yeni doğrulama kodu e-posta adresinize gönderildi!', 'success');
+            startResendCooldownReg(60);
+          } else {
+            showAlert(data.reason || 'Kod gönderilemedi.', 'error');
+            btnResendRegOtp.disabled = false;
+            btnResendRegOtp.textContent = '🔄 Kodu Tekrar Gönder';
+          }
+        } catch (e) {
+          showAlert('Bağlantı hatası: ' + e.message, 'error');
+          btnResendRegOtp.disabled = false;
+          btnResendRegOtp.textContent = '🔄 Kodu Tekrar Gönder';
+        }
+      };
+    }
+
+    // KAYIT ADIM 1'E GERİ DÖN
+    const btnBackReg1 = portal.querySelector('#btnBackToRegStep1');
+    if (btnBackReg1) {
+      btnBackReg1.onclick = () => {
+        hideAlert();
+        portal.querySelector('#regStep2').style.display = 'none';
+        portal.querySelector('#regStep1').style.display = 'block';
+      };
+    }
 
     // ── OTP KODU İÇİN SADECE RAKAM FİLTRESİ ──
     const otpInput = portal.querySelector('#forgotOtpCodeInput');

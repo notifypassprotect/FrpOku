@@ -44,9 +44,10 @@ if (SMTP_USER && SMTP_PASS) {
   });
 }
 
-// In-Memory OTP & Cooldown Stores
+// In-Memory OTP, Cooldown & Pending Registration Stores
 const otpStore = new Map(); // email -> { code, expiresAt, userId, name, attempts }
 const otpCooldownStore = new Map(); // email -> lastRequestTimestamp
+const pendingRegistrations = new Map(); // email -> { code, expiresAt, fullName, username, email, phone, department, passwordHash, attempts }
 
 function hashPassword(plainText) {
   if (!plainText) return '';
@@ -247,7 +248,243 @@ function getPasswordChangedEmailHtml(name) {
   `;
 }
 
-// ── 1. HOŞ GELDİNİZ MAİLİ GÖNDERME ──────────────────────────
+function getRegisterOtpEmailHtml(name, code) {
+  return `
+  <!DOCTYPE html>
+  <html>
+  <head><meta charset="utf-8"></head>
+  <body style="margin:0;padding:0;background-color:#0f172a;font-family:'Segoe UI',Roboto,Helvetica,sans-serif;color:#f8fafc;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0f172a;padding:40px 10px;">
+      <tr>
+        <td align="center">
+          <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background-color:#1e293b;border-radius:20px;border:1px solid #334155;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);">
+            <tr>
+              <td style="height:6px;background:linear-gradient(90deg, #10b981, #3b82f6, #8b5cf6);"></td>
+            </tr>
+            <tr>
+              <td style="padding:32px 36px 20px;text-align:center;">
+                <div style="display:inline-block;width:64px;height:64px;line-height:64px;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);border-radius:18px;font-size:30px;text-align:center;">✨</div>
+                <h1 style="margin:18px 0 6px;color:#ffffff;font-size:22px;font-weight:800;">E-Posta Doğrulama Kodu</h1>
+                <p style="margin:0;color:#94a3b8;font-size:13px;">FrpOku Cloud Portal Hesap Oluşturma</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 36px 32px;">
+                <div style="background-color:#0f172a;border-radius:14px;border:1px solid #334155;padding:22px;margin-bottom:24px;text-align:center;">
+                  <p style="margin:0 0 12px;font-size:15px;color:#f8fafc;">Merhaba <strong>${name || 'Yeni Kullanıcı'}</strong>,</p>
+                  <p style="margin:0 0 20px;font-size:13px;line-height:1.6;color:#cbd5e1;">
+                    FrpOku Cloud Portal hesabınızı aktifleştirmek için aşağıdaki 6 haneli güvenlik kodunu giriniz:
+                  </p>
+                  
+                  <div style="display:inline-block;background:linear-gradient(135deg, rgba(16,185,129,0.15), rgba(59,130,246,0.15));border:2px dashed #10b981;border-radius:12px;padding:14px 28px;letter-spacing:10px;font-size:32px;font-weight:900;color:#34d399;font-family:monospace;">
+                    ${code}
+                  </div>
+
+                  <p style="margin:20px 0 0;font-size:12px;color:#94a3b8;">
+                    ⏳ Bu kod <strong>10 dakika</strong> boyunca geçerlidir.
+                  </p>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 36px;background-color:#0f172a;border-top:1px solid #334155;text-align:center;font-size:11px;color:#64748b;">
+                FrpOku Güvenlik Ekibi • <a href="https://frpoku.onrender.com" style="color:#38bdf8;text-decoration:none;">frpoku.onrender.com</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+  </html>
+  `;
+}
+
+// ── 0. YENİ KULLANICI KAYIT TALEBİ VE OTP GÖNDERME ─────────────
+app.post('/api/auth/register-request', async (req, res) => {
+  const { fullName, username, email, phone, department, password } = req.body;
+  const cleanEmail = (email || '').trim().toLowerCase();
+  const cleanUser = (username || '').trim().toLowerCase();
+  const cleanName = (fullName || '').trim();
+  const cleanPhone = (phone || '').trim();
+
+  if (!cleanName || !cleanUser || !cleanEmail || !password) {
+    return res.status(400).json({ success: false, reason: '⚠️ Lütfen zorunlu alanları (Ad Soyad, Kullanıcı Adı, E-Posta, Şifre) eksiksiz doldurunuz.' });
+  }
+
+  if (!EMAIL_REGEX.test(cleanEmail)) {
+    return res.status(400).json({ success: false, reason: '⚠️ Lütfen geçerli bir e-posta formatı giriniz (Örn: ad.soyad@kurum.com).' });
+  }
+
+  if (password.length < 4) {
+    return res.status(400).json({ success: false, reason: '⚠️ Şifreniz en az 4 karakter olmalıdır.' });
+  }
+
+  if (!supabase) {
+    return res.status(500).json({ success: false, reason: '❌ Veritabanı bağlantısı kurulamadı.' });
+  }
+
+  try {
+    // 1. E-Posta veya Kullanıcı Adı Zaten Kayıtlı mı?
+    const { data: existingUsers, error: searchErr } = await supabase
+      .from('app_users')
+      .select('id, username, email')
+      .or(`email.ilike.${cleanEmail},username.ilike.${cleanUser}`)
+      .limit(2);
+
+    if (existingUsers && existingUsers.length > 0) {
+      const matchEmail = existingUsers.some(u => (u.email || '').toLowerCase() === cleanEmail);
+      if (matchEmail) {
+        return res.status(400).json({ success: false, reason: `⚠️ '${cleanEmail}' e-posta adresi ile zaten kayıtlı bir hesap var. Lütfen giriş yapın veya şifrenizi sıfırlayın.` });
+      }
+      return res.status(400).json({ success: false, reason: `⚠️ '${cleanUser}' kullanıcı adı başkası tarafından kullanılıyor. Lütfen farklı bir kullanıcı adı seçiniz.` });
+    }
+
+    // 2. Cooldown Kontrolü (60 saniye)
+    const lastSent = otpCooldownStore.get(cleanEmail);
+    if (lastSent && Date.now() - lastSent < 60000) {
+      const waitSeconds = Math.ceil((60000 - (Date.now() - lastSent)) / 1000);
+      return res.status(429).json({
+        success: false,
+        reason: `⏱️ Yeni bir kayıt doğrulama kodu talep etmek için lütfen ${waitSeconds} saniye bekleyiniz.`
+      });
+    }
+
+    // 3. 6 Haneli OTP Kod Üret
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 dakika
+
+    pendingRegistrations.set(cleanEmail, {
+      code: otpCode,
+      expiresAt,
+      fullName: cleanName,
+      username: cleanUser,
+      email: cleanEmail,
+      phone: cleanPhone,
+      department: department || '',
+      passwordHash: hashPassword(password),
+      attempts: 0
+    });
+
+    otpCooldownStore.set(cleanEmail, Date.now());
+
+    // 4. Doğrulama Kodunu E-Postaya Gönder
+    if (mailTransporter) {
+      try {
+        await Promise.race([
+          mailTransporter.sendMail({
+            from: SMTP_FROM,
+            to: cleanEmail,
+            subject: `FrpOku Kayit Dogrulama Kodu: ${otpCode}`,
+            text: `Merhaba ${cleanName},\n\nFrpOku hesabınızı oluşturmak için 6 haneli güvenlik kodunuz: ${otpCode}\n\nBu kod 10 dakika geçerlidir.\n\nFrpOku Cloud Portal`,
+            html: getRegisterOtpEmailHtml(cleanName, otpCode)
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('E-posta zaman aşımı')), 10000))
+        ]);
+      } catch (mailErr) {
+        console.warn('Register mail send error:', mailErr.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      email: cleanEmail,
+      maskedEmail: maskEmail(cleanEmail)
+    });
+  } catch (err) {
+    console.error('Register request error:', err.message);
+    res.status(500).json({ success: false, reason: 'Kayıt kodu gönderilirken hata oluştu: ' + err.message });
+  }
+});
+
+// ── 0.1. YENİ KULLANICI OTP DOĞRULAMA VE HESAP OLUŞTURMA ───────
+app.post('/api/auth/register-verify', async (req, res) => {
+  const { email, code } = req.body;
+  const cleanEmail = (email || '').trim().toLowerCase();
+  const cleanCode = (code || '').trim().replace(/\D/g, '');
+
+  if (!cleanEmail || !cleanCode) {
+    return res.status(400).json({ success: false, reason: '⚠️ Lütfen güvenlik kodunu eksiksiz giriniz.' });
+  }
+
+  if (cleanCode.length !== 6) {
+    return res.status(400).json({ success: false, reason: '⚠️ Güvenlik kodu 6 haneli olmalıdır.' });
+  }
+
+  const record = pendingRegistrations.get(cleanEmail);
+  if (!record) {
+    return res.status(400).json({ success: false, reason: '❌ Geçersiz veya süresi dolmuş kayıt başvurusu. Lütfen formu tekrar doldurunuz.' });
+  }
+
+  if (Date.now() > record.expiresAt) {
+    pendingRegistrations.delete(cleanEmail);
+    return res.status(400).json({ success: false, reason: '⏱️ Doğrulama kodunun süresi doldu (10 dk). Lütfen yeni kod isteyiniz.' });
+  }
+
+  record.attempts = (record.attempts || 0) + 1;
+  if (record.attempts > 5) {
+    pendingRegistrations.delete(cleanEmail);
+    return res.status(400).json({ success: false, reason: '⛔ Çok fazla hatalı kod denemesi yapıldı. Lütfen kayıt formunu tekrar doldurunuz.' });
+  }
+
+  if (record.code !== cleanCode) {
+    return res.status(400).json({
+      success: false,
+      reason: `❌ Girdiğiniz 6 haneli güvenlik kodu hatalı! (Kalan deneme hakkı: ${5 - record.attempts})`
+    });
+  }
+
+  if (!supabase) {
+    return res.status(500).json({ success: false, reason: '❌ Veritabanı bağlantısı yok.' });
+  }
+
+  try {
+    const newUser = {
+      id: 'usr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      username: record.username,
+      password_hash: record.passwordHash,
+      email: record.email,
+      full_name: record.fullName,
+      phone: record.phone || '',
+      department: record.department || '',
+      role: 'user',
+      is_active: true,
+      email_verified: true,
+      created_at: new Date().toISOString()
+    };
+
+    const { error: insertErr } = await supabase.from('app_users').insert([newUser]);
+    if (insertErr) throw insertErr;
+
+    // Temizle
+    pendingRegistrations.delete(cleanEmail);
+    otpCooldownStore.delete(cleanEmail);
+
+    // 🎉 Hoş Geldiniz Maili Gönder
+    if (mailTransporter) {
+      mailTransporter.sendMail({
+        from: SMTP_FROM,
+        to: record.email,
+        subject: 'FrpOku Cloud Portalına Hoş Geldiniz! 🚀',
+        text: `Merhaba ${record.fullName},\n\nFrpOku hesabınız başarıyla doğrulandı ve aktifleştirildi!\n\nArtık tüm kurumsal raporlarınıza ve kod havuzunuza dilediğiniz cihazdan erişebilirsiniz.\n\nFrpOku Ekibi`,
+        html: getWelcomeEmailHtml(record.fullName, record.username)
+      }).catch(e => console.warn('Welcome mail error:', e.message));
+    }
+
+    const safeUser = { ...newUser };
+    delete safeUser.password_hash;
+
+    res.json({
+      success: true,
+      user: safeUser
+    });
+  } catch (err) {
+    console.error('Register verify error:', err.message);
+    res.status(500).json({ success: false, reason: 'Hesap oluşturulurken hata oluştu: ' + err.message });
+  }
+});
+
+// ── 1. HOŞ GELDİNİZ MAİLİ GÖNDERME (Manuel Tetikleme İçin) ─────
 app.post('/api/auth/send-welcome', async (req, res) => {
   const { email, fullName, username } = req.body;
   if (!email || !mailTransporter) {
