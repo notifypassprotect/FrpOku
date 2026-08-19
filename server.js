@@ -18,23 +18,21 @@ if (SUPABASE_URL && SUPABASE_KEY) {
 }
 
 // ── Nodemailer SMTP Transporter ─────────────────────────────
-const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
-const SMTP_PORT = parseInt(process.env.SMTP_PORT, 10) || 465;
-const SMTP_SECURE = process.env.SMTP_SECURE !== 'false';
 const SMTP_USER = process.env.SMTP_USER || 'notifypassprotect@gmail.com';
-const SMTP_PASS = (process.env.SMTP_PASS || '').replace(/\s+/g, '');
+const SMTP_PASS = (process.env.SMTP_PASS || 'pudmkitqegolfpkf').replace(/\s+/g, '');
 const SMTP_FROM = process.env.SMTP_FROM || `"FrpOku Cloud Portal" <${SMTP_USER}>`;
 
 let mailTransporter = null;
 if (SMTP_USER && SMTP_PASS) {
   mailTransporter = nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: SMTP_PORT,
-    secure: SMTP_SECURE,
+    service: 'gmail',
     auth: {
       user: SMTP_USER,
       pass: SMTP_PASS
-    }
+    },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000
   });
 
   mailTransporter.verify((err, success) => {
@@ -281,22 +279,22 @@ app.post('/api/auth/send-reset-code', async (req, res) => {
   }
 
   try {
-    // Kullanıcıyı bul
+    // Kullanıcıyı bul (Büyük/Küçük harfe duyarsız)
     let query = supabase.from('app_users').select('id, username, email, full_name');
     if (ident.includes('@')) {
-      query = query.eq('email', ident);
+      query = query.ilike('email', ident);
     } else {
-      query = query.eq('username', ident);
+      query = query.or(`username.ilike.${ident},email.ilike.${ident}`);
     }
 
     const { data: users, error } = await query.limit(1);
     if (error || !users || users.length === 0) {
-      return res.status(404).json({ success: false, reason: 'Girdiğiniz bilgilere ait bir kullanıcı bulunamadı.' });
+      return res.status(404).json({ success: false, reason: 'Girdiğiniz bilgilere ait bir kullanıcı hesabı bulunamadı.' });
     }
 
     const user = users[0];
     if (!user.email) {
-      return res.status(400).json({ success: false, reason: 'Kullanıcının kayıtlı bir e-posta adresi bulunmuyor.' });
+      return res.status(400).json({ success: false, reason: 'Bu hesaba ait kayıtlı bir e-posta adresi bulunmuyor.' });
     }
 
     // 6 Haneli Rastgele Sayısal OTP Üret
@@ -311,14 +309,21 @@ app.post('/api/auth/send-reset-code', async (req, res) => {
       name: user.full_name || user.username
     });
 
-    // E-Posta Gönder
+    // E-Posta Gönder (Timeout korumalı)
     if (mailTransporter) {
-      await mailTransporter.sendMail({
-        from: SMTP_FROM,
-        to: user.email,
-        subject: `🔑 ${otpCode} - FrpOku Şifre Sıfırlama Doğrulama Kodu`,
-        html: getOtpEmailHtml(user.full_name || user.username, otpCode)
-      });
+      try {
+        await Promise.race([
+          mailTransporter.sendMail({
+            from: SMTP_FROM,
+            to: user.email,
+            subject: `🔑 ${otpCode} - FrpOku Şifre Sıfırlama Doğrulama Kodu`,
+            html: getOtpEmailHtml(user.full_name || user.username, otpCode)
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('E-posta sunucusu yanıt vermedi')), 10000))
+        ]);
+      } catch (mailErr) {
+        console.warn('Mail send timeout/error:', mailErr.message);
+      }
     }
 
     res.json({

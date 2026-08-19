@@ -996,15 +996,18 @@
       btnSendOtp.textContent = 'Kod Gönderiliyor... ⏳';
 
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
+
         const res = await fetch('/api/auth/send-reset-code', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identifier: ident })
+          body: JSON.stringify({ identifier: ident }),
+          signal: controller.signal
         });
+        clearTimeout(timeoutId);
 
         const data = await res.json();
-        btnSendOtp.disabled = false;
-        btnSendOtp.textContent = '📨 6 Haneli Doğrulama Kodu Gönder';
 
         if (data.success) {
           activeResetEmail = data.email;
@@ -1019,9 +1022,14 @@
           showAlert(data.reason || 'Kod gönderilemedi.', 'error');
         }
       } catch (err) {
+        if (err.name === 'AbortError') {
+          showAlert('E-posta sunucusu yanıt vermedi. Lütfen internetinizi kontrol edip tekrar deneyin.', 'error');
+        } else {
+          showAlert('Sunucu bağlantı hatası: ' + err.message, 'error');
+        }
+      } finally {
         btnSendOtp.disabled = false;
         btnSendOtp.textContent = '📨 6 Haneli Doğrulama Kodu Gönder';
-        showAlert('Sunucu bağlantı hatası: ' + err.message, 'error');
       }
     };
 
@@ -1052,6 +1060,9 @@
       btnVerifyOtp.textContent = 'Şifre Güncelleniyor... ⏳';
 
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
+
         const res = await fetch('/api/auth/verify-reset-code', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1059,12 +1070,12 @@
             email: activeResetEmail,
             code,
             newPassword: newPass
-          })
+          }),
+          signal: controller.signal
         });
+        clearTimeout(timeoutId);
 
         const data = await res.json();
-        btnVerifyOtp.disabled = false;
-        btnVerifyOtp.textContent = '✅ Şifremi Güncelle ve Giriş Yap';
 
         if (data.success) {
           showAlert('🎉 Şifreniz başarıyla güncellendi! Giriş ekranına yönlendiriliyorsunuz...', 'success');
@@ -1078,9 +1089,14 @@
           showAlert(data.reason || 'Doğrulama başarısız oldu.', 'error');
         }
       } catch (err) {
+        if (err.name === 'AbortError') {
+          showAlert('İstek zaman aşımına uğradı. Lütfen tekrar deneyin.', 'error');
+        } else {
+          showAlert('Sunucu hatası: ' + err.message, 'error');
+        }
+      } finally {
         btnVerifyOtp.disabled = false;
         btnVerifyOtp.textContent = '✅ Şifremi Güncelle ve Giriş Yap';
-        showAlert('Sunucu hatası: ' + err.message, 'error');
       }
     };
   }
