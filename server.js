@@ -589,13 +589,30 @@ app.get('/api/store/load', async (req, res) => {
 
   if (supabase) {
     try {
-      const { data, error } = await supabase
-        .from('reports')
-        .select('*')
-        .order('updated_at', { ascending: false });
+      let allRows = [];
+      let from = 0;
+      const step = 1000;
 
-      if (!error && Array.isArray(data)) {
-        const parsedList = data.map(row => row.data || row);
+      while (true) {
+        const { data, error } = await supabase
+          .from('reports')
+          .select('*')
+          .order('updated_at', { ascending: false })
+          .range(from, from + step - 1);
+
+        if (error) {
+          console.warn('Supabase okuma hatası:', error.message);
+          break;
+        }
+        if (!data || data.length === 0) break;
+
+        allRows.push(...data);
+        if (data.length < step) break;
+        from += step;
+      }
+
+      if (allRows.length > 0) {
+        const parsedList = allRows.map(row => row.data || row);
         // Sync local cache
         try {
           const dataDir = path.dirname(storePath);
@@ -677,9 +694,10 @@ app.post('/api/store/save', async (req, res) => {
       });
 
       if (rows.length > 0) {
-        // Chunk upserts in batches of 100
-        for (let i = 0; i < rows.length; i += 100) {
-          const chunk = rows.slice(i, i + 100);
+        // Chunk upserts in batches of 50 for max safety & stability
+        const BATCH_SIZE = 50;
+        for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+          const chunk = rows.slice(i, i + BATCH_SIZE);
           await supabase.from('reports').upsert(chunk, { onConflict: 'id' });
         }
       }

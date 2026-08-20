@@ -92,24 +92,37 @@
       const sb = getClient();
       if (!sb) return null;
       try {
-        let query = sb
-          .from('reports')
-          .select('*')
-          .eq('is_deleted', false);
-
         const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
-        if (curUser && curUser.role !== 'admin') {
-          // Normal kullanıcı: Kendi yükledikleri + Genel (public) raporlar
-          query = query.or(`user_id.eq.${curUser.id},user_id.eq.public`);
+        let allRows = [];
+        let from = 0;
+        const step = 1000;
+
+        while (true) {
+          let query = sb
+            .from('reports')
+            .select('*')
+            .eq('is_deleted', false);
+
+          if (curUser && curUser.role !== 'admin') {
+            query = query.or(`user_id.eq.${curUser.id},user_id.eq.public`);
+          }
+
+          const { data, error } = await query
+            .order('updated_at', { ascending: false })
+            .range(from, from + step - 1);
+
+          if (error) {
+            console.warn('Supabase aktif raporlar çekilemedi:', error.message);
+            break;
+          }
+          if (!data || data.length === 0) break;
+
+          allRows.push(...data);
+          if (data.length < step) break;
+          from += step;
         }
 
-        const { data, error } = await query.order('updated_at', { ascending: false });
-
-        if (error) {
-          console.warn('Supabase aktif raporlar çekilemedi:', error.message);
-          return null;
-        }
-        return Array.isArray(data) ? data.map(parseReportFromRow) : [];
+        return allRows.map(parseReportFromRow);
       } catch (e) {
         console.warn('Supabase load error:', e);
         return null;
@@ -121,20 +134,34 @@
       const sb = getClient();
       if (!sb) return null;
       try {
-        let query = sb
-          .from('reports')
-          .select('*')
-          .eq('is_deleted', true);
-
         const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
-        if (curUser && curUser.role !== 'admin') {
-          query = query.eq('user_id', curUser.id);
+        let allRows = [];
+        let from = 0;
+        const step = 1000;
+
+        while (true) {
+          let query = sb
+            .from('reports')
+            .select('*')
+            .eq('is_deleted', true);
+
+          if (curUser && curUser.role !== 'admin') {
+            query = query.eq('user_id', curUser.id);
+          }
+
+          const { data, error } = await query
+            .order('deleted_at', { ascending: false })
+            .range(from, from + step - 1);
+
+          if (error) break;
+          if (!data || data.length === 0) break;
+
+          allRows.push(...data);
+          if (data.length < step) break;
+          from += step;
         }
 
-        const { data, error } = await query.order('deleted_at', { ascending: false });
-
-        if (error) return null;
-        return Array.isArray(data) ? data.map(parseReportFromRow) : [];
+        return allRows.map(parseReportFromRow);
       } catch (e) {
         return null;
       }
