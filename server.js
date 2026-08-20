@@ -704,7 +704,6 @@ app.post('/api/store/save', async (req, res) => {
           is_favorite: isFavorite,
           is_pinned: isPinned,
           is_deleted: isDeleted,
-          is_public: isPublic,
           sql_count: sqlCount,
           memo_count: memoCount,
           dataset_count: datasetCount,
@@ -771,13 +770,11 @@ app.post('/api/reports/toggle-pool', async (req, res) => {
       fs.writeFileSync(storePath, JSON.stringify(localData, null, 2), 'utf8');
     }
 
-    if (supabase) {
-      const updates = {
-        is_public: !!makePublic,
+    if (supabase && idx !== -1) {
+      await supabase.from('reports').update({
+        data: localData[idx],
         updated_at: new Date().toISOString()
-      };
-      if (idx !== -1) updates.data = localData[idx];
-      await supabase.from('reports').update(updates).eq('id', String(reportId));
+      }).eq('id', String(reportId));
     }
 
     res.json({ success: true, isPublic: !!makePublic });
@@ -818,10 +815,13 @@ app.post('/api/reports/bulk-toggle-pool', async (req, res) => {
     fs.writeFileSync(storePath, JSON.stringify(localData, null, 2), 'utf8');
 
     if (supabase) {
-      await supabase.from('reports').update({
-        is_public: !!makePublic,
-        updated_at: nowIso
-      }).in('id', Array.from(idSet));
+      const updatedRows = localData.filter(r => idSet.has(String(r.id || r.fileId)));
+      for (const r of updatedRows) {
+        await supabase.from('reports').update({
+          data: r,
+          updated_at: nowIso
+        }).eq('id', String(r.id || r.fileId));
+      }
     }
 
     res.json({ success: true, count: reportIds.length, isPublic: !!makePublic });

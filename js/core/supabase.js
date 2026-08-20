@@ -78,7 +78,6 @@
       is_favorite: isFavorite,
       is_pinned: isPinned,
       is_deleted: isDeleted,
-      is_public: isPublic,
       deleted_at: isDeleted ? (report.deletedAt || new Date().toISOString()) : null,
       sql_count: sqlCount,
       memo_count: memoCount,
@@ -102,7 +101,7 @@
     r.userNote = row.user_note || r.userNote || '';
     r.isFavorite = !!row.is_favorite;
     r.isPinned = !!row.is_pinned;
-    r.isPublic = !!(row.is_public || r.isPublic || r.is_public);
+    r.isPublic = !!(r.isPublic || r.is_public || row.is_public);
     r.ownerName = r.ownerName || r.owner_name || row.owner_name || '';
     r.ownerUsername = r.ownerUsername || r.owner_username || row.owner_username || '';
     r.ownerDepartment = r.ownerDepartment || r.owner_department || row.owner_department || '';
@@ -119,23 +118,15 @@
       const sb = getClient();
       if (!sb) return null;
       try {
-        const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
         let allRows = [];
         let from = 0;
         const step = 1000;
 
         while (true) {
-          let query = sb
+          const { data, error } = await sb
             .from('reports')
             .select('*')
-            .eq('is_deleted', false);
-
-          if (curUser && curUser.role !== 'admin') {
-            // Normal kullanıcı: Kendi yükledikleri + Genel/Ortak Havuzdakiler
-            query = query.or(`user_id.eq.${curUser.id},user_id.eq.public,is_public.eq.true`);
-          }
-
-          const { data, error } = await query
+            .eq('is_deleted', false)
             .order('updated_at', { ascending: false })
             .range(from, from + step - 1);
 
@@ -295,10 +286,21 @@
         }
 
         if (sb) {
-          await sb.from('reports').update({
-            is_public: !!makePublic,
-            updated_at: new Date().toISOString()
-          }).eq('id', String(reportId));
+          // Row'un data JSON alanını çekip güncelle
+          const { data: row } = await sb.from('reports').select('data').eq('id', String(reportId)).single();
+          if (row && row.data) {
+            const updatedData = { ...row.data, isPublic: !!makePublic, is_public: !!makePublic };
+            if (ownerInfo) {
+              updatedData.ownerName = ownerInfo.fullName || ownerInfo.name || updatedData.ownerName || '';
+              updatedData.ownerUsername = ownerInfo.username || updatedData.ownerUsername || '';
+              updatedData.ownerDepartment = ownerInfo.department || updatedData.ownerDepartment || '';
+            }
+            if (makePublic) updatedData.sharedAt = new Date().toISOString();
+            await sb.from('reports').update({
+              data: updatedData,
+              updated_at: new Date().toISOString()
+            }).eq('id', String(reportId));
+          }
         }
         return true;
       } catch (e) {
@@ -321,10 +323,20 @@
 
         if (sb) {
           const strIds = reportIds.map(String);
-          await sb.from('reports').update({
-            is_public: !!makePublic,
-            updated_at: new Date().toISOString()
-          }).in('id', strIds);
+          const { data: rows } = await sb.from('reports').select('id, data').in('id', strIds);
+          if (Array.isArray(rows)) {
+            const nowIso = new Date().toISOString();
+            for (const r of rows) {
+              const updatedData = { ...(r.data || {}), isPublic: !!makePublic, is_public: !!makePublic };
+              if (ownerInfo) {
+                updatedData.ownerName = ownerInfo.fullName || ownerInfo.name || updatedData.ownerName || '';
+                updatedData.ownerUsername = ownerInfo.username || updatedData.ownerUsername || '';
+                updatedData.ownerDepartment = ownerInfo.department || updatedData.ownerDepartment || '';
+              }
+              if (makePublic) updatedData.sharedAt = nowIso;
+              await sb.from('reports').update({ data: updatedData, updated_at: nowIso }).eq('id', r.id);
+            }
+          }
         }
         return true;
       } catch (e) {
