@@ -119,6 +119,7 @@ window.showPromptDialog = function({
 };
 
 window.openSettingsModal = function(initialTab = 'appearance') {
+  document.querySelectorAll('.modal-overlay').forEach(el => el.remove());
   let activeTab = initialTab;
   
   // Taslak (Staged) Ayarlar — "Tüm Değişiklikleri Kaydet" basılana kadar izole tutulur

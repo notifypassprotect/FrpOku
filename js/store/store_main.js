@@ -620,12 +620,23 @@
     const list = getAll();
     const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
     if (!curUser) return list;
-    return list.filter(f => f.userId === curUser.id || !f.userId || f.userId === 'public');
+
+    // Kullanıcının kendi raporları veya yerel/sahipsiz raporlar
+    const myFiles = list.filter(f => {
+      if (f.userId === curUser.id) return true;
+      if (curUser.username && (f.ownerUsername === curUser.username || f.ownerName === curUser.username)) return true;
+      if (!f.userId || f.userId === 'public' || f.userId === 'default' || f.userId === 'local') return true;
+      if (curUser.role === 'admin') return true; // Admin tüm raporları görebilir
+      return false;
+    });
+
+    return myFiles.length > 0 ? myFiles : list;
   }
 
   function getPoolReports() {
     const list = getAll();
-    return list.filter(f => f.isPublic === true || f.is_public === true);
+    const poolList = list.filter(f => f.isPublic === true || f.is_public === true);
+    return poolList;
   }
 
   function toggleReportPool(id, makePublic) {
