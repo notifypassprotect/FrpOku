@@ -270,7 +270,11 @@ app.post('/api/auth/login', async (req, res) => {
     user.last_login = nowIso;
 
     if (supabase) {
-      supabase.from('app_users').update({ last_login: nowIso }).eq('id', user.id).catch(() => {});
+      try {
+        await supabase.from('app_users').update({ last_login: nowIso }).eq('id', user.id);
+      } catch (e) {
+        console.warn('Last login update warning:', e.message);
+      }
     }
     const localUsers = getLocalUsers();
     const locIdx = localUsers.findIndex(u => u.id === user.id);
