@@ -89,6 +89,79 @@ if (btnBack) {
   });
 }
 
+// ── Inline Metadata Düzenleme Yardımcıları ─────────────────
+function makeEditableMetaRow(label, field, currentValue, fileId) {
+  const safeVal = esc(currentValue || '');
+  return `
+    <div class="meta-row meta-editable" data-field="${field}" data-file-id="${fileId}">
+      <div class="meta-label">${esc(label)}</div>
+      <div class="meta-value-wrap">
+        <span class="meta-value meta-val-display" title="Düzenlemek için tıklayın">${safeVal || '<span style="color:var(--text-muted);font-style:italic;">—</span>'}</span>
+        <input type="text" class="meta-inline-input" value="${safeVal}" style="display:none;" />
+        <div class="meta-edit-actions" style="display:none;">
+          <button class="btn-meta-save" title="Kaydet">✓</button>
+          <button class="btn-meta-cancel" title="İptal">✕</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function activateMetaEdit(rowEl) {
+  const display = rowEl.querySelector('.meta-val-display');
+  const input = rowEl.querySelector('.meta-inline-input');
+  const actions = rowEl.querySelector('.meta-edit-actions');
+  if (!display || !input || !actions) return;
+  display.style.display = 'none';
+  input.style.display = 'block';
+  actions.style.display = 'flex';
+  input.focus();
+  input.select();
+}
+
+function deactivateMetaEdit(rowEl, newDisplay) {
+  const display = rowEl.querySelector('.meta-val-display');
+  const input = rowEl.querySelector('.meta-inline-input');
+  const actions = rowEl.querySelector('.meta-edit-actions');
+  if (!display || !input || !actions) return;
+  if (newDisplay !== undefined) display.innerHTML = newDisplay || '<span style="color:var(--text-muted);font-style:italic;">—</span>';
+  display.style.display = '';
+  input.style.display = 'none';
+  actions.style.display = 'none';
+}
+
+function bindMetaEditEvents(container, fileId) {
+  if (!container) return;
+  container.querySelectorAll('.meta-editable').forEach(rowEl => {
+    const field = rowEl.dataset.field;
+    const display = rowEl.querySelector('.meta-val-display');
+    const input = rowEl.querySelector('.meta-inline-input');
+    const saveBtn = rowEl.querySelector('.btn-meta-save');
+    const cancelBtn = rowEl.querySelector('.btn-meta-cancel');
+
+    if (display) display.addEventListener('click', () => activateMetaEdit(rowEl));
+
+    function saveEdit() {
+      const newVal = input.value.trim();
+      FrpStore.updateMeta(fileId, { [field]: newVal });
+      currentFile = FrpStore.getById(fileId);
+      deactivateMetaEdit(rowEl, esc(newVal));
+      showToast(`${field === 'reportName' ? 'Rapor adı' : field === 'author' ? 'Yazar' : 'Açıklama'} güncellendi. ✏️`, 'success');
+      if (field === 'reportName') {
+        const pTitle = document.getElementById('pageTitle');
+        if (pTitle) pTitle.textContent = newVal || currentFile.name;
+        document.title = `FrpOku — ${newVal || currentFile.name}`;
+      }
+    }
+
+    if (saveBtn) saveBtn.addEventListener('click', saveEdit);
+    if (cancelBtn) cancelBtn.addEventListener('click', () => deactivateMetaEdit(rowEl));
+    if (input) input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') saveEdit();
+      if (e.key === 'Escape') deactivateMetaEdit(rowEl);
+    });
+  });
+}
+
 // ── Sidebar Render ─────────────────────────────────────────
 function renderSidebar(file) {
   const sb = document.getElementById('sidebarBody');

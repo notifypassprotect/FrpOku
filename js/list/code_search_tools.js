@@ -95,3 +95,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+window.performCodeSearch = performCodeSearch;
+window.navigateMatch = navigateMatch;
+
