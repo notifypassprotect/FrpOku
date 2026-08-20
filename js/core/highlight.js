@@ -231,6 +231,7 @@ window.SQL_TYPO_MAP = SQL_TYPO_MAP;
  * Highlight SQL code — returns HTML string with syntax error badges
  */
 function highlightSQL(raw) {
+  if (!raw) return '';
   let out = '';
   let i = 0;
   const len = raw.length;
@@ -350,6 +351,7 @@ const PAS_TYPE = new Set([
  * Highlight PascalScript code — returns HTML string
  */
 function highlightPascal(raw) {
+  if (!raw) return '';
   let out = '';
   let i = 0;
   const len = raw.length;

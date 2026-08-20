@@ -639,21 +639,38 @@ app.post('/api/store/save', async (req, res) => {
   if (supabase && Array.isArray(reports)) {
     try {
       const rows = reports.map(report => {
-        const id = report.id || report.fileId || String(Date.now());
-        const name = report.name || report.fileName || 'İsimsiz Rapor';
+        const id = String(report.id || report.fileId || Date.now());
+        const name = String(report.name || report.fileName || 'İsimsiz Rapor');
+        const userId = String(report.userId || report.user_id || 'public');
+        const fileSize = Number(report.sizeBytes || report.size || report.file_size || 0);
+        const category = String(report.category || '');
+        const tags = Array.isArray(report.tags) ? report.tags : [];
+        const userNote = String(report.userNote || report.user_note || '');
+        const isFavorite = !!(report.isFavorite || report.favorite || report.is_favorite);
+        const isPinned = !!(report.isPinned || report.pinned || report.is_pinned);
+        const isDeleted = !!(report.isDeleted || report.is_deleted);
+        const sqlCount = Array.isArray(report.queries) ? report.queries.length : Number(report.stats?.sqlCount || report.sql_count || 0);
+        const memoCount = Array.isArray(report.memos) ? report.memos.length : Number(report.stats?.memoCount || report.memo_count || 0);
+        const datasetCount = Array.isArray(report.datasets) ? report.datasets.length : Number(report.dataset_count || 0);
+        const pageCount = Array.isArray(report.pages) ? report.pages.length : Number(report.stats?.pageCount || report.page_count || 1);
+        const hasScript = !!(report.pascalScript && report.pascalScript.trim().length > 0);
+
         return {
           id,
           name,
-          file_size: report.size || 0,
-          category: report.category || '',
-          tags: Array.isArray(report.tags) ? report.tags : [],
-          is_favorite: !!report.favorite,
-          is_pinned: !!report.pinned,
-          sql_count: Array.isArray(report.queries) ? report.queries.length : (report.stats?.sqlCount || 0),
-          memo_count: Array.isArray(report.memos) ? report.memos.length : (report.stats?.memoCount || 0),
-          dataset_count: Array.isArray(report.datasets) ? report.datasets.length : 0,
-          page_count: Array.isArray(report.pages) ? report.pages.length : (report.stats?.pageCount || 1),
-          has_script: !!(report.pascalScript && report.pascalScript.trim().length > 0),
+          user_id: userId,
+          file_size: fileSize,
+          category,
+          tags,
+          user_note: userNote,
+          is_favorite: isFavorite,
+          is_pinned: isPinned,
+          is_deleted: isDeleted,
+          sql_count: sqlCount,
+          memo_count: memoCount,
+          dataset_count: datasetCount,
+          page_count: pageCount,
+          has_script: hasScript,
           data: report,
           updated_at: new Date().toISOString()
         };

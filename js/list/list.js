@@ -2691,9 +2691,13 @@ window.exportReportListExcel = exportReportListExcel;
 
 function bindSearchControls() {
   if (searchInput) {
+    let searchDebounceTimer = null;
     searchInput.addEventListener('input', () => {
       searchQuery = searchInput.value;
-      applySearch();
+      if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = setTimeout(() => {
+        applySearch();
+      }, 100);
     });
   }
 

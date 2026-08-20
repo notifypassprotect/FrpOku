@@ -1908,6 +1908,39 @@
     setSession(merged, localStorage.getItem(REMEMBER_KEY) === '1');
   }
 
+  // ── 14. Çoklu Sekme (Multi-tab) Canlı Oturum Senkronizasyonu ──
+  window.addEventListener('storage', (e) => {
+    if (e.key === AUTH_STORAGE_KEY || e.key === REMEMBER_KEY) {
+      currentUser = null;
+      const user = getSession();
+      const portal = document.getElementById('authFullScreenPortal');
+      const appWrap = document.querySelector('.app-wrap');
+      const drop = document.getElementById('userMenuDropdown');
+      if (drop) drop.remove();
+
+      if (user) {
+        // Başka bir sekmede giriş yapıldı veya profil güncellendi
+        if (portal) portal.remove();
+        if (appWrap) appWrap.style.display = 'flex';
+        updateNavbarUserBadge();
+        setupAdminFeatures();
+        if (window.FrpStore && typeof window.FrpStore.refreshFromCloud === 'function') {
+          window.FrpStore.refreshFromCloud();
+        }
+      } else {
+        // Başka bir sekmede oturum kapatıldı -> Bu sekmeyi de anında kilitle
+        if (adminPollingInterval) {
+          clearInterval(adminPollingInterval);
+          adminPollingInterval = null;
+        }
+        updateNavbarUserBadge();
+        const existingAdminModal = document.getElementById('adminApprovalModalOverlay');
+        if (existingAdminModal) existingAdminModal.remove();
+        showAuthFullScreenPortal('login');
+      }
+    }
+  });
+
   // ── Public Auth API ──────────────────────────────────────────
   window.FrpAuth = {
     register,
