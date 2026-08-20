@@ -588,6 +588,15 @@
     return false;
   }
 
+  function getAllTags() {
+    const files = _read();
+    const tagSet = new Set();
+    files.forEach(f => {
+      (f.tags || []).forEach(t => tagSet.add(t));
+    });
+    return [...tagSet].sort();
+  }
+
   // ── 6.5. Ortak Rapor Havuzu & Çalışma Alanı Yönetimi ─────────
   const WORKSPACE_KEY = 'frpoku_active_workspace';
   let _activeWorkspace = localStorage.getItem(WORKSPACE_KEY) || 'personal';
@@ -879,7 +888,21 @@
       storageFormatted = Math.round(totalBytes / 1024) + ' KB';
     }
 
-    return { totalFiles: files.length, totalQueries, totalPascal, totalFavorites, totalPinned, totalBytes, storageFormatted };
+    return { total: files.length, totalFiles: files.length, totalQueries, queries: totalQueries, totalPascal, pascal: totalPascal, totalFavorites, favorites: totalFavorites, totalPinned, totalBytes, storageFormatted };
+  }
+
+  function isStorageNearFull() {
+    try {
+      let total = 0;
+      for (let x in localStorage) {
+        if (Object.prototype.hasOwnProperty.call(localStorage, x)) {
+          total += ((localStorage[x] || '').length * 2);
+        }
+      }
+      return total > 4 * 1024 * 1024;
+    } catch {
+      return false;
+    }
   }
 
   function search(query, filterType = 'all') {
@@ -1048,7 +1071,7 @@
     getTheme, setTheme, initTheme,
     getPreferences, setPreferences, applyPreferences, getUserProfile, setUserProfile,
     addRecent, getRecent, clearRecent, removeRecent,
-    exportAllSqls, exportAllSqlsCsv, search, getStats,
+    exportAllSqls, exportAllSqlsCsv, search, getStats, isStorageNearFull,
 
     // Ortak Havuz & Çalışma Alanı
     getActiveWorkspace, setActiveWorkspace, getMyReports, getPoolReports,
