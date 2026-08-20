@@ -52,10 +52,12 @@ function toast(msg, type = 'info', duration = 3500) {
   stack.appendChild(el);
   setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateX(40px)'; el.style.transition = '.3s'; setTimeout(() => el.remove(), 350); }, duration);
 }
+window.toast = toast;
 
 function escHtml(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+window.escHtml = escHtml;
 
 // ── Hash-based tag renklendirme ─────────────────────────────────────────
 const TAG_PALETTE = [

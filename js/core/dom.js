@@ -37,4 +37,5 @@ function showToast(message, type = 'info', duration = 3500) {
 window.escHtml = escHtml;
 window.esc = esc;
 window.showToast = showToast;
-window.toast = showToast;
+// Note: window.toast is NOT set here - list.js defines function toast() for the list page
+// detail.js/app.js pages use showToast() directly
