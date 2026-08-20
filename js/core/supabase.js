@@ -91,22 +91,34 @@
 
   function parseReportFromRow(row) {
     if (!row) return null;
-    const r = row.data || {};
-    r.id = row.id;
-    r.name = row.name;
+    let r = {};
+    if (row.data) {
+      if (typeof row.data === 'string') {
+        try { r = JSON.parse(row.data); } catch { r = {}; }
+      } else if (typeof row.data === 'object') {
+        r = { ...row.data };
+      }
+    }
+    r.id = String(row.id);
+    r.name = row.name || r.name || 'İsimsiz Rapor';
     r.userId = row.user_id || r.userId || 'public';
     r.sizeBytes = Number(row.file_size || r.sizeBytes || 0);
     r.category = row.category || r.category || '';
-    r.tags = Array.isArray(row.tags) ? row.tags : (r.tags || []);
+    r.tags = Array.isArray(row.tags) ? row.tags : (Array.isArray(r.tags) ? r.tags : []);
     r.userNote = row.user_note || r.userNote || '';
-    r.isFavorite = !!row.is_favorite;
-    r.isPinned = !!row.is_pinned;
-    r.isPublic = !!(r.isPublic || r.is_public || row.is_public);
-    r.ownerName = r.ownerName || r.owner_name || row.owner_name || '';
-    r.ownerUsername = r.ownerUsername || r.owner_username || row.owner_username || '';
-    r.ownerDepartment = r.ownerDepartment || r.owner_department || row.owner_department || '';
-    r.sharedAt = r.sharedAt || r.shared_at || row.shared_at || null;
+    r.isFavorite = !!(row.is_favorite || r.isFavorite);
+    r.isPinned = !!(row.is_pinned || r.isPinned);
+    r.isPublic = !!(row.is_public || r.isPublic || r.is_public);
+    r.ownerName = row.owner_name || r.ownerName || r.owner_name || '';
+    r.ownerUsername = row.owner_username || r.ownerUsername || r.owner_username || '';
+    r.ownerDepartment = row.owner_department || r.ownerDepartment || r.owner_department || '';
+    r.sharedAt = row.shared_at || r.sharedAt || r.shared_at || null;
     r.deletedAt = row.deleted_at || r.deletedAt || null;
+    r.meta = r.meta || { reportName: r.name };
+    r.queries = Array.isArray(r.queries) ? r.queries : [];
+    r.datasets = Array.isArray(r.datasets) ? r.datasets : [];
+    r.tree = Array.isArray(r.tree) ? r.tree : [];
+    r.loadedAt = r.loadedAt || row.updated_at || new Date().toISOString();
     return r;
   }
 

@@ -1009,11 +1009,11 @@
 
     // 4. Arayüz & Yazı Boyutu (UI Scale)
     const fontSizeMap = {
-      'micro': '12.5px',
-      'compact': '13.5px',
+      'micro': '13px',
+      'compact': '14px',
       'normal': '15px',
-      'spacious': '16.5px',
-      'large': '18px'
+      'spacious': '16px',
+      'large': '17px'
     };
     if (prefs.fontSize) {
       root.setAttribute('data-ui-scale', prefs.fontSize);
@@ -1026,17 +1026,17 @@
     const density = prefs.density || 'normal';
     root.setAttribute('data-density', density);
     if (density === 'compact-ultra' || density === 'ultra') {
-      root.style.setProperty('--row-height', '22px');
-      root.style.setProperty('--cell-padding', '2px 8px');
-    } else if (density === 'compact') {
       root.style.setProperty('--row-height', '28px');
-      root.style.setProperty('--cell-padding', '4px 10px');
+      root.style.setProperty('--cell-padding', '4px 8px');
+    } else if (density === 'compact') {
+      root.style.setProperty('--row-height', '34px');
+      root.style.setProperty('--cell-padding', '6px 10px');
     } else if (density === 'spacious') {
-      root.style.setProperty('--row-height', '44px');
-      root.style.setProperty('--cell-padding', '12px 16px');
+      root.style.setProperty('--row-height', '50px');
+      root.style.setProperty('--cell-padding', '14px 16px');
     } else {
-      root.style.setProperty('--row-height', '36px');
-      root.style.setProperty('--cell-padding', '8px 12px');
+      root.style.setProperty('--row-height', '42px');
+      root.style.setProperty('--cell-padding', '9px 12px');
     }
   }
 

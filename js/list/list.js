@@ -925,14 +925,18 @@ if (tableBody && ctxMenu) {
   });
 }
 
-selectAllCb.addEventListener('change', () => {
-  if (selectAllCb.checked) {
-    sortFiles(allFiles).forEach(f => selectedIds.add(f.id));
-  } else {
-    selectedIds.clear();
+// Delegated selectAll handler (Header dinamik render edildiğinde de her zaman çalışır)
+document.addEventListener('change', e => {
+  if (e.target && e.target.id === 'selectAll') {
+    const cb = e.target;
+    if (cb.checked) {
+      sortFiles(allFiles).forEach(f => selectedIds.add(f.id));
+    } else {
+      selectedIds.clear();
+    }
+    renderTable();
+    if (typeof updateBulkBar === 'function') updateBulkBar();
   }
-  renderTable();
-  if (typeof updateBulkBar === 'function') updateBulkBar();
 });
 
 function toggleSelect(e, id) {
@@ -943,7 +947,7 @@ function toggleSelect(e, id) {
   if (typeof updateBulkBar === 'function') updateBulkBar();
 }
 
-btnCompareSelected.addEventListener('click', () => {
+document.getElementById('btnCompareSelected')?.addEventListener('click', () => {
   const ids = [...selectedIds];
   if (ids.length < 2) {
     toast('Karşılaştırmak için lütfen en az 2 rapor seçin.', 'warning');
