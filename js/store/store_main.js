@@ -365,7 +365,9 @@
 
   // ── 5. Çöp Kutusu (Soft Delete) Metotları ─────────────────────
   function getTrash() {
-    return _trashStore;
+    const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
+    if (!curUser) return _trashStore;
+    return _trashStore.filter(t => t.userId === curUser.id || !t.userId || t.userId === 'public');
   }
 
   async function moveToTrash(id) {
@@ -618,7 +620,6 @@
     const list = getAll();
     const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
     if (!curUser) return list;
-    if (curUser.role === 'admin') return list; // Admin tümünü görebilir
     return list.filter(f => f.userId === curUser.id || !f.userId || f.userId === 'public');
   }
 

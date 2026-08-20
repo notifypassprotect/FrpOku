@@ -164,7 +164,7 @@
             .select('*')
             .eq('is_deleted', true);
 
-          if (curUser && curUser.role !== 'admin') {
+          if (curUser) {
             query = query.eq('user_id', curUser.id);
           }
 
