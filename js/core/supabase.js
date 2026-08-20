@@ -277,6 +277,10 @@
         await sb.from('reports').update({ is_deleted: false, deleted_at: null }).in('id', strIds);
         return true;
       } catch {
+        return false;
+      }
+    },
+
     // ── 7. ORTAK HAVUZ PAYLAŞIM YÖNETİMİ ─────────────────────────
     async togglePoolStatus(reportId, makePublic, ownerInfo) {
       const sb = getClient();
