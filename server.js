@@ -60,7 +60,6 @@ async function ensureAdminUser() {
     department: 'Bilgi İşlem ve Yönetim',
     role: 'admin',
     is_active: true,
-    status: 'approved',
     avatar: '👑',
     created_at: new Date().toISOString(),
     last_login: null
@@ -160,8 +159,7 @@ app.post('/api/auth/register', async (req, res) => {
       phone: cleanPhone,
       department: (department || 'Bilgi İşlem').trim(),
       role: 'user',
-      is_active: false, // Yönetici onayı bekliyor
-      status: 'pending', // 'pending' | 'approved' | 'rejected'
+      is_active: false, // Yönetici onayı bekliyor (false = pending)
       avatar: '👤',
       created_at: new Date().toISOString(),
       last_login: null
@@ -190,7 +188,7 @@ app.post('/api/auth/register', async (req, res) => {
         username: newRecord.username,
         full_name: newRecord.full_name,
         email: newRecord.email,
-        status: 'pending'
+        is_active: false
       }
     });
   } catch (err) {
@@ -250,18 +248,11 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     // Onay ve Aktiflik Durumu Denetimi
-    if (user.is_active === false || user.status === 'pending') {
+    if (user.is_active === false) {
       return res.status(403).json({
         success: false,
         pendingApproval: true,
         reason: '⏳ Hesabınız henüz sistem yöneticisi (Admin) tarafından onaylanmamıştır. Lütfen yöneticinizle iletişime geçiniz.'
-      });
-    }
-
-    if (user.status === 'rejected') {
-      return res.status(403).json({
-        success: false,
-        reason: '🚫 Kayıt başvurunuz sistem yöneticisi tarafından onaylanmamıştır.'
       });
     }
 
@@ -304,8 +295,8 @@ app.get('/api/admin/pending-users', async (req, res) => {
     if (supabase) {
       const { data, error } = await supabase
         .from('app_users')
-        .select('id, username, email, full_name, phone, department, role, is_active, status, created_at, avatar')
-        .or('is_active.eq.false,status.eq.pending')
+        .select('id, username, email, full_name, phone, department, role, is_active, created_at, avatar')
+        .eq('is_active', false)
         .order('created_at', { ascending: false });
 
       if (!error && Array.isArray(data)) {
@@ -316,7 +307,7 @@ app.get('/api/admin/pending-users', async (req, res) => {
     if (pendingList.length === 0) {
       const localUsers = getLocalUsers();
       pendingList = localUsers
-        .filter(u => u.is_active === false || u.status === 'pending')
+        .filter(u => u.is_active === false)
         .map(u => {
           const safe = { ...u };
           delete safe.password_hash;
@@ -342,7 +333,7 @@ app.get('/api/admin/all-users', async (req, res) => {
     if (supabase) {
       const { data, error } = await supabase
         .from('app_users')
-        .select('id, username, email, full_name, phone, department, role, is_active, status, created_at, last_login, avatar')
+        .select('id, username, email, full_name, phone, department, role, is_active, created_at, last_login, avatar')
         .order('created_at', { ascending: false });
 
       if (!error && Array.isArray(data)) {
@@ -377,10 +368,7 @@ app.post('/api/admin/approve-user', async (req, res) => {
   }
 
   try {
-    const updates = {
-      is_active: true,
-      status: 'approved'
-    };
+    const updates = { is_active: true };
 
     if (supabase) {
       const { error } = await supabase
@@ -427,7 +415,7 @@ app.post('/api/admin/reject-user', async (req, res) => {
       saveLocalUsers(localUsers);
       console.log(`🗑️ Kullanıcı Kaydı Silindi / Reddedildi: ${userId}`);
     } else {
-      const updates = { is_active: false, status: 'rejected' };
+      const updates = { is_active: false };
       if (supabase) {
         await supabase.from('app_users').update(updates).eq('id', userId);
       }
@@ -454,7 +442,7 @@ app.post('/api/admin/toggle-status', async (req, res) => {
   if (!userId) return res.status(400).json({ success: false, reason: 'Kullanıcı ID gerekli.' });
 
   try {
-    const updates = { is_active: !!isActive, status: isActive ? 'approved' : 'suspended' };
+    const updates = { is_active: !!isActive };
     if (supabase) {
       await supabase.from('app_users').update(updates).eq('id', userId);
     }

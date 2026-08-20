@@ -1812,5 +1812,89 @@ tr.pinned-row {
   flex-shrink: 0;
 }
 
+/* ── Modern Filtreleme Çipleri ────────────────────────────── */
+.admin-filter-chips {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.1rem;
+}
+
+.admin-chip {
+  padding: .35rem .75rem;
+  border-radius: 999px;
+  font-size: .78rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1.5px solid var(--border, #e2e8f0);
+  background: var(--bg-raised, #f8fafc);
+  color: var(--text-secondary, #64748b);
+  transition: all .18s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  user-select: none;
+}
+
+.admin-chip:hover {
+  border-color: var(--accent-bright, #3b82f6);
+  color: var(--accent-bright, #2563eb);
+}
+
+.admin-chip.active {
+  background: var(--accent-bright, #2563eb);
+  color: #ffffff;
+  border-color: var(--accent-bright, #2563eb);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+/* Kart Aksiyon Animasyonları */
+.card-approved-anim {
+  animation: cardApproveFade .45s ease-out forwards;
+}
+
+@keyframes cardApproveFade {
+  0% { transform: scale(1); background: rgba(16, 185, 129, 0.15); border-color: #10b981; }
+  40% { transform: scale(1.02); background: rgba(16, 185, 129, 0.25); border-color: #10b981; }
+  100% { transform: translateY(-12px) scale(0.96); opacity: 0; height: 0; padding: 0; margin: 0; border: none; }
+}
+
+.card-rejected-anim {
+  animation: cardRejectFade .4s ease-out forwards;
+}
+
+@keyframes cardRejectFade {
+  0% { transform: scale(1); background: rgba(239, 68, 68, 0.15); border-color: #ef4444; }
+  100% { transform: translateY(8px) scale(0.95); opacity: 0; height: 0; padding: 0; margin: 0; border: none; }
+}
+
+/* ── Modern Şifre Sıfırlama & Onay Popover / Modalı ─────────── */
+.modern-sub-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(6px);
+  z-index: 100010;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: fadeIn .18s ease-out;
+}
+
+.modern-sub-card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--bg-surface, #ffffff);
+  border-radius: 20px;
+  border: 1.5px solid var(--border, #e2e8f0);
+  box-shadow: 0 25px 60px rgba(0,0,0,0.3);
+  padding: 1.6rem;
+  color: var(--text-primary, #0f172a);
+  animation: modalPop .2s ease-out;
+}
+
+
 
 

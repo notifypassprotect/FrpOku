@@ -1,10 +1,10 @@
 /**
- * FrpOku - Güvenli Kullanıcı Oturum & Kimlik Doğrulama Katmanı (Auth Module v5)
+ * FrpOku - Güvenli Kullanıcı Oturum & Kimlik Doğrulama Katmanı (Auth Module v5 - Modernized)
  * - E-Postasız Yeni Kullanıcı Kayıt Akışı
  * - Yönetici (Admin) Onayı Sistemi (Pending Approval Workflow)
  * - Admin Panelinde Yanıp Sönen (Flashing / Pulsing) "Yeni Kayıt Var" Bildirimi
- * - Admin Kullanıcı Yönetimi & Kayıt Onay Modalı
- * - Beni Hatırla & Giriş Bilgileri Kalıcılığı
+ * - Ultra-Modern Kayıt Onay & Kullanıcı Yönetim Paneli (Animasyonlu, Filtreli & Şifre Üreticili)
+ * - Supabase Schema Tam Uyumluluğu (is_active boolean kontrolü)
  * - Responsive Tam Ekran Portal & Akıllı Dropdown Konumlandırması
  */
 
@@ -156,7 +156,7 @@
     }
 
     try {
-      // Önce Backend API dene
+      // Önce Node Express Backend API dene
       try {
         const res = await fetch('/api/auth/register', {
           method: 'POST',
@@ -208,8 +208,7 @@
         password_hash: passwordHash,
         role: 'user',
         avatar: '👤',
-        is_active: false, // Yönetici onayı bekliyor
-        status: 'pending',
+        is_active: false, // Yönetici onayı bekliyor (false = pending)
         created_at: new Date().toISOString(),
         last_login: null
       };
@@ -302,19 +301,12 @@
         return { success: false, reason: '🔒 Şifreniz hatalı! Lütfen şifrenizi kontrol edip tekrar deneyin.' };
       }
 
-      // Onay Kontrolü
-      if (user.is_active === false || user.status === 'pending') {
+      // Onay Kontrolü (is_active boolean kontrolü)
+      if (user.is_active === false) {
         return {
           success: false,
           pendingApproval: true,
           reason: '⏳ Hesabınız henüz sistem yöneticisi (Admin) tarafından onaylanmamıştır. Lütfen yöneticinizle iletişime geçiniz.'
-        };
-      }
-
-      if (user.status === 'rejected') {
-        return {
-          success: false,
-          reason: '🚫 Kayıt başvurunuz sistem yöneticisi tarafından onaylanmamıştır.'
         };
       }
 
@@ -401,7 +393,6 @@
     }
     updateNavbarUserBadge();
 
-    // Raporları temizle ve tam ekran portalı aç
     if (window.FrpStore && typeof window.FrpStore.refreshFromCloud === 'function') {
       window.FrpStore.refreshFromCloud();
     }
@@ -449,9 +440,9 @@
       console.warn('Pending users fetch error:', e.message);
     }
 
-    // Fallback Supabase REST
+    // Fallback Supabase REST (is_active = false)
     try {
-      const users = await fetchUsersFromRest('?or=(is_active.eq.false,status.eq.pending)&order=created_at.desc');
+      const users = await fetchUsersFromRest('?is_active=eq.false&order=created_at.desc');
       return Array.isArray(users) ? users : [];
     } catch (e) {
       return [];
@@ -541,7 +532,7 @@
     }
   }
 
-  // ── 9. ADMİN: KAYIT ONAY & KULLANICI YÖNETİM MODALI ───────────
+  // ── 9. ULTRA-MODERN ADMİN MODALI (Kayıt Onay & Kullanıcı Yönetimi) ─
   async function showAdminApprovalModal(initialTab = 'pending') {
     const existing = document.getElementById('adminApprovalModalOverlay');
     if (existing) existing.remove();
@@ -551,7 +542,7 @@
     overlay.className = 'modal-overlay';
     overlay.style.cssText = `
       position: fixed; inset: 0;
-      background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(8px);
+      background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(8px);
       z-index: 100000; display: flex; align-items: center; justify-content: center;
       padding: 1rem; animation: fadeIn .2s ease-out;
     `;
@@ -626,7 +617,8 @@
       `;
 
       const pendingUsers = await fetchPendingUsers();
-      overlay.querySelector('#adminPendingTabBadge').textContent = pendingUsers.length;
+      const badge = overlay.querySelector('#adminPendingTabBadge');
+      if (badge) badge.textContent = pendingUsers.length;
 
       if (pendingUsers.length === 0) {
         body.innerHTML = `
@@ -649,13 +641,13 @@
           </div>
           <button type="button" id="btnRefreshPendingList" class="btn btn-sm btn-ghost" style="font-size:.78rem;">🔄 Listeyi Yenile</button>
         </div>
-        <div class="admin-card-grid">
+        <div class="admin-card-grid" id="pendingGridList">
       `;
 
       pendingUsers.forEach(u => {
         const timeAgo = formatRelativeTime(u.created_at);
         html += `
-          <div class="admin-user-card" id="userCard_${u.id}">
+          <div class="admin-user-card" id="pendingCard_${u.id}">
             <div class="admin-user-info">
               <div class="admin-user-avatar">${u.avatar || '👤'}</div>
               <div style="min-width:0;flex:1;">
@@ -673,7 +665,7 @@
               </div>
             </div>
             <div class="admin-actions">
-              <button type="button" class="btn btn-sm btn-success btn-approve-user" data-id="${u.id}" data-name="${escHtml(u.full_name || u.username)}" style="font-weight:800;padding:.45rem .85rem;">
+              <button type="button" class="btn btn-sm btn-success btn-approve-user" data-id="${u.id}" data-name="${escHtml(u.full_name || u.username)}" style="font-weight:800;padding:.45rem .85rem;box-shadow:0 2px 6px rgba(16,185,129,0.25);">
                 ✅ Onayla
               </button>
               <button type="button" class="btn btn-sm btn-danger btn-reject-user" data-id="${u.id}" data-name="${escHtml(u.full_name || u.username)}" style="font-weight:800;padding:.45rem .85rem;">
@@ -690,34 +682,43 @@
       const refBtn = body.querySelector('#btnRefreshPendingList');
       if (refBtn) refBtn.onclick = renderPendingTab;
 
-      // Onayla Butonları
+      // Onayla Butonları (Animasyonlu & Hızlı)
       body.querySelectorAll('.btn-approve-user').forEach(btn => {
         btn.onclick = async () => {
           const uId = btn.getAttribute('data-id');
           const uName = btn.getAttribute('data-name');
+          const card = document.getElementById(`pendingCard_${uId}`);
           btn.disabled = true;
           btn.textContent = 'Onaylanıyor...';
 
           try {
+            // Backend API isteği
             const res = await fetch('/api/admin/approve-user', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ userId: uId })
             });
             const data = await res.json();
+            
             if (data.success) {
+              if (card) {
+                card.classList.add('card-approved-anim');
+                setTimeout(() => {
+                  card.remove();
+                  const remaining = body.querySelectorAll('.admin-user-card').length;
+                  if (badge) badge.textContent = remaining;
+                  if (remaining === 0) renderPendingTab();
+                }, 450);
+              }
               if (typeof window.toast === 'function') {
                 window.toast(`✅ "${uName}" kullanıcısı başarıyla onaylandı ve hesabı açıldı!`, 'success');
               }
-              renderPendingTab();
               refreshAdminPendingBadge();
             } else {
-              alert(data.reason || 'Kullanıcı onaylanamadı.');
-              btn.disabled = false;
-              btn.textContent = '✅ Onayla';
+              throw new Error(data.reason || 'Onaylanamadı');
             }
           } catch (err) {
-            // Supabase REST fallback
+            // Supabase REST doğrudan deneme (is_active = true)
             try {
               await fetch(`${SUPABASE_REST_URL}/rest/v1/app_users?id=eq.${uId}`, {
                 method: 'PATCH',
@@ -726,15 +727,27 @@
                   'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
                   'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ is_active: true, status: 'approved' })
+                body: JSON.stringify({ is_active: true })
               });
-              if (typeof window.toast === 'function') {
-                window.toast(`✅ "${uName}" kullanıcısı başarıyla onaylandı!`, 'success');
+              if (card) {
+                card.classList.add('card-approved-anim');
+                setTimeout(() => {
+                  card.remove();
+                  const remaining = body.querySelectorAll('.admin-user-card').length;
+                  if (badge) badge.textContent = remaining;
+                  if (remaining === 0) renderPendingTab();
+                }, 450);
               }
-              renderPendingTab();
+              if (typeof window.toast === 'function') {
+                window.toast(`✅ "${uName}" kullanıcısı onaylandı!`, 'success');
+              }
               refreshAdminPendingBadge();
             } catch (e) {
-              alert('Hata: ' + e.message);
+              showCustomPromptModal({
+                title: 'Onaylama Hatası',
+                message: e.message || 'Kullanıcı onaylanırken bir hata oluştu.',
+                isAlertOnly: true
+              });
               btn.disabled = false;
               btn.textContent = '✅ Onayla';
             }
@@ -742,50 +755,58 @@
         };
       });
 
-      // Reddet Butonları
+      // Reddet Butonları (Özel Onay Modalı ile)
       body.querySelectorAll('.btn-reject-user').forEach(btn => {
-        btn.onclick = async () => {
+        btn.onclick = () => {
           const uId = btn.getAttribute('data-id');
           const uName = btn.getAttribute('data-name');
-          if (!confirm(`"${uName}" kullanıcısının kayıt başvurusunu silmek / reddetmek istediğinize emin misiniz?`)) {
-            return;
-          }
-          btn.disabled = true;
-          btn.textContent = 'Siliniyor...';
+          const card = document.getElementById(`pendingCard_${uId}`);
 
-          try {
-            await fetch('/api/admin/reject-user', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userId: uId, deletePermanently: true })
-            });
-            if (typeof window.toast === 'function') {
-              window.toast(`"${uName}" başvurusu reddedildi ve silindi.`, 'info');
-            }
-            renderPendingTab();
-            refreshAdminPendingBadge();
-          } catch (err) {
-            try {
-              await fetch(`${SUPABASE_REST_URL}/rest/v1/app_users?id=eq.${uId}`, {
-                method: 'DELETE',
-                headers: {
-                  'apikey': SUPABASE_ANON_KEY,
-                  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+          showCustomPromptModal({
+            title: 'Kayıt Başvurusunu Reddet',
+            message: `<strong>"${escHtml(uName)}"</strong> kullanıcısının kayıt başvurusunu silmek ve reddetmek istediğinize emin misiniz?`,
+            confirmText: 'Evet, Reddet ve Sil',
+            isDanger: true,
+            onConfirm: async () => {
+              try {
+                await fetch('/api/admin/reject-user', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ userId: uId, deletePermanently: true })
+                });
+                if (card) {
+                  card.classList.add('card-rejected-anim');
+                  setTimeout(() => {
+                    card.remove();
+                    const remaining = body.querySelectorAll('.admin-user-card').length;
+                    if (badge) badge.textContent = remaining;
+                    if (remaining === 0) renderPendingTab();
+                  }, 400);
                 }
-              });
-              renderPendingTab();
-              refreshAdminPendingBadge();
-            } catch (e) {
-              alert('Hata: ' + e.message);
-              btn.disabled = false;
-              btn.textContent = '❌ Reddet';
+                if (typeof window.toast === 'function') {
+                  window.toast(`"${uName}" başvurusu reddedildi ve silindi.`, 'info');
+                }
+                refreshAdminPendingBadge();
+              } catch (err) {
+                try {
+                  await fetch(`${SUPABASE_REST_URL}/rest/v1/app_users?id=eq.${uId}`, {
+                    method: 'DELETE',
+                    headers: {
+                      'apikey': SUPABASE_ANON_KEY,
+                      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    }
+                  });
+                  if (card) card.remove();
+                  refreshAdminPendingBadge();
+                } catch (e) { }
+              }
             }
-          }
+          });
         };
       });
     }
 
-    // ── Sekme 2: Tüm Kullanıcılar ──
+    // ── Sekme 2: Tüm Kullanıcılar (Filtreli & Gelişmiş) ──
     async function renderAllUsersTab() {
       const body = overlay.querySelector('#adminModalBody');
       body.innerHTML = `
@@ -796,35 +817,76 @@
       `;
 
       const allUsers = await fetchAllUsers();
-      overlay.querySelector('#adminAllTabBadge').textContent = allUsers.length;
+      const badge = overlay.querySelector('#adminAllTabBadge');
+      if (badge) badge.textContent = allUsers.length;
+
+      let activeFilter = 'all'; // 'all', 'pending', 'active', 'suspended', 'admin'
 
       let html = `
-        <div style="margin-bottom:1rem;display:flex;align-items:center;gap:.75rem;">
+        <!-- Arama & Filtre Çipleri -->
+        <div style="margin-bottom:.85rem;display:flex;align-items:center;gap:.75rem;">
           <div style="position:relative;flex:1;">
             <span style="position:absolute;left:.75rem;top:50%;transform:translateY(-50%);color:#94a3b8;">🔍</span>
-            <input type="text" id="adminUserSearchInput" placeholder="Kullanıcı adı, isim veya e-posta ile ara..." style="
-              width:100%;padding:.6rem .85rem .6rem 2.2rem;border-radius:10px;
+            <input type="text" id="adminUserSearchInput" placeholder="İsim, kullanıcı adı, birim veya e-posta ile filtrele..." style="
+              width:100%;padding:.65rem .85rem .65rem 2.2rem;border-radius:12px;
               background:var(--bg-raised,#f8fafc);border:1.5px solid var(--border,#cbd5e1);
-              color:var(--text-primary,#0f172a);font-size:.85rem;outline:none;
+              color:var(--text-primary,#0f172a);font-size:.86rem;outline:none;
             " />
           </div>
           <button type="button" id="btnRefreshAllList" class="btn btn-sm btn-ghost" style="font-size:.78rem;">🔄 Yenile</button>
         </div>
-        <div class="admin-card-grid" id="adminAllUsersGrid">
+
+        <div class="admin-filter-chips" id="adminFilterChips">
+          <button type="button" class="admin-chip active" data-filter="all">Tümü (${allUsers.length})</button>
+          <button type="button" class="admin-chip" data-filter="pending">⏳ Onay Bekleyen (${allUsers.filter(u => u.is_active === false).length})</button>
+          <button type="button" class="admin-chip" data-filter="active">🟢 Aktif (${allUsers.filter(u => u.is_active !== false).length})</button>
+          <button type="button" class="admin-chip" data-filter="admin">👑 Adminler (${allUsers.filter(u => u.role === 'admin' || u.username === 'admin').length})</button>
+        </div>
+
+        <div class="admin-card-grid" id="adminAllUsersGrid"></div>
       `;
 
-      const renderList = (list) => {
-        if (list.length === 0) {
-          return `<div style="text-align:center;padding:2rem;color:var(--text-muted,#64748b);">Eşleşen kullanıcı bulunamadı.</div>`;
-        }
-        let listHtml = '';
-        list.forEach(u => {
+      body.innerHTML = html;
+
+      const grid = body.querySelector('#adminAllUsersGrid');
+      const searchInp = body.querySelector('#adminUserSearchInput');
+      const chips = body.querySelectorAll('.admin-chip');
+
+      const applyFiltersAndRender = () => {
+        const q = (searchInp ? searchInp.value : '').trim().toLowerCase();
+        const filtered = allUsers.filter(u => {
           const isUsrAdmin = u.role === 'admin' || u.username === 'admin';
-          const isPending = u.is_active === false || u.status === 'pending';
-          const isActive = u.is_active !== false && u.status !== 'pending' && u.status !== 'rejected';
+          const isPending = u.is_active === false;
+          const isActive = u.is_active !== false;
+
+          if (activeFilter === 'pending' && !isPending) return false;
+          if (activeFilter === 'active' && !isActive) return false;
+          if (activeFilter === 'admin' && !isUsrAdmin) return false;
+
+          if (q) {
+            const matches = (u.full_name || '').toLowerCase().includes(q) ||
+              (u.username || '').toLowerCase().includes(q) ||
+              (u.email || '').toLowerCase().includes(q) ||
+              (u.phone || '').includes(q) ||
+              (u.department || '').toLowerCase().includes(q);
+            if (!matches) return false;
+          }
+          return true;
+        });
+
+        if (filtered.length === 0) {
+          grid.innerHTML = `<div style="text-align:center;padding:2.5rem;color:var(--text-muted,#64748b);">Filtreye uygun kullanıcı bulunamadı.</div>`;
+          return;
+        }
+
+        let listHtml = '';
+        filtered.forEach(u => {
+          const isUsrAdmin = u.role === 'admin' || u.username === 'admin';
+          const isPending = u.is_active === false;
+          const isActive = u.is_active !== false;
 
           listHtml += `
-            <div class="admin-user-card" style="padding:.9rem 1.1rem;">
+            <div class="admin-user-card" id="allUserCard_${u.id}" style="padding:.9rem 1.15rem;">
               <div class="admin-user-info">
                 <div class="admin-user-avatar">${u.avatar || (isUsrAdmin ? '👑' : '👤')}</div>
                 <div style="min-width:0;flex:1;">
@@ -832,7 +894,7 @@
                     <span style="font-weight:800;font-size:.95rem;color:var(--text-primary,#0f172a);">${escHtml(u.full_name || u.username)}</span>
                     <span style="font-size:.75rem;font-weight:700;font-family:monospace;color:#2563eb;background:rgba(37,99,235,0.08);padding:.1rem .4rem;border-radius:5px;">@${escHtml(u.username)}</span>
                     ${isUsrAdmin ? `<span class="badge badge-purple" style="font-size:.68rem;">👑 Admin</span>` : `<span class="badge badge-blue" style="font-size:.68rem;">Kullanıcı</span>`}
-                    ${isPending ? `<span class="badge badge-amber" style="font-size:.68rem;">⏳ Bekliyor</span>` : (isActive ? `<span class="badge badge-green" style="font-size:.68rem;">🟢 Aktif</span>` : `<span class="badge badge-red" style="font-size:.68rem;">🔴 Pasif</span>`)}
+                    ${isPending ? `<span class="badge badge-amber" style="font-size:.68rem;">⏳ Onay Bekliyor</span>` : `<span class="badge badge-green" style="font-size:.68rem;">🟢 Aktif</span>`}
                   </div>
                   <div style="display:flex;align-items:center;gap:.8rem;flex-wrap:wrap;font-size:.75rem;color:var(--text-secondary,#64748b);">
                     <span>📧 ${escHtml(u.email || '-')}</span>
@@ -855,59 +917,33 @@
             </div>
           `;
         });
-        return listHtml;
+
+        grid.innerHTML = listHtml;
+        bindAllUsersActions(grid);
       };
 
-      html += renderList(allUsers) + `</div>`;
-      body.innerHTML = html;
-
-      const searchInp = body.querySelector('#adminUserSearchInput');
-      const grid = body.querySelector('#adminAllUsersGrid');
-      if (searchInp) {
-        searchInp.oninput = () => {
-          const q = searchInp.value.trim().toLowerCase();
-          const filtered = allUsers.filter(u => 
-            (u.full_name || '').toLowerCase().includes(q) ||
-            (u.username || '').toLowerCase().includes(q) ||
-            (u.email || '').toLowerCase().includes(q) ||
-            (u.department || '').toLowerCase().includes(q)
-          );
-          grid.innerHTML = renderList(filtered);
-          bindAllUsersEvents(grid);
+      chips.forEach(c => {
+        c.onclick = () => {
+          chips.forEach(x => x.classList.remove('active'));
+          c.classList.add('active');
+          activeFilter = c.getAttribute('data-filter');
+          applyFiltersAndRender();
         };
-      }
+      });
 
+      if (searchInp) searchInp.oninput = applyFiltersAndRender;
       const refAllBtn = body.querySelector('#btnRefreshAllList');
       if (refAllBtn) refAllBtn.onclick = renderAllUsersTab;
 
-      bindAllUsersEvents(grid);
+      applyFiltersAndRender();
 
-      function bindAllUsersEvents(scope) {
-        // Şifre Sıfırla
+      function bindAllUsersActions(scope) {
+        // Modern Şifre Sıfırlama
         scope.querySelectorAll('.btn-admin-reset-pass').forEach(btn => {
-          btn.onclick = async () => {
+          btn.onclick = () => {
             const uId = btn.getAttribute('data-id');
             const uName = btn.getAttribute('data-name');
-            const newPass = prompt(`"${uName}" kullanıcısı için yeni şifre belirleyin (en az 3 karakter):`, '123456');
-            if (!newPass || newPass.trim().length < 3) return;
-
-            try {
-              const res = await fetch('/api/admin/reset-password', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: uId, newPassword: newPass.trim() })
-              });
-              const data = await res.json();
-              if (data.success) {
-                if (typeof window.toast === 'function') {
-                  window.toast(`✅ "${uName}" şifresi başarıyla güncellendi! Yeni şifre: ${newPass.trim()}`, 'success');
-                } else {
-                  alert(`Şifre güncellendi: ${newPass.trim()}`);
-                }
-              }
-            } catch (err) {
-              alert('Hata: ' + err.message);
-            }
+            showPasswordResetDialog(uId, uName);
           };
         });
 
@@ -924,6 +960,9 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId: uId, makeAdmin })
               });
+              if (typeof window.toast === 'function') {
+                window.toast(`Kullanıcı rolü ${makeAdmin ? '👑 Admin' : '👤 Normal Kullanıcı'} olarak güncellendi.`, 'success');
+              }
               renderAllUsersTab();
             } catch (err) {
               alert('Rol güncellenemedi: ' + err.message);
@@ -931,7 +970,7 @@
           };
         });
 
-        // Aktiflik Durumu Değiştir
+        // Aktiflik Durumu Değiştir (Dondur / Aktif Et)
         scope.querySelectorAll('.btn-admin-toggle-active').forEach(btn => {
           btn.onclick = async () => {
             const uId = btn.getAttribute('data-id');
@@ -944,7 +983,11 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId: uId, isActive: setActive })
               });
+              if (typeof window.toast === 'function') {
+                window.toast(setActive ? '✅ Kullanıcı aktifleştirildi.' : '⏸️ Kullanıcı donduruldu.', 'info');
+              }
               renderAllUsersTab();
+              refreshAdminPendingBadge();
             } catch (err) {
               alert('Durum güncellenemedi: ' + err.message);
             }
@@ -960,7 +1003,6 @@
       renderAllUsersTab();
     }
 
-    // Sayaçları doldur
     fetchPendingUsers().then(list => {
       const b = overlay.querySelector('#adminPendingTabBadge');
       if (b) b.textContent = list.length;
@@ -969,6 +1011,128 @@
       const b = overlay.querySelector('#adminAllTabBadge');
       if (b) b.textContent = list.length;
     });
+  }
+
+  // ── 10. MODERN ÖZEL DİYALOGLAR (Şifre Sıfırlama & Onay) ───────
+  function showPasswordResetDialog(userId, userName) {
+    const existing = document.getElementById('modernPasswordResetDialog');
+    if (existing) existing.remove();
+
+    const generateRandomPassword = () => {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$';
+      let pass = '';
+      for (let i = 0; i < 8; i++) pass += chars.charAt(Math.floor(Math.random() * chars.length));
+      return pass;
+    };
+
+    const dialog = document.createElement('div');
+    dialog.id = 'modernPasswordResetDialog';
+    dialog.className = 'modern-sub-modal';
+
+    dialog.innerHTML = `
+      <div class="modern-sub-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+          <div style="font-weight:900;font-size:1.1rem;">🔑 Şifre Sıfırla</div>
+          <button type="button" id="btnClosePassModal" class="btn btn-sm btn-ghost" style="border-radius:50%;width:32px;height:32px;padding:0;">✕</button>
+        </div>
+        <p style="font-size:.84rem;color:#64748b;margin-bottom:1.1rem;line-height:1.45;">
+          <strong>"${escHtml(userName)}"</strong> kullanıcısı için yeni şifre belirleyin veya otomatik oluşturun:
+        </p>
+
+        <div style="margin-bottom:1rem;">
+          <label style="display:block;font-size:.76rem;font-weight:700;margin-bottom:.35rem;color:#334155;">Yeni Şifre</label>
+          <div style="display:flex;gap:.5rem;">
+            <input type="text" id="modernNewPassInput" value="${generateRandomPassword()}" style="
+              flex:1;padding:.65rem .85rem;border-radius:10px;border:1.5px solid #cbd5e1;
+              font-family:monospace;font-weight:800;font-size:1rem;outline:none;background:#f8fafc;
+            " />
+            <button type="button" id="btnGenRandomPass" class="btn btn-sm btn-ghost" style="font-weight:700;font-size:.78rem;" title="Yeni Rastgele Şifre Üret">
+              🎲 Üret
+            </button>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:.5rem;margin-top:1.25rem;">
+          <button type="button" id="btnSaveAndCopyPass" class="btn btn-primary" style="flex:1;justify-content:center;padding:.75rem;font-weight:800;">
+            💾 Kaydet ve Kopyala
+          </button>
+          <button type="button" id="btnCancelPassReset" class="btn btn-ghost" style="padding:.75rem .95rem;font-weight:700;">
+            İptal
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(dialog);
+
+    const input = dialog.querySelector('#modernNewPassInput');
+    const btnGen = dialog.querySelector('#btnGenRandomPass');
+    btnGen.onclick = () => { input.value = generateRandomPassword(); };
+
+    const close = () => dialog.remove();
+    dialog.querySelector('#btnClosePassModal').onclick = close;
+    dialog.querySelector('#btnCancelPassReset').onclick = close;
+
+    dialog.querySelector('#btnSaveAndCopyPass').onclick = async () => {
+      const pass = (input.value || '').trim();
+      if (!pass || pass.length < 3) {
+        alert('Şifre en az 3 karakter olmalıdır.');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/admin/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, newPassword: pass })
+        });
+        const data = await res.json();
+        if (data.success) {
+          navigator.clipboard.writeText(pass).catch(() => {});
+          if (typeof window.toast === 'function') {
+            window.toast(`✅ "${userName}" şifresi güncellendi ve panoya kopyalandı! (Yeni şifre: ${pass})`, 'success');
+          }
+          close();
+        } else {
+          alert(data.reason || 'Şifre güncellenemedi.');
+        }
+      } catch (err) {
+        alert('Hata: ' + err.message);
+      }
+    };
+  }
+
+  function showCustomPromptModal({ title, message, confirmText = 'Tamam', isDanger = false, isAlertOnly = false, onConfirm }) {
+    const existing = document.getElementById('customPromptModal');
+    if (existing) existing.remove();
+
+    const dialog = document.createElement('div');
+    dialog.id = 'customPromptModal';
+    dialog.className = 'modern-sub-modal';
+
+    dialog.innerHTML = `
+      <div class="modern-sub-card">
+        <div style="font-weight:900;font-size:1.15rem;margin-bottom:.5rem;color:${isDanger ? '#ef4444' : '#0f172a'};">${title}</div>
+        <div style="font-size:.85rem;color:#475569;margin-bottom:1.35rem;line-height:1.5;">${message}</div>
+        <div style="display:flex;gap:.5rem;justify-content:flex-end;">
+          ${!isAlertOnly ? `<button type="button" id="btnPromptCancel" class="btn btn-ghost" style="padding:.65rem 1rem;font-weight:700;">Vazgeç</button>` : ''}
+          <button type="button" id="btnPromptConfirm" class="btn ${isDanger ? 'btn-danger' : 'btn-primary'}" style="padding:.65rem 1.25rem;font-weight:800;">
+            ${confirmText}
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(dialog);
+
+    const close = () => dialog.remove();
+    const btnCancel = dialog.querySelector('#btnPromptCancel');
+    if (btnCancel) btnCancel.onclick = close;
+
+    dialog.querySelector('#btnPromptConfirm').onclick = () => {
+      close();
+      if (typeof onConfirm === 'function') onConfirm();
+    };
   }
 
   function formatRelativeTime(isoDate) {
@@ -984,7 +1148,7 @@
     }
   }
 
-  // ── 10. Navbar Rozeti & Hızlı Çıkış Butonu ───────────────────
+  // ── 11. Navbar Rozeti & Hızlı Çıkış Butonu ───────────────────
   function updateNavbarUserBadge() {
     const user = getSession();
     const btnProfile = document.getElementById('btnUserProfile') || document.querySelector('[data-auth-badge]');
@@ -1037,7 +1201,7 @@
     return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  // ── 11. Oturum Açılış Splash Screen ──────────────────────────
+  // ── 12. Oturum Açılış Splash Screen ──────────────────────────
   function showLoginTransitionSplash(user, onComplete) {
     const splash = document.createElement('div');
     splash.id = 'loginTransitionSplash';
@@ -1076,7 +1240,7 @@
     }, 850);
   }
 
-  // ── 12. BAĞIMSIZ TAM EKRAN AUTH PORTAL ───────────────────────
+  // ── 13. BAĞIMSIZ TAM EKRAN AUTH PORTAL ───────────────────────
   function showAuthFullScreenPortal(initialTab = 'login') {
     const existing = document.getElementById('authFullScreenPortal');
     if (existing) existing.remove();
@@ -1207,7 +1371,7 @@
           ">🚀 Giriş Yap</button>
         </form>
 
-        <!-- ── 2. KAYIT FORMU (Tek Adım, E-Postasız & Admin Onaylı) ── -->
+        <!-- ── 2. KAYIT FORMU ── -->
         <form id="authRegisterForm" style="display: ${initialTab === 'register' ? 'block' : 'none'};">
           <div id="regFormBody">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem;">
