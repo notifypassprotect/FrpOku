@@ -1620,4 +1620,197 @@ tr.pinned-row {
   color: #94a3b8;
 }
 
+/* ── ADMİN YENİ KAYIT BİLDİRİM BUTONU & YANIP SÖNME EFEKTİ ────── */
+.btn-admin-pending {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .42rem .85rem;
+  border-radius: 10px;
+  font-size: .84rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all .25s cubic-bezier(0.4, 0, 0.2, 1);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(239, 68, 68, 0.15));
+  border: 1.5px solid #f59e0b;
+  color: #d97706;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2);
+}
+
+[data-theme="dark"] .btn-admin-pending {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(239, 68, 68, 0.25));
+  border-color: #f59e0b;
+  color: #fbbf24;
+}
+
+.btn-admin-pending:hover {
+  transform: translateY(-1px) scale(1.03);
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.35);
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: #ffffff;
+  border-color: transparent;
+}
+
+/* Yeni Kayıt Varken Yanıp Sönen (Flashing / Pulsing) Durum */
+.btn-admin-pending.has-pending {
+  background: linear-gradient(135deg, #f59e0b, #ef4444) !important;
+  color: #ffffff !important;
+  border-color: #ffffff !important;
+  animation: adminPulseGlow 1.2s infinite alternate ease-in-out;
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.6), 0 0 30px rgba(245, 158, 11, 0.4);
+}
+
+@keyframes adminPulseGlow {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.5), 0 0 12px rgba(239, 68, 68, 0.4);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.06);
+    box-shadow: 0 0 18px rgba(239, 68, 68, 0.85), 0 0 32px rgba(245, 158, 11, 0.7);
+    filter: brightness(1.15);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.5), 0 0 12px rgba(239, 68, 68, 0.4);
+    filter: brightness(1);
+  }
+}
+
+.admin-pending-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: .75rem;
+  font-weight: 900;
+  background: #ef4444;
+  color: #ffffff;
+  border: 1.5px solid #ffffff;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+  animation: badgeBlink 1.2s infinite;
+}
+
+@keyframes badgeBlink {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.22); }
+}
+
+/* ── ADMİN YÖNETİM MODAL STİLLERİ ─────────────────────────── */
+.admin-modal-wrap {
+  width: 95vw;
+  max-width: 860px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface, #ffffff);
+  border-radius: 24px;
+  border: 1.5px solid var(--border, #e2e8f0);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  animation: modalPop .25s ease-out;
+}
+
+.admin-modal-header {
+  padding: 1.25rem 1.6rem;
+  background: var(--bg-raised, #f8fafc);
+  border-bottom: 1.5px solid var(--border, #e2e8f0);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.admin-modal-tabs {
+  display: flex;
+  gap: .5rem;
+  padding: .75rem 1.6rem;
+  background: var(--bg-surface, #ffffff);
+  border-bottom: 1px solid var(--border, #e2e8f0);
+}
+
+.admin-tab-btn {
+  padding: .55rem 1.1rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: .85rem;
+  font-weight: 700;
+  color: var(--text-secondary, #64748b);
+  cursor: pointer;
+  transition: all .2s;
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+}
+
+.admin-tab-btn.active {
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--accent-bright, #2563eb);
+  border-color: rgba(37, 99, 235, 0.3);
+}
+
+.admin-modal-body {
+  padding: 1.5rem 1.6rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.admin-card-grid {
+  display: flex;
+  flex-direction: column;
+  gap: .9rem;
+}
+
+.admin-user-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.25rem;
+  background: var(--bg-raised, #f8fafc);
+  border: 1.5px solid var(--border, #e2e8f0);
+  border-radius: 16px;
+  transition: all .2s ease;
+}
+
+.admin-user-card:hover {
+  border-color: var(--accent-bright, #3b82f6);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+  transform: translateY(-1px);
+}
+
+.admin-user-info {
+  display: flex;
+  align-items: center;
+  gap: .9rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-user-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(37,99,235,0.15), rgba(139,92,246,0.15));
+  border: 1px solid rgba(37,99,235,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  flex-shrink: 0;
+}
+
+.admin-actions {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-shrink: 0;
+}
+
+
 

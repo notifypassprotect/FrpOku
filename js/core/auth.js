@@ -1,8 +1,10 @@
 /**
- * FrpOku - Güvenli Kullanıcı Oturum & Kimlik Doğrulama Katmanı (Auth Module v4)
+ * FrpOku - Güvenli Kullanıcı Oturum & Kimlik Doğrulama Katmanı (Auth Module v5)
+ * - E-Postasız Yeni Kullanıcı Kayıt Akışı
+ * - Yönetici (Admin) Onayı Sistemi (Pending Approval Workflow)
+ * - Admin Panelinde Yanıp Sönen (Flashing / Pulsing) "Yeni Kayıt Var" Bildirimi
+ * - Admin Kullanıcı Yönetimi & Kayıt Onay Modalı
  * - Beni Hatırla & Giriş Bilgileri Kalıcılığı
- * - 6 Haneli OTP Kodlu Şifremi Unuttum Akışı (Gmail SMTP)
- * - Otomatik Hoş Geldiniz & Güvenlik Bildirim E-postaları
  * - Responsive Tam Ekran Portal & Akıllı Dropdown Konumlandırması
  */
 
@@ -17,7 +19,8 @@
 
   let currentUser = null;
   let currentCaptchaText = '';
-  let activeResetEmail = '';
+  let adminPollingInterval = null;
+  let cachedPendingCount = 0;
 
   // ── 1. Hızlı ve Güvenli SHA-256 Hash Fonksiyonu ────────────────
   async function hashPassword(plainText) {
@@ -38,7 +41,7 @@
     }
   }
 
-  // ── 2. Akıllı Görsel CAPTCHA Motoru (Aydınlık & Kontrastlı) ─────
+  // ── 2. Akıllı Görsel CAPTCHA Motoru ───────────────────────────
   function generateCaptcha(canvasId) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return '';
@@ -98,7 +101,7 @@
     return code;
   }
 
-  // ── 3. REST API İstek Motoru ──────────────────────────────────
+  // ── 3. REST / Server API İstek Motoru ─────────────────────────
   async function fetchUsersFromRest(queryString = '') {
     const res = await fetch(`${SUPABASE_REST_URL}/rest/v1/app_users${queryString}`, {
       headers: {
@@ -111,25 +114,7 @@
     return await res.json();
   }
 
-  async function insertUserToRest(userRecord) {
-    const res = await fetch(`${SUPABASE_REST_URL}/rest/v1/app_users`, {
-      method: 'POST',
-      headers: {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=representation'
-      },
-      body: JSON.stringify(userRecord)
-    });
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData.message || ('HTTP ' + res.status));
-    }
-    return await res.json();
-  }
-
-  // ── 4. Kayıt Ol (Register) ────────────────────────────────────
+  // ── 4. Kayıt Ol (Register - E-Postasız & Admin Onayına Gönder) ─
   async function register({ fullName, username, email, phone, department, password }) {
     const cleanUser = (username || '').trim().toLowerCase();
     const cleanEmail = (email || '').trim().toLowerCase();
@@ -159,9 +144,7 @@
     if (rawPhone) {
       const tenDigits = rawPhone.startsWith('0') ? rawPhone.slice(1) : rawPhone;
       const isTurkishMobile = /^5\d{9}$/.test(tenDigits);
-      const isRepeatingBogus = /^5(\d)\1{8}$/.test(tenDigits) || tenDigits === '5345241111' || tenDigits === '5000000000';
-
-      if (!isTurkishMobile || isRepeatingBogus) {
+      if (!isTurkishMobile) {
         return { success: false, reason: '⚠️ Lütfen geçerli bir Türkiye cep telefonu numarası giriniz (Örnek: 05XX XXX XX XX).' };
       }
       formattedPhone = tenDigits;
@@ -173,18 +156,42 @@
     }
 
     try {
-      // 6. Mükerrer Kontrolü
+      // Önce Backend API dene
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fullName: cleanName,
+            username: cleanUser,
+            email: cleanEmail,
+            phone: formattedPhone,
+            department: (department || 'Bilgi İşlem').trim(),
+            password
+          })
+        });
+        const data = await res.json();
+        if (data && data.success) {
+          return { success: true, pendingApproval: true, message: data.message };
+        } else if (data && data.reason) {
+          return { success: false, reason: data.reason };
+        }
+      } catch (backendErr) {
+        console.warn('Backend register API çağrısı başarısız, Supabase REST doğrudan deneniyor...', backendErr);
+      }
+
+      // Supabase REST doğrudan kayıt (Backend erişilemezse)
       let existingUsers = [];
       try {
         existingUsers = await fetchUsersFromRest(`?or=(username.eq.${cleanUser},email.eq.${cleanEmail})&limit=1`);
-      } catch (e) {}
+      } catch (e) { }
 
       if (existingUsers && existingUsers.length > 0) {
         if (existingUsers[0].username === cleanUser) {
           return { success: false, reason: `⚠️ '${cleanUser}' kullanıcı adı zaten kullanımda. Lütfen başka bir kullanıcı adı seçin.` };
         }
         if (existingUsers[0].email === cleanEmail) {
-          return { success: false, reason: `⚠️ '${cleanEmail}' e-posta adresi zaten kayıtlı. Giriş yapmayı deneyin.` };
+          return { success: false, reason: `⚠️ '${cleanEmail}' e-posta adresi zaten kayıtlıdır.` };
         }
       }
 
@@ -201,26 +208,33 @@
         password_hash: passwordHash,
         role: 'user',
         avatar: '👤',
-        is_active: true,
+        is_active: false, // Yönetici onayı bekliyor
+        status: 'pending',
         created_at: new Date().toISOString(),
-        last_login: new Date().toISOString()
+        last_login: null
       };
 
-      await insertUserToRest(newRecord);
-      setSession(newRecord, true);
-
-      // Kayıt Sonrası Hoş Geldiniz E-Postası Gönder (Arka Planda)
-      fetch('/api/auth/send-welcome', {
+      const res = await fetch(`${SUPABASE_REST_URL}/rest/v1/app_users`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: cleanEmail,
-          fullName: cleanName,
-          username: cleanUser
-        })
-      }).catch(err => console.warn('Welcome email error:', err));
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify(newRecord)
+      });
 
-      return { success: true, user: newRecord };
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || ('HTTP ' + res.status));
+      }
+
+      return {
+        success: true,
+        pendingApproval: true,
+        message: 'Kayıt başvurunuz başarıyla alındı. Sistem yöneticisi (Admin) onayladıktan sonra hesabınız aktif edilecek ve giriş yapabileceksiniz.'
+      };
     } catch (err) {
       return { success: false, reason: 'Kayıt sırasında hata oluştu: ' + (err.message || err) };
     }
@@ -233,6 +247,36 @@
     if (!password) return { success: false, reason: 'Lütfen şifrenizi girin.' };
 
     try {
+      // 1. Önce Node Express Backend Endpoint'i Dene
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier: ident, password })
+        });
+        const data = await res.json();
+        if (data && data.success && data.user) {
+          if (rememberMe) {
+            localStorage.setItem(SAVED_IDENTIFIER_KEY, ident);
+          } else {
+            localStorage.removeItem(SAVED_IDENTIFIER_KEY);
+          }
+          setSession(data.user, rememberMe);
+          return { success: true, user: data.user };
+        } else if (data && data.pendingApproval) {
+          return {
+            success: false,
+            pendingApproval: true,
+            reason: data.reason || '⏳ Hesabınız henüz sistem yöneticisi (Admin) tarafından onaylanmamıştır. Lütfen yöneticinizle iletişime geçiniz.'
+          };
+        } else if (data && data.reason) {
+          return { success: false, reason: data.reason };
+        }
+      } catch (backendErr) {
+        console.warn('Backend login başarısız, Supabase REST doğrudan deneniyor...', backendErr);
+      }
+
+      // 2. Supabase REST Fallback
       const cleanIdent = ident.toLowerCase();
       const phoneDigits = ident.replace(/\D/g, '');
 
@@ -258,8 +302,20 @@
         return { success: false, reason: '🔒 Şifreniz hatalı! Lütfen şifrenizi kontrol edip tekrar deneyin.' };
       }
 
-      if (user.is_active === false) {
-        return { success: false, reason: '🚫 Hesabınız pasif duruma getirilmiştir. Yöneticinizle iletişime geçin.' };
+      // Onay Kontrolü
+      if (user.is_active === false || user.status === 'pending') {
+        return {
+          success: false,
+          pendingApproval: true,
+          reason: '⏳ Hesabınız henüz sistem yöneticisi (Admin) tarafından onaylanmamıştır. Lütfen yöneticinizle iletişime geçiniz.'
+        };
+      }
+
+      if (user.status === 'rejected') {
+        return {
+          success: false,
+          reason: '🚫 Kayıt başvurunuz sistem yöneticisi tarafından onaylanmamıştır.'
+        };
       }
 
       // Son giriş zamanını güncelle
@@ -271,9 +327,8 @@
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ last_login: new Date().toISOString() })
-      }).catch(() => {});
+      }).catch(() => { });
 
-      // Giriş bilgisini hatırla (Identifier)
       if (rememberMe) {
         localStorage.setItem(SAVED_IDENTIFIER_KEY, ident);
       } else {
@@ -283,7 +338,7 @@
       setSession(user, rememberMe);
       return { success: true, user };
     } catch (err) {
-      return { success: false, reason: 'Bulut bağlantı hatası: ' + (err.message || err) };
+      return { success: false, reason: 'Bağlantı hatası: ' + (err.message || err) };
     }
   }
 
@@ -314,16 +369,17 @@
     }
 
     updateNavbarUserBadge();
+    setupAdminFeatures();
   }
 
   function getSession() {
     if (currentUser) return currentUser;
     try {
       const isRemembered = localStorage.getItem(REMEMBER_KEY) === '1';
-      const raw = isRemembered 
-        ? localStorage.getItem(AUTH_STORAGE_KEY) 
+      const raw = isRemembered
+        ? localStorage.getItem(AUTH_STORAGE_KEY)
         : (sessionStorage.getItem(AUTH_STORAGE_KEY) || localStorage.getItem(AUTH_STORAGE_KEY));
-      
+
       if (raw) {
         currentUser = JSON.parse(raw);
         return currentUser;
@@ -339,6 +395,10 @@
     localStorage.removeItem(AUTH_STORAGE_KEY);
     localStorage.removeItem(REMEMBER_KEY);
     sessionStorage.removeItem(AUTH_STORAGE_KEY);
+    if (adminPollingInterval) {
+      clearInterval(adminPollingInterval);
+      adminPollingInterval = null;
+    }
     updateNavbarUserBadge();
 
     // Raporları temizle ve tam ekran portalı aç
@@ -351,6 +411,10 @@
 
   function isLoggedIn() { return !!getSession(); }
   function getUser() { return getSession(); }
+  function isAdmin() {
+    const u = getSession();
+    return !!(u && (u.role === 'admin' || u.username === 'admin'));
+  }
 
   // ── 7. Modern Çıkış Onay Modalı ───────────────────────────────
   function confirmLogout() {
@@ -373,7 +437,554 @@
     }
   }
 
-  // ── 8. Navbar Rozeti & Hızlı Çıkış Butonu ────────────────────
+  // ── 8. ADMİN: Onay Bekleyen Kayıtları Sorgulama & Bildirim ────
+  async function fetchPendingUsers() {
+    try {
+      const res = await fetch('/api/admin/pending-users');
+      const data = await res.json();
+      if (data && data.success && Array.isArray(data.users)) {
+        return data.users;
+      }
+    } catch (e) {
+      console.warn('Pending users fetch error:', e.message);
+    }
+
+    // Fallback Supabase REST
+    try {
+      const users = await fetchUsersFromRest('?or=(is_active.eq.false,status.eq.pending)&order=created_at.desc');
+      return Array.isArray(users) ? users : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  async function fetchAllUsers() {
+    try {
+      const res = await fetch('/api/admin/all-users');
+      const data = await res.json();
+      if (data && data.success && Array.isArray(data.users)) {
+        return data.users;
+      }
+    } catch (e) { }
+
+    try {
+      const users = await fetchUsersFromRest('?order=created_at.desc');
+      return Array.isArray(users) ? users : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // Admin Topbar Bildirim Butonunu Güncelle (Yanıp Sönen Buton)
+  async function refreshAdminPendingBadge() {
+    if (!isAdmin()) {
+      const btn = document.getElementById('btnAdminPendingRegistrations');
+      if (btn) btn.remove();
+      return;
+    }
+
+    const topbarRight = document.querySelector('.topbar-right');
+    if (!topbarRight) return;
+
+    const pendingList = await fetchPendingUsers();
+    const count = pendingList.length;
+    cachedPendingCount = count;
+
+    let adminBtn = document.getElementById('btnAdminPendingRegistrations');
+    if (!adminBtn) {
+      adminBtn = document.createElement('button');
+      adminBtn.id = 'btnAdminPendingRegistrations';
+      adminBtn.type = 'button';
+      adminBtn.className = 'btn-admin-pending';
+      adminBtn.onclick = () => showAdminApprovalModal('pending');
+      topbarRight.insertBefore(adminBtn, topbarRight.firstChild);
+    }
+
+    if (count > 0) {
+      adminBtn.classList.add('has-pending');
+      adminBtn.innerHTML = `
+        <span style="font-size:1rem;">🔔</span>
+        <span>Yeni Kayıt Var</span>
+        <span class="admin-pending-badge">${count}</span>
+      `;
+      adminBtn.title = `${count} adet yeni kullanıcı onay bekliyor! İncelemek için tıklayın.`;
+    } else {
+      adminBtn.classList.remove('has-pending');
+      adminBtn.innerHTML = `
+        <span style="font-size:1rem;">👥</span>
+        <span>Kullanıcı Yönetimi</span>
+      `;
+      adminBtn.title = 'Kullanıcı Yönetimi & Kayıt Onay Paneli';
+    }
+  }
+
+  function setupAdminFeatures() {
+    if (!isAdmin()) {
+      if (adminPollingInterval) {
+        clearInterval(adminPollingInterval);
+        adminPollingInterval = null;
+      }
+      const btn = document.getElementById('btnAdminPendingRegistrations');
+      if (btn) btn.remove();
+      return;
+    }
+
+    refreshAdminPendingBadge();
+
+    // 6 Saniyede bir periyodik denetle (Yeni kayıt varsa anında yanıp sönsün)
+    if (!adminPollingInterval) {
+      adminPollingInterval = setInterval(() => {
+        if (isAdmin()) {
+          refreshAdminPendingBadge();
+        }
+      }, 6000);
+    }
+  }
+
+  // ── 9. ADMİN: KAYIT ONAY & KULLANICI YÖNETİM MODALI ───────────
+  async function showAdminApprovalModal(initialTab = 'pending') {
+    const existing = document.getElementById('adminApprovalModalOverlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'adminApprovalModalOverlay';
+    overlay.className = 'modal-overlay';
+    overlay.style.cssText = `
+      position: fixed; inset: 0;
+      background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(8px);
+      z-index: 100000; display: flex; align-items: center; justify-content: center;
+      padding: 1rem; animation: fadeIn .2s ease-out;
+    `;
+
+    overlay.innerHTML = `
+      <div class="admin-modal-wrap" style="color:var(--text-primary, #0f172a);">
+        <!-- Başlık Barı -->
+        <div class="admin-modal-header">
+          <div style="display:flex;align-items:center;gap:.75rem;">
+            <div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg, #f59e0b, #ef4444);display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:#fff;box-shadow:0 4px 12px rgba(245,158,11,0.35);">
+              👑
+            </div>
+            <div>
+              <div style="font-size:1.15rem;font-weight:900;letter-spacing:-.01em;">Kullanıcı & Kayıt Onay Yönetimi</div>
+              <div style="font-size:.78rem;color:var(--text-muted, #64748b);">Kurumsal Kullanıcı Başvuruları & Yetkilendirme</div>
+            </div>
+          </div>
+          <button type="button" id="btnAdminModalClose" class="btn btn-sm btn-ghost" style="font-size:1.2rem;width:36px;height:36px;border-radius:50%;padding:0;display:flex;align-items:center;justify-content:center;">✕</button>
+        </div>
+
+        <!-- Sekmeler -->
+        <div class="admin-modal-tabs">
+          <button type="button" id="tabAdminPending" class="admin-tab-btn ${initialTab === 'pending' ? 'active' : ''}">
+            <span>🔔 Onay Bekleyenler</span>
+            <span id="adminPendingTabBadge" class="badge badge-red" style="font-size:.72rem;padding:.15rem .45rem;">...</span>
+          </button>
+          <button type="button" id="tabAdminAll" class="admin-tab-btn ${initialTab === 'all' ? 'active' : ''}">
+            <span>👥 Tüm Kullanıcılar</span>
+            <span id="adminAllTabBadge" class="badge badge-blue" style="font-size:.72rem;padding:.15rem .45rem;">...</span>
+          </button>
+        </div>
+
+        <!-- İçerik Alanı -->
+        <div class="admin-modal-body" id="adminModalBody">
+          <div style="text-align:center;padding:3rem;color:var(--text-muted,#64748b);">
+            <div class="splash-spinner" style="margin-bottom:1rem;"></div>
+            <div>Kullanıcı listesi yükleniyor...</div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const closeBtn = overlay.querySelector('#btnAdminModalClose');
+    closeBtn.onclick = () => overlay.remove();
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+    const tabPending = overlay.querySelector('#tabAdminPending');
+    const tabAll = overlay.querySelector('#tabAdminAll');
+
+    tabPending.onclick = () => {
+      tabPending.classList.add('active');
+      tabAll.classList.remove('active');
+      renderPendingTab();
+    };
+
+    tabAll.onclick = () => {
+      tabAll.classList.add('active');
+      tabPending.classList.remove('active');
+      renderAllUsersTab();
+    };
+
+    // ── Sekme 1: Onay Bekleyenler ──
+    async function renderPendingTab() {
+      const body = overlay.querySelector('#adminModalBody');
+      body.innerHTML = `
+        <div style="text-align:center;padding:2.5rem;color:var(--text-muted,#64748b);">
+          <div class="splash-spinner" style="margin-bottom:1rem;"></div>
+          <div>Başvurular kontrol ediliyor...</div>
+        </div>
+      `;
+
+      const pendingUsers = await fetchPendingUsers();
+      overlay.querySelector('#adminPendingTabBadge').textContent = pendingUsers.length;
+
+      if (pendingUsers.length === 0) {
+        body.innerHTML = `
+          <div style="text-align:center;padding:3.5rem 1rem;">
+            <div style="font-size:3.5rem;margin-bottom:1rem;animation:pulse 2s infinite;">🎉</div>
+            <div style="font-size:1.2rem;font-weight:800;margin-bottom:.4rem;color:var(--text-primary,#0f172a);">Onay Bekleyen Kayıt Yok</div>
+            <div style="font-size:.85rem;color:var(--text-muted,#64748b);max-width:380px;margin:0 auto;">
+              Şu anda sisteme katılmak için onay bekleyen yeni bir kullanıcı başvurusu bulunmuyor.
+            </div>
+          </div>
+        `;
+        refreshAdminPendingBadge();
+        return;
+      }
+
+      let html = `
+        <div style="margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;">
+          <div style="font-size:.85rem;font-weight:700;color:var(--text-muted,#64748b);">
+            Toplam <strong>${pendingUsers.length}</strong> kullanıcı onayı bekliyor:
+          </div>
+          <button type="button" id="btnRefreshPendingList" class="btn btn-sm btn-ghost" style="font-size:.78rem;">🔄 Listeyi Yenile</button>
+        </div>
+        <div class="admin-card-grid">
+      `;
+
+      pendingUsers.forEach(u => {
+        const timeAgo = formatRelativeTime(u.created_at);
+        html += `
+          <div class="admin-user-card" id="userCard_${u.id}">
+            <div class="admin-user-info">
+              <div class="admin-user-avatar">${u.avatar || '👤'}</div>
+              <div style="min-width:0;flex:1;">
+                <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.2rem;">
+                  <span style="font-weight:900;font-size:1rem;color:var(--text-primary,#0f172a);">${escHtml(u.full_name || u.username)}</span>
+                  <span style="font-size:.78rem;font-weight:700;font-family:monospace;color:#2563eb;background:rgba(37,99,235,0.08);padding:.15rem .45rem;border-radius:6px;">@${escHtml(u.username)}</span>
+                  <span class="badge badge-amber" style="font-size:.7rem;">⏳ Onay Bekliyor</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;font-size:.78rem;color:var(--text-secondary,#475569);">
+                  <span>📧 <a href="mailto:${escHtml(u.email)}" style="color:inherit;text-decoration:none;font-weight:600;">${escHtml(u.email || '-')}</a></span>
+                  ${u.phone ? `<span>📱 <a href="tel:${escHtml(u.phone)}" style="color:inherit;text-decoration:none;font-weight:600;">${escHtml(u.phone)}</a></span>` : ''}
+                  <span>🏢 <strong>${escHtml(u.department || 'Bilgi İşlem')}</strong></span>
+                  <span style="color:var(--text-muted,#94a3b8);">🕒 ${timeAgo}</span>
+                </div>
+              </div>
+            </div>
+            <div class="admin-actions">
+              <button type="button" class="btn btn-sm btn-success btn-approve-user" data-id="${u.id}" data-name="${escHtml(u.full_name || u.username)}" style="font-weight:800;padding:.45rem .85rem;">
+                ✅ Onayla
+              </button>
+              <button type="button" class="btn btn-sm btn-danger btn-reject-user" data-id="${u.id}" data-name="${escHtml(u.full_name || u.username)}" style="font-weight:800;padding:.45rem .85rem;">
+                ❌ Reddet
+              </button>
+            </div>
+          </div>
+        `;
+      });
+
+      html += `</div>`;
+      body.innerHTML = html;
+
+      const refBtn = body.querySelector('#btnRefreshPendingList');
+      if (refBtn) refBtn.onclick = renderPendingTab;
+
+      // Onayla Butonları
+      body.querySelectorAll('.btn-approve-user').forEach(btn => {
+        btn.onclick = async () => {
+          const uId = btn.getAttribute('data-id');
+          const uName = btn.getAttribute('data-name');
+          btn.disabled = true;
+          btn.textContent = 'Onaylanıyor...';
+
+          try {
+            const res = await fetch('/api/admin/approve-user', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: uId })
+            });
+            const data = await res.json();
+            if (data.success) {
+              if (typeof window.toast === 'function') {
+                window.toast(`✅ "${uName}" kullanıcısı başarıyla onaylandı ve hesabı açıldı!`, 'success');
+              }
+              renderPendingTab();
+              refreshAdminPendingBadge();
+            } else {
+              alert(data.reason || 'Kullanıcı onaylanamadı.');
+              btn.disabled = false;
+              btn.textContent = '✅ Onayla';
+            }
+          } catch (err) {
+            // Supabase REST fallback
+            try {
+              await fetch(`${SUPABASE_REST_URL}/rest/v1/app_users?id=eq.${uId}`, {
+                method: 'PATCH',
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY,
+                  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ is_active: true, status: 'approved' })
+              });
+              if (typeof window.toast === 'function') {
+                window.toast(`✅ "${uName}" kullanıcısı başarıyla onaylandı!`, 'success');
+              }
+              renderPendingTab();
+              refreshAdminPendingBadge();
+            } catch (e) {
+              alert('Hata: ' + e.message);
+              btn.disabled = false;
+              btn.textContent = '✅ Onayla';
+            }
+          }
+        };
+      });
+
+      // Reddet Butonları
+      body.querySelectorAll('.btn-reject-user').forEach(btn => {
+        btn.onclick = async () => {
+          const uId = btn.getAttribute('data-id');
+          const uName = btn.getAttribute('data-name');
+          if (!confirm(`"${uName}" kullanıcısının kayıt başvurusunu silmek / reddetmek istediğinize emin misiniz?`)) {
+            return;
+          }
+          btn.disabled = true;
+          btn.textContent = 'Siliniyor...';
+
+          try {
+            await fetch('/api/admin/reject-user', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: uId, deletePermanently: true })
+            });
+            if (typeof window.toast === 'function') {
+              window.toast(`"${uName}" başvurusu reddedildi ve silindi.`, 'info');
+            }
+            renderPendingTab();
+            refreshAdminPendingBadge();
+          } catch (err) {
+            try {
+              await fetch(`${SUPABASE_REST_URL}/rest/v1/app_users?id=eq.${uId}`, {
+                method: 'DELETE',
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY,
+                  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                }
+              });
+              renderPendingTab();
+              refreshAdminPendingBadge();
+            } catch (e) {
+              alert('Hata: ' + e.message);
+              btn.disabled = false;
+              btn.textContent = '❌ Reddet';
+            }
+          }
+        };
+      });
+    }
+
+    // ── Sekme 2: Tüm Kullanıcılar ──
+    async function renderAllUsersTab() {
+      const body = overlay.querySelector('#adminModalBody');
+      body.innerHTML = `
+        <div style="text-align:center;padding:2.5rem;color:var(--text-muted,#64748b);">
+          <div class="splash-spinner" style="margin-bottom:1rem;"></div>
+          <div>Kullanıcılar listeleniyor...</div>
+        </div>
+      `;
+
+      const allUsers = await fetchAllUsers();
+      overlay.querySelector('#adminAllTabBadge').textContent = allUsers.length;
+
+      let html = `
+        <div style="margin-bottom:1rem;display:flex;align-items:center;gap:.75rem;">
+          <div style="position:relative;flex:1;">
+            <span style="position:absolute;left:.75rem;top:50%;transform:translateY(-50%);color:#94a3b8;">🔍</span>
+            <input type="text" id="adminUserSearchInput" placeholder="Kullanıcı adı, isim veya e-posta ile ara..." style="
+              width:100%;padding:.6rem .85rem .6rem 2.2rem;border-radius:10px;
+              background:var(--bg-raised,#f8fafc);border:1.5px solid var(--border,#cbd5e1);
+              color:var(--text-primary,#0f172a);font-size:.85rem;outline:none;
+            " />
+          </div>
+          <button type="button" id="btnRefreshAllList" class="btn btn-sm btn-ghost" style="font-size:.78rem;">🔄 Yenile</button>
+        </div>
+        <div class="admin-card-grid" id="adminAllUsersGrid">
+      `;
+
+      const renderList = (list) => {
+        if (list.length === 0) {
+          return `<div style="text-align:center;padding:2rem;color:var(--text-muted,#64748b);">Eşleşen kullanıcı bulunamadı.</div>`;
+        }
+        let listHtml = '';
+        list.forEach(u => {
+          const isUsrAdmin = u.role === 'admin' || u.username === 'admin';
+          const isPending = u.is_active === false || u.status === 'pending';
+          const isActive = u.is_active !== false && u.status !== 'pending' && u.status !== 'rejected';
+
+          listHtml += `
+            <div class="admin-user-card" style="padding:.9rem 1.1rem;">
+              <div class="admin-user-info">
+                <div class="admin-user-avatar">${u.avatar || (isUsrAdmin ? '👑' : '👤')}</div>
+                <div style="min-width:0;flex:1;">
+                  <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.2rem;">
+                    <span style="font-weight:800;font-size:.95rem;color:var(--text-primary,#0f172a);">${escHtml(u.full_name || u.username)}</span>
+                    <span style="font-size:.75rem;font-weight:700;font-family:monospace;color:#2563eb;background:rgba(37,99,235,0.08);padding:.1rem .4rem;border-radius:5px;">@${escHtml(u.username)}</span>
+                    ${isUsrAdmin ? `<span class="badge badge-purple" style="font-size:.68rem;">👑 Admin</span>` : `<span class="badge badge-blue" style="font-size:.68rem;">Kullanıcı</span>`}
+                    ${isPending ? `<span class="badge badge-amber" style="font-size:.68rem;">⏳ Bekliyor</span>` : (isActive ? `<span class="badge badge-green" style="font-size:.68rem;">🟢 Aktif</span>` : `<span class="badge badge-red" style="font-size:.68rem;">🔴 Pasif</span>`)}
+                  </div>
+                  <div style="display:flex;align-items:center;gap:.8rem;flex-wrap:wrap;font-size:.75rem;color:var(--text-secondary,#64748b);">
+                    <span>📧 ${escHtml(u.email || '-')}</span>
+                    ${u.phone ? `<span>📱 ${escHtml(u.phone)}</span>` : ''}
+                    <span>🏢 ${escHtml(u.department || 'Bilgi İşlem')}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="admin-actions">
+                <button type="button" class="btn btn-sm btn-ghost btn-admin-reset-pass" data-id="${u.id}" data-name="${escHtml(u.full_name || u.username)}" title="Şifre Sıfırla" style="font-size:.78rem;font-weight:700;">
+                  🔑 Şifre Sıfırla
+                </button>
+                <button type="button" class="btn btn-sm btn-ghost btn-admin-toggle-role" data-id="${u.id}" data-admin="${isUsrAdmin ? '1' : '0'}" title="Rol Değiştir" style="font-size:.78rem;font-weight:700;">
+                  ${isUsrAdmin ? '👤 Normal Yap' : '👑 Admin Yap'}
+                </button>
+                <button type="button" class="btn btn-sm ${isActive ? 'btn-ghost' : 'btn-success'} btn-admin-toggle-active" data-id="${u.id}" data-active="${isActive ? '1' : '0'}" style="font-size:.78rem;font-weight:700;">
+                  ${isActive ? '⏸️ Dondur' : '▶️ Aktif Et'}
+                </button>
+              </div>
+            </div>
+          `;
+        });
+        return listHtml;
+      };
+
+      html += renderList(allUsers) + `</div>`;
+      body.innerHTML = html;
+
+      const searchInp = body.querySelector('#adminUserSearchInput');
+      const grid = body.querySelector('#adminAllUsersGrid');
+      if (searchInp) {
+        searchInp.oninput = () => {
+          const q = searchInp.value.trim().toLowerCase();
+          const filtered = allUsers.filter(u => 
+            (u.full_name || '').toLowerCase().includes(q) ||
+            (u.username || '').toLowerCase().includes(q) ||
+            (u.email || '').toLowerCase().includes(q) ||
+            (u.department || '').toLowerCase().includes(q)
+          );
+          grid.innerHTML = renderList(filtered);
+          bindAllUsersEvents(grid);
+        };
+      }
+
+      const refAllBtn = body.querySelector('#btnRefreshAllList');
+      if (refAllBtn) refAllBtn.onclick = renderAllUsersTab;
+
+      bindAllUsersEvents(grid);
+
+      function bindAllUsersEvents(scope) {
+        // Şifre Sıfırla
+        scope.querySelectorAll('.btn-admin-reset-pass').forEach(btn => {
+          btn.onclick = async () => {
+            const uId = btn.getAttribute('data-id');
+            const uName = btn.getAttribute('data-name');
+            const newPass = prompt(`"${uName}" kullanıcısı için yeni şifre belirleyin (en az 3 karakter):`, '123456');
+            if (!newPass || newPass.trim().length < 3) return;
+
+            try {
+              const res = await fetch('/api/admin/reset-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: uId, newPassword: newPass.trim() })
+              });
+              const data = await res.json();
+              if (data.success) {
+                if (typeof window.toast === 'function') {
+                  window.toast(`✅ "${uName}" şifresi başarıyla güncellendi! Yeni şifre: ${newPass.trim()}`, 'success');
+                } else {
+                  alert(`Şifre güncellendi: ${newPass.trim()}`);
+                }
+              }
+            } catch (err) {
+              alert('Hata: ' + err.message);
+            }
+          };
+        });
+
+        // Admin Rolü Değiştir
+        scope.querySelectorAll('.btn-admin-toggle-role').forEach(btn => {
+          btn.onclick = async () => {
+            const uId = btn.getAttribute('data-id');
+            const isCurAdmin = btn.getAttribute('data-admin') === '1';
+            const makeAdmin = !isCurAdmin;
+
+            try {
+              await fetch('/api/admin/toggle-admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: uId, makeAdmin })
+              });
+              renderAllUsersTab();
+            } catch (err) {
+              alert('Rol güncellenemedi: ' + err.message);
+            }
+          };
+        });
+
+        // Aktiflik Durumu Değiştir
+        scope.querySelectorAll('.btn-admin-toggle-active').forEach(btn => {
+          btn.onclick = async () => {
+            const uId = btn.getAttribute('data-id');
+            const isCurActive = btn.getAttribute('data-active') === '1';
+            const setActive = !isCurActive;
+
+            try {
+              await fetch('/api/admin/toggle-status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: uId, isActive: setActive })
+              });
+              renderAllUsersTab();
+            } catch (err) {
+              alert('Durum güncellenemedi: ' + err.message);
+            }
+          };
+        });
+      }
+    }
+
+    // İlk Yükleme
+    if (initialTab === 'pending') {
+      renderPendingTab();
+    } else {
+      renderAllUsersTab();
+    }
+
+    // Sayaçları doldur
+    fetchPendingUsers().then(list => {
+      const b = overlay.querySelector('#adminPendingTabBadge');
+      if (b) b.textContent = list.length;
+    });
+    fetchAllUsers().then(list => {
+      const b = overlay.querySelector('#adminAllTabBadge');
+      if (b) b.textContent = list.length;
+    });
+  }
+
+  function formatRelativeTime(isoDate) {
+    if (!isoDate) return 'Bilinmiyor';
+    try {
+      const diffSec = Math.floor((Date.now() - new Date(isoDate).getTime()) / 1000);
+      if (diffSec < 60) return 'Az önce';
+      if (diffSec < 3600) return `${Math.floor(diffSec / 60)} dk önce`;
+      if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} saat önce`;
+      return `${Math.floor(diffSec / 86400)} gün önce`;
+    } catch {
+      return 'Yakın zamanda';
+    }
+  }
+
+  // ── 10. Navbar Rozeti & Hızlı Çıkış Butonu ───────────────────
   function updateNavbarUserBadge() {
     const user = getSession();
     const btnProfile = document.getElementById('btnUserProfile') || document.querySelector('[data-auth-badge]');
@@ -384,7 +995,7 @@
       if (btnProfile) {
         btnProfile.innerHTML = `
           <span style="display:inline-flex;align-items:center;gap:.4rem;">
-            <span style="font-size:1.05rem;">${user.avatar || '👤'}</span>
+            <span style="font-size:1.05rem;">${user.avatar || (user.role === 'admin' ? '👑' : '👤')}</span>
             <span style="font-weight:700;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(user.full_name || user.username)}</span>
             <span style="width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 6px #10b981;"></span>
           </span>
@@ -392,7 +1003,7 @@
         btnProfile.title = `${user.full_name} (${user.email || user.username}) - Profil & Ayarlar`;
       }
 
-      // Hızlı Çıkış Butonunu EN SAĞA Ekle
+      // Hızlı Çıkış Butonunu Ekle
       if (topbarRight && !quickLogoutBtn) {
         quickLogoutBtn = document.createElement('button');
         quickLogoutBtn.id = 'btnQuickLogout';
@@ -426,7 +1037,7 @@
     return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  // ── 9. Oturum Açılış Splash Screen ───────────────────────────
+  // ── 11. Oturum Açılış Splash Screen ──────────────────────────
   function showLoginTransitionSplash(user, onComplete) {
     const splash = document.createElement('div');
     splash.id = 'loginTransitionSplash';
@@ -440,7 +1051,7 @@
     splash.innerHTML = `
       <div style="display:flex;flex-direction:column;align-items:center;gap:1.2rem;max-width:380px;padding:2rem;">
         <div style="width:76px;height:76px;background:linear-gradient(135deg, #3b82f6, #8b5cf6, #ec4899);border-radius:24px;display:flex;align-items:center;justify-content:center;font-size:2.4rem;box-shadow:0 0 45px rgba(59,130,246,.6);">
-          ${user.avatar || '⚡'}
+          ${user.avatar || (user.role === 'admin' ? '👑' : '⚡')}
         </div>
         <div>
           <div style="font-size:1.4rem;font-weight:900;margin-bottom:.3rem;color:#f8fafc;">Hoş Geldiniz, ${escHtml(user.full_name || user.username)}</div>
@@ -465,12 +1076,11 @@
     }, 850);
   }
 
-  // ── 10. BAĞIMSIZ TAM EKRAN AUTH PORTAL (Aydınlık & Responsive) ─
+  // ── 12. BAĞIMSIZ TAM EKRAN AUTH PORTAL ───────────────────────
   function showAuthFullScreenPortal(initialTab = 'login') {
     const existing = document.getElementById('authFullScreenPortal');
     if (existing) existing.remove();
 
-    // Ana uygulama kapsayıcısını gizle
     const appWrap = document.querySelector('.app-wrap');
     if (appWrap) appWrap.style.display = 'none';
 
@@ -488,7 +1098,7 @@
 
     portal.innerHTML = `
       <div class="auth-card" style="
-        max-width: 480px; width: 100%;
+        max-width: 490px; width: 100%;
         background: #ffffff;
         border: 1px solid #e2e8f0;
         border-radius: 26px;
@@ -509,8 +1119,8 @@
 
         <!-- Canlı Hata / Uyarı Bildirim Kutusu -->
         <div id="authAlertBox" style="
-          display: none; padding: .8rem 1rem; border-radius: 12px; margin-bottom: 1.2rem;
-          font-size: .83rem; font-weight: 600; line-height: 1.4; animation: shake .3s ease-in-out;
+          display: none; padding: .85rem 1rem; border-radius: 12px; margin-bottom: 1.2rem;
+          font-size: .84rem; font-weight: 600; line-height: 1.45; animation: shake .3s ease-in-out;
         "></div>
 
         <!-- Sekmeler (Tab Switcher) -->
@@ -541,7 +1151,7 @@
             <label style="display:block;font-size:.78rem;font-weight:700;color:#334155;margin-bottom:.35rem;">
               👤 E-Posta / Kullanıcı Adı / Telefon No
             </label>
-            <input type="text" id="loginIdentifier" required value="${escHtml(savedIdentifier)}" placeholder="ör: deneme, ilker veya 0534..." style="
+            <input type="text" id="loginIdentifier" required value="${escHtml(savedIdentifier)}" placeholder="ör: admin, ilker veya 0534..." style="
               width: 100%; padding: .72rem 1rem; border-radius: 12px;
               background: #f8fafc; border: 1.5px solid #cbd5e1;
               color: #0f172a; font-size: .9rem; outline: none; transition: all .2s; box-sizing: border-box;
@@ -597,10 +1207,9 @@
           ">🚀 Giriş Yap</button>
         </form>
 
-        <!-- ── 2. KAYIT FORMU ── -->
+        <!-- ── 2. KAYIT FORMU (Tek Adım, E-Postasız & Admin Onaylı) ── -->
         <form id="authRegisterForm" style="display: ${initialTab === 'register' ? 'block' : 'none'};">
-          <!-- Kayıt Adım 1: Bilgileri Girme -->
-          <div id="regStep1">
+          <div id="regFormBody">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem;">
               <div>
                 <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">👤 Ad Soyad *</label>
@@ -682,125 +1291,56 @@
               </div>
             </div>
 
+            <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:.65rem .85rem;margin-bottom:1rem;font-size:.76rem;color:#1e40af;line-height:1.4;">
+              ℹ️ Kaydınız tamamlandığında sistem yöneticisi (Admin) onayına iletilecektir. Yönetici onayının ardından giriş yapabilirsiniz.
+            </div>
+
             <button type="submit" id="btnRegisterSubmit" style="
               width: 100%; padding: .85rem; border: none; border-radius: 12px;
               background: linear-gradient(135deg, #10b981, #059669);
               color: #ffffff; font-weight: 800; font-size: .95rem; cursor: pointer;
               box-shadow: 0 4px 14px rgba(16,185,129,0.3); transition: all .2s;
-            ">✨ Doğrulama Kodu Gönder & Kayıt Ol</button>
+            ">✨ Kayıt Başvurusunu Tamamla</button>
           </div>
 
-          <!-- Kayıt Adım 2: E-Posta OTP Doğrulama -->
-          <div id="regStep2" style="display: none; text-align: left;">
-            <div style="font-size: 1.1rem; font-weight: 800; color: #0f172a; margin-bottom: .3rem;">📬 E-Posta Adresinizi Doğrulayın</div>
-            <p id="regOtpNotice" style="font-size: .82rem; color: #64748b; margin-bottom: 1.2rem; line-height: 1.4;">
-              E-posta adresinize 6 haneli güvenlik kodu gönderildi.
+          <!-- Kayıt Başarılı & Onay Bekleme Bilgilendirme Ekranı -->
+          <div id="regSuccessNotice" style="display:none;text-align:center;padding:1.5rem .5rem;">
+            <div style="font-size:3.2rem;margin-bottom:.8rem;animation:pulse 1.8s infinite;">🎉</div>
+            <div style="font-size:1.25rem;font-weight:900;color:#0f172a;margin-bottom:.4rem;">Kayıt Başvurunuz Alındı!</div>
+            <p style="font-size:.85rem;color:#475569;line-height:1.5;margin-bottom:1.5rem;">
+              Hesabınız başarıyla oluşturuldu. Sistem güvenliği gereği hesabınız <strong>yönetici (admin) onayına</strong> iletilmiştir. Yönetici onayının ardından hesabınızla giriş yapabilirsiniz.
             </p>
-
-            <div style="margin-bottom: 1.2rem;">
-              <label style="display:block;font-size:.78rem;font-weight:700;color:#334155;margin-bottom:.35rem;">🔢 6 Haneli Güvenlik Kodu</label>
-              <input type="text" id="regOtpCodeInput" maxlength="6" placeholder="______" style="
-                width: 100%; padding: .75rem 1rem; border-radius: 12px; letter-spacing: 8px; font-weight: 900; font-family: monospace;
-                background: #ecfdf5; border: 2px dashed #10b981; text-align: center;
-                color: #065f46; font-size: 1.4rem; outline: none; box-sizing: border-box;
-              " />
-            </div>
-
-            <button type="button" id="btnVerifyRegOtp" style="
-              width: 100%; padding: .85rem; border: none; border-radius: 12px;
-              background: linear-gradient(135deg, #10b981, #059669); color: #fff; font-weight: 800; font-size: .92rem; cursor: pointer; margin-bottom: .8rem;
-              box-shadow: 0 4px 14px rgba(16,185,129,0.3);
-            ">✅ Hesabımı Aktifleştir ve Giriş Yap</button>
-
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.8rem; padding: 0 .2rem;">
-              <span style="font-size:.75rem; color:#64748b;">Kodu alamadınız mı?</span>
-              <button type="button" id="btnResendRegOtp" style="background:none; border:none; color:#2563eb; font-weight:700; font-size:.78rem; cursor:pointer;">
-                ⏱️ Tekrar Gönder (60s)
-              </button>
-            </div>
-
-            <button type="button" id="btnBackToRegStep1" style="
-              width: 100%; padding: .65rem; border: 1px solid #cbd5e1; border-radius: 12px;
-              background: #f1f5f9; color: #475569; font-weight: 700; font-size:.82rem; cursor: pointer;
-            ">← Bilgileri Değiştir</button>
+            <button type="button" id="btnGoToLoginAfterReg" style="
+              width:100%;padding:.8rem;border:none;border-radius:12px;
+              background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;
+              font-weight:800;font-size:.92rem;cursor:pointer;
+              box-shadow:0 4px 14px rgba(37,99,235,0.3);
+            ">🔑 Giriş Ekranına Dön</button>
           </div>
         </form>
 
-        <!-- ── 3. ŞİFREMİ UNUTTUM FORMU (6 HANELİ OTP AKIŞI) ── -->
+        <!-- ── 3. ŞİFREMİ UNUTTUM REHBERİ ── -->
         <div id="authForgotPanel" style="display: none; text-align: left;">
-          <!-- Adım 1: E-Posta / Kullanıcı Adı Girme -->
-          <div id="forgotStep1">
-            <div style="font-size: 1.1rem; font-weight: 800; color: #0f172a; margin-bottom: .3rem;">🔑 Şifre Sıfırlama</div>
-            <p style="font-size: .82rem; color: #64748b; margin-bottom: 1.2rem; line-height: 1.4;">
-              Kayıtlı e-posta adresinizi veya kullanıcı adınızı girin. 6 haneli doğrulama kodu gönderilecektir.
+          <div style="text-align:center;margin-bottom:1.5rem;">
+            <div style="font-size:2.8rem;margin-bottom:.6rem;">🔑</div>
+            <div style="font-size: 1.15rem; font-weight: 800; color: #0f172a; margin-bottom: .4rem;">Şifrenizi mi Unuttunuz?</div>
+            <p style="font-size: .84rem; color: #475569; line-height: 1.5; margin: 0 auto; max-width: 360px;">
+              Sistem güvenliği nedeniyle şifre sıfırlama işlemleri <strong>Sistem Yöneticisi (Admin)</strong> kontrolünde yapılmaktadır.
             </p>
-            <div style="margin-bottom: 1.2rem;">
-              <label style="display:block;font-size:.78rem;font-weight:700;color:#334155;margin-bottom:.35rem;">👤 E-Posta veya Kullanıcı Adı</label>
-              <input type="text" id="forgotIdentInput" placeholder="ornek@kurum.com veya kullanıcı adı" style="
-                width: 100%; padding: .75rem 1rem; border-radius: 12px;
-                background: #f8fafc; border: 1.5px solid #cbd5e1;
-                color: #0f172a; font-size: .9rem; outline: none; box-sizing: border-box;
-              " />
-            </div>
-            <button type="button" id="btnSendForgotOtp" style="
-              width: 100%; padding: .85rem; border: none; border-radius: 12px;
-              background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; font-weight: 800; font-size: .92rem; cursor: pointer; margin-bottom: .8rem;
-              box-shadow: 0 4px 14px rgba(37,99,235,0.3);
-            ">📨 6 Haneli Doğrulama Kodu Gönder</button>
           </div>
 
-          <!-- Adım 2: OTP ve Yeni Şifre Belirleme -->
-          <div id="forgotStep2" style="display: none;">
-            <div style="font-size: 1.1rem; font-weight: 800; color: #0f172a; margin-bottom: .3rem;">🛡️ Kodu Girin & Şifrenizi Yenileyin</div>
-            <p id="forgotOtpNotice" style="font-size: .82rem; color: #64748b; margin-bottom: 1.2rem; line-height: 1.4;">
-              E-posta adresinize 6 haneli bir güvenlik kodu gönderildi.
-            </p>
-
-            <div style="margin-bottom: 1rem;">
-              <label style="display:block;font-size:.78rem;font-weight:700;color:#334155;margin-bottom:.35rem;">🔢 6 Haneli Güvenlik Kodu</label>
-              <input type="text" id="forgotOtpCodeInput" maxlength="6" placeholder="______" style="
-                width: 100%; padding: .75rem 1rem; border-radius: 12px; letter-spacing: 8px; font-weight: 900; font-family: monospace;
-                background: #eff6ff; border: 2px dashed #3b82f6; text-align: center;
-                color: #1e40af; font-size: 1.4rem; outline: none; box-sizing: border-box;
-              " />
-            </div>
-
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1.1rem;">
-              <div>
-                <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">🔒 Yeni Şifre</label>
-                <input type="password" id="forgotNewPass" placeholder="Yeni şifreniz" style="
-                  width: 100%; padding: .65rem .85rem; border-radius: 10px;
-                  background: #f8fafc; border: 1.5px solid #cbd5e1;
-                  color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
-                " />
-              </div>
-              <div>
-                <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">🔒 Yeni Şifre Tekrar</label>
-                <input type="password" id="forgotNewPassConfirm" placeholder="Tekrar girin" style="
-                  width: 100%; padding: .65rem .85rem; border-radius: 10px;
-                  background: #f8fafc; border: 1.5px solid #cbd5e1;
-                  color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
-                " />
-              </div>
-            </div>
-
-            <button type="button" id="btnVerifyOtpAndReset" style="
-              width: 100%; padding: .85rem; border: none; border-radius: 12px;
-              background: linear-gradient(135deg, #10b981, #059669); color: #fff; font-weight: 800; font-size: .92rem; cursor: pointer; margin-bottom: .8rem;
-              box-shadow: 0 4px 14px rgba(16,185,129,0.3);
-            ">✅ Şifremi Güncelle ve Giriş Yap</button>
-
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.8rem; padding: 0 .2rem;">
-              <span style="font-size:.75rem; color:#64748b;">Kodu alamadınız mı?</span>
-              <button type="button" id="btnResendForgotOtp" style="background:none; border:none; color:#2563eb; font-weight:700; font-size:.78rem; cursor:pointer;">
-                ⏱️ Tekrar Gönder (60s)
-              </button>
-            </div>
+          <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:14px;padding:1.2rem;margin-bottom:1.5rem;">
+            <div style="font-weight:800;font-size:.85rem;color:#0f172a;margin-bottom:.4rem;">📌 Nasıl Şifre Sıfırlanır?</div>
+            <ul style="margin:0;padding-left:1.2rem;font-size:.8rem;color:#64748b;line-height:1.6;">
+              <li>Kurumunuzun <strong>Sistem Yöneticisi (Admin)</strong> ile iletişime geçiniz.</li>
+              <li>Yönetici, Yönetim Paneli üzerinden hesabınız için anında yeni bir geçici şifre tanımlayacaktır.</li>
+              <li>Tanımlanan şifreyle giriş yaptıktan sonra "Profil & Ayarlar" menüsünden şifrenizi dilediğiniz gibi güncelleyebilirsiniz.</li>
+            </ul>
           </div>
 
           <button type="button" id="btnBackToLoginFromForgot" style="
-            width: 100%; padding: .65rem; border: 1px solid #cbd5e1; border-radius: 12px;
-            background: #f1f5f9; color: #475569; font-weight: 700; font-size: .82rem; cursor: pointer;
+            width: 100%; padding: .75rem; border: 1px solid #cbd5e1; border-radius: 12px;
+            background: #f1f5f9; color: #475569; font-weight: 700; font-size: .85rem; cursor: pointer;
           ">← Giriş Ekranına Geri Dön</button>
         </div>
 
@@ -813,7 +1353,6 @@
 
     document.body.appendChild(portal);
 
-    // Odaklanma Efekti
     portal.querySelectorAll('input').forEach(inp => {
       inp.addEventListener('focus', () => { inp.style.borderColor = '#2563eb'; inp.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.15)'; });
       inp.addEventListener('blur', () => { inp.style.borderColor = '#cbd5e1'; inp.style.boxShadow = 'none'; });
@@ -849,8 +1388,8 @@
       const tabLogin = portal.querySelector('#tabLoginBtn');
       const tabReg = portal.querySelector('#tabRegisterBtn');
       const footerNote = portal.querySelector('#authFooterNote');
-      const forgotStep1 = portal.querySelector('#forgotStep1');
-      const forgotStep2 = portal.querySelector('#forgotStep2');
+      const regBody = portal.querySelector('#regFormBody');
+      const regNotice = portal.querySelector('#regSuccessNotice');
 
       tabSwitcher.style.display = 'flex';
       forgotPanel.style.display = 'none';
@@ -870,10 +1409,8 @@
       } else if (tab === 'register') {
         loginForm.style.display = 'none';
         regForm.style.display = 'block';
-        const regStep1 = portal.querySelector('#regStep1');
-        const regStep2 = portal.querySelector('#regStep2');
-        if (regStep1) regStep1.style.display = 'block';
-        if (regStep2) regStep2.style.display = 'none';
+        if (regBody) regBody.style.display = 'block';
+        if (regNotice) regNotice.style.display = 'none';
         tabReg.style.background = '#ffffff';
         tabReg.style.color = '#2563eb';
         tabReg.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
@@ -888,8 +1425,6 @@
         regForm.style.display = 'none';
         tabSwitcher.style.display = 'none';
         forgotPanel.style.display = 'block';
-        forgotStep1.style.display = 'block';
-        forgotStep2.style.display = 'none';
         footerNote.innerHTML = '';
       }
     };
@@ -949,12 +1484,6 @@
         return;
       }
 
-      if (ident.includes('@') && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}$/.test(ident)) {
-        showAlert('⚠️ Lütfen geçerli bir e-posta formatı giriniz (Örn: ad.soyad@kurum.com).', 'warning');
-        portal.querySelector('#loginIdentifier').focus();
-        return;
-      }
-
       if (!pass) {
         showAlert('⚠️ Lütfen şifrenizi giriniz.', 'warning');
         portal.querySelector('#loginPassword').focus();
@@ -985,55 +1514,24 @@
         showLoginTransitionSplash(res.user, () => {
           if (appWrap) appWrap.style.display = 'flex';
           updateNavbarUserBadge();
+          setupAdminFeatures();
           if (window.FrpStore && typeof window.FrpStore.refreshFromCloud === 'function') {
             window.FrpStore.refreshFromCloud();
           }
           if (typeof window.toast === 'function') window.toast(`Hoş geldiniz, ${res.user.full_name || res.user.username}! 🌟`, 'success');
         });
       } else {
-        showAlert(res.reason || 'Giriş başarısız oldu.', 'error');
+        if (res.pendingApproval) {
+          showAlert(res.reason, 'warning');
+        } else {
+          showAlert(res.reason || 'Giriş başarısız oldu.', 'error');
+        }
         generateCaptcha('captchaCanvasLogin');
       }
     };
 
-    // ── KAYIT DEĞİŞKENLERİ VE SUBMIT ──
-    let pendingRegEmail = '';
-    let pendingRegPayload = null;
-    let regCooldownInterval = null;
-
+    // ── KAYIT SUBMIT (Admin Onaylı) ──
     const regForm = portal.querySelector('#authRegisterForm');
-    const regOtpInput = portal.querySelector('#regOtpCodeInput');
-    if (regOtpInput) {
-      regOtpInput.addEventListener('input', () => {
-        regOtpInput.value = regOtpInput.value.replace(/\D/g, '').slice(0, 6);
-      });
-    }
-
-    function startResendCooldownReg(seconds = 60) {
-      const resendBtn = portal.querySelector('#btnResendRegOtp');
-      if (!resendBtn) return;
-      let remaining = seconds;
-      resendBtn.disabled = true;
-      resendBtn.style.opacity = '0.6';
-      resendBtn.style.cursor = 'not-allowed';
-
-      if (regCooldownInterval) clearInterval(regCooldownInterval);
-      regCooldownInterval = setInterval(() => {
-        remaining--;
-        if (remaining <= 0) {
-          clearInterval(regCooldownInterval);
-          resendBtn.disabled = false;
-          resendBtn.style.opacity = '1';
-          resendBtn.style.cursor = 'pointer';
-          resendBtn.textContent = '🔄 Kodu Tekrar Gönder';
-        } else {
-          resendBtn.textContent = `⏱️ Tekrar Gönder (${remaining}s)`;
-        }
-      }, 1000);
-      resendBtn.textContent = `⏱️ Tekrar Gönder (${remaining}s)`;
-    }
-
-    // 1. ADIM: KAYIT FORMUNU DOĞRULA VE DOĞRULAMA KODU İSTE
     regForm.onsubmit = async (e) => {
       e.preventDefault();
       hideAlert();
@@ -1062,8 +1560,8 @@
         return;
       }
 
-      if (pass.length < 4) {
-        showAlert('⚠️ Şifreniz en az 4 karakter olmalıdır.', 'warning');
+      if (pass.length < 3) {
+        showAlert('⚠️ Şifreniz en az 3 karakter olmalıdır.', 'warning');
         portal.querySelector('#regPassword').focus();
         return;
       }
@@ -1084,9 +1582,9 @@
 
       const submitBtn = portal.querySelector('#btnRegisterSubmit');
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Doğrulama Kodu Gönderiliyor... ⏳';
+      submitBtn.textContent = 'Başvuru İletiliyor... ⏳';
 
-      pendingRegPayload = {
+      const payload = {
         fullName,
         username,
         email,
@@ -1095,316 +1593,25 @@
         password: pass
       };
 
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 22000);
+      const res = await register(payload);
+      submitBtn.disabled = false;
+      submitBtn.textContent = '✨ Kayıt Başvurusunu Tamamla';
 
-        const res = await fetch('/api/auth/register-request', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(pendingRegPayload),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        const data = await res.json();
-        submitBtn.disabled = false;
-        submitBtn.textContent = '✨ Doğrulama Kodu Gönder & Kayıt Ol';
-
-        if (data.success) {
-          pendingRegEmail = data.email;
-          portal.querySelector('#regStep1').style.display = 'none';
-          portal.querySelector('#regStep2').style.display = 'block';
-          portal.querySelector('#regOtpNotice').innerHTML = `
-            <strong>${data.maskedEmail}</strong> adresine 6 haneli doğrulama kodu gönderildi. Kodunuzu aşağıya giriniz:
-          `;
-          showAlert('✅ Doğrulama kodu e-posta adresinize gönderildi! (Spam klasörünü de kontrol ediniz)', 'success');
-          startResendCooldownReg(60);
-          portal.querySelector('#regOtpCodeInput').focus();
-        } else {
-          showAlert(data.reason || 'Kayıt işlemi başlatılamadı.', 'error');
-          generateCaptcha('captchaCanvasReg');
-        }
-      } catch (err) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = '✨ Doğrulama Kodu Gönder & Kayıt Ol';
-        if (err.name === 'AbortError') {
-          showAlert('⏱️ E-posta sunucusu yanıt vermedi. Lütfen internetinizi kontrol edip tekrar deneyiniz.', 'error');
-        } else {
-          showAlert('Sunucu bağlantı hatası: ' + err.message, 'error');
-        }
-      }
-    };
-
-    // 2. ADIM: OTP KODUNU DOĞRULA VE HESABI OLUŞTUR
-    const btnVerifyRegOtp = portal.querySelector('#btnVerifyRegOtp');
-    if (btnVerifyRegOtp) {
-      btnVerifyRegOtp.onclick = async () => {
+      if (res.success) {
+        portal.querySelector('#regFormBody').style.display = 'none';
+        portal.querySelector('#regSuccessNotice').style.display = 'block';
         hideAlert();
-        const code = (portal.querySelector('#regOtpCodeInput').value || '').trim().replace(/\D/g, '');
 
-        if (!code || code.length !== 6) {
-          showAlert('⚠️ Lütfen 6 haneli güvenlik kodunu eksiksiz giriniz.', 'warning');
-          portal.querySelector('#regOtpCodeInput').focus();
-          return;
-        }
-
-        btnVerifyRegOtp.disabled = true;
-        btnVerifyRegOtp.textContent = 'Hesap Aktifleştiriliyor... ⏳';
-
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 22000);
-
-          const res = await fetch('/api/auth/register-verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: pendingRegEmail,
-              code
-            }),
-            signal: controller.signal
-          });
-          clearTimeout(timeoutId);
-
-          const data = await res.json();
-          btnVerifyRegOtp.disabled = false;
-          btnVerifyRegOtp.textContent = '✅ Hesabımı Aktifleştir ve Giriş Yap';
-
-          if (data.success) {
-            currentUser = data.user;
-            setSession(data.user, true);
-            portal.remove();
-            showLoginTransitionSplash(data.user, () => {
-              if (appWrap) appWrap.style.display = 'flex';
-              updateNavbarUserBadge();
-              if (window.FrpStore && typeof window.FrpStore.refreshFromCloud === 'function') {
-                window.FrpStore.refreshFromCloud();
-              }
-              if (typeof window.toast === 'function') window.toast(`🎉 Tebrikler! Hesabınız başarıyla doğrulandı ve aktifleştirildi. Hoş geldiniz, ${data.user.full_name}!`, 'success');
-            });
-          } else {
-            showAlert(data.reason || 'Doğrulama başarısız oldu.', 'error');
-          }
-        } catch (err) {
-          btnVerifyRegOtp.disabled = false;
-          btnVerifyRegOtp.textContent = '✅ Hesabımı Aktifleştir ve Giriş Yap';
-          if (err.name === 'AbortError') {
-            showAlert('⏱️ İstek zaman aşımına uğradı. Lütfen tekrar deneyiniz.', 'error');
-          } else {
-            showAlert('Sunucu hatası: ' + err.message, 'error');
-          }
-        }
-      };
-    }
-
-    // KAYIT OTP YENİDEN GÖNDER
-    const btnResendRegOtp = portal.querySelector('#btnResendRegOtp');
-    if (btnResendRegOtp) {
-      btnResendRegOtp.onclick = async () => {
-        if (!pendingRegPayload) return;
-        hideAlert();
-        btnResendRegOtp.disabled = true;
-        btnResendRegOtp.textContent = 'Kod Gönderiliyor... ⏳';
-
-        try {
-          const res = await fetch('/api/auth/register-request', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(pendingRegPayload)
-          });
-          const data = await res.json();
-          if (data.success) {
-            showAlert('✅ Yeni doğrulama kodu e-posta adresinize gönderildi!', 'success');
-            startResendCooldownReg(60);
-          } else {
-            showAlert(data.reason || 'Kod gönderilemedi.', 'error');
-            btnResendRegOtp.disabled = false;
-            btnResendRegOtp.textContent = '🔄 Kodu Tekrar Gönder';
-          }
-        } catch (e) {
-          showAlert('Bağlantı hatası: ' + e.message, 'error');
-          btnResendRegOtp.disabled = false;
-          btnResendRegOtp.textContent = '🔄 Kodu Tekrar Gönder';
-        }
-      };
-    }
-
-    // KAYIT ADIM 1'E GERİ DÖN
-    const btnBackReg1 = portal.querySelector('#btnBackToRegStep1');
-    if (btnBackReg1) {
-      btnBackReg1.onclick = () => {
-        hideAlert();
-        portal.querySelector('#regStep2').style.display = 'none';
-        portal.querySelector('#regStep1').style.display = 'block';
-      };
-    }
-
-    // ── OTP KODU İÇİN SADECE RAKAM FİLTRESİ ──
-    const otpInput = portal.querySelector('#forgotOtpCodeInput');
-    if (otpInput) {
-      otpInput.addEventListener('input', () => {
-        otpInput.value = otpInput.value.replace(/\D/g, '').slice(0, 6);
-      });
-    }
-
-    let cooldownInterval = null;
-    function startResendCooldown(seconds = 60) {
-      const resendBtn = portal.querySelector('#btnResendForgotOtp');
-      if (!resendBtn) return;
-      let remaining = seconds;
-      resendBtn.disabled = true;
-      resendBtn.style.opacity = '0.6';
-      resendBtn.style.cursor = 'not-allowed';
-
-      if (cooldownInterval) clearInterval(cooldownInterval);
-      cooldownInterval = setInterval(() => {
-        remaining--;
-        if (remaining <= 0) {
-          clearInterval(cooldownInterval);
-          resendBtn.disabled = false;
-          resendBtn.style.opacity = '1';
-          resendBtn.style.cursor = 'pointer';
-          resendBtn.textContent = '🔄 Kodu Tekrar Gönder';
-        } else {
-          resendBtn.textContent = `⏱️ Tekrar Gönder (${remaining}s)`;
-        }
-      }, 1000);
-      resendBtn.textContent = `⏱️ Tekrar Gönder (${remaining}s)`;
-    }
-
-    // ── ŞİFREMİ UNUTTUM 1. ADIM: KOD GÖNDER ──
-    const btnSendOtp = portal.querySelector('#btnSendForgotOtp');
-    const handleSendOtp = async () => {
-      hideAlert();
-      const ident = (portal.querySelector('#forgotIdentInput').value || '').trim();
-
-      if (!ident) {
-        showAlert('⚠️ Lütfen e-posta adresinizi veya kullanıcı adınızı giriniz.', 'warning');
-        portal.querySelector('#forgotIdentInput').focus();
-        return;
-      }
-
-      // Geçersiz format engeli (asdasdas gibi)
-      if (ident.includes('@') && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}$/.test(ident)) {
-        showAlert('⚠️ Lütfen geçerli bir e-posta formatı giriniz (Örn: ad.soyad@kurum.com).', 'warning');
-        portal.querySelector('#forgotIdentInput').focus();
-        return;
-      }
-
-      btnSendOtp.disabled = true;
-      btnSendOtp.textContent = 'Kod Gönderiliyor... ⏳';
-
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 22000);
-
-        const res = await fetch('/api/auth/send-reset-code', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identifier: ident }),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        const data = await res.json();
-
-        if (data.success) {
-          activeResetEmail = data.email;
-          portal.querySelector('#forgotStep1').style.display = 'none';
-          portal.querySelector('#forgotStep2').style.display = 'block';
-          portal.querySelector('#forgotOtpNotice').innerHTML = `
-            <strong>${data.maskedEmail}</strong> adresine 6 haneli güvenlik kodu gönderildi. Kodunuzu aşağıya giriniz:
-          `;
-          showAlert('✅ Doğrulama kodu e-posta adresinize gönderildi! (Spam klasörünü de kontrol ediniz)', 'success');
-          startResendCooldown(60);
-          portal.querySelector('#forgotOtpCodeInput').focus();
-        } else {
-          showAlert(data.reason || '❌ Kod gönderilemedi.', 'error');
-        }
-      } catch (err) {
-        if (err.name === 'AbortError') {
-          showAlert('⏱️ E-posta sunucusu yanıt vermedi. Lütfen internetinizi kontrol edip tekrar deneyiniz.', 'error');
-        } else {
-          showAlert('Sunucu bağlantı hatası: ' + err.message, 'error');
-        }
-      } finally {
-        btnSendOtp.disabled = false;
-        btnSendOtp.textContent = '📨 6 Haneli Doğrulama Kodu Gönder';
-      }
-    };
-
-    btnSendOtp.onclick = handleSendOtp;
-    const btnResend = portal.querySelector('#btnResendForgotOtp');
-    if (btnResend) btnResend.onclick = handleSendOtp;
-
-    // ── ŞİFREMİ UNUTTUM 2. ADIM: OTP DOĞRULA VE ŞİFRE GÜNCELLE ──
-    const btnVerifyOtp = portal.querySelector('#btnVerifyOtpAndReset');
-    btnVerifyOtp.onclick = async () => {
-      hideAlert();
-      const code = (portal.querySelector('#forgotOtpCodeInput').value || '').trim().replace(/\D/g, '');
-      const newPass = portal.querySelector('#forgotNewPass').value;
-      const newPassConf = portal.querySelector('#forgotNewPassConfirm').value;
-
-      if (!code || code.length !== 6) {
-        showAlert('⚠️ Lütfen 6 haneli güvenlik kodunu eksiksiz giriniz.', 'warning');
-        portal.querySelector('#forgotOtpCodeInput').focus();
-        return;
-      }
-
-      if (!newPass || newPass.length < 4) {
-        showAlert('⚠️ Yeni şifreniz en az 4 karakter olmalıdır.', 'warning');
-        portal.querySelector('#forgotNewPass').focus();
-        return;
-      }
-
-      if (newPass !== newPassConf) {
-        showAlert('🔒 Yeni şifreler eşleşmiyor! İki kutuya da aynı şifreyi yazınız.', 'warning');
-        portal.querySelector('#forgotNewPassConfirm').focus();
-        return;
-      }
-
-      btnVerifyOtp.disabled = true;
-      btnVerifyOtp.textContent = 'Şifre Güncelleniyor... ⏳';
-
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 22000);
-
-        const res = await fetch('/api/auth/verify-reset-code', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: activeResetEmail,
-            code,
-            newPassword: newPass
-          }),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        const data = await res.json();
-
-        if (data.success) {
-          showAlert('🎉 Şifreniz başarıyla güncellendi! Giriş ekranına yönlendiriliyorsunuz...', 'success');
-          setTimeout(() => {
+        const btnGoLog = portal.querySelector('#btnGoToLoginAfterReg');
+        if (btnGoLog) {
+          btnGoLog.onclick = () => {
             switchTab('login');
-            portal.querySelector('#loginIdentifier').value = activeResetEmail;
-            portal.querySelector('#loginPassword').value = '';
-            portal.querySelector('#loginPassword').focus();
-          }, 1800);
-        } else {
-          showAlert(data.reason || '❌ Doğrulama başarısız oldu.', 'error');
+            portal.querySelector('#loginIdentifier').value = username;
+          };
         }
-      } catch (err) {
-        if (err.name === 'AbortError') {
-          showAlert('⏱️ İstek zaman aşımına uğradı. Lütfen tekrar deneyiniz.', 'error');
-        } else {
-          showAlert('Sunucu hatası: ' + err.message, 'error');
-        }
-      } finally {
-        btnVerifyOtp.disabled = false;
-        btnVerifyOtp.textContent = '✅ Şifremi Güncelle ve Giriş Yap';
+      } else {
+        showAlert(res.reason || 'Kayıt işlemi gerçekleştirilemedi.', 'error');
+        generateCaptcha('captchaCanvasReg');
       }
     };
   }
@@ -1417,6 +1624,7 @@
       const appWrap = document.querySelector('.app-wrap');
       if (appWrap) appWrap.style.display = 'flex';
       updateNavbarUserBadge();
+      setupAdminFeatures();
     }
 
     const btnProfile = document.getElementById('btnUserProfile') || document.querySelector('[data-auth-badge]');
@@ -1432,7 +1640,7 @@
     }
   });
 
-  // ── Kullanıcı Dropdown Menüsü (Akıllı Konumlandırma) ─────────
+  // ── Kullanıcı Dropdown Menüsü ─────────────────────────────────
   function showUserDropdown(anchorEl) {
     const user = getUser();
     if (!user) { showAuthFullScreenPortal('login'); return; }
@@ -1443,8 +1651,7 @@
     const rect = anchorEl.getBoundingClientRect();
     const drop = document.createElement('div');
     drop.id = 'userMenuDropdown';
-    
-    // Sağdan taşmayı önleme
+
     const rightOffset = Math.max(16, window.innerWidth - rect.right);
 
     drop.style.cssText = `
@@ -1455,16 +1662,27 @@
       color: #0f172a;
     `;
 
+    const isUsrAdmin = isAdmin();
+
     drop.innerHTML = `
       <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;padding-bottom:.85rem;border-bottom:1px solid #f1f5f9;">
-        <div style="font-size:2rem;background:#eff6ff;width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid #dbeafe;">${user.avatar || '👤'}</div>
+        <div style="font-size:2rem;background:#eff6ff;width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid #dbeafe;">
+          ${user.avatar || (isUsrAdmin ? '👑' : '👤')}
+        </div>
         <div style="min-width:0;flex:1;">
           <div style="font-weight:800;font-size:1rem;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(user.full_name || user.username)}</div>
           <div style="font-size:.78rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(user.email || user.username)}</div>
-          <div style="margin-top:.3rem;"><span class="badge badge-blue" style="font-size:.7rem;padding:.2rem .5rem;">🏢 ${user.department || 'Bilgi İşlem'}</span></div>
+          <div style="margin-top:.3rem;">
+            ${isUsrAdmin ? `<span class="badge badge-purple" style="font-size:.7rem;padding:.2rem .5rem;">👑 Admin</span>` : `<span class="badge badge-blue" style="font-size:.7rem;padding:.2rem .5rem;">🏢 ${user.department || 'Bilgi İşlem'}</span>`}
+          </div>
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:.4rem;">
+        ${isUsrAdmin ? `
+          <button type="button" id="btnMenuAdminUsers" class="btn btn-sm btn-ghost" style="width:100%;justify-content:flex-start;padding:.6rem .8rem;font-weight:800;color:#d97706;border-radius:8px;background:rgba(245,158,11,0.08);">
+            👑 Kullanıcı & Kayıt Onay Paneli
+          </button>
+        ` : ''}
         <button type="button" id="btnMenuProfile" class="btn btn-sm btn-ghost" style="width:100%;justify-content:flex-start;padding:.6rem .8rem;font-weight:700;color:#334155;border-radius:8px;">
           ⚙️ Profil & Ayarlar
         </button>
@@ -1478,6 +1696,16 @@
     `;
 
     document.body.appendChild(drop);
+
+    if (isUsrAdmin) {
+      const adminBtn = drop.querySelector('#btnMenuAdminUsers');
+      if (adminBtn) {
+        adminBtn.onclick = () => {
+          drop.remove();
+          showAdminApprovalModal('pending');
+        };
+      }
+    }
 
     drop.querySelector('#btnMenuProfile').onclick = () => {
       drop.remove();
@@ -1524,10 +1752,13 @@
     confirmLogout,
     getSession,
     getUser,
+    isAdmin,
     isLoggedIn,
     updateSession,
     showAuthModal: showAuthFullScreenPortal,
     showAuthFullScreenPortal,
-    updateNavbarUserBadge
+    updateNavbarUserBadge,
+    showAdminApprovalModal,
+    refreshAdminPendingBadge
   };
 })();
