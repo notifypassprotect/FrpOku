@@ -1310,6 +1310,7 @@ async function init() {
     const errWrap = document.getElementById('errorWrap');
     const viewer = document.getElementById('viewer');
     if (errWrap) errWrap.style.display = 'none';
+    if (viewer) viewer.style.display = 'flex';
     renderViewer(file);
 
     // ── Ortak Havuz Bannerı & Salt-Okunur Kontrolü ─────────────
