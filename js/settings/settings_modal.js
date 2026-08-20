@@ -6,14 +6,15 @@
 
 function safeToast(msg, type = 'info') {
   if (typeof window.toast === 'function') {
-    window.toast(msg, type);
+    window.safeToast(msg, type);
   } else if (typeof window.showToast === 'function') {
     window.showToast(msg, type);
   } else {
     console.log(`[Toast ${type}]`, msg);
   }
 }
-const toast = safeToast;
+// Use unique name to avoid collision with list.js's global toast function
+const _settingsToast = safeToast;
 
 // ── MODERN CAM EFEKTLİ DİYALOG MOTORLARI (SIFIR NATIVE ALERT/CONFIRM) ──
 window.showConfirmDialog = function({
@@ -938,7 +939,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
           overlay.querySelector('#profOldPass').value = '';
           overlay.querySelector('#profNewPass').value = '';
           overlay.querySelector('#profNewPassConfirm').value = '';
-          if (typeof window.toast === 'function') window.toast('Şifreniz başarıyla güncellendi! 🛡️', 'success');
+          if (typeof window.toast === 'function') window.safeToast('Şifreniz başarıyla güncellendi! 🛡️', 'success');
         } else {
           showStatus(data.reason || 'Şifre güncellenemedi.', 'error');
         }
@@ -1067,7 +1068,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
             theme: 'light'
           };
           FrpStore.setPreferences(stagedPrefs);
-          toast('Ayarlar varsayılana sıfırlandı.', 'info');
+          safeToast('Ayarlar varsayılana sıfırlandı.', 'info');
           if (typeof window.refreshAll === 'function') window.refreshAll();
           renderModal();
         }
@@ -1135,12 +1136,12 @@ window.openSettingsModal = function(initialTab = 'appearance') {
         const icon = overlay.querySelector('#newCatIcon').value;
         const res = FrpStore.addCategory(name, color, icon);
         if (res.success) {
-          toast(`'${name.trim()}' kategorisi eklendi 🏷️`, 'success');
+          safeToast(`'${name.trim()}' kategorisi eklendi 🏷️`, 'success');
           if (typeof window.updateCategoryDropdowns === 'function') window.updateCategoryDropdowns();
           if (typeof window.refreshAll === 'function') window.refreshAll();
           renderModal();
         } else {
-          toast(res.reason || 'Kategori eklenemedi', 'warning');
+          safeToast(res.reason || 'Kategori eklenemedi', 'warning');
         }
       });
 
@@ -1154,7 +1155,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
             isDanger: true,
             onConfirm: () => {
               FrpStore.deleteCategory(name);
-              toast(`'${name}' kategorisi silindi`, 'info');
+              safeToast(`'${name}' kategorisi silindi`, 'info');
               if (typeof window.updateCategoryDropdowns === 'function') window.updateCategoryDropdowns();
               if (typeof window.refreshAll === 'function') window.refreshAll();
               renderModal();
@@ -1176,7 +1177,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
             onConfirm: (newName) => {
               if (newName && newName.trim()) {
                 FrpStore.updateCategory(oldName, newName.trim(), oldColor, oldIcon);
-                toast('Kategori güncellendi ✏️', 'success');
+                safeToast('Kategori güncellendi ✏️', 'success');
                 if (typeof window.updateCategoryDropdowns === 'function') window.updateCategoryDropdowns();
                 if (typeof window.refreshAll === 'function') window.refreshAll();
                 renderModal();
@@ -1191,11 +1192,11 @@ window.openSettingsModal = function(initialTab = 'appearance') {
         const input = overlay.querySelector('#newCustomTagName');
         const res = FrpStore.addCustomTag(input.value);
         if (res.success) {
-          toast(`'${res.tag}' etiketi eklendi 🏷️`, 'success');
+          safeToast(`'${res.tag}' etiketi eklendi 🏷️`, 'success');
           if (typeof window.updateTagSelect === 'function') window.updateTagSelect();
           renderModal();
         } else {
-          toast(res.reason || 'Etiket eklenemedi', 'warning');
+          safeToast(res.reason || 'Etiket eklenemedi', 'warning');
         }
       });
 
@@ -1204,7 +1205,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
         btn.addEventListener('click', () => {
           const tag = btn.dataset.tag;
           FrpStore.deleteCustomTag(tag);
-          toast(`'${tag}' etiketi kaldırıldı`, 'info');
+          safeToast(`'${tag}' etiketi kaldırıldı`, 'info');
           if (typeof window.updateTagSelect === 'function') window.updateTagSelect();
           renderModal();
         });
@@ -1296,7 +1297,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
         const ids = [...selectedTrashIds];
         if (ids.length === 0) return;
         const restored = FrpStore.restoreManyFromTrash(ids);
-        toast(`${restored} rapor başarıyla geri yüklendi! 🔄`, 'success');
+        safeToast(`${restored} rapor başarıyla geri yüklendi! 🔄`, 'success');
         if (typeof window.refreshAll === 'function') window.refreshAll();
         renderModal();
       });
@@ -1311,7 +1312,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
           isDanger: true,
           onConfirm: () => {
             FrpStore.purgeManyFromTrash(ids);
-            toast(`${ids.length} rapor kalıcı olarak silindi.`, 'info');
+            safeToast(`${ids.length} rapor kalıcı olarak silindi.`, 'info');
             renderModal();
           }
         });
@@ -1321,7 +1322,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
         btn.addEventListener('click', () => {
           const id = btn.dataset.id;
           FrpStore.restoreFromTrash(id);
-          toast('Rapor başarıyla geri yüklendi! 🔄', 'success');
+          safeToast('Rapor başarıyla geri yüklendi! 🔄', 'success');
           if (typeof window.refreshAll === 'function') window.refreshAll();
           renderModal();
         });
@@ -1337,7 +1338,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
             isDanger: true,
             onConfirm: () => {
               FrpStore.purgeFromTrash(id);
-              toast('Rapor kalıcı olarak silindi.', 'info');
+              safeToast('Rapor kalıcı olarak silindi.', 'info');
               renderModal();
             }
           });
@@ -1352,7 +1353,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
           isDanger: true,
           onConfirm: () => {
             FrpStore.emptyTrash();
-            toast('Çöp kutusu tamamen boşaltıldı. 🗑️', 'info');
+            safeToast('Çöp kutusu tamamen boşaltıldı. 🗑️', 'info');
             renderModal();
           }
         });
@@ -1370,7 +1371,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
         a.download = `frpoku_yedek_${new Date().toISOString().slice(0, 10)}.json`;
         a.click();
         URL.revokeObjectURL(a.href);
-        toast('Tüm veriler JSON olarak yedeklendi! 💾', 'success');
+        safeToast('Tüm veriler JSON olarak yedeklendi! 💾', 'success');
       });
 
       const backupInput = overlay.querySelector('#settingsBackupFileInput');
@@ -1385,11 +1386,11 @@ window.openSettingsModal = function(initialTab = 'appearance') {
         reader.onload = ev => {
           const count = FrpStore.importBackup(ev.target.result);
           if (count > 0) {
-            toast(`${count} rapor başarıyla içe aktarıldı! 🎉`, 'success');
+            safeToast(`${count} rapor başarıyla içe aktarıldı! 🎉`, 'success');
             if (typeof window.refreshAll === 'function') window.refreshAll();
             renderModal();
           } else {
-            toast('Geçersiz yedek dosyası.', 'error');
+            safeToast('Geçersiz yedek dosyası.', 'error');
           }
         };
         reader.readAsText(file);
@@ -1404,7 +1405,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
           onConfirm: () => {
             FrpStore.deleteAll();
             FrpStore.emptyTrash();
-            toast('Tüm veriler temizlendi ve sıfırlandı.', 'info');
+            safeToast('Tüm veriler temizlendi ve sıfırlandı.', 'info');
             if (typeof window.refreshAll === 'function') window.refreshAll();
             overlay.remove();
           }

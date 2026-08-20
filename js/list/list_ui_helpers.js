@@ -94,16 +94,8 @@ document.getElementById('btnBulkCategory')?.addEventListener('click', () => {
   openCategoryManagerModal(ids);
 });
 
-function updateBulkBar() {
-  const n = window.selectedIds ? window.selectedIds.size : (typeof selectedIds !== 'undefined' ? selectedIds.size : 0);
-  const bar = document.getElementById('bulkBar');
-  const info = document.getElementById('bulkInfo');
-  const btnCompare = document.getElementById('btnCompareSelected');
-  if (bar) bar.classList.toggle('show', n > 0);
-  if (info) info.textContent = `☑ ${n} rapor seçildi`;
-  if (btnCompare) btnCompare.style.display = (n >= 2) ? 'inline-flex' : 'none';
-}
-window.updateBulkBar = updateBulkBar;
+// updateBulkBar is defined in list.js with full workspace/admin logic
+// window.updateBulkBar is set there; this file just uses it via window reference
 
 function bindInlineNameEdit() {
   // Inline name editing replaced by Right-Click -> "Adını Düzenle" modal per user request
