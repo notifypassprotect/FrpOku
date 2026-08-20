@@ -2723,10 +2723,17 @@ function updateBulkBar() {
   const btnBulkShare = document.getElementById('btnBulkSharePool');
   const btnBulkRemove = document.getElementById('btnBulkRemovePool');
   const btnDeleteBulk = document.getElementById('btnDeleteBulk');
+  const btnCompare = document.getElementById('btnCompareSelected') || document.getElementById('btnBulkCompare');
 
   if (btnBulkShare) btnBulkShare.style.display = curWs === 'personal' ? 'inline-flex' : 'none';
   if (btnBulkRemove) btnBulkRemove.style.display = (curWs === 'pool' && (isAdmin || true)) ? 'inline-flex' : 'none';
   if (btnDeleteBulk) btnDeleteBulk.style.display = (curWs === 'personal' || isAdmin) ? 'inline-flex' : 'none';
+
+  // 🔀 Karşılaştırma Butonu (2 veya 3 rapor seçildiğinde aktifleşir)
+  if (btnCompare) {
+    btnCompare.style.display = (count >= 2 && count <= 3) ? 'inline-flex' : 'none';
+    btnCompare.textContent = count === 3 ? '🔀 3 Raporu Karşılaştır' : '🔀 Karşılaştır (2 Rapor)';
+  }
 }
 window.updateBulkBar = updateBulkBar;
 
