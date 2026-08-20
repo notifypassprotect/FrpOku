@@ -954,7 +954,79 @@
 
   function applyPreferences() {
     const prefs = getPreferences();
-    if (prefs.theme) setTheme(prefs.theme);
+    if (!prefs) return;
+
+    // 1. Tema
+    if (prefs.theme) {
+      if (window.FrpThemes && typeof window.FrpThemes.setTheme === 'function') {
+        window.FrpThemes.setTheme(prefs.theme);
+      } else if (typeof setTheme === 'function') {
+        setTheme(prefs.theme);
+      }
+    }
+
+    if (typeof document === 'undefined' || !document.documentElement) return;
+    const root = document.documentElement;
+
+    // 2. Genel Font Ailesi (10 Popüler Font)
+    const fontMap = {
+      'inter': "'Inter', sans-serif",
+      'jakarta': "'Plus Jakarta Sans', sans-serif",
+      'outfit': "'Outfit', sans-serif",
+      'roboto': "'Roboto', sans-serif",
+      'poppins': "'Poppins', sans-serif",
+      'opensans': "'Open Sans', sans-serif",
+      'jetbrains': "'JetBrains Mono', monospace",
+      'fira': "'Fira Code', monospace",
+      'cascadia': "'Cascadia Code', monospace",
+      'system': "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+    };
+    if (prefs.fontFamily && fontMap[prefs.fontFamily]) {
+      root.style.setProperty('--font', fontMap[prefs.fontFamily]);
+    }
+
+    // 3. Kod Editörü Fontu
+    const codeFontMap = {
+      'jetbrains': "'JetBrains Mono', monospace",
+      'fira': "'Fira Code', monospace",
+      'cascadia': "'Cascadia Code', monospace",
+      'consolas': "'Consolas', monospace"
+    };
+    if (prefs.codeFont && codeFontMap[prefs.codeFont]) {
+      root.style.setProperty('--mono', codeFontMap[prefs.codeFont]);
+    }
+
+    // 4. Arayüz & Yazı Boyutu (UI Scale)
+    const fontSizeMap = {
+      'micro': '12.5px',
+      'compact': '13.5px',
+      'normal': '15px',
+      'spacious': '16.5px',
+      'large': '18px'
+    };
+    if (prefs.fontSize) {
+      root.setAttribute('data-ui-scale', prefs.fontSize);
+      if (fontSizeMap[prefs.fontSize]) {
+        root.style.setProperty('--font-size-base', fontSizeMap[prefs.fontSize]);
+      }
+    }
+
+    // 5. Tablo & Liste Sıkışıklığı (Density)
+    const density = prefs.density || 'normal';
+    root.setAttribute('data-density', density);
+    if (density === 'compact-ultra' || density === 'ultra') {
+      root.style.setProperty('--row-height', '22px');
+      root.style.setProperty('--cell-padding', '2px 8px');
+    } else if (density === 'compact') {
+      root.style.setProperty('--row-height', '28px');
+      root.style.setProperty('--cell-padding', '4px 10px');
+    } else if (density === 'spacious') {
+      root.style.setProperty('--row-height', '44px');
+      root.style.setProperty('--cell-padding', '12px 16px');
+    } else {
+      root.style.setProperty('--row-height', '36px');
+      root.style.setProperty('--cell-padding', '8px 12px');
+    }
   }
 
   function getUserProfile() {
@@ -1104,4 +1176,5 @@
   };
 
   window.FrpStore = FrpStore;
+  try { applyPreferences(); } catch (e) {}
 })();

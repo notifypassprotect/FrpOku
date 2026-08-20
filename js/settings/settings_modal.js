@@ -4,6 +4,17 @@
 //  Ayrı Dosya Boyutu Sütunu, Temiz Kullanıcı Profili
 // ============================================================
 
+function safeToast(msg, type = 'info') {
+  if (typeof window.toast === 'function') {
+    window.toast(msg, type);
+  } else if (typeof window.showToast === 'function') {
+    window.showToast(msg, type);
+  } else {
+    console.log(`[Toast ${type}]`, msg);
+  }
+}
+const toast = safeToast;
+
 // ── MODERN CAM EFEKTLİ DİYALOG MOTORLARI (SIFIR NATIVE ALERT/CONFIRM) ──
 window.showConfirmDialog = function({
   title = 'İşlemi Onaylayın',
@@ -957,67 +968,73 @@ window.openSettingsModal = function(initialTab = 'appearance') {
 
     // 💾 TÜM DEĞİŞİKLİKLERİ KAYDET BUTONU
     overlay.querySelector('#btnSaveAllSettingsChanges')?.addEventListener('click', async () => {
-      captureProfileInputs();
-
       const saveBtn = overlay.querySelector('#btnSaveAllSettingsChanges');
       if (saveBtn) {
         saveBtn.disabled = true;
         saveBtn.textContent = 'Kaydediliyor... ⏳';
       }
 
-      // E-Posta format kontrolü
-      const email = (stagedProfile.email || '').trim().toLowerCase();
-      if (email && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}$/.test(email)) {
-        toast('⚠️ Lütfen geçerli bir e-posta adresi giriniz (Örn: ad.soyad@kurum.com).', 'warning');
-        if (saveBtn) {
-          saveBtn.disabled = false;
-          saveBtn.textContent = '💾 Tüm Değişiklikleri Kaydet';
-        }
-        return;
-      }
+      try {
+        captureProfileInputs();
 
-      // Bulut & Auth Veritabanı ile Senkronizasyon
-      const authUser = (typeof window.FrpAuth !== 'undefined' && window.FrpAuth.getUser) ? window.FrpAuth.getUser() : null;
-      if (authUser && authUser.id && activeTab === 'profile') {
-        try {
-          const fullName = `${stagedProfile.firstName || ''} ${stagedProfile.lastName || ''}`.trim();
-          const res = await fetch('/api/auth/update-profile', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              userId: authUser.id,
-              fullName: fullName || authUser.full_name,
-              username: stagedProfile.username || authUser.username,
-              email: email || authUser.email,
-              phone: stagedProfile.phone || authUser.phone,
-              department: stagedProfile.department || authUser.department
-            })
-          });
-
-          const data = await res.json();
-          if (data && data.success && data.user) {
-            window.FrpAuth.updateSession(data.user);
+        // E-Posta format kontrolü
+        const email = (stagedProfile.email || '').trim().toLowerCase();
+        if (email && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}$/.test(email)) {
+          safeToast('⚠️ Lütfen geçerli bir e-posta adresi giriniz (Örn: ad.soyad@kurum.com).', 'warning');
+          if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = '💾 Tüm Değişiklikleri Kaydet';
           }
-        } catch (syncErr) {
-          console.warn('Profile sync error:', syncErr.message);
+          return;
         }
-      }
 
-      FrpStore.setUserProfile(stagedProfile);
-      FrpStore.setPreferences(stagedPrefs);
-      if (stagedPrefs.theme) {
-        FrpStore.setTheme(stagedPrefs.theme);
-      }
-      if (typeof FrpStore.applyPreferences === 'function') {
-        FrpStore.applyPreferences();
-      }
+        // Bulut & Auth Veritabanı ile Senkronizasyon
+        const authUser = (typeof window.FrpAuth !== 'undefined' && window.FrpAuth.getUser) ? window.FrpAuth.getUser() : null;
+        if (authUser && authUser.id && activeTab === 'profile') {
+          try {
+            const fullName = `${stagedProfile.firstName || ''} ${stagedProfile.lastName || ''}`.trim();
+            const res = await fetch('/api/auth/update-profile', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: authUser.id,
+                fullName: fullName || authUser.full_name,
+                username: stagedProfile.username || authUser.username,
+                email: email || authUser.email,
+                phone: stagedProfile.phone || authUser.phone,
+                department: stagedProfile.department || authUser.department
+              })
+            });
 
-      toast('Tüm ayarlar başarıyla kaydedildi! 💾', 'success');
-      if (typeof window.refreshAll === 'function') window.refreshAll();
-      if (typeof window.updateStats === 'function') window.updateStats();
-      if (typeof window._refreshUserTopbarBadge === 'function') window._refreshUserTopbarBadge();
-      if (typeof window.FrpAuth?.updateNavbarUserBadge === 'function') window.FrpAuth.updateNavbarUserBadge();
-      overlay.remove();
+            const data = await res.json();
+            if (data && data.success && data.user) {
+              window.FrpAuth.updateSession(data.user);
+            }
+          } catch (syncErr) {
+            console.warn('Profile sync error:', syncErr.message);
+          }
+        }
+
+        FrpStore.setUserProfile(stagedProfile);
+        FrpStore.setPreferences(stagedPrefs);
+        if (stagedPrefs.theme) {
+          FrpStore.setTheme(stagedPrefs.theme);
+        }
+        if (typeof FrpStore.applyPreferences === 'function') {
+          FrpStore.applyPreferences();
+        }
+
+        safeToast('Tüm ayarlar başarıyla kaydedildi! 💾', 'success');
+        if (typeof window.refreshAll === 'function') window.refreshAll();
+        if (typeof window.updateStats === 'function') window.updateStats();
+        if (typeof window._refreshUserTopbarBadge === 'function') window._refreshUserTopbarBadge();
+        if (typeof window.FrpAuth?.updateNavbarUserBadge === 'function') window.FrpAuth.updateNavbarUserBadge();
+      } catch (err) {
+        console.error('Settings save error:', err);
+        safeToast('Ayarlar kaydedilirken hata: ' + err.message, 'error');
+      } finally {
+        overlay.remove();
+      }
     });
 
     // 🔄 FABRİKA AYARLARINA DÖN (ÖZEL MODAL)
