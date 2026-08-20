@@ -12,9 +12,15 @@ let sortDir         = 'desc';
 let searchQuery     = '';
 let searchField     = 'all';
 let selectedTag     = '';
+let selectedCategory = '';
 let onlyFavorites   = false;
+let onlyPinned      = false;
+let onlyNotes       = false;
 let isRegexMode     = false;
 let regexError      = false;
+let isStoreLoaded   = false;
+let currentPage     = 1;
+let currentViewMode = 'table';
 
 const tableBody          = document.getElementById('tableBody');
 const searchInput        = document.getElementById('searchInput');
@@ -288,8 +294,6 @@ function bindTableSortHeaders() {
 }
 
 // ── SAYFALAMA (PAGINATION) BARI & KONTROLLERİ ──────────────
-let currentPage = 1;
-
 function renderPaginationControls(totalItems, pageSize) {
   let pagWrap = document.getElementById('paginationWrap');
   if (!pagWrap) {
@@ -1226,13 +1230,6 @@ if (uploadMini) {
 document.addEventListener('dragover', e => e.preventDefault());
 document.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files); });
 
-
-// ── YENİ ÖZELLİKLER HAFISA DEĞİŞKENLERİ ──────────────────
-let isStoreLoaded   = false;
-let currentViewMode = 'table'; // 'table' | 'cards' | 'timeline'
-let onlyPinned      = false;
-let onlyNotes       = false;
-let selectedCategory = '';
 
 // ── SABİTLEME (PIN) TOGGLE ────────────────────────────────
 // ── SIRALAMA (Pin önce, sonra favori, sonra alan sıralaması) ──────────────
