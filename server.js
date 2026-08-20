@@ -666,11 +666,32 @@ app.post('/api/store/save', async (req, res) => {
         const isFavorite = !!(report.isFavorite || report.favorite || report.is_favorite);
         const isPinned = !!(report.isPinned || report.pinned || report.is_pinned);
         const isDeleted = !!(report.isDeleted || report.is_deleted);
+        const isPublic = !!(report.isPublic || report.is_public || report.inPool || report.in_pool);
+        const ownerName = String(report.ownerName || report.owner_name || report.uploadedBy || '');
+        const ownerUsername = String(report.ownerUsername || report.owner_username || '');
+        const ownerDepartment = String(report.ownerDepartment || report.owner_department || '');
+        const sharedAt = isPublic ? (report.sharedAt || report.shared_at || new Date().toISOString()) : null;
+
         const sqlCount = Array.isArray(report.queries) ? report.queries.length : Number(report.stats?.sqlCount || report.sql_count || 0);
         const memoCount = Array.isArray(report.memos) ? report.memos.length : Number(report.stats?.memoCount || report.memo_count || 0);
         const datasetCount = Array.isArray(report.datasets) ? report.datasets.length : Number(report.dataset_count || 0);
         const pageCount = Array.isArray(report.pages) ? report.pages.length : Number(report.stats?.pageCount || report.page_count || 1);
         const hasScript = !!(report.pascalScript && report.pascalScript.trim().length > 0);
+
+        const safeReportData = {
+          ...report,
+          userId,
+          isPublic,
+          is_public: isPublic,
+          ownerName,
+          owner_name: ownerName,
+          ownerUsername,
+          owner_username: ownerUsername,
+          ownerDepartment,
+          owner_department: ownerDepartment,
+          sharedAt,
+          shared_at: sharedAt
+        };
 
         return {
           id,
@@ -683,12 +704,13 @@ app.post('/api/store/save', async (req, res) => {
           is_favorite: isFavorite,
           is_pinned: isPinned,
           is_deleted: isDeleted,
+          is_public: isPublic,
           sql_count: sqlCount,
           memo_count: memoCount,
           dataset_count: datasetCount,
           page_count: pageCount,
           has_script: hasScript,
-          data: report,
+          data: safeReportData,
           updated_at: new Date().toISOString()
         };
       });
@@ -720,6 +742,92 @@ app.delete('/api/reports/:id', async (req, res) => {
     }
   }
   res.json({ success: true });
+});
+
+// ── ORTAK HAVUZ ENDPOINTLERİ ────────────────────────────────
+app.post('/api/reports/toggle-pool', async (req, res) => {
+  const { reportId, makePublic, ownerInfo } = req.body;
+  if (!reportId) return res.status(400).json({ success: false, reason: 'Rapor ID gerekli.' });
+
+  try {
+    const storePath = path.join(__dirname, 'data', 'store.json');
+    let localData = [];
+    if (fs.existsSync(storePath)) {
+      try { localData = JSON.parse(fs.readFileSync(storePath, 'utf8')) || []; } catch {}
+    }
+
+    const idx = localData.findIndex(r => String(r.id || r.fileId) === String(reportId));
+    if (idx !== -1) {
+      localData[idx].isPublic = !!makePublic;
+      localData[idx].is_public = !!makePublic;
+      if (ownerInfo) {
+        localData[idx].ownerName = ownerInfo.fullName || ownerInfo.name || localData[idx].ownerName || '';
+        localData[idx].ownerUsername = ownerInfo.username || localData[idx].ownerUsername || '';
+        localData[idx].ownerDepartment = ownerInfo.department || localData[idx].ownerDepartment || '';
+      }
+      if (makePublic) {
+        localData[idx].sharedAt = new Date().toISOString();
+      }
+      fs.writeFileSync(storePath, JSON.stringify(localData, null, 2), 'utf8');
+    }
+
+    if (supabase) {
+      const updates = {
+        is_public: !!makePublic,
+        updated_at: new Date().toISOString()
+      };
+      if (idx !== -1) updates.data = localData[idx];
+      await supabase.from('reports').update(updates).eq('id', String(reportId));
+    }
+
+    res.json({ success: true, isPublic: !!makePublic });
+  } catch (err) {
+    res.status(500).json({ success: false, reason: err.message });
+  }
+});
+
+app.post('/api/reports/bulk-toggle-pool', async (req, res) => {
+  const { reportIds, makePublic, ownerInfo } = req.body;
+  if (!Array.isArray(reportIds) || reportIds.length === 0) {
+    return res.status(400).json({ success: false, reason: 'Rapor ID listesi gerekli.' });
+  }
+
+  try {
+    const storePath = path.join(__dirname, 'data', 'store.json');
+    let localData = [];
+    if (fs.existsSync(storePath)) {
+      try { localData = JSON.parse(fs.readFileSync(storePath, 'utf8')) || []; } catch {}
+    }
+
+    const idSet = new Set(reportIds.map(String));
+    const nowIso = new Date().toISOString();
+
+    localData.forEach(r => {
+      if (idSet.has(String(r.id || r.fileId))) {
+        r.isPublic = !!makePublic;
+        r.is_public = !!makePublic;
+        if (ownerInfo) {
+          r.ownerName = ownerInfo.fullName || ownerInfo.name || r.ownerName || '';
+          r.ownerUsername = ownerInfo.username || r.ownerUsername || '';
+          r.ownerDepartment = ownerInfo.department || r.ownerDepartment || '';
+        }
+        if (makePublic) r.sharedAt = nowIso;
+      }
+    });
+
+    fs.writeFileSync(storePath, JSON.stringify(localData, null, 2), 'utf8');
+
+    if (supabase) {
+      await supabase.from('reports').update({
+        is_public: !!makePublic,
+        updated_at: nowIso
+      }).in('id', Array.from(idSet));
+    }
+
+    res.json({ success: true, count: reportIds.length, isPublic: !!makePublic });
+  } catch (err) {
+    res.status(500).json({ success: false, reason: err.message });
+  }
 });
 
 app.listen(PORT, () => {

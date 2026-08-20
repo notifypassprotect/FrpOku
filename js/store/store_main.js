@@ -242,24 +242,35 @@
     const autoTags = window.FrpTags ? window.FrpTags.generateAutoTags(parsedData, fileName) : [];
     const existingTags = existingIdx >= 0 ? (files[existingIdx].tags || []) : [];
     const mergedTags = [...new Set([...existingTags, ...autoTags])];
+    const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
+    const userId = curUser ? curUser.id : 'public';
+    const ownerName = curUser ? (curUser.full_name || curUser.username) : 'Anonim';
+    const ownerUsername = curUser ? curUser.username : '';
+    const ownerDepartment = curUser ? (curUser.department || 'Bilgi İşlem') : '';
 
     const fileRecord = {
-      id:           existingIdx >= 0 ? files[existingIdx].id : _uuid(),
-      name:         fileName,
-      sizeBytes:    fileSize,
-      loadedAt:     new Date().toISOString(),
-      meta:         parsedData.meta || {},
-      pascalScript: parsedData.pascalScript || null,
-      queries:      parsedData.queries || [],
-      datasets:     parsedData.datasets || [],
-      tree:         parsedData.tree || [],
-      pages:        parsedData.pages || [],
-      dialogPages:  parsedData.dialogPages || [],
-      rawXml:       parsedData.rawXml || null,
-      userNote:     existingIdx >= 0 ? (files[existingIdx].userNote || '') : '',
-      isFavorite:   existingIdx >= 0 ? (files[existingIdx].isFavorite || false) : false,
-      isPinned:     existingIdx >= 0 ? (files[existingIdx].isPinned || false) : false,
-      tags:         mergedTags
+      id:              existingIdx >= 0 ? files[existingIdx].id : _uuid(),
+      name:            fileName,
+      userId:          existingIdx >= 0 ? (files[existingIdx].userId || userId) : userId,
+      sizeBytes:       fileSize,
+      loadedAt:        new Date().toISOString(),
+      meta:            parsedData.meta || {},
+      pascalScript:    parsedData.pascalScript || null,
+      queries:         parsedData.queries || [],
+      datasets:        parsedData.datasets || [],
+      tree:            parsedData.tree || [],
+      pages:           parsedData.pages || [],
+      dialogPages:     parsedData.dialogPages || [],
+      rawXml:          parsedData.rawXml || null,
+      userNote:        existingIdx >= 0 ? (files[existingIdx].userNote || '') : '',
+      isFavorite:      existingIdx >= 0 ? (files[existingIdx].isFavorite || false) : false,
+      isPinned:        existingIdx >= 0 ? (files[existingIdx].isPinned || false) : false,
+      isPublic:        existingIdx >= 0 ? (files[existingIdx].isPublic || false) : false,
+      ownerName:       existingIdx >= 0 ? (files[existingIdx].ownerName || ownerName) : ownerName,
+      ownerUsername:   existingIdx >= 0 ? (files[existingIdx].ownerUsername || ownerUsername) : ownerUsername,
+      ownerDepartment: existingIdx >= 0 ? (files[existingIdx].ownerDepartment || ownerDepartment) : ownerDepartment,
+      sharedAt:        existingIdx >= 0 ? (files[existingIdx].sharedAt || null) : null,
+      tags:            mergedTags
     };
 
     if (existingIdx >= 0) {
@@ -276,6 +287,11 @@
   function addMany(parsedList) {
     const files = _read();
     let added = 0, updated = 0;
+    const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
+    const userId = curUser ? curUser.id : 'public';
+    const ownerName = curUser ? (curUser.full_name || curUser.username) : 'Anonim';
+    const ownerUsername = curUser ? curUser.username : '';
+    const ownerDepartment = curUser ? (curUser.department || 'Bilgi İşlem') : '';
 
     parsedList.forEach(item => {
       const { parsedData, fileName, fileSize } = item;
@@ -285,22 +301,28 @@
       const mergedTags = [...new Set([...existingTags, ...autoTags])];
 
       const fileRecord = {
-        id:           existingIdx >= 0 ? files[existingIdx].id : _uuid(),
-        name:         fileName,
-        sizeBytes:    fileSize,
-        loadedAt:     new Date().toISOString(),
-        meta:         parsedData.meta || {},
-        pascalScript: parsedData.pascalScript || null,
-        queries:      parsedData.queries || [],
-        datasets:     parsedData.datasets || [],
-        tree:         parsedData.tree || [],
-        pages:        parsedData.pages || [],
-        dialogPages:  parsedData.dialogPages || [],
-        rawXml:       parsedData.rawXml || null,
-        userNote:     existingIdx >= 0 ? (files[existingIdx].userNote || '') : '',
-        isFavorite:   existingIdx >= 0 ? (files[existingIdx].isFavorite || false) : false,
-        isPinned:     existingIdx >= 0 ? (files[existingIdx].isPinned || false) : false,
-        tags:         mergedTags
+        id:              existingIdx >= 0 ? files[existingIdx].id : _uuid(),
+        name:            fileName,
+        userId:          existingIdx >= 0 ? (files[existingIdx].userId || userId) : userId,
+        sizeBytes:       fileSize,
+        loadedAt:        new Date().toISOString(),
+        meta:            parsedData.meta || {},
+        pascalScript:    parsedData.pascalScript || null,
+        queries:         parsedData.queries || [],
+        datasets:        parsedData.datasets || [],
+        tree:            parsedData.tree || [],
+        pages:           parsedData.pages || [],
+        dialogPages:     parsedData.dialogPages || [],
+        rawXml:          parsedData.rawXml || null,
+        userNote:        existingIdx >= 0 ? (files[existingIdx].userNote || '') : '',
+        isFavorite:      existingIdx >= 0 ? (files[existingIdx].isFavorite || false) : false,
+        isPinned:        existingIdx >= 0 ? (files[existingIdx].isPinned || false) : false,
+        isPublic:        existingIdx >= 0 ? (files[existingIdx].isPublic || false) : false,
+        ownerName:       existingIdx >= 0 ? (files[existingIdx].ownerName || ownerName) : ownerName,
+        ownerUsername:   existingIdx >= 0 ? (files[existingIdx].ownerUsername || ownerUsername) : ownerUsername,
+        ownerDepartment: existingIdx >= 0 ? (files[existingIdx].ownerDepartment || ownerDepartment) : ownerDepartment,
+        sharedAt:        existingIdx >= 0 ? (files[existingIdx].sharedAt || null) : null,
+        tags:            mergedTags
       };
 
       if (existingIdx >= 0) {
@@ -566,13 +588,131 @@
     return false;
   }
 
-  function getAllTags() {
+  // ── 6.5. Ortak Rapor Havuzu & Çalışma Alanı Yönetimi ─────────
+  const WORKSPACE_KEY = 'frpoku_active_workspace';
+  let _activeWorkspace = localStorage.getItem(WORKSPACE_KEY) || 'personal';
+
+  function getActiveWorkspace() {
+    return _activeWorkspace;
+  }
+
+  function setActiveWorkspace(ws) {
+    if (ws === 'pool' || ws === 'personal') {
+      _activeWorkspace = ws;
+      localStorage.setItem(WORKSPACE_KEY, ws);
+      if (typeof window.refreshAll === 'function') window.refreshAll();
+    }
+    return _activeWorkspace;
+  }
+
+  function getMyReports() {
+    const list = getAll();
+    const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
+    if (!curUser) return list;
+    if (curUser.role === 'admin') return list; // Admin tümünü görebilir
+    return list.filter(f => f.userId === curUser.id || !f.userId || f.userId === 'public');
+  }
+
+  function getPoolReports() {
+    const list = getAll();
+    return list.filter(f => f.isPublic === true || f.is_public === true);
+  }
+
+  function toggleReportPool(id, makePublic) {
     const files = _read();
-    const tagSet = new Set();
+    const idx = files.findIndex(f => f.id === id);
+    if (idx < 0) return false;
+
+    const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
+    const nowIso = new Date().toISOString();
+
+    files[idx].isPublic = !!makePublic;
+    files[idx].is_public = !!makePublic;
+
+    if (makePublic) {
+      files[idx].sharedAt = nowIso;
+      if (curUser) {
+        files[idx].ownerName = curUser.full_name || curUser.username;
+        files[idx].ownerUsername = curUser.username;
+        files[idx].ownerDepartment = curUser.department || 'Bilgi İşlem';
+      }
+    }
+
+    _write(files);
+
+    if (window.FrpCloud && typeof window.FrpCloud.togglePoolStatus === 'function') {
+      window.FrpCloud.togglePoolStatus(id, makePublic, curUser ? {
+        fullName: curUser.full_name || curUser.username,
+        username: curUser.username,
+        department: curUser.department
+      } : null).catch(() => {});
+    }
+
+    return files[idx].isPublic;
+  }
+
+  function bulkToggleReportPool(ids, makePublic) {
+    if (!Array.isArray(ids) || ids.length === 0) return 0;
+    const files = _read();
+    const idSet = new Set(ids);
+    const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
+    const nowIso = new Date().toISOString();
+    let count = 0;
+
     files.forEach(f => {
-      (f.tags || []).forEach(t => tagSet.add(t));
+      if (idSet.has(f.id)) {
+        f.isPublic = !!makePublic;
+        f.is_public = !!makePublic;
+        if (makePublic) {
+          f.sharedAt = nowIso;
+          if (curUser) {
+            f.ownerName = curUser.full_name || curUser.username;
+            f.ownerUsername = curUser.username;
+            f.ownerDepartment = curUser.department || 'Bilgi İşlem';
+          }
+        }
+        count++;
+      }
     });
-    return [...tagSet].sort();
+
+    if (count > 0) {
+      _write(files);
+      if (window.FrpCloud && typeof window.FrpCloud.bulkTogglePoolStatus === 'function') {
+        window.FrpCloud.bulkTogglePoolStatus(ids, makePublic, curUser ? {
+          fullName: curUser.full_name || curUser.username,
+          username: curUser.username,
+          department: curUser.department
+        } : null).catch(() => {});
+      }
+    }
+    return count;
+  }
+
+  function cloneReportToPersonal(id) {
+    const original = getById(id);
+    if (!original) return null;
+
+    const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
+    const newId = _uuid();
+    const clonedName = original.name.replace(/\.frp$/i, '') + ' (Kopya).frp';
+
+    const clonedRecord = JSON.parse(JSON.stringify(original));
+    clonedRecord.id = newId;
+    clonedRecord.name = clonedName;
+    clonedRecord.userId = curUser ? curUser.id : 'public';
+    clonedRecord.ownerName = curUser ? (curUser.full_name || curUser.username) : 'Anonim';
+    clonedRecord.ownerUsername = curUser ? curUser.username : '';
+    clonedRecord.ownerDepartment = curUser ? (curUser.department || 'Bilgi İşlem') : '';
+    clonedRecord.isPublic = false;
+    clonedRecord.is_public = false;
+    clonedRecord.sharedAt = null;
+    clonedRecord.loadedAt = new Date().toISOString();
+
+    const files = _read();
+    files.unshift(clonedRecord);
+    _write(files);
+
+    return clonedRecord;
   }
 
   // ── 7. Kategoriler ──────────────────────────────────────────
@@ -909,6 +1049,10 @@
     getPreferences, setPreferences, applyPreferences, getUserProfile, setUserProfile,
     addRecent, getRecent, clearRecent, removeRecent,
     exportAllSqls, exportAllSqlsCsv, search, getStats,
+
+    // Ortak Havuz & Çalışma Alanı
+    getActiveWorkspace, setActiveWorkspace, getMyReports, getPoolReports,
+    toggleReportPool, bulkToggleReportPool, cloneReportToPersonal,
 
     // Analytics delegasyonları
     getSqlComplexity: (sql) => window.FrpComplexity ? window.FrpComplexity.getSqlComplexity(sql) : {},

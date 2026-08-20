@@ -1310,8 +1310,60 @@ async function init() {
     const errWrap = document.getElementById('errorWrap');
     const viewer = document.getElementById('viewer');
     if (errWrap) errWrap.style.display = 'none';
-    if (viewer) viewer.style.display = '';
     renderViewer(file);
+
+    // ── Ortak Havuz Bannerı & Salt-Okunur Kontrolü ─────────────
+    const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
+    const isOwner = curUser && file.userId === curUser.id;
+    const isAdmin = curUser && curUser.role === 'admin';
+    const isOwnerOrAdmin = isOwner || isAdmin || !file.userId || file.userId === 'public';
+    const isPublic = !!(file.isPublic || file.is_public);
+
+    const poolBanner = document.getElementById('poolDetailBanner');
+    const poolOwnerInfo = document.getElementById('poolDetailOwnerInfo');
+    const btnCloneFromPool = document.getElementById('btnCloneFromPool');
+    const btnTogglePoolDetail = document.getElementById('btnTogglePoolDetail');
+
+    if (isPublic) {
+      if (poolBanner) {
+        poolBanner.style.display = 'flex';
+        const ownerName = file.ownerName || file.owner_name || 'Kurum Personeli';
+        const ownerDept = file.ownerDepartment || file.owner_department || '';
+        if (poolOwnerInfo) {
+          poolOwnerInfo.textContent = `Yükleyen / Paylaşan: 👤 ${ownerName}${ownerDept ? ' · 🏢 ' + ownerDept : ''}`;
+        }
+      }
+    } else {
+      if (poolBanner) poolBanner.style.display = 'none';
+    }
+
+    if (btnCloneFromPool) {
+      btnCloneFromPool.onclick = () => {
+        const cloned = FrpStore.cloneReportToPersonal(file.id);
+        if (cloned) {
+          showToast(`"${cloned.name}" kişisel raporlarınıza kopyalandı! 📋`, 'success');
+          setTimeout(() => {
+            window.location.href = `detail.html?id=${encodeURIComponent(cloned.id)}`;
+          }, 800);
+        }
+      };
+    }
+
+    if (btnTogglePoolDetail) {
+      btnTogglePoolDetail.style.display = 'inline-flex';
+      btnTogglePoolDetail.textContent = isPublic ? '🔒 Havuzdan Kaldır' : '🌐 Havuzda Paylaş';
+      btnTogglePoolDetail.className = isPublic ? 'btn btn-sm btn-ghost' : 'btn btn-sm btn-primary';
+
+      btnTogglePoolDetail.onclick = () => {
+        if (!isOwnerOrAdmin) {
+          showToast('Bu raporu yalnızca sahibi veya Admin havuzdan çekebilir.', 'warning');
+          return;
+        }
+        const newState = FrpStore.toggleReportPool(file.id, !isPublic);
+        showToast(newState ? 'Rapor Ortak Havuzda Paylaşıldı! 🌐' : 'Rapor havuzdan kaldırıldı ve gizlendi 🔒', 'success');
+        setTimeout(() => location.reload(), 600);
+      };
+    }
 
     // Topbar'a Tema Seçici ve Zen Butonu Ekle
     const topbarRight = document.querySelector('.topbar-right');

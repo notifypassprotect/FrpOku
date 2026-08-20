@@ -39,12 +39,33 @@
     const userNote = String(report.userNote || report.user_note || '');
     const isFavorite = !!(report.isFavorite || report.favorite || report.is_favorite);
     const isPinned = !!(report.isPinned || report.pinned || report.is_pinned);
+    const isPublic = !!(report.isPublic || report.is_public || report.inPool || report.in_pool);
+    const ownerName = String(report.ownerName || report.owner_name || report.uploadedBy || '');
+    const ownerUsername = String(report.ownerUsername || report.owner_username || '');
+    const ownerDepartment = String(report.ownerDepartment || report.owner_department || '');
+    const sharedAt = isPublic ? (report.sharedAt || report.shared_at || new Date().toISOString()) : null;
+
     const sqlCount = Array.isArray(report.queries) ? report.queries.length : Number(report.stats?.sqlCount || report.sql_count || 0);
     const memoCount = Array.isArray(report.memos) ? report.memos.length : Number(report.stats?.memoCount || report.memo_count || 0);
     const datasetCount = Array.isArray(report.datasets) ? report.datasets.length : Number(report.dataset_count || 0);
     const pageCount = Array.isArray(report.pages) ? report.pages.length : Number(report.stats?.pageCount || report.page_count || 1);
     const hasScript = !!(report.pascalScript && report.pascalScript.trim().length > 0);
     const userId = String(report.userId || report.user_id || (window.FrpAuth && window.FrpAuth.getUser() ? window.FrpAuth.getUser().id : 'public'));
+
+    const safeData = {
+      ...report,
+      userId,
+      isPublic,
+      is_public: isPublic,
+      ownerName,
+      owner_name: ownerName,
+      ownerUsername,
+      owner_username: ownerUsername,
+      ownerDepartment,
+      owner_department: ownerDepartment,
+      sharedAt,
+      shared_at: sharedAt
+    };
 
     return {
       id,
@@ -57,13 +78,14 @@
       is_favorite: isFavorite,
       is_pinned: isPinned,
       is_deleted: isDeleted,
+      is_public: isPublic,
       deleted_at: isDeleted ? (report.deletedAt || new Date().toISOString()) : null,
       sql_count: sqlCount,
       memo_count: memoCount,
       dataset_count: datasetCount,
       page_count: pageCount,
       has_script: hasScript,
-      data: { ...report, userId },
+      data: safeData,
       updated_at: new Date().toISOString()
     };
   }
@@ -80,6 +102,11 @@
     r.userNote = row.user_note || r.userNote || '';
     r.isFavorite = !!row.is_favorite;
     r.isPinned = !!row.is_pinned;
+    r.isPublic = !!(row.is_public || r.isPublic || r.is_public);
+    r.ownerName = r.ownerName || r.owner_name || row.owner_name || '';
+    r.ownerUsername = r.ownerUsername || r.owner_username || row.owner_username || '';
+    r.ownerDepartment = r.ownerDepartment || r.owner_department || row.owner_department || '';
+    r.sharedAt = r.sharedAt || r.shared_at || row.shared_at || null;
     r.deletedAt = row.deleted_at || r.deletedAt || null;
     return r;
   }
@@ -104,7 +131,8 @@
             .eq('is_deleted', false);
 
           if (curUser && curUser.role !== 'admin') {
-            query = query.or(`user_id.eq.${curUser.id},user_id.eq.public`);
+            // Normal kullanıcı: Kendi yükledikleri + Genel/Ortak Havuzdakiler
+            query = query.or(`user_id.eq.${curUser.id},user_id.eq.public,is_public.eq.true`);
           }
 
           const { data, error } = await query
@@ -249,11 +277,59 @@
         await sb.from('reports').update({ is_deleted: false, deleted_at: null }).in('id', strIds);
         return true;
       } catch {
+    // ── 7. ORTAK HAVUZ PAYLAŞIM YÖNETİMİ ─────────────────────────
+    async togglePoolStatus(reportId, makePublic, ownerInfo) {
+      const sb = getClient();
+      if (!reportId) return false;
+      try {
+        if (USE_SERVER_BRIDGE) {
+          fetch('/api/reports/toggle-pool', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reportId, makePublic, ownerInfo })
+          }).catch(() => {});
+        }
+
+        if (sb) {
+          await sb.from('reports').update({
+            is_public: !!makePublic,
+            updated_at: new Date().toISOString()
+          }).eq('id', String(reportId));
+        }
+        return true;
+      } catch (e) {
+        console.warn('Havuz toggle hatası:', e);
         return false;
       }
     },
 
-    // ── 7. KALICI SİL (Purge from Database) ─────────────────────────
+    async bulkTogglePoolStatus(reportIds, makePublic, ownerInfo) {
+      const sb = getClient();
+      if (!Array.isArray(reportIds) || reportIds.length === 0) return false;
+      try {
+        if (USE_SERVER_BRIDGE) {
+          fetch('/api/reports/bulk-toggle-pool', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reportIds, makePublic, ownerInfo })
+          }).catch(() => {});
+        }
+
+        if (sb) {
+          const strIds = reportIds.map(String);
+          await sb.from('reports').update({
+            is_public: !!makePublic,
+            updated_at: new Date().toISOString()
+          }).in('id', strIds);
+        }
+        return true;
+      } catch (e) {
+        console.warn('Toplu havuz toggle hatası:', e);
+        return false;
+      }
+    },
+
+    // ── 8. KALICI SİL (Purge from Database) ─────────────────────────
     async purgeReport(id) {
       const sb = getClient();
       if (!sb || !id) return false;

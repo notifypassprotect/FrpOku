@@ -361,7 +361,7 @@ function renderPaginationControls(totalItems, pageSize) {
   }
 }
 
-const DEFAULT_COLUMN_ORDER = ['reportName', 'fileName', 'fileSize', 'category', 'guid', 'tags', 'queries', 'date'];
+const DEFAULT_COLUMN_ORDER = ['reportName', 'owner', 'fileName', 'fileSize', 'category', 'guid', 'tags', 'queries', 'date'];
 
 const COLUMN_DEFS = {
   reportName: {
@@ -369,13 +369,32 @@ const COLUMN_DEFS = {
     sortKey: 'name',
     thClass: 'col-reportName',
     thStyle: '',
-    renderTd: (file, h) => `
+    renderTd: (file, h) => {
+      const isPublic = !!(file.isPublic || file.is_public);
+      return `
       <td class="col-reportName">
         <div class="file-name" data-id="${file.id}">
           📋 <span class="report-name-title" style="font-weight:700;">${escHtml(h.reportName)}</span>
+          ${isPublic ? '<span class="badge badge-pool" style="font-size:.65rem;padding:.1rem .35rem;margin-left:.25rem;" title="Ortak Havuzda Paylaşıldı">🌐 Havuzda</span>' : ''}
           ${h.hasNote ? '<span class="note-icon" title="Not var">📝</span>' : ''}
         </div>
-      </td>`
+      </td>`;
+    }
+  },
+  owner: {
+    label: 'Yükleyen / Birim',
+    sortKey: 'ownerName',
+    thClass: 'col-owner',
+    thStyle: 'min-width:135px;',
+    renderTd: (file) => {
+      const oName = file.ownerName || file.owner_name || (file.userId === 'usr_admin_root' ? 'Admin' : 'Sistem');
+      const oDept = file.ownerDepartment || file.owner_department || '';
+      return `<td class="col-owner" style="white-space:nowrap;">
+        <span class="owner-chip" title="Yükleyen: ${escHtml(oName)}${oDept ? ' · ' + escHtml(oDept) : ''}">
+          👤 ${escHtml(oName)}
+        </span>
+      </td>`;
+    }
   },
   fileName: {
     label: 'Dosya Adı',
@@ -797,6 +816,39 @@ if (tableBody && ctxMenu) {
     const titleEl = document.getElementById('ctxMenuReportTitle');
     if (titleEl) titleEl.textContent = `📋 ${file.meta?.reportName || file.name}`;
 
+    const curWs = FrpStore.getActiveWorkspace ? FrpStore.getActiveWorkspace() : 'personal';
+    const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
+    const isOwnerOrAdmin = !curUser || curUser.role === 'admin' || file.userId === curUser.id;
+    const isPublic = !!(file.isPublic || file.is_public);
+
+    const btnTogglePool = document.getElementById('ctxBtnTogglePool');
+    const textTogglePool = document.getElementById('ctxTextTogglePool');
+    const btnClonePersonal = document.getElementById('ctxBtnClonePersonal');
+    const btnDelete = document.getElementById('ctxBtnDelete');
+    const btnRename = ctxMenu.querySelector('[data-action="rename"]');
+
+    if (btnTogglePool && textTogglePool) {
+      if (isPublic) {
+        textTogglePool.textContent = '🔒 Havuzdan Kaldır (Özele Al)';
+        btnTogglePool.style.display = isOwnerOrAdmin ? 'flex' : 'none';
+      } else {
+        textTogglePool.textContent = '🌐 Ortak Havuzda Paylaş';
+        btnTogglePool.style.display = 'flex';
+      }
+    }
+
+    if (btnClonePersonal) {
+      btnClonePersonal.style.display = curWs === 'pool' ? 'flex' : 'none';
+    }
+
+    if (btnDelete) {
+      btnDelete.style.display = (curWs === 'personal' || isOwnerOrAdmin) ? 'flex' : 'none';
+    }
+
+    if (btnRename) {
+      btnRename.style.display = (curWs === 'personal' || isOwnerOrAdmin) ? 'flex' : 'none';
+    }
+
     ctxMenu.style.display = 'flex';
 
     // Ekran dışına taşmayı önleme
@@ -835,6 +887,21 @@ if (tableBody && ctxMenu) {
         case 'view':
           openDetail(fileId);
           break;
+        case 'toggle-pool': {
+          const isPublic = !!(file?.isPublic || file?.is_public);
+          const newState = FrpStore.toggleReportPool(fileId, !isPublic);
+          toast(newState ? 'Rapor Ortak Havuzda Paylaşıldı! 🌐' : 'Rapor havuzdan kaldırıldı ve gizlendi 🔒', 'success');
+          refreshAll();
+          break;
+        }
+        case 'clone-to-personal': {
+          const cloned = FrpStore.cloneReportToPersonal(fileId);
+          if (cloned) {
+            toast(`"${cloned.name}" kişisel raporlarınıza kopyalandı! 📋`, 'success');
+            refreshAll();
+          }
+          break;
+        }
         case 'rename':
           openRenameModal(fileId);
           break;
@@ -1139,17 +1206,40 @@ function applySearch() {
   }
 
   try {
-    let files = FrpStore.search(searchQuery, searchField, isRegexMode, selectedTag, onlyFavorites);
-    if (onlyPinned) files = files.filter(f => f.isPinned);
-    if (onlyNotes) files = files.filter(f => f.userNote && f.userNote.trim());
-    if (selectedCategory) files = files.filter(f => f.category === selectedCategory);
+    const curWs = FrpStore.getActiveWorkspace ? FrpStore.getActiveWorkspace() : 'personal';
+    let baseList = curWs === 'pool'
+      ? (FrpStore.getPoolReports ? FrpStore.getPoolReports() : [])
+      : (FrpStore.getMyReports ? FrpStore.getMyReports() : FrpStore.getAll());
+
+    let files = baseList.filter(file => {
+      if (onlyFavorites && !file.isFavorite) return false;
+      if (selectedTag && !(file.tags || []).includes(selectedTag)) return false;
+      if (onlyPinned && !file.isPinned) return false;
+      if (onlyNotes && !(file.userNote && file.userNote.trim())) return false;
+      if (selectedCategory && file.category !== selectedCategory) return false;
+
+      if (!searchQuery) return true;
+      const q = searchQuery.toLowerCase();
+      const name = (file.meta?.reportName || file.name || '').toLowerCase();
+      const fileName = (file.name || '').toLowerCase();
+      const guid = (file.meta?.guid || '').toLowerCase();
+      const owner = (file.ownerName || file.owner_name || '').toLowerCase();
+      const sql = (file.queries || []).map(x => x.sql || '').join(' ').toLowerCase();
+
+      if (searchField === 'name') return name.includes(q);
+      if (searchField === 'guid') return guid.includes(q);
+      if (searchField === 'sql') return sql.includes(q);
+      if (searchField === 'author' || searchField === 'owner') return owner.includes(q);
+      return name.includes(q) || fileName.includes(q) || guid.includes(q) || owner.includes(q) || sql.includes(q);
+    });
+
     allFiles = files;
   } catch (err) {
     regexError = true;
     if (regexErrMsg) { regexErrMsg.textContent = '⚠️ ' + err.message; regexErrMsg.classList.add('show'); }
     if (sw) sw.classList.add('error');
     if (regexBtn) regexBtn.classList.add('error');
-    allFiles = FrpStore.getAll();
+    allFiles = [];
   }
 
   renderCurrentView();
@@ -2603,10 +2693,95 @@ function updateStats() {
   if (statPascal)    statPascal.textContent    = s.pascal;
   if (statStorage)   statStorage.textContent   = s.storageFormatted;
 
+  const myReports = FrpStore.getMyReports ? FrpStore.getMyReports() : [];
+  const poolReports = FrpStore.getPoolReports ? FrpStore.getPoolReports() : [];
+  const badgeMy = document.getElementById('badgeMyCount');
+  const badgePool = document.getElementById('badgePoolCount');
+  if (badgeMy) badgeMy.textContent = myReports.length;
+  if (badgePool) badgePool.textContent = poolReports.length;
+
   if (storageWarn) {
     storageWarn.classList.toggle('show', FrpStore.isStorageNearFull());
   }
 }
+
+// ── TOPLU İŞLEM ÇUBUĞU (BULK BAR) GÜNCELLEMESİ ──────────────
+function updateBulkBar() {
+  const count = selectedIds.size;
+  if (!bulkBar) return;
+  if (count > 0) {
+    bulkBar.classList.add('show');
+    if (bulkInfo) bulkInfo.textContent = `${count} rapor seçildi`;
+  } else {
+    bulkBar.classList.remove('show');
+  }
+
+  const curWs = FrpStore.getActiveWorkspace ? FrpStore.getActiveWorkspace() : 'personal';
+  const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
+  const isAdmin = curUser && curUser.role === 'admin';
+
+  const btnBulkShare = document.getElementById('btnBulkSharePool');
+  const btnBulkRemove = document.getElementById('btnBulkRemovePool');
+  const btnDeleteBulk = document.getElementById('btnDeleteBulk');
+
+  if (btnBulkShare) btnBulkShare.style.display = curWs === 'personal' ? 'inline-flex' : 'none';
+  if (btnBulkRemove) btnBulkRemove.style.display = (curWs === 'pool' && (isAdmin || true)) ? 'inline-flex' : 'none';
+  if (btnDeleteBulk) btnDeleteBulk.style.display = (curWs === 'personal' || isAdmin) ? 'inline-flex' : 'none';
+}
+window.updateBulkBar = updateBulkBar;
+
+// ── ÇALIŞMA ALANI / HAVUZ GEÇİŞİ BIND ───────────────────────
+function setupWorkspaceSwitcher() {
+  const tabWsPersonal = document.getElementById('tabWsPersonal');
+  const tabWsPool = document.getElementById('tabWsPool');
+  const poolNotice = document.getElementById('poolNotice');
+
+  if (tabWsPersonal && tabWsPool) {
+    const curWs = FrpStore.getActiveWorkspace ? FrpStore.getActiveWorkspace() : 'personal';
+    tabWsPersonal.classList.toggle('active', curWs === 'personal');
+    tabWsPool.classList.toggle('active', curWs === 'pool');
+    tabWsPool.classList.toggle('pool-active', curWs === 'pool');
+    if (poolNotice) poolNotice.style.display = curWs === 'pool' ? 'block' : 'none';
+
+    tabWsPersonal.onclick = () => {
+      FrpStore.setActiveWorkspace('personal');
+      tabWsPersonal.classList.add('active');
+      tabWsPool.classList.remove('active', 'pool-active');
+      if (poolNotice) poolNotice.style.display = 'none';
+      selectedIds.clear();
+      refreshAll();
+    };
+
+    tabWsPool.onclick = () => {
+      FrpStore.setActiveWorkspace('pool');
+      tabWsPool.classList.add('active', 'pool-active');
+      tabWsPersonal.classList.remove('active');
+      if (poolNotice) poolNotice.style.display = 'block';
+      selectedIds.clear();
+      refreshAll();
+    };
+  }
+
+  // Toplu havuz butonları
+  document.getElementById('btnBulkSharePool')?.addEventListener('click', () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    const count = FrpStore.bulkToggleReportPool(ids, true);
+    toast(`${count} adet rapor Ortak Havuzda Paylaşıldı! 🌐`, 'success');
+    selectedIds.clear();
+    refreshAll();
+  });
+
+  document.getElementById('btnBulkRemovePool')?.addEventListener('click', () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    const count = FrpStore.bulkToggleReportPool(ids, false);
+    toast(`${count} adet rapor havuzdan kaldırıldı 🔒`, 'info');
+    selectedIds.clear();
+    refreshAll();
+  });
+}
+setupWorkspaceSwitcher();
 
 function updateCategorySelect() {
   if (!catSelect) return;
