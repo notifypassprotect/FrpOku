@@ -937,6 +937,21 @@ window.openSettingsModal = function(initialTab = 'appearance') {
       }
     });
 
+    // ── Profil Alanlarını Güvenle Toplama ────────────────────────
+    function captureProfileInputs() {
+      const fName = overlay.querySelector('#profFirstName')?.value;
+      const lName = overlay.querySelector('#profLastName')?.value;
+      const uName = overlay.querySelector('#profUsername')?.value;
+      const phone = overlay.querySelector('#profPhone')?.value;
+      const email = overlay.querySelector('#profEmail')?.value;
+
+      if (fName !== undefined) stagedProfile.firstName = fName.trim();
+      if (lName !== undefined) stagedProfile.lastName = lName.trim();
+      if (uName !== undefined) stagedProfile.username = uName.trim();
+      if (phone !== undefined) stagedProfile.phone = phone.trim();
+      if (email !== undefined) stagedProfile.email = email.trim();
+    }
+
     // Kapatma
     overlay.querySelector('#btnCloseSettingsModal')?.addEventListener('click', () => overlay.remove());
 
@@ -953,7 +968,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
       // E-Posta format kontrolü
       const email = (stagedProfile.email || '').trim().toLowerCase();
       if (email && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}$/.test(email)) {
-        if (typeof window.toast === 'function') window.toast('⚠️ Lütfen geçerli bir e-posta adresi giriniz (Örn: ad.soyad@kurum.com).', 'warning');
+        toast('⚠️ Lütfen geçerli bir e-posta adresi giriniz (Örn: ad.soyad@kurum.com).', 'warning');
         if (saveBtn) {
           saveBtn.disabled = false;
           saveBtn.textContent = '💾 Tüm Değişiklikleri Kaydet';
@@ -963,7 +978,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
 
       // Bulut & Auth Veritabanı ile Senkronizasyon
       const authUser = (typeof window.FrpAuth !== 'undefined' && window.FrpAuth.getUser) ? window.FrpAuth.getUser() : null;
-      if (authUser && authUser.id) {
+      if (authUser && authUser.id && activeTab === 'profile') {
         try {
           const fullName = `${stagedProfile.firstName || ''} ${stagedProfile.lastName || ''}`.trim();
           const res = await fetch('/api/auth/update-profile', {
@@ -980,15 +995,8 @@ window.openSettingsModal = function(initialTab = 'appearance') {
           });
 
           const data = await res.json();
-          if (data.success && data.user) {
+          if (data && data.success && data.user) {
             window.FrpAuth.updateSession(data.user);
-          } else if (!data.success) {
-            if (typeof window.toast === 'function') window.toast(data.reason || 'Profil güncellenemedi.', 'error');
-            if (saveBtn) {
-              saveBtn.disabled = false;
-              saveBtn.textContent = '💾 Tüm Değişiklikleri Kaydet';
-            }
-            return;
           }
         } catch (syncErr) {
           console.warn('Profile sync error:', syncErr.message);
@@ -1000,8 +1008,11 @@ window.openSettingsModal = function(initialTab = 'appearance') {
       if (stagedPrefs.theme) {
         FrpStore.setTheme(stagedPrefs.theme);
       }
+      if (typeof FrpStore.applyPreferences === 'function') {
+        FrpStore.applyPreferences();
+      }
 
-      toast('Tüm ayarlar ve profil bilgileri başarıyla kaydedildi! 💾', 'success');
+      toast('Tüm ayarlar başarıyla kaydedildi! 💾', 'success');
       if (typeof window.refreshAll === 'function') window.refreshAll();
       if (typeof window.updateStats === 'function') window.updateStats();
       if (typeof window._refreshUserTopbarBadge === 'function') window._refreshUserTopbarBadge();
