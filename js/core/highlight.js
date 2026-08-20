@@ -792,6 +792,25 @@ function findSyntaxErrors(code, lang = 'sql') {
     });
   }
 
+  // 5. PascalScript için Noktalı Virgül (;) ve Blok Bütünlüğü Doğrulaması
+  if (lang === 'pascal' && window.FrpSyntaxCheck && typeof window.FrpSyntaxCheck.checkPascalSyntax === 'function') {
+    const pasRes = window.FrpSyntaxCheck.checkPascalSyntax(code);
+    if (pasRes && Array.isArray(pasRes.errors)) {
+      pasRes.errors.forEach(pe => {
+        const lineN = pe.line || 1;
+        if (!errors.some(e => e.line === lineN && (e.message === pe.text || e.token === ';'))) {
+          errors.push({
+            line: lineN,
+            col: 1,
+            token: ';',
+            suggestion: pe.suggestion || "Satır sonuna ';' ekleyin",
+            message: pe.text
+          });
+        }
+      });
+    }
+  }
+
   return errors;
 }
 
