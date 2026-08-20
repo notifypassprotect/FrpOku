@@ -2154,6 +2154,375 @@ function autoSaveDraft() {
   });
 }
 
+// ── GUID KOPYALAMA ──────────────────────────────────────────
+function copyGuidText(guid) {
+  if (!guid) return;
+  if (typeof copyTextToClipboard === 'function') {
+    copyTextToClipboard(guid).then(ok => {
+      if (ok) showToast('GUID panoya kopyalandı! 📋', 'success');
+      else showToast('Kopyalama başarısız oldu.', 'error');
+    });
+  } else {
+    navigator.clipboard?.writeText(guid).then(() => {
+      showToast('GUID panoya kopyalandı! 📋', 'success');
+    });
+  }
+}
+
+// ── SQL PARAMETRE TESTİ & ENJEKSİYONU ─────────────────────────
+async function openParamInjector(queryIndex) {
+  if (!currentFile || !currentFile.queries || !currentFile.queries[queryIndex]) return;
+  const q = currentFile.queries[queryIndex];
+  const rawSql = q.sql;
+  const queryName = q.name;
+
+  function isDateParamName(p) {
+    if (typeof detectParamType === 'function') {
+      return detectParamType(rawSql, p) === 'tarih';
+    }
+    const u = (p || '').replace(/^:/, '').toUpperCase();
+    return u === 'T1' || u === 'T2' || u === 'T3' || u === 'T4' ||
+      u.includes('TARIH') || u.includes('DATE') ||
+      u === 'BASLANGIC' || u === 'BITIS' ||
+      u.includes('BASTARIH') || u.includes('BITTARIH') || u.includes('BAS_TARIH') || u.includes('BIT_TARIH');
+  }
+
+  const params = extractParams(rawSql);
+  const inputsHtml = params.length > 0 ? params.map(p => {
+    const isDate = isDateParamName(p);
+    return `
+      <div style="margin-bottom:.6rem;display:flex;align-items:center;gap:.6rem;background:var(--bg-raised);padding:.5rem .75rem;border-radius:8px;border:1px solid var(--border-light);">
+        <label style="font-family:var(--mono);font-size:.84rem;font-weight:700;color:var(--orange);min-width:110px;">${esc(p)} =</label>
+        ${isDate ? `
+          <input type="date" min="1900-01-01" max="2100-12-31" class="tag-add-input param-input-val" data-param="${esc(p)}" data-is-date="true" style="padding:.3rem .6rem;border-radius:8px;border:1.5px solid var(--border);color:var(--text-primary);background:var(--bg-surface);" />
+          <span style="font-size:.72rem;color:var(--text-muted);font-weight:600;">📅 Takvim Seçimi ('DD.MM.YYYY')</span>
+        ` : `
+          <input type="text" class="tag-add-input param-input-val" data-param="${esc(p)}" placeholder="Değer (ör: 100 veya 'METIN')" style="flex:1;padding:.3rem .6rem;border-radius:8px;border:1.5px solid var(--border);" />
+        `}
+      </div>
+    `;
+  }).join('') : '<div style="font-size:.82rem;color:var(--text-muted);margin-bottom:.5rem;">Bu sorguda <code>:param</code> bulunmamaktadır. Ham SQL doğrudan çalıştırılabilir:</div>';
+
+  const body = `
+    <div style="font-size:.82rem;color:var(--text-muted);margin-bottom:.75rem;">
+      SQL sorgusundaki parametrelere test değerleri girerek DB araçlarında direkt çalıştırılabilir SQL elde edin:
+    </div>
+    ${inputsHtml}
+    <div style="margin-top:.75rem;">
+      <label style="font-size:.75rem;font-weight:700;color:var(--text-muted);">Çalıştırılabilir Ham SQL:</label>
+      <textarea id="paramResultSql" class="note-textarea" style="height:150px;font-family:var(--mono);font-size:.78rem;" readonly>${esc(rawSql)}</textarea>
+    </div>
+    <button class="btn btn-sm btn-primary" id="btnCopyInjectedSql" style="margin-top:.6rem;">📋 Ham SQL'i Kopyala</button>
+  `;
+
+  showModal({
+    title: `⚡ ${esc(queryName)} — SQL Parametre Injector / Testi`,
+    body,
+    confirmText: 'Kapat',
+    maxWidth: '680px'
+  });
+
+  setTimeout(() => {
+    const modalEl = document.querySelector('.modal');
+    if (!modalEl) return;
+    const inputs = modalEl.querySelectorAll('.param-input-val');
+    const resultArea = modalEl.querySelector('#paramResultSql');
+
+    function updateInjected() {
+      let finalSql = rawSql;
+      inputs.forEach(inp => {
+        const p = inp.dataset.param;
+        const val = inp.value.trim();
+        if (val) {
+          let injectedVal = val;
+          if (inp.dataset.isDate === 'true') {
+            if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+              const parts = val.split('-');
+              const yr = parseInt(parts[0], 10);
+              if (yr >= 1900 && yr <= 2100) {
+                injectedVal = `'${parts[2]}.${parts[1]}.${parts[0]}'`;
+              } else {
+                injectedVal = `'GECERSIZ_YIL'`;
+              }
+            } else if (!val.startsWith("'") && !val.endsWith("'")) {
+              injectedVal = `'${val}'`;
+            }
+          }
+          const rx = new RegExp(p + '\\b', 'g');
+          finalSql = finalSql.replace(rx, injectedVal);
+        }
+      });
+      if (resultArea) resultArea.value = finalSql;
+    }
+
+    inputs.forEach(inp => inp.addEventListener('input', updateInjected));
+    inputs.forEach(inp => inp.addEventListener('change', updateInjected));
+
+    const btnCopy = modalEl.querySelector('#btnCopyInjectedSql');
+    if (btnCopy) {
+      btnCopy.addEventListener('click', function () {
+        if (resultArea) {
+          navigator.clipboard.writeText(resultArea.value).then(() => {
+            this.textContent = '✅ Kopyalandı!';
+            setTimeout(() => this.textContent = '📋 Ham SQL\'i Kopyala', 2000);
+            showToast('Ham SQL panoya kopyalandı.', 'success');
+          });
+        }
+      });
+    }
+  }, 100);
+}
+
+// ── DIŞA AKTARMA VE DOKÜMANTASYON ──────────────────────────────
+async function exportReportJson() {
+  if (!currentFile) return;
+  const reportTitle = currentFile.meta?.reportName || currentFile.name;
+
+  const ok = typeof showModal === 'function'
+    ? await showModal({
+        title: '📄 Rapor JSON İndir',
+        body: `<strong>${esc(reportTitle)}</strong> raporuna ait ham JSON verisini indirmek istediğinize emin misiniz?`,
+        confirmText: 'Evet, İndir',
+        cancelText: 'İptal'
+      })
+    : true;
+  if (!ok) return;
+
+  const baseName = currentFile.name.replace(/\.frp$/i, '');
+  let fileName = `${baseName}_rapor.json`;
+
+  const exportData = {
+    app: 'FrpOku',
+    version: 3,
+    exportedAt: new Date().toISOString(),
+    files: [currentFile],
+    snippets: []
+  };
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = fileName;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+  showToast(`'${fileName}' indirildi. 📥`, 'success');
+}
+
+async function exportHtmlDoc() {
+  if (!currentFile) return;
+  const reportTitle = currentFile.meta?.reportName || currentFile.name;
+
+  const ok = typeof showModal === 'function'
+    ? await showModal({
+        title: '🌐 HTML Dokümantasyon Üret',
+        body: `<strong>${esc(reportTitle)}</strong> raporunun tam teknik dokümantasyonunu HTML dosyası olarak indirmek istiyor musunuz?`,
+        confirmText: 'Evet, Üret ve İndir',
+        cancelText: 'İptal'
+      })
+    : true;
+  if (!ok) return;
+
+  const baseName = currentFile.name.replace(/\.frp$/i, '');
+  const fileName = `${baseName}_dokumantasyon.html`;
+
+  const meta = currentFile.meta || {};
+  const queries = currentFile.queries || [];
+
+  const queriesHtml = queries.map((q, idx) => `
+    <div class="card">
+      <h3>🗄️ Sorgu ${idx + 1}: ${esc(q.name)}</h3>
+      <pre class="code-block"><code>${esc(q.sql)}</code></pre>
+    </div>
+  `).join('');
+
+  const htmlContent = `<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>${esc(reportTitle)} — Rapor Dokümantasyonu</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 2rem; line-height: 1.6; }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 { color: #3b82f6; border-bottom: 2px solid #334155; padding-bottom: .5rem; }
+    h2 { color: #60a5fa; margin-top: 1.5rem; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 1.25rem; margin-bottom: 1.25rem; }
+    .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+    .meta-item { background: #0f172a; padding: .75rem; border-radius: 6px; border: 1px solid #334155; }
+    .meta-label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; }
+    .meta-val { font-size: 0.95rem; font-weight: bold; color: #f8fafc; word-break: break-all; }
+    .code-block { background: #090d16; padding: 1rem; border-radius: 6px; overflow-x: auto; color: #38bdf8; font-family: monospace; font-size: 0.85rem; border: 1px solid #1e293b; white-space: pre-wrap; }
+    @media print { body { background: #fff; color: #000; } .card, .meta-item { border-color: #ccc; background: #fff; } .code-block { background: #f5f5f5; color: #000; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📋 ${esc(reportTitle)}</h1>
+    <div class="card">
+      <h2>Metadatalar</h2>
+      <div class="meta-grid">
+        <div class="meta-item"><div class="meta-label">Dosya Adı</div><div class="meta-val">${esc(currentFile.name)}</div></div>
+        <div class="meta-item"><div class="meta-label">GUID</div><div class="meta-val">${esc(meta.guid || '—')}</div></div>
+        <div class="meta-item"><div class="meta-label">Yazar / Kodlayan</div><div class="meta-val">${esc(meta.author || '—')}</div></div>
+        <div class="meta-item"><div class="meta-label">Kategori</div><div class="meta-val">${esc(currentFile.category || '—')}</div></div>
+        ${meta.description ? `<div class="meta-item" style="grid-column:1/-1;"><div class="meta-label">Açıklama</div><div class="meta-val">${esc(meta.description)}</div></div>` : ''}
+      </div>
+    </div>
+
+    ${currentFile.userNote && currentFile.userNote.trim() ? `
+    <div class="card" style="border-left:4px solid #3b82f6;background:rgba(59,130,246,0.06);">
+      <h2 style="color:#60a5fa;margin-top:0;">📝 Kullanıcı Notu</h2>
+      <div style="font-size:0.92rem;color:#e2e8f0;white-space:pre-wrap;line-height:1.6;">${esc(currentFile.userNote.trim())}</div>
+    </div>` : ''}
+
+    ${queries.length > 0 ? `<h2>🗄️ SQL Sorguları (${queries.length} Adet)</h2>${queriesHtml}` : ''}
+
+    ${currentFile.pascalScript ? `
+    <div class="card">
+      <h2>📜 PascalScript</h2>
+      <pre class="code-block"><code>${esc(currentFile.pascalScript)}</code></pre>
+    </div>` : ''}
+  </div>
+</body>
+</html>`;
+
+  const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = fileName;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+  showToast(`'${fileName}' HTML dokümanı başarıyla üretildi. 🌐`, 'success');
+}
+
+async function exportSqlQueryModal(queryIndex) {
+  if (!currentFile || !currentFile.queries || !currentFile.queries[queryIndex]) return;
+  const q = currentFile.queries[queryIndex];
+
+  let chosenFormat = 'sql';
+
+  const body = `
+    <div style="font-size:.9rem;margin-bottom:1rem;color:var(--text-primary);">
+      <strong>${esc(q.name)}</strong> sorgusunu hangi formatta dışa aktarmak istersiniz?
+    </div>
+    <div style="display:flex;gap:1.5rem;margin-bottom:.5rem;">
+      <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;">
+        <input type="radio" name="queryFormatChoice" value="sql" checked />
+        <strong>.SQL</strong> (Veritabanı Dosyası)
+      </label>
+      <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;">
+        <input type="radio" name="queryFormatChoice" value="txt" />
+        <strong>.TXT</strong> (Metin Dosyası)
+      </label>
+    </div>
+  `;
+
+  const ok = typeof showModal === 'function'
+    ? await showModal({
+        title: `📤 ${esc(q.name)} Sorgusunu İndir`,
+        body: body,
+        confirmText: 'İndir',
+        cancelText: 'İptal'
+      })
+    : true;
+
+  if (!ok) return;
+
+  const selectedEl = document.querySelector('input[name="queryFormatChoice"]:checked');
+  if (selectedEl) chosenFormat = selectedEl.value;
+
+  const fileName = `${q.name}.${chosenFormat}`;
+  const blob = new Blob([q.sql || ''], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = fileName;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+
+  showToast(`'${fileName}' başarıyla indirildi. 📥`, 'success');
+}
+
+async function exportFrpOrSqlWithVersion(tabId, queryIndex) {
+  if (!currentFile) return;
+
+  const originalName = currentFile.meta?.reportName || currentFile.name;
+  const baseName = currentFile.name.replace(/\.frp$/i, '');
+
+  const match = baseName.match(/^(.*?)([-_])(\d+)$/);
+  let prefix = baseName;
+  let sep = '-';
+  let currentVerNum = 1;
+  if (match) {
+    prefix = match[1];
+    sep = match[2];
+    currentVerNum = parseInt(match[3], 10) || 1;
+  }
+
+  const suggestedVerNum = currentVerNum + 1;
+  const initialFrpName = `${prefix}${sep}${suggestedVerNum}.frp`;
+
+  const bodyHtml = `
+    <div style="font-size:.85rem;line-height:1.6;margin-bottom:1rem;color:var(--text-secondary);">
+      Mevcut dosya adı: <strong style="color:var(--text-primary);">${esc(originalName)}</strong><br>
+      İndirmeden önce versiyon numarasını (<code>${sep}${currentVerNum}</code> kısmını) belirleyebilirsiniz:
+    </div>
+    <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:1rem;background:var(--bg-raised);padding:.75rem;border-radius:10px;border:1px solid var(--border-light);">
+      <label style="font-weight:700;font-size:.82rem;color:var(--text-primary);white-space:nowrap;">Yeni Versiyon No:</label>
+      <input type="text" id="inputVersionNum" class="tag-add-input" style="width:110px;font-weight:700;font-size:.9rem;text-align:center;color:var(--accent-bright);" value="${suggestedVerNum}" />
+    </div>
+    <div style="font-size:.82rem;background:rgba(59,130,246,.08);padding:.65rem .8rem;border-radius:8px;border:1px solid rgba(59,130,246,.2);margin-bottom:.5rem;">
+      Oluşacak FRP Dosya Adı: <strong id="previewVersionedFilename" style="color:var(--accent-bright);">${esc(initialFrpName)}</strong>
+    </div>
+  `;
+
+  const modalPromise = showModal({
+    title: '📥 Rapor Versiyonu Güncelle & İndir',
+    body: bodyHtml,
+    confirmText: '💾 FRP Olarak İndir',
+    cancelText: 'Vazgeç'
+  });
+
+  let userVersionVal = String(suggestedVerNum);
+
+  setTimeout(() => {
+    const modalEl = document.querySelector('.modal');
+    if (!modalEl) return;
+    const inp = modalEl.querySelector('#inputVersionNum');
+    const preview = modalEl.querySelector('#previewVersionedFilename');
+
+    if (inp && preview) {
+      const updatePreview = () => {
+        const val = inp.value.trim();
+        userVersionVal = val ? val : String(suggestedVerNum);
+        preview.textContent = `${prefix}${sep}${userVersionVal}.frp`;
+      };
+      inp.addEventListener('input', updatePreview);
+      inp.select();
+    }
+  }, 80);
+
+  const confirmed = await modalPromise;
+  if (!confirmed) return;
+
+  const inpVal = userVersionVal || String(suggestedVerNum);
+  const finalFrpName = `${prefix}${sep}${inpVal}.frp`;
+
+  const frpXml = window.buildUpdatedFrpXml ? window.buildUpdatedFrpXml(currentFile, inpVal) : (currentFile.rawXml || '');
+
+  const blob = new Blob([frpXml], { type: 'application/octet-stream;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = finalFrpName;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+
+  FrpStore.updateFileName(currentFile.id, finalFrpName);
+  currentFile.name = finalFrpName;
+  const pSub = document.getElementById('pageSubTitle');
+  if (pSub) pSub.textContent = finalFrpName;
+
+  showToast(`'${finalFrpName}' indirildi ve güncellendi. 📦`, 'success');
+}
+
+// ── GLOBAL EXPORTS ───────────────────────────────────────────
 window.addToSnippetLibrary = addToSnippetLibrary;
 window.copyGuidText = copyGuidText;
 window.formatSqlInTab = formatSqlInTab;
@@ -2162,6 +2531,14 @@ window.changeSqlCaseInTab = changeSqlCaseInTab;
 window.openComplexityModal = openComplexityModal;
 window.checkPascalSyntaxInTab = checkPascalSyntaxInTab;
 window.toggleZenMode = toggleZenMode;
+window.openParamInjector = openParamInjector;
+window.exportReportJson = exportReportJson;
+window.exportHtmlDoc = exportHtmlDoc;
+window.exportSqlQueryModal = exportSqlQueryModal;
+window.exportFrpOrSqlWithVersion = exportFrpOrSqlWithVersion;
+window.removeTagFromDetail = removeTagFromDetail;
+window.openAllSyntaxErrorsModal = openAllSyntaxErrorsModal;
+window.jumpToEditorLine = jumpToEditorLine;
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
