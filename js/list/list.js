@@ -1015,6 +1015,95 @@ async function deleteAllData() {
   refreshAll();
 }
 
+// ── Toplu İşlem Butonları (Favori, Etiket, Kategori, Çöp Kutusu, Seçimi Temizle) ──
+document.getElementById('btnBulkFav')?.addEventListener('click', () => {
+  const ids = Array.from(selectedIds);
+  if (ids.length === 0) return;
+  let count = 0;
+  ids.forEach(id => {
+    const f = FrpStore.getById(id);
+    if (f) {
+      FrpStore.toggleFavorite(id);
+      count++;
+    }
+  });
+  toast(`${count} raporun favori durumu güncellendi ⭐`, 'success');
+  refreshAll();
+});
+
+document.getElementById('btnBulkTag')?.addEventListener('click', async () => {
+  const ids = Array.from(selectedIds);
+  if (ids.length === 0) return;
+  const existingTags = FrpStore.getAllTags ? FrpStore.getAllTags() : [];
+  const datalistOptions = existingTags.map(t => `<option value="${escHtml(t)}">`).join('');
+
+  let enteredTag = '';
+  const ok = await showModal({
+    title: `🏷️ ${ids.length} Rapora Etiket Ekle`,
+    body: `
+      <div style="font-size:.85rem;color:var(--text-secondary);margin-bottom:.8rem;">
+        Seçilen <strong>${ids.length} rapora</strong> eklenecek etiketi yazın veya listeden seçin:
+      </div>
+      <input type="text" id="bulkTagInput" class="master-search-input" list="bulkTagsList" placeholder="Örn: Finans, Acil, 2026..." style="width:100%;font-size:.9rem;" />
+      <datalist id="bulkTagsList">${datalistOptions}</datalist>
+    `,
+    confirmText: '🏷️ Etiketi Ekle',
+    cancelText: 'İptal',
+    onOpen: (modalEl) => {
+      const inp = modalEl.querySelector('#bulkTagInput');
+      if (inp) {
+        setTimeout(() => inp.focus(), 60);
+        inp.addEventListener('input', () => { enteredTag = inp.value.trim(); });
+      }
+    }
+  });
+  if (!ok) return;
+  const inputEl = document.getElementById('bulkTagInput');
+  const tag = (inputEl ? inputEl.value.trim() : enteredTag);
+  if (!tag) {
+    toast('Lütfen geçerli bir etiket girin.', 'warning');
+    return;
+  }
+  ids.forEach(id => FrpStore.addTag(id, tag));
+  toast(`${ids.length} rapora '${tag}' etiketi eklendi 🏷️`, 'success');
+  refreshAll();
+});
+
+document.getElementById('btnBulkCategory')?.addEventListener('click', async () => {
+  const ids = Array.from(selectedIds);
+  if (ids.length === 0) return;
+  const cats = FrpStore.getCategories ? FrpStore.getCategories() : [];
+  const catOptions = cats.map(c => `<option value="${escHtml(c)}">📁 ${escHtml(c)}</option>`).join('');
+
+  const ok = await showModal({
+    title: `📁 ${ids.length} Rapora Kategori Ata`,
+    body: `
+      <div style="font-size:.85rem;color:var(--text-secondary);margin-bottom:.8rem;">
+        Seçilen <strong>${ids.length} rapora</strong> atanacak kategoriyi seçin:
+      </div>
+      <select id="bulkCategorySelect" class="select-field" style="width:100%;font-size:.88rem;padding:.5rem .75rem;margin-bottom:.6rem;">
+        <option value="">-- Kategori Seçin --</option>
+        ${catOptions}
+      </select>
+      <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.3rem;">Veya Yeni Kategori Yazın:</div>
+      <input type="text" id="bulkNewCategoryInput" class="master-search-input" placeholder="Yeni kategori adı..." style="width:100%;font-size:.88rem;" />
+    `,
+    confirmText: '📁 Kategoriyi Kaydet',
+    cancelText: 'İptal'
+  });
+  if (!ok) return;
+  const sel = document.getElementById('bulkCategorySelect');
+  const inp = document.getElementById('bulkNewCategoryInput');
+  const finalCat = (inp && inp.value.trim()) ? inp.value.trim() : (sel ? sel.value : '');
+  if (!finalCat) {
+    toast('Lütfen bir kategori seçin veya yazın.', 'warning');
+    return;
+  }
+  ids.forEach(id => FrpStore.setCategory(id, finalCat));
+  toast(`${ids.length} raporun kategorisi '${finalCat}' olarak güncellendi 📁`, 'success');
+  refreshAll();
+});
+
 document.getElementById('btnDeleteBulk')?.addEventListener('click', deleteBulk);
 document.getElementById('btnDeleteAllData')?.addEventListener('click', deleteAllData);
 document.getElementById('btnClearSelection')?.addEventListener('click', () => {

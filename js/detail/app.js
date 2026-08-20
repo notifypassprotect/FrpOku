@@ -1063,6 +1063,28 @@ function saveEditMode(tabId) {
   const tabCfg = activeTabs.find(t => t.id === tabId);
   if (!tabCfg) return;
 
+  const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
+  const isOwner = curUser && currentFile.userId === curUser.id;
+  const isAdmin = curUser && curUser.role === 'admin';
+  const isPublic = !!(currentFile.isPublic || currentFile.is_public);
+
+  // Havuzdaki başka bir kullanıcının raporu düzenleniyorsa kişisel alana kopyalayarak kaydet
+  if (isPublic && !isOwner && !isAdmin) {
+    const cloned = FrpStore.cloneReportToPersonal(currentFile.id);
+    if (cloned) {
+      if (tabCfg.type === 'sql') {
+        FrpStore.updateCode(cloned.id, { queryIndex: tabCfg.queryIndex, sql: newCode });
+      } else if (tabCfg.type === 'pascal') {
+        FrpStore.updateCode(cloned.id, { pascalScript: newCode });
+      }
+      showToast('Ortak havuzdaki rapor kişisel alanınıza kopyalanarak kaydedildi! 📋💾', 'success');
+      setTimeout(() => {
+        window.location.href = `detail.html?id=${encodeURIComponent(cloned.id)}`;
+      }, 700);
+      return;
+    }
+  }
+
   if (tabCfg.type === 'sql') {
     FrpStore.updateCode(currentFile.id, { queryIndex: tabCfg.queryIndex, sql: newCode });
     currentFile = FrpStore.getById(currentFile.id);
