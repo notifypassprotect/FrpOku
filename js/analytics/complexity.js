@@ -161,20 +161,112 @@
       });
     }
 
-    // Puanlama Hesabı
-    let score = (totalJoins * 3) + (subqCount * 4) + (unionCount * 3) + (caseCount * 2) + (andOrCount * 0.5) + (paramCount * 1.5) + (cteCount * 2) + (lines * 0.1);
-    score = Math.round(score);
+    // Çok Katmanlı / Ağır Alt Sorgular (Derived Tables / Inline Views in FROM / JOIN)
+    const inlineViewsCount = (cleanSql.match(/\b(?:FROM|JOIN)\s*\(\s*SELECT\b/gi) || []).length;
+    if (inlineViewsCount > 0) {
+      warnings.push({
+        type: 'warning',
+        category: 'inline_views',
+        categoryLabel: 'İç İçe Inline Görünüm',
+        title: `FROM / JOIN İçinde Türetilmiş Alt Sorgu (${inlineViewsCount} Adet Inline View)`,
+        text: `Sorgu gövdesinde ${inlineViewsCount} adet iç içe türetilmiş tablo (Derived Table / Inline View) bulunuyor. Bu durum CBO optimizasyon planını karmaşıklaştırabilir ve TEMP/PGA bellek kullanımını artırabilir.`
+      });
+      recommendations.push({
+        category: 'inline_views',
+        title: 'Inline Alt Sorguları WITH (CTE) İfadesine Taşıyın',
+        desc: 'İç içe alt sorguları WITH tab_adi AS (...) bloğu ile tanımlayarak SQL okunabilirliğini artırın ve optimizer\'ın ara tabloları daha net değerlendirmesini sağlayın.',
+        before: 'FROM (\n  SELECT ...\n) aa LEFT JOIN (\n  SELECT ...\n) kk',
+        after: 'WITH aa AS (\n  SELECT ...\n),\nkk AS (\n  SELECT ...\n)\nSELECT ... FROM aa LEFT JOIN kk ...'
+      });
+    }
 
-    let healthScore = 100 - (warnings.filter(w => w.type === 'danger').length * 20) - (warnings.filter(w => w.type === 'warning').length * 10);
-    healthScore = Math.max(10, Math.min(100, healthScore));
+    // TABLE() Fonksiyonu ile JOIN Bağlantısı
+    const tableFuncMatch = cleanSql.match(/\b(?:FROM|JOIN)\s+TABLE\s*\(\s*([a-zA-Z0-9_\$#.]+)\s*\(/i);
+    if (tableFuncMatch) {
+      const funcName = tableFuncMatch[1];
+      warnings.push({
+        type: 'warning',
+        category: 'table_func',
+        categoryLabel: 'TABLE() Fonksiyonu',
+        title: `TABLE(${funcName}) Pipelined / Fonksiyonel JOIN`,
+        text: `'TABLE(${funcName}(...))' kullanımı veritabanı optimizer'ı (CBO) için kardinalite tahminini zorlaştırabilir. Fonksiyon büyük veri döndürüyorsa sorgu süresi uzayabilir.`
+      });
+      recommendations.push({
+        category: 'table_func',
+        title: 'Fonksiyon Kardinalitesini veya Filtre İndekslerini Doğrulayın',
+        desc: 'Table fonksiyonunun giriş parametrelerinin indekslendiğinden ve mümkünse CARDINALITY hinti kullanıldığından emin olun.',
+        before: tableFuncMatch[0],
+        after: `/*+ CARDINALITY(s 100) */ ${tableFuncMatch[0]}`
+      });
+    }
+
+    // NOT IN Kullanımı (Olası NULL Riski)
+    const notInMatch = cleanSql.match(/\b([a-zA-Z0-9_\$#.]+)\s+NOT\s+IN\s*\(([^\)]+)\)/i);
+    if (notInMatch) {
+      const colName = notInMatch[1];
+      warnings.push({
+        type: 'warning',
+        category: 'not_in',
+        categoryLabel: 'NOT IN Riski',
+        title: `'${colName} NOT IN (...)' Filtresi`,
+        text: `NOT IN listesinde veya alt sorgusunda NULL değer bulunması durumunda SQL hiçbir satır döndürmez (Three-Valued Logic). Ayrıca NOT IN indeks kullanımını kısıtlayabilir.`
+      });
+      recommendations.push({
+        category: 'not_in',
+        title: `'NOT IN' Yerine 'NOT EXISTS' veya Açık IS NOT NULL Kullanın`,
+        desc: 'Null güvenliği ve daha iyi indeks performansı için NOT EXISTS tercih edilir.',
+        before: notInMatch[0],
+        after: `NOT EXISTS (SELECT 1 FROM ... WHERE ...)`
+      });
+    }
+
+    // EXISTS Alt Sorgusu
+    if (existsCount > 0) {
+      warnings.push({
+        type: 'info',
+        category: 'exists',
+        categoryLabel: 'Korelasyonlu EXISTS',
+        title: `Korelasyonlu EXISTS Alt Sorgusu (${existsCount} adet)`,
+        text: `EXISTS ifadesi ana sorgu satırları için hızlı doğrulama sağlar. Bağlantı kolonlarının (örn: depo_id, malzeme_id, tarihi) kompozit B-Tree indeksle desteklendiğinden emin olun.`
+      });
+    }
+
+    // Geniş GROUP BY Listesi
+    const groupByMatch = cleanSql.match(/\bGROUP\s+BY\s+([\s\S]+?)(?:\bORDER\b|\bHAVING\b|$)/i);
+    if (groupByMatch) {
+      const groupCols = groupByMatch[1].split(',').map(c => c.trim()).filter(Boolean);
+      if (groupCols.length >= 6) {
+        warnings.push({
+          type: 'warning',
+          category: 'groupby',
+          categoryLabel: 'Ağır GROUP BY',
+          title: `Geniş GROUP BY Listesi (${groupCols.length} Kolon)`,
+          text: `Sorguda ${groupCols.length} kolon üzerinden gruplama yapılıyor. Bu durum veritabanında yüksek TEMP tablespace ve PGA sıralama belleği tüketebilir.`
+        });
+      }
+    }
+
+    // Puanlama Hesabı (0 - 100)
+    let rawScore = (totalJoins * 3.5) + (subqCount * 5) + (unionCount * 4) + (caseCount * 2) + (andOrCount * 0.4) + (paramCount * 1.5) + (cteCount * 2) + (lines * 0.08);
+    let score = Math.max(0, Math.min(100, Math.round(rawScore)));
+
+    // Sağlık Skoru: Hem yapısal ağırlık hem de riskli anti-pattern cezaları dengeli hesaplanır
+    const structuralDeduction = Math.min(45, Math.round(score * 0.45));
+    const dangerDeduction = warnings.filter(w => w.type === 'danger').length * 15;
+    const warningDeduction = warnings.filter(w => w.type === 'warning').length * 8;
+    let healthScore = Math.max(10, Math.min(100, 100 - structuralDeduction - dangerDeduction - warningDeduction));
 
     let level = 'Basit (Hafif)', color = '#10b981', grade = 'A+';
-    if (score > 60 || healthScore < 50) {
-      level = 'Aşırı Karmaşık (Yüksek Risk)'; color = '#ef4444'; grade = 'D';
-    } else if (score > 35 || healthScore < 75) {
-      level = 'Karmaşık (Orta Risk)'; color = '#f59e0b'; grade = 'B';
-    } else if (score > 15) {
-      level = 'Orta Düzey'; color = '#3b82f6'; grade = 'A';
+    if (healthScore >= 88 && score <= 20) {
+      level = 'Basit (Hafif & Temiz)'; color = '#10b981'; grade = 'A+';
+    } else if (healthScore >= 75 && score <= 40) {
+      level = 'Orta Düzey (İyi)'; color = '#3b82f6'; grade = 'A';
+    } else if (healthScore >= 60 && score <= 65) {
+      level = 'Karmaşık (Orta Yük)'; color = '#f59e0b'; grade = 'B';
+    } else if (healthScore >= 45 && score <= 80) {
+      level = 'Çok Karmaşık (Yüksek Yük)'; color = '#f97316'; grade = 'C';
+    } else {
+      level = 'Aşırı Karmaşık (Kritik Risk)'; color = '#ef4444'; grade = 'D';
     }
 
     return {

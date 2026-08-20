@@ -135,9 +135,12 @@
       errors.push({ text: `Satır ${b.line}: Açılan '[' köşeli parantezi kapatılmamış`, line: b.line });
     }
 
-    // Begin / End Eşleşmesi
+    // Begin / End Eşleşmesi ve Satır Sonu Noktalı Virgül (;) Kontrolü
     let beginCount = 0, endCount = 0;
     const beginStack = [];
+
+    const NON_SEMICOLON_LINE_STARTERS = /^(BEGIN|THEN|ELSE|DO|TRY|EXCEPT|FINALLY|REPEAT|VAR|CONST|TYPE|USES|INTERFACE|IMPLEMENTATION)\b/i;
+    const NON_SEMICOLON_LINE_ENDERS = /(:=|;|,|\(|\+|-\*|\/|\bAND\b|\bOR\b|\bTHEN\b|\bELSE\b|\bDO\b|\bBEGIN\b|\bTRY\b|\bEXCEPT\b|\bFINALLY\b|\bREPEAT\b|\bVAR\b|\bCONST\b|\bTYPE\b)$/i;
 
     strippedLines.forEach((sLine, lIdx) => {
       const lnum = lIdx + 1;
@@ -163,19 +166,64 @@
       eMatches.forEach(() => {
         endCount++;
         if (beginStack.length > 0) beginStack.pop();
-        else errors.push({ text: `Satır ${lnum}: Eşleşmeyen 'end' ifadesi`, line: lnum });
+        else errors.push({ text: `Satır ${lnum}: Eşleşmeyen 'end' ifadesi`, line: lnum, suggestion: "Fazladan 'end' ifadesini kaldırın." });
       });
 
+      // Procedure / Function bildirim sonu kontrolü
       if (/^(PROCEDURE|FUNCTION)\b/i.test(up)) {
         if (!up.endsWith(';') && !up.endsWith('FORWARD;') && !up.endsWith('EXTERNAL;')) {
-          errors.push({ text: `Satır ${lnum}: '${rawTrim.slice(0, 45)}' bildiriminin sonunda ';' eksik`, line: lnum });
+          errors.push({ text: `Satır ${lnum}: '${rawTrim.slice(0, 45)}' bildiriminin sonunda ';' eksik`, line: lnum, suggestion: "Satır sonuna ';' ekleyin." });
         }
+      }
+
+      // Satır Sonu ';' (Noktalı Virgül) Eksikliği Tespiti
+      // Eğer satır bir atama (:=), method çağrısı (qp.open) veya ifade içeriyor ve ';' ile bitmiyorsa
+      // ve bir sonraki dolu satır 'else', 'end', 'until' değilse bu bir sözdizimi hatasıdır.
+      const isStatementCandidate = (
+        !NON_SEMICOLON_LINE_STARTERS.test(up) &&
+        !NON_SEMICOLON_LINE_ENDERS.test(up) &&
+        !up.endsWith('.') &&
+        !up.startsWith('//') &&
+        !up.startsWith('{') &&
+        !up.startsWith('(*')
+      );
+
+      if (isStatementCandidate) {
+        // Sonraki ilk dolu satırı bul
+        let nextNonEmptyTrim = '';
+        for (let nextIdx = lIdx + 1; nextIdx < strippedLines.length; nextIdx++) {
+          const nt = strippedLines[nextIdx].trim();
+          if (nt) {
+            nextNonEmptyTrim = nt.toUpperCase();
+            break;
+          }
+        }
+
+        // Eğer sonraki satır 'ELSE' veya 'END' veya 'UNTIL' değilse ';' zorunludur
+        if (nextNonEmptyTrim && !/^(ELSE|END|UNTIL)\b/i.test(nextNonEmptyTrim)) {
+          errors.push({
+            text: `Satır ${lnum}: İfade sonunda ';' (noktalı virgül) eksik ➔ '${rawTrim}'`,
+            line: lnum,
+            suggestion: `Satır sonuna ';' ekleyin (Ör: ${rawTrim};)`
+          });
+        }
+      }
+
+      // '=' yerine ':=' kontrolü (atama yaparken tek eşittir kullanımı)
+      if (!up.startsWith('IF') && !up.startsWith('WHILE') && !up.startsWith('CONST') && !up.includes('=')) {
+        // ok
+      } else if (!/^(IF|WHILE|UNTIL|CASE|CONST)\b/i.test(up) && !up.includes(':=') && /^[a-zA-Z0-9_\.]+\s*=\s*[^=]/i.test(up)) {
+        warnings.push({
+          text: `Satır ${lnum}: Atama işlemi için '=' yerine ':=' kullanılmalıdır.`,
+          line: lnum,
+          suggestion: "Atama operatörünü ':=' olarak düzeltin."
+        });
       }
     });
 
     if (beginStack.length > 0) {
       const unclosed = beginStack[beginStack.length - 1];
-      errors.push({ text: `Satır ${unclosed.line}: Açılan '${unclosed.type || 'begin'}' bloğu kapatılmamış`, line: unclosed.line });
+      errors.push({ text: `Satır ${unclosed.line}: Açılan '${unclosed.type || 'begin'}' bloğu kapatılmamış`, line: unclosed.line, suggestion: "Bloğu uygun bir 'end;' ile kapatın." });
     }
 
     return { errors, warnings };

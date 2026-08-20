@@ -1468,11 +1468,21 @@ async function init() {
 // ── ORTAK KOD GÜNCELLEME VE RENKLENDİRME YARDIMCISI ────────
 function applyCodeUpdateInTab(tabId, newCode) {
   const panel = document.getElementById(tabId + '_panel');
-  const cfg = panel ? panel._tabCfg : null;
+  const cfg = (panel && panel._tabCfg) || activeTabs.find(t => t.id === tabId);
   if (!cfg) return;
 
   cfg.rawCode = newCode;
-  const viewScroll = document.getElementById(tabId + '_viewscroll');
+
+  // currentFile nesnesini de güncelle
+  if (currentFile) {
+    if (tabId === 'tab_pascal') {
+      currentFile.pascalScript = newCode;
+    } else if (typeof cfg.queryIndex === 'number' && currentFile.queries && currentFile.queries[cfg.queryIndex]) {
+      currentFile.queries[cfg.queryIndex].sql = newCode;
+    }
+  }
+
+  const viewScroll = document.getElementById(tabId + '_viewscroll') || document.querySelector(`#${tabId}_panel .code-scroll`);
   const editArea = document.getElementById(tabId + '_editarea');
 
   if (viewScroll) {
@@ -1492,7 +1502,7 @@ function applyCodeUpdateInTab(tabId, newCode) {
 // ── SQL FORMATTER ENTEGRASYONU ───────────────────────────
 function formatSqlInTab(tabId) {
   const panel = document.getElementById(tabId + '_panel');
-  const cfg = panel ? panel._tabCfg : null;
+  const cfg = (panel && panel._tabCfg) || activeTabs.find(t => t.id === tabId);
   if (!cfg) return;
 
   const editWrap = document.getElementById(tabId + '_editorwrap');
@@ -1519,7 +1529,7 @@ function formatSqlInTab(tabId) {
 // ── SQL MINIFIER (TEK SATIRA İNDİRME - TOGGLE DESTEKLİ) ───
 function minifySqlInTab(tabId) {
   const panel = document.getElementById(tabId + '_panel');
-  const cfg = panel ? panel._tabCfg : null;
+  const cfg = (panel && panel._tabCfg) || activeTabs.find(t => t.id === tabId);
   if (!cfg) return;
 
   const editWrap = document.getElementById(tabId + '_editorwrap');
@@ -1553,7 +1563,7 @@ function minifySqlInTab(tabId) {
 // ── SQL HARF BÜYÜKLÜĞÜ DÖNÜŞTÜRÜCÜ (TOGGLE DESTEKLİ) ─────
 function changeSqlCaseInTab(tabId, mode = 'upper') {
   const panel = document.getElementById(tabId + '_panel');
-  const cfg = panel ? panel._tabCfg : null;
+  const cfg = (panel && panel._tabCfg) || activeTabs.find(t => t.id === tabId);
   if (!cfg) return;
 
   const editWrap = document.getElementById(tabId + '_editorwrap');
@@ -1569,7 +1579,16 @@ function changeSqlCaseInTab(tabId, mode = 'upper') {
     showToast('SQL harf biçimlendirmesi sıfırlandı ↩️', 'info');
   } else {
     cfg._originalCode = currentCode;
-    const SQL_KW = ['SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'NOT', 'IN', 'ON', 'JOIN', 'LEFT', 'RIGHT', 'INNER', 'OUTER', 'FULL', 'CROSS', 'UNION', 'ALL', 'DISTINCT', 'AS', 'WITH', 'GROUP', 'BY', 'ORDER', 'HAVING', 'LIMIT', 'OFFSET', 'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE', 'CREATE', 'TABLE', 'DROP', 'ALTER', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'IS', 'NULL', 'BETWEEN', 'LIKE', 'EXISTS'];
+    const SQL_KW = [
+      'SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'NOT', 'IN', 'ON', 'JOIN', 'LEFT', 'RIGHT',
+      'INNER', 'OUTER', 'FULL', 'CROSS', 'UNION', 'ALL', 'DISTINCT', 'AS', 'WITH',
+      'GROUP', 'BY', 'ORDER', 'HAVING', 'LIMIT', 'OFFSET', 'INSERT', 'INTO', 'VALUES',
+      'UPDATE', 'SET', 'DELETE', 'CREATE', 'TABLE', 'DROP', 'ALTER', 'CASE', 'WHEN',
+      'THEN', 'ELSE', 'END', 'IS', 'NULL', 'BETWEEN', 'LIKE', 'EXISTS', 'COALESCE',
+      'NVL', 'AVG', 'SUM', 'COUNT', 'MIN', 'MAX', 'TRUNC', 'SYSDATE', 'TO_DATE',
+      'TO_CHAR', 'SUBSTR', 'ROUND', 'ROWNUM', 'REPLACE', 'LPAD', 'RPAD', 'TRIM',
+      'INSTR', 'ASC', 'DESC', 'OVER', 'PARTITION', 'FETCH', 'FIRST', 'ROWS', 'ONLY'
+    ];
     let res = currentCode;
 
     SQL_KW.forEach(kw => {
