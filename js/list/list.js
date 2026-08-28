@@ -249,6 +249,25 @@ async function handleFiles(fileList) {
       if (window.FrpNotify) window.FrpNotify.success(`${added} rapor başarıyla sisteme aktarıldı.`, 'Yükleme Tamamlandı');
       else toast(`📋 ${added} rapor başarıyla yüklendi.`, 'success');
     }
+    // ── AUDİT LOGU ───────────────────────────────────────────────
+    if (window.FrpAudit) {
+      const fileNames = resultsToSave.slice(0, 5).map(r => r.fileName).join(', ');
+      const moreText = resultsToSave.length > 5 ? ` ve ${resultsToSave.length - 5} dosya daha` : '';
+      if (added > 0) {
+        window.FrpAudit.logAction({
+          action: 'REPORT_UPLOAD',
+          target: added === 1 ? (resultsToSave[0]?.fileName || 'Rapor') : `${added} Rapor`,
+          details: `${added} yeni rapor sisteme yüklendi: ${fileNames}${moreText}`
+        });
+      }
+      if (updated > 0) {
+        window.FrpAudit.logAction({
+          action: 'REPORT_UPDATE',
+          target: updated === 1 ? (resultsToSave[0]?.fileName || 'Rapor') : `${updated} Rapor`,
+          details: `${updated} mevcut rapor güncellendi: ${fileNames}${moreText}`
+        });
+      }
+    }
   }
 
   if (errorDetails.length > 0) {
@@ -266,6 +285,14 @@ async function handleFiles(fileList) {
         cancelText: ''
       });
     }
+  }
+
+  if (window.FrpAudit && errorDetails.length > 0) {
+    window.FrpAudit.logAction({
+      action: 'REPORT_UPLOAD_ERROR',
+      target: `${errorDetails.length} Dosya`,
+      details: `${errorDetails.length} dosya yüklenemedi: ${errorDetails[0].name}: ${errorDetails[0].error}`
+    });
   }
 
   refreshAll();
@@ -1322,6 +1349,13 @@ async function deleteSingle(id, name) {
   if (selectAllCb) selectAllCb.checked = false;
   if (typeof updateBulkBar === 'function') updateBulkBar();
   toast('Rapor Çöp Kutusu\'na taşındı 🗑️ (Ayarlar\'dan geri alabilirsiniz)', 'info');
+  if (window.FrpAudit) {
+    window.FrpAudit.logAction({
+      action: 'REPORT_DELETE',
+      target: name || id,
+      details: `Rapor Çöp Kutusu'na taşındı: ${name || id}`
+    });
+  }
   refreshAll();
 }
 
@@ -1363,6 +1397,13 @@ async function deleteAllData() {
   if (selectAllCb) selectAllCb.checked = false;
   if (typeof updateBulkBar === 'function') updateBulkBar();
   toast('Tüm veriler başarıyla temizlendi! 🧹', 'success');
+  if (window.FrpAudit) {
+    window.FrpAudit.logAction({
+      action: 'DATA_RESET',
+      target: 'Tüm Sistem Verileri',
+      details: `Sistemdeki tüm ${count} rapor ve ilgili veriler temizlendi.`
+    });
+  }
   refreshAll();
 }
 

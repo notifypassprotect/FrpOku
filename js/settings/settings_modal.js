@@ -6,14 +6,16 @@
 
 function safeToast(msg, type = 'info') {
   if (typeof window.toast === 'function') {
-    window.safeToast(msg, type);
+    window.toast(msg, type);
   } else if (typeof window.showToast === 'function') {
     window.showToast(msg, type);
+  } else if (window.FrpNotify && typeof window.FrpNotify[type] === 'function') {
+    window.FrpNotify[type](msg);
   } else {
     console.log('[Toast]', type, msg);
   }
 }
-// Use unique name to avoid collision with list.js's global toast function
+window.safeToast = safeToast;
 const _settingsToast = safeToast;
 
 // ── MODERN CAM EFEKTLİ DİYALOG MOTORLARI (SIFIR NATIVE ALERT/CONFIRM) ──
@@ -183,20 +185,26 @@ window.openSettingsModal = function(initialTab = 'appearance') {
       { id: 'categories', icon: '🏷️', label: `Kategoriler & Etiketler` },
       { id: 'columns',    icon: '👁️', label: 'Sütun & Tablo' },
       { id: 'shortcuts',  icon: '⌨️', label: 'Klavye Kısayolları' },
-      { id: 'trash',      icon: '🗑️', label: `Çöp Kutusu (${trashItems.length})` },
-      { id: 'storage',    icon: '💾', label: 'Yedekleme & Depolama' }
+      { id: 'trash',      icon: '🗑️', label: 'Çöp Kutusu', count: trashItems.length, isTrash: true },
+      { id: 'storage',    icon: '💾', label: 'Yedekleme & Depolama' },
+      { id: 'audit',      icon: '📋', label: 'İşlem Geçmişi (Audit)' }
     ];
 
-    if (isAdmin) {
-      tabs.push({ id: 'audit', icon: '📋', label: 'İşlem Geçmişi (Audit Logs)' });
-    }
-
-    const tabButtonsHtml = tabs.map(t => `
-      <button type="button" class="settings-nav-btn ${t.id === activeTab ? 'active' : ''}" data-tab="${t.id}">
-        <span style="font-size:1.05rem;">${t.icon}</span>
-        <span>${t.label}</span>
-      </button>
-    `).join('');
+    const tabButtonsHtml = tabs.map(t => {
+      const isTrashWithItems = t.isTrash && (t.count > 0);
+      const countBadge = t.count !== undefined ? `
+        <span class="badge ${t.count > 0 ? 'badge-red' : 'badge-gray'}" style="margin-left:auto;font-size:.68rem;padding:2px 6px;border-radius:10px;${isTrashWithItems ? 'animation:pulse 2s infinite;' : ''}">
+          ${t.count}
+        </span>
+      ` : '';
+      return `
+        <button type="button" class="settings-nav-btn ${t.id === activeTab ? 'active' : ''} ${isTrashWithItems ? 'trash-has-items' : ''}" data-tab="${t.id}" style="display:flex;align-items:center;width:100%;${isTrashWithItems ? 'border-left:3px solid #ef4444;' : ''}">
+          <span style="font-size:1.05rem;">${t.icon}</span>
+          <span style="flex:1;text-align:left;">${t.label}</span>
+          ${countBadge}
+        </button>
+      `;
+    }).join('');
 
     let tabContentHtml = '';
 
@@ -839,11 +847,20 @@ window.openSettingsModal = function(initialTab = 'appearance') {
             </div>
             <select id="auditActionFilter" class="master-search-input" style="font-size:.82rem;font-weight:700;">
               <option value="">Tüm İşlemler</option>
-              <option value="LOGIN">Giriş Yapma (LOGIN)</option>
-              <option value="USER_UPDATE">Kullanıcı Güncelleme</option>
-              <option value="EMAIL_CHANGE">E-Posta Değişikliği</option>
-              <option value="DELETE">Silme İşlemleri</option>
-              <option value="AUTO_BACKUP">Otomatik Yedekleme</option>
+              <option value="FRP_DOWNLOAD">📥 İndirmeler (FRP_DOWNLOAD)</option>
+              <option value="REPORT_UPLOAD">📤 Yüklemeler (REPORT_UPLOAD)</option>
+              <option value="REPORT_UPDATE">🔄 Güncellemeler (REPORT_UPDATE)</option>
+              <option value="REPORT_DELETE">🗑️ Çöp Kutusuna Taşıma</option>
+              <option value="TRASH_RESTORE">♻️ Çöpten Geri Yükleme</option>
+              <option value="TRASH_PURGE">❌ Kalıcı Silme (TRASH_PURGE)</option>
+              <option value="TRASH_EMPTY">🧹 Çöp Kutusunu Boşaltma</option>
+              <option value="DESIGN_EDIT">🎨 Tasarım Düzenleme</option>
+              <option value="SQL_EDIT">🗄️ SQL Sorgu Düzenleme</option>
+              <option value="PASCAL_EDIT">📜 Pascal Script Düzenleme</option>
+              <option value="LOGIN">🔐 Giriş Yapma (LOGIN)</option>
+              <option value="USER_UPDATE">👤 Profil Güncelleme</option>
+              <option value="EMAIL_CHANGE">✉️ E-Posta Değişikliği</option>
+              <option value="DATA_RESET">🚨 Tüm Verileri Sıfırlama</option>
             </select>
           </div>
 
@@ -1553,6 +1570,18 @@ window.openSettingsModal = function(initialTab = 'appearance') {
           USER_UPDATE: 'badge-purple',
           EMAIL_CHANGE: 'badge-amber',
           DELETE: 'badge-red',
+          REPORT_DELETE: 'badge-red',
+          REPORT_DELETE_BULK: 'badge-red',
+          TRASH_PURGE: 'badge-red',
+          TRASH_EMPTY: 'badge-red',
+          TRASH_RESTORE: 'badge-green',
+          REPORT_UPLOAD: 'badge-green',
+          REPORT_UPDATE: 'badge-blue',
+          FRP_DOWNLOAD: 'badge-purple',
+          DESIGN_EDIT: 'badge-blue',
+          SQL_EDIT: 'badge-purple',
+          PASCAL_EDIT: 'badge-amber',
+          DATA_RESET: 'badge-red',
           REPORT_EDIT: 'badge-blue',
           AUTO_BACKUP: 'badge-green',
           EXPORT: 'badge-blue'
@@ -1574,7 +1603,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
                 <span class="badge ${badgeClass}" style="font-size:.7rem;padding:.2rem .5rem;">${escHtml(l.action || 'INFO')}</span>
               </td>
               <td style="padding:.6rem .8rem;font-weight:600;color:var(--accent);">${escHtml(l.target || '-')}</td>
-              <td style="padding:.6rem .8rem;color:var(--text-secondary);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(l.details || '-')}</td>
+              <td style="padding:.6rem .8rem;color:var(--text-secondary);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(l.details || '')}">${escHtml(l.details || '-')}</td>
               <td style="padding:.6rem .8rem;color:var(--text-muted);font-family:var(--mono);">${escHtml(l.ip || '-')}</td>
             </tr>
           `;
@@ -1622,18 +1651,27 @@ window.openSettingsModal = function(initialTab = 'appearance') {
           container.innerHTML = `<div style="text-align:center;padding:2.5rem;color:var(--text-muted);"><div class="splash-spinner" style="margin-bottom:.5rem;"></div><div>Kayıtlar yükleniyor...</div></div>`;
         }
         try {
-          const res = await fetch('/api/admin/audit-logs?limit=300', {
-            headers: window.FrpAuth ? window.FrpAuth.getAuthHeaders() : {}
-          });
-          const data = await res.json();
-          if (data && data.success && Array.isArray(data.logs)) {
-            loadedLogs = data.logs;
+          if (window.FrpAudit && typeof window.FrpAudit.getLogs === 'function') {
+            loadedLogs = await window.FrpAudit.getLogs();
           } else {
-            loadedLogs = [];
+            const res = await fetch('/api/admin/audit-logs?limit=300', {
+              headers: window.FrpAuth ? window.FrpAuth.getAuthHeaders() : {}
+            });
+            const data = await res.json();
+            if (data && data.success && Array.isArray(data.logs)) {
+              loadedLogs = data.logs;
+            } else {
+              loadedLogs = [];
+            }
           }
         } catch (e) {
           console.warn('Audit logs fetch hatası:', e.message);
-          loadedLogs = [];
+          try {
+            const stored = localStorage.getItem('frp_audit_logs');
+            loadedLogs = stored ? JSON.parse(stored) : [];
+          } catch {
+            loadedLogs = [];
+          }
         }
         filterAndDisplayLogs();
       };

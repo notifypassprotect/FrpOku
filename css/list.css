@@ -309,7 +309,8 @@
 .col-guid       { width: 170px; max-width: 220px; font-family: var(--mono); font-size: 0.72rem; white-space: nowrap; letter-spacing: -0.2px; }
 .col-tags       { max-width: 220px; font-family: var(--font); font-size: 0.78rem; }
 .col-queries    { width: 90px; text-align: center; font-family: var(--font); font-size: 0.8rem; white-space: nowrap; }
-.col-date       { width: 140px; font-family: var(--font); font-size: 0.78rem; color: var(--text-muted); white-space: nowrap; text-align: right; }
+.col-date       { width: 140px; font-family: var(--font); font-size: 0.78rem; color: var(--text-muted); white-space: nowrap; text-align: left; }
+.col-lastModified { width: 145px; font-family: var(--font); font-size: 0.78rem; color: var(--text-muted); white-space: nowrap; text-align: left; }
 
 .report-table thead {
   position: sticky;

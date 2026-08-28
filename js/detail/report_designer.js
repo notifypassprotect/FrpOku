@@ -872,9 +872,9 @@
         }).join('');
 
         return `
-          <div class="fr-band-container ${meta.class}" style="min-height:${bHeight}px;">
+          <div class="fr-band-container ${meta.class}" data-band-idx="${bIdx}" data-band-type="${band.type || ''}" data-band-name="${esc(band.name || '')}" style="min-height:${bHeight}px;">
             ${currentMode === 'designer' ? `
-              <div class="fr-band-header">
+              <div class="fr-band-header" data-band-idx="${bIdx}" data-band-type="${band.type || ''}" data-band-name="${esc(band.name || '')}">
                 <div class="fr-band-header-left">
                   <span>${meta.icon}</span>
                   <span>${esc(meta.label)}: ${esc(band.name)}</span>
@@ -885,7 +885,7 @@
                 </div>
               </div>
             ` : ''}
-            <div class="fr-band-body" style="min-height:${bHeight}px; height:${bHeight}px;">
+            <div class="fr-band-body" data-band-idx="${bIdx}" style="min-height:${bHeight}px; height:${bHeight}px;">
               ${componentsHtml}
             </div>
           </div>
@@ -1943,11 +1943,14 @@
       });
 
       // 2. Bantlara (Header, Footer, ReportTitle, MasterData vb.) Tıklama Dinleyicisi
-      containerEl.querySelectorAll('.fr-band-container, .fr-band-header, .fr-vband-box').forEach(bEl => {
+      // ALL band-related elements: container, header, body - both designer and preview mode
+      containerEl.querySelectorAll('.fr-band-container, .fr-band-header, .fr-band-body, .fr-vband-box').forEach(bEl => {
         bEl.addEventListener('click', (e) => {
           if (e.target.closest('.fr-view-item') || e.target.closest('.fr-ctrl-item')) return;
           e.stopPropagation();
-          const bandIdx = parseInt(bEl.dataset.bandIdx, 10);
+          // Resolve band idx: from self or from closest parent container
+          const bandIdx = parseInt(bEl.dataset.bandIdx ?? bEl.closest('[data-band-idx]')?.dataset.bandIdx, 10);
+          if (isNaN(bandIdx)) return;
           const activePage = allPages[activePageIndex];
           if (activePage && activePage.type === 'report' && activePage.data.bands?.[bandIdx]) {
             selectedItem = activePage.data.bands[bandIdx];
@@ -1955,6 +1958,28 @@
           }
         });
       });
+
+      // Also: clicking fr-band-body in preview mode (no fr-band-header rendered)
+      // Delegate from the report page container for preview mode bands
+      const reportPageEl = containerEl.querySelector('#frReportPage');
+      if (reportPageEl) {
+        reportPageEl.addEventListener('click', (e) => {
+          if (e.target.closest('.fr-view-item') || e.target.closest('.fr-ctrl-item')) return;
+          // If click lands on a band container or any of its non-item children
+          const bandContainer = e.target.closest('.fr-band-container');
+          if (bandContainer) {
+            const bandIdx = parseInt(bandContainer.dataset.bandIdx, 10);
+            if (!isNaN(bandIdx)) {
+              e.stopPropagation();
+              const activePage = allPages[activePageIndex];
+              if (activePage && activePage.type === 'report' && activePage.data.bands?.[bandIdx]) {
+                selectedItem = activePage.data.bands[bandIdx];
+                updateSelection();
+              }
+            }
+          }
+        });
+      }
     }
 
     // ── OLAYLARI BAĞLA (EVENT LISTENERS & RESIZING) ───────────
