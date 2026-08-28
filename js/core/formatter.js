@@ -66,51 +66,90 @@
       return `'__LIT_${literals.length - 1}__'`;
     });
 
-    // 3. Boşlukları ve girintileri düzenle
+    // 3. Normalizasyon: Satır sonlarını ve boşlukları tek standarda getir
     s = s.replace(/\r\n/g, '\n').replace(/\t/g, '  ');
-    s = s.replace(/[ \t]+/g, ' ').trim();
+    s = s.replace(/\s+/g, ' ').trim();
 
-    // 4. Ana cümlelerin önüne newline koy
+    // 4. Ana SQL Cümlelerini yeni satıra al
     MAIN_CLAUSES.forEach(clause => {
       const safeClause = typeof escapeRegex === 'function' ? escapeRegex(clause) : clause.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const escaped = safeClause.replace(/ /g, '\\s+');
       const rx = new RegExp('(?<=[\\s,)]|^)(' + escaped + ')(?=[\\s(,]|$)', 'gi');
-      s = s.replace(rx, '\n' + clause);
+      s = s.replace(rx, '\n' + clause.toUpperCase() + ' ');
     });
 
-    if (mode === 'compact') {
-      // ── KOMPAKT FORMAT (Daha Az Satır Sayısı - Kolonlar & Gruplar Yan Yana) ──
-      // WHERE, GROUP BY, ORDER BY, HAVING ana başlıklarını yeni satıra al, kolonları tek satırda tut
-      s = s.replace(/\n(WHERE|HAVING|GROUP\s+BY|ORDER\s+BY|SET|VALUES)\s+/gi, (m, g1) => `\n${g1.toUpperCase()} `);
+    if (mode === 'expanded') {
+      // ── GENİŞLETİLMİŞ FORMAT (Her Sütun ve Koşul Ayrı Satırda) ──
+      const lines = s.split('\n');
+      const resultLines = [];
+
+      lines.forEach(line => {
+        let l = line.trim();
+        if (!l) return;
+
+        const up = l.toUpperCase();
+        if (up.startsWith('SELECT')) {
+          const isDistinct = up.startsWith('SELECT DISTINCT');
+          const prefix = isDistinct ? 'SELECT DISTINCT' : 'SELECT';
+          const selectBody = l.slice(prefix.length).trim();
+          resultLines.push(prefix);
+
+          // SELECT kolonlarını virgülle ayır (fonksiyon/parantez içi virgüller hariç)
+          let curCol = '';
+          let pDepth = 0;
+          for (let i = 0; i < selectBody.length; i++) {
+            const ch = selectBody[i];
+            if (ch === '(') pDepth++;
+            else if (ch === ')') pDepth = Math.max(0, pDepth - 1);
+
+            if (ch === ',' && pDepth === 0) {
+              if (curCol.trim()) resultLines.push('  ' + curCol.trim() + ',');
+              curCol = '';
+              continue;
+            }
+            curCol += ch;
+          }
+          if (curCol.trim()) {
+            resultLines.push('  ' + curCol.trim());
+          }
+          return;
+        }
+
+        if (up.startsWith('WHERE') || up.startsWith('HAVING')) {
+          let whereBody = l;
+          whereBody = whereBody.replace(/\bAND\b(?!\s*\()/gi, '\n  AND');
+          whereBody = whereBody.replace(/\bOR\b(?!\s*\()/gi, '\n  OR');
+          resultLines.push(whereBody);
+          return;
+        }
+
+        // CASE / WHEN / THEN / ELSE / END girintileme
+        l = l.replace(/\bCASE\b/gi, '\n  CASE');
+        l = l.replace(/\bWHEN\b/gi, '\n    WHEN');
+        l = l.replace(/\bTHEN\b/gi, ' THEN');
+        l = l.replace(/\bELSE\b(?!\s*IF)/gi, '\n    ELSE');
+        l = l.replace(/\bEND\b(?!\s*(CASE|IF))/gi, '\n  END');
+
+        resultLines.push(l);
+      });
+
+      s = resultLines.join('\n');
+    } else if (mode === 'compact') {
+      // ── KOMPAKT FORMAT (Daha Az Satır - Kolonlar & Şartlar Yan Yana) ──
       s = s.replace(/\nSELECT\s+/gi, '\nSELECT ');
       s = s.replace(/,\s+/g, ', ');
-      s = s.replace(/\bAND\b(?!\s*\()/gi, '\n  AND');
-      s = s.replace(/\bOR\b(?!\s*\()/gi, '\n  OR');
-    } else {
-      // ── GENİŞLETİLMİŞ FORMAT (Standart - Her Kolon ve Koşul Ayrı Satırda) ──
-      // 5. WHERE / HAVING altında AND/OR'ları girintili yeni satıra al
-      s = s.replace(/\n(WHERE|HAVING)\s/gi, '\nWHERE\n  ');
-      s = s.replace(/\bAND\b(?!\s*\()/gi, '\n  AND');
-      s = s.replace(/\bOR\b(?!\s*\()/gi, '\n  OR');
-
-      // 6. CASE/WHEN/THEN/ELSE/END girintileme
-      s = s.replace(/\bCASE\b/gi, '\n  CASE');
-      s = s.replace(/\bWHEN\b/gi, '\n    WHEN');
-      s = s.replace(/\bTHEN\b/gi, ' THEN');
-      s = s.replace(/\bELSE\b(?!\s*IF)/gi, '\n    ELSE');
-      s = s.replace(/\bEND\b(?!\s*(CASE|IF))/gi, '\n  END');
-
-      // 7. SELECT sütunlarını virgül sonrası yeni satır + girinti
-      s = s.replace(/\nSELECT\s+/gi, '\nSELECT\n  ');
-      s = s.replace(/,(?=[^\n]*\n(FROM|WHERE|GROUP|ORDER|HAVING|LIMIT|UNION|\n))/g, ',\n  ');
+      s = s.replace(/\nWHERE\s+/gi, '\nWHERE ');
+      s = s.replace(/\bAND\b(?!\s*\()/gi, ' AND');
+      s = s.replace(/\bOR\b(?!\s*\()/gi, ' OR');
     }
 
-    // 8. Literal'leri ve Yorumları geri yükle
+    // 5. Literal'leri ve Yorumları geri yükle
     literals.forEach((lit, i) => {
       s = s.replace(`'__LIT_${i}__'`, lit);
     });
 
     comments.forEach((c, i) => {
+      s = s.replace(`\n__LINE_COMMENT_${i}__\n`, '\n' + c + '\n');
       s = s.replace(`__LINE_COMMENT_${i}__`, c);
       s = s.replace(`__BLOCK_COMMENT_${i}__`, c);
     });
@@ -119,7 +158,7 @@
       s = window.convertSqlKeywords(s, 'upper');
     }
 
-    return s.trim();
+    return s.split('\n').filter(l => l.trim().length > 0 || l.includes('--')).join('\n').trim();
   }
 
   /**

@@ -1597,30 +1597,21 @@ function formatSqlInTab(tabId, mode = 'expanded') {
   const editWrap = document.getElementById(tabId + '_editorwrap');
   const editArea = document.getElementById(tabId + '_editarea');
   const isEditing = editWrap ? (editWrap.style.display !== 'none') : (editArea && editArea.style.display !== 'none');
-  const rawSql = isEditing ? editArea.value : cfg.rawCode;
+  const currentCode = isEditing && editArea ? editArea.value : (cfg.rawCode || '');
 
-  // Aynı mod zaten uygulandıysa toggle ile geri al
-  if (cfg._formatApplied && cfg._currentFormatMode === mode) {
-    const restored = cfg._formatOriginalCode != null ? cfg._formatOriginalCode : rawSql;
-    applyCodeUpdateInTab(tabId, restored);
-    cfg._formatApplied = false;
-    cfg._currentFormatMode = null;
-    cfg._formatOriginalCode = null;
-    showToast('SQL orijinal haline döndürüldü ↩️', 'info');
+  if (!currentCode || !currentCode.trim()) {
+    showToast('Biçimlendirilecek SQL kodu bulunamadı.', 'warning');
     return;
   }
 
-  if (!cfg._formatApplied) {
-    cfg._formatOriginalCode = rawSql;
-  }
-
-  const formatted = window.formatSQL ? window.formatSQL(rawSql, { mode }) : rawSql;
+  const formatted = window.formatSQL ? window.formatSQL(currentCode, { mode }) : currentCode;
+  applyCodeUpdateInTab(tabId, formatted);
+  cfg._isMinified = false;
   cfg._formatApplied = true;
   cfg._currentFormatMode = mode;
-  applyCodeUpdateInTab(tabId, formatted);
 
-  const modeLabel = mode === 'compact' ? 'Kompakt (Az Satır) Formatlandı 📄' : 'Standart (Geniş) Formatlandı 🎨';
-  showToast(`${modeLabel} (Tekrar basınca orijinaline döner)`, 'success');
+  const modeLabel = mode === 'compact' ? 'Kompakt Formatlandı (Az Satır) 📄' : 'Standart Formatlandı (Geniş) 🎨';
+  showToast(modeLabel, 'success');
 }
 
 // ── SQL MINIFIER (TEK SATIRA İNDİRME - TOGGLE DESTEKLİ) ───
@@ -2802,7 +2793,78 @@ async function exportFrpOrSqlWithVersion(tabId, queryIndex) {
   showToast(`'${finalFrpName}' indirildi ve güncellendi. 📦`, 'success');
 }
 
+// ── SORGU KÜTÜPHANESİ ENTEGRASYONLARI ────────────────────────
+function addSnippetAsNewQueryToReport(title, sql) {
+  if (!currentFile || !sql) return false;
+  if (!Array.isArray(currentFile.queries)) currentFile.queries = [];
+
+  const baseName = (title || 'q_yeni').replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+  let queryName = baseName;
+  let counter = 1;
+  while (currentFile.queries.some(q => q.name?.toLowerCase() === queryName.toLowerCase())) {
+    queryName = `${baseName}_${counter++}`;
+  }
+
+  const newQuery = {
+    name: queryName,
+    sql: sql,
+    params: (typeof extractParamsFromSql === 'function') ? extractParamsFromSql(sql) : []
+  };
+
+  currentFile.queries.push(newQuery);
+
+  // Kaydet
+  if (window.FrpStore && typeof window.FrpStore.updateReport === 'function') {
+    window.FrpStore.updateReport(currentFile.id, currentFile);
+  }
+
+  // Arayüzü yeniden çiz ve yeni eklenen sekmeye geç
+  const newIndex = currentFile.queries.length - 1;
+  renderViewer(currentFile);
+  const targetTabId = 'tab_sql_' + newIndex;
+  setTimeout(() => switchTab(targetTabId), 50);
+
+  return queryName;
+}
+
+function insertSnippetToActiveEditor(sqlText) {
+  if (!sqlText) return false;
+
+  const activeTabObj = activeTabs.find(t => {
+    const p = document.getElementById(t.id + '_panel');
+    return p && p.classList.contains('active');
+  });
+
+  if (!activeTabObj) return false;
+
+  const tabId = activeTabObj.id;
+  const editWrap = document.getElementById(tabId + '_editorwrap');
+
+  // Düzenleme modunda değilse düzenleme moduna geçir
+  if (!editWrap || editWrap.style.display === 'none') {
+    if (typeof toggleEditMode === 'function') toggleEditMode(tabId);
+  }
+
+  const curEditArea = document.getElementById(tabId + '_editarea');
+  if (curEditArea) {
+    const start = curEditArea.selectionStart || 0;
+    const end = curEditArea.selectionEnd || 0;
+    const val = curEditArea.value || '';
+    const newVal = val.substring(0, start) + sqlText + val.substring(end);
+    applyCodeUpdateInTab(tabId, newVal);
+    curEditArea.selectionStart = start;
+    curEditArea.selectionEnd = start + sqlText.length;
+    curEditArea.focus();
+    return true;
+  } else {
+    applyCodeUpdateInTab(tabId, sqlText);
+    return true;
+  }
+}
+
 // ── GLOBAL EXPORTS ───────────────────────────────────────────
+window.addSnippetAsNewQueryToReport = addSnippetAsNewQueryToReport;
+window.insertSnippetToActiveEditor = insertSnippetToActiveEditor;
 window.addToSnippetLibrary = addToSnippetLibrary;
 window.copyGuidText = copyGuidText;
 window.formatSqlInTab = formatSqlInTab;

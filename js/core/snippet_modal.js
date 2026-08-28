@@ -237,11 +237,12 @@
                   ${sqlPreview}
                 </div>
 
-                <div style="display:flex;justify-content:flex-end;gap:.5rem;margin-top:.15rem;">
-                  ${(onInsert || window.currentFile) ? `
-                    <button type="button" class="btn btn-sm btn-primary btn-insert-snippet" style="padding:.3rem .75rem;font-size:.78rem;" data-id="${s.id}">📥 Editöre Ekle</button>
+                <div style="display:flex;justify-content:flex-end;gap:.5rem;margin-top:.15rem;flex-wrap:wrap;">
+                  ${window.currentFile ? `
+                    <button type="button" class="btn btn-sm btn-primary btn-add-new-query" style="padding:.3rem .75rem;font-size:.78rem;background:linear-gradient(135deg, #059669, #10b981);color:#fff;border:none;font-weight:700;" data-id="${s.id}" title="Bu sorguyu mevcut rapora yeni bir sekme/Dataset olarak ekle">➕ Rapora Yeni Sorgu Ekle</button>
+                    <button type="button" class="btn btn-sm btn-secondary btn-insert-snippet" style="padding:.3rem .75rem;font-size:.78rem;" data-id="${s.id}" title="Açık olan SQL editörüne yapıştır">📥 Aktif Editöre Yapıştır</button>
                   ` : ''}
-                  <button type="button" class="btn btn-sm btn-secondary btn-copy-snippet" style="padding:.3rem .75rem;font-size:.78rem;" data-id="${s.id}">📋 Panoya Kopyala</button>
+                  <button type="button" class="btn btn-sm btn-ghost btn-copy-snippet" style="padding:.3rem .75rem;font-size:.78rem;" data-id="${s.id}">📋 Panoya Kopyala</button>
                 </div>
               </div>
             `;
@@ -260,6 +261,22 @@
             });
           });
 
+          listContainer.querySelectorAll('.btn-add-new-query').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const id = btn.getAttribute('data-id');
+              const item = snippets.find(x => x.id === id);
+              if (!item || !item.sql) return;
+
+              if (window.addSnippetAsNewQueryToReport) {
+                const qName = window.addSnippetAsNewQueryToReport(item.title, item.sql);
+                if (qName) {
+                  toast(`'${item.title || qName}' sorgusu rapora yeni sekme olarak eklendi! ➕`, 'success');
+                  modal.remove();
+                }
+              }
+            });
+          });
+
           listContainer.querySelectorAll('.btn-insert-snippet').forEach(btn => {
             btn.addEventListener('click', () => {
               const id = btn.getAttribute('data-id');
@@ -269,11 +286,13 @@
               if (typeof onInsert === 'function') {
                 onInsert(item.sql);
                 toast('SQL sorgusu editöre aktarıldı. 📥', 'success');
+                modal.remove();
               } else if (window.insertSnippetToActiveEditor && window.insertSnippetToActiveEditor(item.sql)) {
-                toast('SQL sorgusu aktif sekmeye yapıştırıldı. 📥', 'success');
+                toast('SQL sorgusu aktif editöre aktarıldı. 📥', 'success');
+                modal.remove();
               } else {
                 navigator.clipboard.writeText(item.sql).then(() => {
-                  toast('Aktif editör bulunamadı, SQL kopyalandı! 📋', 'info');
+                  toast('SQL panoya kopyalandı! 📋', 'info');
                 });
               }
             });

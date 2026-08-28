@@ -247,16 +247,30 @@
         });
       }
 
-      // Standart Delphi / FastReport anahtar kelimeleri ve yerleşik nesneleri
+      // Standart Delphi / FastReport anahtar kelimeleri ve yerleşik nesneleri (Spesifik görsel sayfa isimleri hariç)
       const PASCAL_BUILTINS = new Set([
-        'REPORT', 'ENGINE', 'SENDER', 'SELF', 'CANVAS', 'DIALOGPAGE', 'PAGE', 'APPLICATION', 'SCREEN',
+        'REPORT', 'ENGINE', 'SENDER', 'SELF', 'CANVAS', 'APPLICATION', 'SCREEN',
         'TRUNC', 'ROUND', 'INTTOSTR', 'STRTOINT', 'FLOATTOSTR', 'STRTOFLOAT', 'FORMATDATETIME',
         'NOW', 'DATE', 'TIME', 'INCMONTH', 'TRIM', 'COPY', 'POS', 'LENGTH', 'UPPERCASE', 'LOWERCASE',
         'SHOWMESSAGE', 'MESSAGEDLG', 'GET', 'SET', 'VARARRAYCREATE', 'VARARRAYOF', 'NULL', 'UNASSIGNED',
         'TRUE', 'FALSE', 'RESULT', 'ITEMS', 'LINES', 'TEXT', 'CAPTION', 'VALUE', 'CLOSE', 'OPEN',
         'TFRXMEMOVIEW', 'TFRXPICTUREVIEW', 'TFRXCHECKLISTBOXCONTROL', 'TFRXDBCHECKLISTBOXCONTROL',
-        'TSTRINGLIST', 'TLIST', 'TOBJECT', 'COMPONENT', 'OWNER'
+        'TSTRINGLIST', 'TLIST', 'TOBJECT', 'COMPONENT', 'OWNER', 'MATH', 'SYSUTILS', 'CLASSES', 'FORMS'
       ]);
+
+      function getLevenshteinDist(s1, s2) {
+        const m = s1.length, n = s2.length;
+        const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+        for (let i = 0; i <= m; i++) dp[i][0] = i;
+        for (let j = 0; j <= n; j++) dp[0][j] = j;
+        for (let i = 1; i <= m; i++) {
+          for (let j = 1; j <= n; j++) {
+            if (s1[i - 1] === s2[j - 1]) dp[i][j] = dp[i - 1][j - 1];
+            else dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+          }
+        }
+        return dp[m][n];
+      }
 
       const seenUnknowns = new Set();
       strippedLines.forEach((sLine, lIdx) => {
@@ -274,12 +288,18 @@
           if (!reportComponentNames.has(upperObj) && !seenUnknowns.has(upperObj)) {
             seenUnknowns.add(upperObj);
 
-            // En yakın eşleşen nesneyi bul (Örn: DBCheckListBox -> DBCheckListBox1)
+            // En yakın eşleşen nesneyi bul (Örn: DBCheckListBox -> DBCheckListBox1, Page -> Page1, DialogPage -> DialogPage1, Typo)
             let closest = '';
+            let minDistance = 999;
             for (const realComp of reportComponentNames) {
               if (realComp.startsWith(upperObj) || upperObj.startsWith(realComp)) {
                 closest = realComp;
                 break;
+              }
+              const dist = getLevenshteinDist(upperObj, realComp);
+              if (dist < minDistance && dist <= 3) {
+                minDistance = dist;
+                closest = realComp;
               }
             }
 
