@@ -1807,7 +1807,7 @@ function renderCurrentView() {
   }
 }
 
-// ── KART GÖRÜNÜMÜ RENDER (TAŞMASIZ & ZENGİNLEŞTİRİLMİŞ) ───
+// ── KART GÖRÜNÜMÜ RENDER (MODÜLER DELEGASYON) ───
 function renderCards(container) {
   const sorted = sortFiles(allFiles);
   resultCount.textContent = sorted.length + ' sonuç';
@@ -1824,122 +1824,20 @@ function renderCards(container) {
 
   renderPaginationControls(totalItems, pageSize);
 
-  if (sorted.length === 0) {
-    container.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--text-muted);font-size:.9rem;">Sonuç bulunamadı.</div>`;
-    return;
+  const targetContainer = container || document.getElementById('reportCardsGrid');
+  if (window.FrpListRenderers && typeof window.FrpListRenderers.renderCards === 'function') {
+    window.FrpListRenderers.renderCards(pagedFiles, targetContainer);
   }
-
-  container.style.display = 'grid';
-  container.style.gridTemplateColumns = 'repeat(auto-fill, minmax(320px, 1fr))';
-  container.style.gap = '1.1rem';
-  container.style.padding = '1rem 0';
-  container.style.boxSizing = 'border-box';
-  container.style.width = '100%';
-
-  container.innerHTML = pagedFiles.map(file => {
-    const reportName = file.meta.reportName || file.name;
-    const date = new Date(file.loadedAt).toLocaleDateString('tr-TR');
-    const size = file.sizeBytes > 1024 ? Math.round(file.sizeBytes / 1024) + ' KB' : file.sizeBytes + ' B';
-    const guidVal = (file.meta && file.meta.guid) ? file.meta.guid : '';
-    const guidBadge = guidVal
-      ? `<span class="badge badge-gray" onclick="event.stopPropagation();copyGuidText('${escHtml(guidVal)}')" title="Tıklayınca GUID kopyalar: ${escHtml(guidVal)}" style="cursor:pointer;font-family:var(--mono);font-size:.68rem;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle;">🔑 ${escHtml(guidVal)}</span>`
-      : '';
-
-    const oName = file.ownerName || file.owner_name || (file.userId === 'usr_admin_root' ? 'Admin' : 'Sistem');
-    const oDept = file.ownerDepartment || file.owner_department || '';
-    const ownerChip = `<span class="owner-chip" style="font-size:.72rem;padding:.15rem .5rem;" title="Yükleyen: ${escHtml(oName)}${oDept ? ' · ' + escHtml(oDept) : ''}">👤 ${escHtml(oName)}</span>`;
-
-    const isPublic = !!(file.isPublic || file.is_public);
-    const poolBadge = isPublic ? `<span class="badge badge-pool" style="font-size:.7rem;padding:.12rem .4rem;" title="Ortak Havuzda Paylaşıldı">🌐 Havuzda</span>` : '';
-
-    return `
-      <div class="report-card ${file.isPinned ? 'pinned' : ''}" style="background:var(--bg-surface);border:1.5px solid var(--border-light);border-radius:14px;padding:1.1rem;display:flex;flex-direction:column;gap:.75rem;cursor:pointer;transition:transform .18s ease, box-shadow .18s ease;box-shadow:0 4px 14px rgba(0,0,0,.04);box-sizing:border-box;max-width:100%;overflow:hidden;" onclick="openDetail('${file.id}')">
-        <div class="card-top" style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;">
-          <div style="min-width:0;flex:1;overflow:hidden;">
-            <div class="card-title" style="font-weight:800;font-size:.92rem;color:var(--text-primary);line-height:1.35;word-break:break-word;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;">
-              <span>📋 ${escHtml(reportName)}</span>
-              ${poolBadge}
-            </div>
-            <div style="font-size:.74rem;color:var(--text-muted);font-family:var(--font);margin-top:.25rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;" title="${escHtml(file.name)} · ${size}">
-              📄 ${escHtml(file.name)} · <strong>${size}</strong>
-            </div>
-          </div>
-          <div class="card-actions" onclick="event.stopPropagation();" style="display:flex;align-items:center;gap:.25rem;flex-shrink:0;">
-            <button class="pin-btn ${file.isPinned ? 'active' : ''}" onclick="togglePin(event, '${file.id}')" title="Üste Sabitle" style="background:none;border:none;cursor:pointer;font-size:1rem;opacity:${file.isPinned ? '1' : '0.35'};">📌</button>
-            <button class="star-btn ${file.isFavorite ? 'active' : ''}" onclick="toggleFav(event, '${file.id}')" title="Favori">★</button>
-          </div>
-        </div>
-
-        <div class="card-body" style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;overflow:hidden;">
-          ${ownerChip}
-          <span class="badge badge-blue">🗄️ ${file.queries.length} SQL</span>
-          ${file.pascalScript ? '<span class="badge badge-purple">✓ Pascal</span>' : ''}
-          ${file.category ? `<span class="badge badge-purple" onclick="event.stopPropagation();openCategoryModalFor('${file.id}')" style="cursor:pointer;" title="Kategori: ${escHtml(file.category)}">🏷️ ${escHtml(file.category)}</span>` : `<button class="btn btn-sm" onclick="event.stopPropagation();openCategoryModalFor('${file.id}')" style="font-size:.7rem;padding:1px 6px;border-radius:5px;opacity:.7;">+ Kategori</button>`}
-        </div>
-
-        <div class="card-footer" style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border-light);padding-top:.6rem;font-size:.74rem;color:var(--text-muted);gap:.5rem;overflow:hidden;">
-          ${guidBadge || '<span style="font-size:.72rem;">—</span>'}
-          <span style="white-space:nowrap;flex-shrink:0;">📅 ${date}</span>
-        </div>
-      </div>
-    `;
-  }).join('');
 }
 
-// ── TIMELINE GÖRÜNÜMÜ RENDER ──────────────────────────────
+// ── TIMELINE GÖRÜNÜMÜ RENDER (MODÜLER DELEGASYON) ──
 function renderTimeline(container) {
   const sorted = sortFiles(allFiles);
   resultCount.textContent = sorted.length + ' sonuç';
-
-  if (sorted.length === 0) {
-    container.innerHTML = `<div style="text-align:center;padding:3rem;color:var(--text-muted);">Sonuç bulunamadı.</div>`;
-    return;
+  const targetContainer = container || document.getElementById('reportTimelineContainer');
+  if (window.FrpListRenderers && typeof window.FrpListRenderers.renderTimeline === 'function') {
+    window.FrpListRenderers.renderTimeline(sorted, targetContainer);
   }
-
-  // Yüklenme tarihine göre grupla (Yıl-Ay)
-  const groups = {};
-  sorted.forEach(file => {
-    const d = new Date(file.loadedAt);
-    const key = d.toLocaleString('tr-TR', { month: 'long', year: 'numeric' });
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(file);
-  });
-
-  container.innerHTML = Object.entries(groups).map(([groupTitle, items]) => `
-    <div class="timeline-group">
-      <div class="timeline-group-header">📅 ${groupTitle} (${items.length} rapor)</div>
-      <div class="timeline-items">
-        ${items.map(file => {
-          const reportName = file.meta.reportName || file.name;
-          const timeStr = new Date(file.loadedAt).toLocaleDateString('tr-TR');
-          const guidVal = (file.meta && file.meta.guid) ? file.meta.guid : '—';
-          const oName = file.ownerName || file.owner_name || (file.userId === 'usr_admin_root' ? 'Admin' : 'Sistem');
-          const oDept = file.ownerDepartment || file.owner_department || '';
-          const ownerChip = `<span class="owner-chip" style="font-size:.7rem;padding:.1rem .45rem;" title="Yükleyen: ${escHtml(oName)}${oDept ? ' · ' + escHtml(oDept) : ''}">👤 ${escHtml(oName)}</span>`;
-          const isPublic = !!(file.isPublic || file.is_public);
-          const poolBadge = isPublic ? `<span class="badge badge-pool" style="font-size:.68rem;padding:.1rem .35rem;" title="Ortak Havuzda Paylaşıldı">🌐 Havuzda</span>` : '';
-
-          return `
-            <div class="timeline-item" onclick="openDetail('${file.id}')" style="cursor:pointer;">
-              <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;">
-                <div style="display:flex;align-items:center;gap:.4rem;">
-                  <strong style="font-size:.9rem;color:var(--text-primary);">📋 ${escHtml(reportName)}</strong>
-                  ${poolBadge}
-                </div>
-                <span style="font-size:.75rem;color:var(--text-muted);">${timeStr}</span>
-              </div>
-              <div style="font-size:.76rem;color:var(--text-muted);margin-top:.35rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
-                ${ownerChip}
-                <span>Dosya: <code style="font-family:var(--font);font-size:.76rem;">${escHtml(file.name)}</code></span>
-                <span class="badge badge-gray" style="font-family:var(--mono);font-size:.7rem;">🔑 GUID: ${escHtml(guidVal)}</span>
-                <span class="badge badge-blue" style="font-size:.7rem;">🗄️ ${file.queries.length} SQL</span>
-              </div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    </div>
-  `).join('');
 }
 
 // ── PARAMETRE YÖNETİM PANELİ MODALI (Master-Detail Geniş Konsol) ─────────────────────────

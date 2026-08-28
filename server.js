@@ -18,6 +18,7 @@ if (SUPABASE_URL && SUPABASE_KEY) {
 
 // ── Kullanıcı Veri Yönetimi & Yerel Yedekleme ─────────────────
 const usersJsonPath = path.join(__dirname, 'data', 'users.json');
+const auditLogsJsonPath = path.join(__dirname, 'data', 'audit_logs.json');
 
 function hashPassword(plainText) {
   if (!plainText) return '';
@@ -45,6 +46,52 @@ function saveLocalUsers(users) {
     fs.writeFileSync(usersJsonPath, JSON.stringify(users, null, 2), 'utf8');
   } catch (e) {
     console.warn('Yerel kullanıcı dosyası yazılamadı:', e.message);
+  }
+}
+
+// ── Denetim Günlüğü (Audit Log) Yönetimi ────────────────────────
+function getLocalAuditLogs() {
+  try {
+    if (fs.existsSync(auditLogsJsonPath)) {
+      return JSON.parse(fs.readFileSync(auditLogsJsonPath, 'utf8')) || [];
+    }
+  } catch (e) {
+    console.warn('Audit logs okuma hatası:', e.message);
+  }
+  return [];
+}
+
+function saveLocalAuditLogs(logs) {
+  try {
+    const dataDir = path.dirname(auditLogsJsonPath);
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    fs.writeFileSync(auditLogsJsonPath, JSON.stringify(logs.slice(0, 1000), null, 2), 'utf8');
+  } catch (e) {
+    console.warn('Audit logs yazma hatası:', e.message);
+  }
+}
+
+function recordAuditLog({ userId = 'system', username = 'system', role = 'system', action = 'GENERAL', target = '-', details = '-', ip = '127.0.0.1' } = {}) {
+  try {
+    const cleanIp = (ip || '127.0.0.1').replace(/^::ffff:/, '');
+    const entry = {
+      id: 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      userId,
+      username,
+      role,
+      action,
+      target,
+      details,
+      timestamp: new Date().toISOString(),
+      ip: cleanIp
+    };
+    const logs = getLocalAuditLogs();
+    logs.unshift(entry);
+    saveLocalAuditLogs(logs);
+    return entry;
+  } catch (e) {
+    console.warn('recordAuditLog hatası:', e.message);
+    return null;
   }
 }
 
@@ -918,10 +965,20 @@ app.post('/api/auth/verify-password', async (req, res) => {
 });
 
 // ── 14. DENETİM GÜNLÜĞÜ (AUDIT LOGS) ──────────────────────────
+// ── 14. DENETİM GÜNLÜĞÜ (AUDIT LOGS) & İSTEMCİ IP ───────────────
+app.get('/api/client-ip', (req, res) => {
+  const rawIp = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 
+                req.socket?.remoteAddress || 
+                req.ip || 
+                '127.0.0.1';
+  const cleanIp = rawIp.replace(/^::ffff:/, '');
+  res.json({ success: true, ip: cleanIp || '127.0.0.1' });
+});
+
 app.get('/api/admin/audit-logs', adminRateLimiter, requireAdmin, (req, res) => {
   try {
-    const { q, action, limit = 150 } = req.query;
-    let logs = getAuditLogs();
+    const { q, action, limit = 300 } = req.query;
+    let logs = getLocalAuditLogs();
 
     if (action) {
       logs = logs.filter(l => (l.action || '').toUpperCase() === String(action).toUpperCase());
@@ -938,7 +995,7 @@ app.get('/api/admin/audit-logs', adminRateLimiter, requireAdmin, (req, res) => {
       );
     }
 
-    const lim = Math.min(500, parseInt(limit, 10) || 150);
+    const lim = Math.min(1000, parseInt(limit, 10) || 300);
     res.json({
       success: true,
       total: logs.length,
@@ -951,6 +1008,12 @@ app.get('/api/admin/audit-logs', adminRateLimiter, requireAdmin, (req, res) => {
 
 app.post('/api/audit-log', (req, res) => {
   try {
+    const rawIp = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 
+                  req.socket?.remoteAddress || 
+                  req.ip || 
+                  '127.0.0.1';
+    const cleanIp = rawIp.replace(/^::ffff:/, '');
+
     const { userId, username, fullName, role, action, target, details } = req.body || {};
     const log = recordAuditLog({
       userId,
@@ -960,7 +1023,7 @@ app.post('/api/audit-log', (req, res) => {
       action,
       target,
       details,
-      ip: req.ip || req.connection?.remoteAddress
+      ip: cleanIp
     });
     res.json({ success: true, log });
   } catch (err) {

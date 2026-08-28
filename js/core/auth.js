@@ -1938,9 +1938,26 @@
   });
 
   // ── Global Denetim Günlüğü API (FrpAudit) ────────────────────
+  let cachedClientIp = '127.0.0.1';
+  async function resolveClientIp() {
+    try {
+      const res = await fetch('/api/client-ip');
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.ip) cachedClientIp = data.ip;
+      }
+    } catch {}
+  }
+  resolveClientIp();
+
   window.FrpAudit = {
+    getClientIp() {
+      return cachedClientIp || '127.0.0.1';
+    },
+
     async logAction({ action, target = '', details = '', extra = {} }) {
       const user = getUser();
+      const ip = cachedClientIp || '127.0.0.1';
       const logEntry = {
         id: 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
         userId: user ? user.id : 'guest',
@@ -1950,6 +1967,7 @@
         action: action || 'GENERAL',
         target: target || '',
         details: details || '',
+        ip: ip,
         timestamp: new Date().toISOString(),
         ...extra
       };
@@ -1979,6 +1997,8 @@
     },
 
     async getLogs(filter = {}) {
+      if (cachedClientIp === '127.0.0.1') await resolveClientIp();
+
       let serverLogs = [];
       try {
         const res = await fetch('/api/admin/audit-logs' + (filter.q ? `?q=${encodeURIComponent(filter.q)}` : ''), {
@@ -1996,10 +2016,16 @@
         if (stored) localLogs = JSON.parse(stored) || [];
       } catch (e) {}
 
+      // Local loglarda eksik IP'leri doldur
+      localLogs.forEach(l => {
+        if (!l.ip || l.ip === '-' || l.ip === '') l.ip = cachedClientIp || '127.0.0.1';
+      });
+
       const all = [...serverLogs, ...localLogs];
       const seen = new Set();
       const unique = [];
       for (const l of all) {
+        if (!l.ip || l.ip === '-' || l.ip === '') l.ip = cachedClientIp || '127.0.0.1';
         const key = l.id || `${l.timestamp}_${l.action}_${l.target}`;
         if (!seen.has(key)) {
           seen.add(key);
