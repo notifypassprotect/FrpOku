@@ -82,14 +82,66 @@ async function ensureAdminUser() {
     }
   }
 
-  // Yerel dosyayı da güncelle
   const localUsers = getLocalUsers();
   if (!localUsers.some(u => u.role === 'admin' || u.username === 'admin')) {
     localUsers.unshift(defaultAdmin);
     saveLocalUsers(localUsers);
   }
 }
-ensureAdminUser();
+
+// ── DENETİM GÜNLÜĞÜ (AUDIT LOGS) DEPOLAMA ────────────────────
+const LOGS_FILE = path.join(__dirname, 'data', 'audit_logs.json');
+
+function getAuditLogs() {
+  try {
+    if (!fs.existsSync(LOGS_FILE)) {
+      const dataDir = path.join(__dirname, 'data');
+      if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+      fs.writeFileSync(LOGS_FILE, '[]', 'utf8');
+      return [];
+    }
+    const raw = fs.readFileSync(LOGS_FILE, 'utf8');
+    return JSON.parse(raw);
+  } catch (err) {
+    console.error('Audit logs okuma hatası:', err.message);
+    return [];
+  }
+}
+
+function saveAuditLogs(logs) {
+  try {
+    const dataDir = path.join(__dirname, 'data');
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    const trimmed = Array.isArray(logs) ? logs.slice(0, 5000) : [];
+    fs.writeFileSync(LOGS_FILE, JSON.stringify(trimmed, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Audit logs yazma hatası:', err.message);
+  }
+}
+
+function recordAuditLog({ userId, username, fullName, role, action, target, details, ip }) {
+  try {
+    const logEntry = {
+      id: 'log_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      timestamp: new Date().toISOString(),
+      userId: userId || 'system',
+      username: username || 'misafir',
+      fullName: fullName || '',
+      role: role || 'user',
+      action: action || 'INFO',
+      target: target || '',
+      details: details || '',
+      ip: ip || '127.0.0.1'
+    };
+    const logs = getAuditLogs();
+    logs.unshift(logEntry);
+    saveAuditLogs(logs);
+    return logEntry;
+  } catch (e) {
+    console.warn('Audit log yazılamadı:', e.message);
+    return null;
+  }
+}
 
 app.disable('x-powered-by');
 
@@ -736,6 +788,181 @@ app.post('/api/auth/update-profile', async (req, res) => {
     }
 
     res.json({ success: true, user: updates });
+  } catch (err) {
+    res.status(500).json({ success: false, reason: err.message });
+  }
+});
+
+// ── 11. ADMİN: KULLANICI ADI DEĞİŞTİRME ───────────────────────
+app.post('/api/admin/change-username', adminRateLimiter, requireAdmin, async (req, res) => {
+  const { userId, newUsername } = req.body;
+  const cleanUser = (newUsername || '').trim().toLowerCase();
+
+  if (!userId || !cleanUser) {
+    return res.status(400).json({ success: false, reason: 'Kullanıcı ID ve yeni kullanıcı adı gereklidir.' });
+  }
+
+  try {
+    const localUsers = getLocalUsers();
+    if (localUsers.some(u => u.id !== userId && (u.username || '').toLowerCase() === cleanUser)) {
+      return res.status(400).json({ success: false, reason: `⚠️ '@${cleanUser}' kullanıcı adı zaten başka bir kullanıcı tarafından kullanılıyor.` });
+    }
+
+    if (supabase) {
+      const { data: exist } = await supabase.from('app_users').select('id').eq('username', cleanUser).neq('id', userId).limit(1);
+      if (exist && exist.length > 0) {
+        return res.status(400).json({ success: false, reason: `⚠️ '@${cleanUser}' kullanıcı adı zaten kullanımda.` });
+      }
+      await supabase.from('app_users').update({ username: cleanUser }).eq('id', userId);
+    }
+
+    const idx = localUsers.findIndex(u => u.id === userId);
+    let oldUsername = '';
+    if (idx !== -1) {
+      oldUsername = localUsers[idx].username;
+      localUsers[idx].username = cleanUser;
+      saveLocalUsers(localUsers);
+    }
+
+    recordAuditLog({
+      userId: req.adminUser?.id || 'admin',
+      username: req.adminUser?.username || 'admin',
+      role: 'admin',
+      action: 'USER_UPDATE',
+      target: `@${cleanUser}`,
+      details: `Kullanıcı adı değiştirildi: @${oldUsername} ➔ @${cleanUser}`,
+      ip: req.ip
+    });
+
+    res.json({ success: true, username: cleanUser });
+  } catch (err) {
+    res.status(500).json({ success: false, reason: err.message });
+  }
+});
+
+// ── 12. E-POSTA DEĞİŞTİRME ────────────────────────────────────
+app.post('/api/auth/change-email', async (req, res) => {
+  const { userId, newEmail } = req.body;
+  const cleanEmail = (newEmail || '').trim().toLowerCase();
+
+  if (!userId || !cleanEmail || !EMAIL_REGEX.test(cleanEmail)) {
+    return res.status(400).json({ success: false, reason: 'Geçerli bir e-posta adresi giriniz.' });
+  }
+
+  try {
+    const localUsers = getLocalUsers();
+    if (localUsers.some(u => u.id !== userId && (u.email || '').toLowerCase() === cleanEmail)) {
+      return res.status(400).json({ success: false, reason: `⚠️ '${cleanEmail}' e-posta adresi zaten kullanımda.` });
+    }
+
+    if (supabase) {
+      const { data: exist } = await supabase.from('app_users').select('id').eq('email', cleanEmail).neq('id', userId).limit(1);
+      if (exist && exist.length > 0) {
+        return res.status(400).json({ success: false, reason: `⚠️ '${cleanEmail}' e-posta adresi zaten kullanımda.` });
+      }
+      await supabase.from('app_users').update({ email: cleanEmail }).eq('id', userId);
+    }
+
+    const idx = localUsers.findIndex(u => u.id === userId);
+    if (idx !== -1) {
+      localUsers[idx].email = cleanEmail;
+      saveLocalUsers(localUsers);
+    }
+
+    recordAuditLog({
+      userId,
+      username: localUsers[idx]?.username || 'user',
+      role: localUsers[idx]?.role || 'user',
+      action: 'EMAIL_CHANGE',
+      target: cleanEmail,
+      details: `E-posta adresi güncellendi: ${cleanEmail}`,
+      ip: req.ip
+    });
+
+    res.json({ success: true, email: cleanEmail });
+  } catch (err) {
+    res.status(500).json({ success: false, reason: err.message });
+  }
+});
+
+// ── 13. KRİTİK İŞLEM ÖNCESİ ŞİFRE DOĞRULAMA ──────────────────
+app.post('/api/auth/verify-password', async (req, res) => {
+  const { userId, password } = req.body;
+  if (!userId || !password) {
+    return res.status(400).json({ success: false, reason: 'Kullanıcı ve şifre gereklidir.' });
+  }
+
+  try {
+    let user = null;
+    if (supabase) {
+      const { data } = await supabase.from('app_users').select('password_hash').eq('id', userId).limit(1);
+      if (data && data.length > 0) user = data[0];
+    }
+    if (!user) {
+      user = getLocalUsers().find(u => u.id === userId);
+    }
+
+    if (!user) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
+
+    const pHash = hashPassword(password);
+    const isValid = user.password_hash === pHash || user.password_hash === password;
+
+    if (!isValid) {
+      return res.status(401).json({ success: false, reason: 'Girdiğiniz şifre hatalı!' });
+    }
+
+    res.json({ success: true, verified: true });
+  } catch (err) {
+    res.status(500).json({ success: false, reason: err.message });
+  }
+});
+
+// ── 14. DENETİM GÜNLÜĞÜ (AUDIT LOGS) ──────────────────────────
+app.get('/api/admin/audit-logs', adminRateLimiter, requireAdmin, (req, res) => {
+  try {
+    const { q, action, limit = 150 } = req.query;
+    let logs = getAuditLogs();
+
+    if (action) {
+      logs = logs.filter(l => (l.action || '').toUpperCase() === String(action).toUpperCase());
+    }
+
+    if (q) {
+      const query = String(q).toLowerCase();
+      logs = logs.filter(l => 
+        (l.username || '').toLowerCase().includes(query) ||
+        (l.details || '').toLowerCase().includes(query) ||
+        (l.target || '').toLowerCase().includes(query) ||
+        (l.action || '').toLowerCase().includes(query) ||
+        (l.ip || '').includes(query)
+      );
+    }
+
+    const lim = Math.min(500, parseInt(limit, 10) || 150);
+    res.json({
+      success: true,
+      total: logs.length,
+      logs: logs.slice(0, lim)
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, reason: err.message });
+  }
+});
+
+app.post('/api/audit-log', (req, res) => {
+  try {
+    const { userId, username, fullName, role, action, target, details } = req.body || {};
+    const log = recordAuditLog({
+      userId,
+      username,
+      fullName,
+      role,
+      action,
+      target,
+      details,
+      ip: req.ip || req.connection?.remoteAddress
+    });
+    res.json({ success: true, log });
   } catch (err) {
     res.status(500).json({ success: false, reason: err.message });
   }

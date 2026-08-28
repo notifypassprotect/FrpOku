@@ -229,10 +229,10 @@
             <div class="designer-toolbar-group">
               ${activePage.type === 'report' ? `
                 <div class="designer-mode-toggle">
-                  <button type="button" class="designer-mode-btn ${currentMode === 'designer' ? 'active' : ''}" id="btnModeDesigner" title="Tasarımcı Görünümü (Bantlar &amp; Izgara &amp; Seçim Kutuları)">
+                  <button type="button" class="designer-mode-btn ${currentMode === 'designer' ? 'active' : ''}" id="btnModeDesigner" title="Tasarımcı Görünümü (Bantlar &amp; Izgara &amp; Canlı Düzenleme)">
                     📐 Tasarımcı Modu
                   </button>
-                  <button type="button" class="designer-mode-btn ${currentMode === 'preview' ? 'active' : ''}" id="btnModePreview" title="Baskı Sayfası Önizleme (Temiz Çıktı - Çerçeveler Gizli)">
+                  <button type="button" class="designer-mode-btn ${currentMode === 'preview' ? 'active' : ''}" id="btnModePreview" title="Baskı Sayfası Önizleme (Temiz Çıktı)">
                     👁️ Baskı Önizleme
                   </button>
                 </div>
@@ -242,6 +242,30 @@
                 </span>
               `}
             </div>
+
+            <!-- CANLI BİLEŞEN EKLEME PALETİ (Component Palette) -->
+            ${currentMode === 'designer' ? `
+              <div class="designer-comp-palette">
+                <button type="button" class="designer-palette-btn" id="btnToolAddMemo" title="Yeni Metin / Memo Ekle">
+                  📝 Memo
+                </button>
+                <button type="button" class="designer-palette-btn" id="btnToolAddPicture" title="Yeni Resim / Logo Ekle">
+                  🖼️ Resim
+                </button>
+                <button type="button" class="designer-palette-btn" id="btnToolAddLine" title="Yeni Çizgi Ekle">
+                  ➖ Çizgi
+                </button>
+                <button type="button" class="designer-palette-btn" id="btnToolAddBarcode" title="Yeni Barkod Ekle">
+                  📊 Barkod
+                </button>
+                <button type="button" class="designer-palette-btn" id="btnToolAddCheckbox" title="Yeni CheckBox Ekle">
+                  ☑️ CheckBox
+                </button>
+                <button type="button" class="designer-palette-btn danger" id="btnToolDeleteSelected" title="Seçili Bileşeni Sil (Delete)">
+                  🗑️ Sil
+                </button>
+              </div>
+            ` : ''}
 
             <!-- Zoom & Panel Kontrolleri -->
             <div class="designer-toolbar-group">
@@ -465,6 +489,20 @@
       const finalPageWidth = Math.max(stdPaperWidth, Math.ceil(maxCompRight + 120));
       const finalPageMinHeight = Math.max(stdPaperHeight, totalBandsHeight + 250);
 
+      function renderResizeHandles(isSelected) {
+        if (!isSelected || currentMode !== 'designer') return '';
+        return `
+          <div class="fr-resize-handle fr-resize-nw" data-handle="nw"></div>
+          <div class="fr-resize-handle fr-resize-n" data-handle="n"></div>
+          <div class="fr-resize-handle fr-resize-ne" data-handle="ne"></div>
+          <div class="fr-resize-handle fr-resize-e" data-handle="e"></div>
+          <div class="fr-resize-handle fr-resize-se" data-handle="se"></div>
+          <div class="fr-resize-handle fr-resize-s" data-handle="s"></div>
+          <div class="fr-resize-handle fr-resize-sw" data-handle="sw"></div>
+          <div class="fr-resize-handle fr-resize-w" data-handle="w"></div>
+        `;
+      }
+
       // YALNIZCA Yatay Bantları Yatay Akışta Çiz
       const bandsHtml = horizontalBands.map((band, bIdx) => {
         const meta = BAND_META[band.type] || { label: band.type, icon: '📐', class: 'fr-band-header-type' };
@@ -551,6 +589,7 @@
                 <div style="font-family:'Courier New', monospace; font-size:9px; font-weight:700; color:#000; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%;">
                   ${esc(comp.text || comp.dataField || '*BARKOD*')}
                 </div>
+                ${renderResizeHandles(isSelected)}
               </div>
             `;
           }
@@ -580,6 +619,7 @@
                 <div class="fr-memo-content" style="justify-content:${hAlign}; align-items:${vAlign}; white-space:pre-wrap;">
                   ${esc(comp.text || (comp.dataField ? `[${comp.dataSet ? comp.dataSet + '.' : ''}"${comp.dataField}"]` : ''))}
                 </div>
+                ${renderResizeHandles(isSelected)}
               </div>
             `;
           }
@@ -592,6 +632,7 @@
                    style="left:${comp.left}px; top:${comp.top}px; width:${comp.width}px; height:${comp.height}px;"
                    title="${esc(comp.name)} [${esc(comp.dataField || 'Logo')}]${eventTitle}">
                 🖼️ ${esc(comp.dataField || comp.name)}
+                ${renderResizeHandles(isSelected)}
               </div>
             `;
           }
@@ -602,6 +643,7 @@
               <div class="fr-view-item fr-line-view ${hasEvent ? 'fr-has-event' : ''} ${isSelected ? 'selected' : ''}"
                    data-band-idx="${bIdx}" data-comp-idx="${cIdx}"
                    style="left:${comp.left}px; top:${comp.top}px; width:${comp.width}px; height:${Math.max(1, comp.height)}px; border-top:1px solid ${textColor};">
+                ${renderResizeHandles(isSelected)}
               </div>
             `;
           }
@@ -721,6 +763,7 @@
                 <div style="flex:1;width:100%;position:relative;background:#ffffff;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:6px;">
                   ${chartSvg}
                 </div>
+                ${renderResizeHandles(isSelected)}
               </div>
             `;
           }
@@ -744,6 +787,7 @@
                      box-sizing:border-box;
                    "
                    title="${esc(comp.name)} [${esc(comp.shape || 'Şekil')}]${eventTitle}">
+                ${renderResizeHandles(isSelected)}
               </div>
             `;
           }
@@ -775,6 +819,7 @@
                    style="justify-content:${hAlign}; align-items:${vAlign};">
                 ${esc(comp.text || (comp.dataField ? `[${comp.dataSet ? comp.dataSet + '.' : ''}"${comp.dataField}"]` : ''))}
               </div>
+              ${renderResizeHandles(isSelected)}
             </div>
           `;
         }).join('');
@@ -1203,69 +1248,50 @@
       `;
     }
 
-    // ── NESNE DENETÇİSİ ÖZELLİK TABLOSU (Object Inspector) ─────
+    // ── NESNE DENETÇİSİ ÖZELLİK TABLOSU (Object Inspector - Canlı Düzenlenebilir) ─────
     function renderObjectInspectorProperties(obj) {
-      if (!obj) return '<div style="padding:1rem;color:var(--text-muted);">Seçili bileşen yok.</div>';
+      if (!obj) return '<div style="padding:1rem;color:var(--text-muted);font-size:.78rem;">Seçili bileşen yok.</div>';
 
       let propList = [];
 
       if (inspectorTab === 'events') {
         propList = [
-          { name: 'OnClick', val: obj.onClick || '—' },
-          { name: 'OnBeforePrint', val: obj.onBeforePrint || '—' },
-          { name: 'OnChange', val: obj.onChange || '—' },
-          { name: 'OnAfterPrint', val: obj.onAfterPrint || '—' },
-          { name: 'OnPreviewClick', val: obj.onPreviewClick || '—' },
-          { name: 'OnEnter', val: obj.onEnter || '—' },
-          { name: 'OnExit', val: obj.onExit || '—' },
-          { name: 'OnKeyDown', val: obj.onKeyDown || '—' }
+          { name: 'OnClick', val: obj.onClick || '', propKey: 'onClick', editable: true },
+          { name: 'OnBeforePrint', val: obj.onBeforePrint || '', propKey: 'onBeforePrint', editable: true },
+          { name: 'OnChange', val: obj.onChange || '', propKey: 'onChange', editable: true },
+          { name: 'OnAfterPrint', val: obj.onAfterPrint || '', propKey: 'onAfterPrint', editable: true },
+          { name: 'OnPreviewClick', val: obj.onPreviewClick || '', propKey: 'onPreviewClick', editable: true },
+          { name: 'OnEnter', val: obj.onEnter || '', propKey: 'onEnter', editable: true },
+          { name: 'OnExit', val: obj.onExit || '', propKey: 'onExit', editable: true },
+          { name: 'OnKeyDown', val: obj.onKeyDown || '', propKey: 'onKeyDown', editable: true }
         ];
       } else if (inspectorTab === 'favorites') {
         propList = [
-          { name: 'Name', val: obj.name || '—' },
-          { name: 'Caption / Text', val: obj.caption || obj.text || '—' },
-          { name: 'DataSet', val: obj.dataSet || obj.listSource || '—' },
-          { name: 'DataField', val: obj.dataField || obj.listField || '—' },
-          { name: 'Font.Color', rawVal: obj.fontColor, val: formatDelphiColorName(obj.fontColor), isColor: true },
-          { name: 'Frame.Color', rawVal: obj.frameColor, val: formatDelphiColorName(obj.frameColor), isColor: true },
-          { name: 'OnClick', val: obj.onClick || '—' },
-          { name: 'OnBeforePrint', val: obj.onBeforePrint || '—' },
-          { name: 'Visible', val: obj.visible !== false ? 'True' : 'False' }
+          { name: 'Name', val: obj.name || '', propKey: 'name', editable: true },
+          { name: 'Caption / Text', val: obj.caption || obj.text || '', propKey: 'text', editable: true },
+          { name: 'DataSet', val: obj.dataSet || obj.listSource || '', propKey: 'dataSet', editable: true },
+          { name: 'DataField', val: obj.dataField || obj.listField || '', propKey: 'dataField', editable: true },
+          { name: 'Font.Color', rawVal: obj.fontColor, val: obj.fontColor || '-16777208', propKey: 'fontColor', editable: true },
+          { name: 'Fill.BackColor', rawVal: obj.fillBackColor || obj.color, val: obj.fillBackColor || obj.color || 'clNone', propKey: 'fillBackColor', editable: true },
+          { name: 'Visible', val: obj.visible !== false ? 'true' : 'false', propKey: 'visible', isSelect: true, options: ['true', 'false'] }
         ];
       } else {
-        // Standart Properties Tab (Images 3, 4, 5)
         propList = [
-          { name: 'Name', val: obj.name || '—' },
-          { name: 'Class', val: obj.type || 'TfrxComponent' },
-          { name: 'Left', val: obj.left ?? '0' },
-          { name: 'Top', val: obj.top ?? '0' },
-          { name: 'Width', val: obj.width ?? '0' },
-          { name: 'Height', val: obj.height ?? '0' },
-          { name: 'Caption / Text', val: obj.caption || obj.text || '—' },
-          { name: 'DataSet', val: obj.dataSet || obj.listSource || '—' },
-          { name: 'DataField', val: obj.dataField || obj.listField || '—' },
-          { name: 'DisplayFormat', val: obj.displayFormat || '—' },
-          { name: 'Font.Name', val: obj.fontName || 'Arial' },
-          { name: 'Font.Size', val: obj.fontSize || '10' },
-          { name: 'Font.Color', rawVal: obj.fontColor, val: formatDelphiColorName(obj.fontColor), isColor: true, isText: true },
-          { name: 'Font.Style', val: formatFontStyle(obj.fontStyle) },
-          { name: 'Fill.BackColor', rawVal: (obj.fillBackColor || obj.color), val: formatDelphiColorName(obj.fillBackColor || obj.color), isColor: true },
-          { name: 'Frame.Typ', val: formatFrameType(obj.frameTyp) },
-          { name: 'Frame.Color', rawVal: obj.frameColor, val: formatDelphiColorName(obj.frameColor), isColor: true },
-          { name: 'Frame.Width', val: obj.frameWidth ?? '1' },
-          { name: 'Align', val: obj.align || 'baNone' },
-          { name: 'HAlign', val: obj.hAlign || 'haLeft' },
-          { name: 'VAlign', val: obj.vAlign || 'vaTop' },
-          { name: 'Rotation', val: obj.rotation ?? '0' },
-          { name: 'ShiftMode', val: obj.shiftMode || 'smAlways' },
-          { name: 'StretchMode', val: obj.stretchMode || 'smDontStretch' },
-          { name: 'AllowExpressions', val: obj.allowExpressions !== false ? 'True' : 'False' },
-          { name: 'AutoWidth', val: obj.autoWidth ? 'True' : 'False' },
-          { name: 'OnClick', val: obj.onClick || '—' },
-          { name: 'OnBeforePrint', val: obj.onBeforePrint || '—' },
-          { name: 'Visible', val: obj.visible !== false ? 'True' : 'False' },
-          { name: 'Enabled', val: obj.enabled !== false ? 'True' : 'False' },
-          { name: 'ModalResult', val: obj.modalResult || '0' }
+          { name: 'Name', val: obj.name || '', propKey: 'name', editable: true },
+          { name: 'Class', val: obj.type || 'TfrxComponent', readOnly: true },
+          { name: 'Left', val: obj.left ?? 0, propKey: 'left', isNumber: true, editable: true },
+          { name: 'Top', val: obj.top ?? 0, propKey: 'top', isNumber: true, editable: true },
+          { name: 'Width', val: obj.width ?? 0, propKey: 'width', isNumber: true, editable: true },
+          { name: 'Height', val: obj.height ?? 0, propKey: 'height', isNumber: true, editable: true },
+          { name: 'Caption / Text', val: obj.caption || obj.text || '', propKey: 'text', editable: true },
+          { name: 'DataSet', val: obj.dataSet || obj.listSource || '', propKey: 'dataSet', editable: true },
+          { name: 'DataField', val: obj.dataField || obj.listField || '', propKey: 'dataField', editable: true },
+          { name: 'Font.Name', val: obj.fontName || 'Arial', propKey: 'fontName', isSelect: true, options: ['Arial', 'Segoe UI', 'Tahoma', 'Courier New', 'Times New Roman', 'Consolas', 'Roboto'] },
+          { name: 'Font.Size', val: obj.fontSize || 10, propKey: 'fontSize', isNumber: true, editable: true },
+          { name: 'Font.Color', rawVal: obj.fontColor, val: obj.fontColor || '-16777208', propKey: 'fontColor', editable: true },
+          { name: 'Fill.BackColor', rawVal: (obj.fillBackColor || obj.color), val: obj.fillBackColor || obj.color || 'clNone', propKey: 'fillBackColor', editable: true },
+          { name: 'Visible', val: obj.visible !== false ? 'true' : 'false', propKey: 'visible', isSelect: true, options: ['true', 'false'] },
+          { name: 'Enabled', val: obj.enabled !== false ? 'true' : 'false', propKey: 'enabled', isSelect: true, options: ['true', 'false'] }
         ];
       }
 
@@ -1274,28 +1300,315 @@
         : propList;
 
       return filtered.map(p => {
-        let colorSwatch = '';
-        if (p.isColor || p.name.includes('Color')) {
-          const rawColor = p.rawVal !== undefined ? p.rawVal : p.val;
-          const isText = !!p.isText;
-          const hexCol = decodeDelphiColor(rawColor, !isText);
-          const isTransparent = !rawColor || rawColor === 'clNone' || rawColor === '536870911' || rawColor === '-1';
-
-          if (isTransparent) {
-            colorSwatch = `<span style="display:inline-block;width:12px;height:12px;border-radius:2px;border:1px dashed #94a3b8;background:transparent;margin-right:6px;vertical-align:middle;flex-shrink:0;" title="Şeffaf"></span>`;
-          } else {
-            colorSwatch = `<span style="display:inline-block;width:12px;height:12px;border-radius:2px;border:1px solid rgba(0,0,0,0.35);box-shadow:inset 0 0 0 1px rgba(255,255,255,0.4);background-color:${hexCol};margin-right:6px;vertical-align:middle;flex-shrink:0;" title="${esc(hexCol)}"></span>`;
-          }
+        let inputControl = '';
+        if (p.isSelect) {
+          inputControl = `
+            <select class="designer-prop-select" data-prop="${p.propKey}">
+              ${p.options.map(opt => `<option value="${opt}" ${String(p.val) === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+            </select>
+          `;
+        } else if (p.editable) {
+          const typeAttr = p.isNumber ? 'type="number"' : 'type="text"';
+          inputControl = `
+            <input ${typeAttr} class="designer-prop-input" data-prop="${p.propKey}" value="${esc(String(p.val))}" />
+          `;
+        } else {
+          inputControl = `<span style="font-weight:600;color:#38bdf8;">${esc(String(p.val))}</span>`;
         }
+
         return `
           <div class="designer-prop-row">
             <div class="designer-prop-name" title="${esc(p.name)}">${esc(p.name)}</div>
-            <div class="designer-prop-val" title="${esc(String(p.val))}">
-              <span style="display:flex;align-items:center;">${colorSwatch}${esc(String(p.val))}</span>
+            <div class="designer-prop-val">
+              ${inputControl}
             </div>
           </div>
         `;
       }).join('');
+    }
+
+    // ── CANLI SAHNE YENİLEME (Lightweight Canvas Re-render) ────
+    function renderCanvasOnly() {
+      const vp = containerEl.querySelector('#designerViewport');
+      const activePage = allPages[activePageIndex];
+      if (vp && activePage) {
+        vp.innerHTML = activePage.type === 'report' ? renderReportPageHtml(activePage.data) : renderDialogPageHtml(activePage.data);
+        bindCanvasInteraction();
+      }
+    }
+
+    // ── BİLEŞEN EKLEME METODU ─────────────────────────────────
+    function addNewComponent(type) {
+      const activePage = allPages[activePageIndex];
+      if (!activePage) return;
+
+      const randomId = Math.floor(100 + Math.random() * 900);
+      let newComp = null;
+
+      if (type === 'memo') {
+        newComp = {
+          name: `Memo${randomId}`,
+          type: 'TfrxMemoView',
+          left: 60,
+          top: 30,
+          width: 140,
+          height: 24,
+          text: 'Yeni Rapor Metni',
+          fontName: 'Arial',
+          fontSize: 10,
+          fontColor: '-16777208',
+          fillBackColor: 'clNone'
+        };
+      } else if (type === 'picture') {
+        newComp = {
+          name: `Picture${randomId}`,
+          type: 'TfrxPictureView',
+          left: 60,
+          top: 30,
+          width: 100,
+          height: 60,
+          dataField: 'Logo'
+        };
+      } else if (type === 'line') {
+        newComp = {
+          name: `Line${randomId}`,
+          type: 'TfrxLineView',
+          left: 40,
+          top: 30,
+          width: 250,
+          height: 2,
+          fontColor: '-16777208'
+        };
+      } else if (type === 'barcode') {
+        newComp = {
+          name: `BarCode${randomId}`,
+          type: 'TfrxBarCodeView',
+          left: 60,
+          top: 30,
+          width: 130,
+          height: 45,
+          text: '1234567890',
+          barType: 'bcCode128'
+        };
+      } else if (type === 'checkbox') {
+        newComp = {
+          name: `CheckBox${randomId}`,
+          type: 'TfrxCheckBoxControl',
+          left: 60,
+          top: 30,
+          width: 120,
+          height: 20,
+          caption: 'Seçenek',
+          checked: false
+        };
+      }
+
+      if (!newComp) return;
+
+      if (activePage.type === 'report') {
+        const bands = activePage.data.bands || [];
+        if (bands.length > 0) {
+          if (!bands[0].components) bands[0].components = [];
+          bands[0].components.push(newComp);
+        } else {
+          activePage.data.bands = [{
+            name: 'MasterData1',
+            type: 'TfrxMasterData',
+            left: 0,
+            top: 0,
+            width: 794,
+            height: 100,
+            components: [newComp]
+          }];
+        }
+      } else {
+        if (!activePage.data.controls) activePage.data.controls = [];
+        activePage.data.controls.push(newComp);
+      }
+
+      selectedItem = newComp;
+      render();
+      if (typeof toast === 'function') toast(`'${newComp.name}' eklendi ➕`, 'success');
+      else if (typeof showToast === 'function') showToast(`'${newComp.name}' eklendi ➕`, 'success');
+    }
+
+    // ── BİLEŞEN SİLME METODU ──────────────────────────────────
+    function deleteSelectedComponent() {
+      if (!selectedItem) {
+        if (typeof toast === 'function') toast('Silinecek bir bileşen seçilmedi.', 'info');
+        return;
+      }
+
+      const activePage = allPages[activePageIndex];
+      if (!activePage) return;
+
+      let deleted = false;
+      if (activePage.type === 'report') {
+        (activePage.data.bands || []).forEach(b => {
+          const idx = (b.components || []).findIndex(c => c.name === selectedItem.name);
+          if (idx !== -1) {
+            b.components.splice(idx, 1);
+            deleted = true;
+          }
+        });
+      } else {
+        const idx = (activePage.data.controls || []).findIndex(c => c.name === selectedItem.name);
+        if (idx !== -1) {
+          activePage.data.controls.splice(idx, 1);
+          deleted = true;
+        }
+      }
+
+      if (deleted) {
+        const delName = selectedItem.name;
+        selectedItem = null;
+        render();
+        if (typeof toast === 'function') toast(`'${delName}' silindi 🗑️`, 'info');
+        else if (typeof showToast === 'function') showToast(`'${delName}' silindi 🗑️`, 'info');
+      }
+    }
+
+    // ── SAHNE İÇİ İNTERAKTİF SÜRÜKLE / BOYUTLANDIR / DÜZENLE BAĞLAYICI ──
+    function bindCanvasInteraction() {
+      containerEl.querySelectorAll('.fr-view-item, .fr-ctrl-item').forEach(el => {
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const bandIdx = parseInt(el.dataset.bandIdx, 10);
+          const compIdx = parseInt(el.dataset.compIdx, 10);
+          const rawIdx = el.dataset.ctrlIdx;
+          const activePage = allPages[activePageIndex];
+
+          if (activePage.type === 'report' && activePage.data.bands?.[bandIdx]?.components?.[compIdx]) {
+            selectedItem = activePage.data.bands[bandIdx].components[compIdx];
+            updateSelection();
+          } else if (activePage.type === 'dialog' && rawIdx !== undefined) {
+            if (rawIdx.includes('_')) {
+              const parts = rawIdx.split('_').map(n => parseInt(n, 10));
+              const parentCtrl = activePage.data.controls?.[parts[0]];
+              selectedItem = parentCtrl?.children?.[parts[1]] || parentCtrl;
+            } else {
+              const idx = parseInt(rawIdx, 10);
+              selectedItem = activePage.data.controls?.[idx];
+            }
+            updateSelection();
+          }
+        });
+
+        // Çift Tıklama ile Metin Düzenleme (In-place Text Edit)
+        el.addEventListener('dblclick', (e) => {
+          e.stopPropagation();
+          if (!selectedItem || currentMode !== 'designer') return;
+          const oldText = selectedItem.text || selectedItem.caption || '';
+          const newText = prompt(`"${selectedItem.name}" metnini düzenleyin:`, oldText);
+          if (newText !== null && newText !== oldText) {
+            selectedItem.text = newText;
+            selectedItem.caption = newText;
+            renderCanvasOnly();
+            const propTable = containerEl.querySelector('#propTableBody');
+            if (propTable) {
+              const activePage = allPages[activePageIndex];
+              propTable.innerHTML = renderObjectInspectorProperties(selectedItem || activePage?.data);
+              bindInspectorInputs();
+            }
+          }
+        });
+
+        // Sürükle & Boyutlandır Başlangıcı (MouseDown)
+        el.addEventListener('mousedown', (e) => {
+          if (currentMode !== 'designer' || !selectedItem) return;
+          if (e.target.closest('.designer-prop-input') || e.target.closest('.designer-prop-select')) return;
+
+          const resizeHandle = e.target.closest('.fr-resize-handle');
+          const handleType = resizeHandle ? resizeHandle.dataset.handle : null;
+
+          let isDragging = !handleType;
+          let isResizing = !!handleType;
+
+          const startX = e.clientX;
+          const startY = e.clientY;
+          const startLeft = selectedItem.left || 0;
+          const startTop = selectedItem.top || 0;
+          const startWidth = selectedItem.width || 100;
+          const startHeight = selectedItem.height || 30;
+
+          if (isDragging) el.classList.add('is-dragging');
+
+          const onMouseMove = (moveEvt) => {
+            const dx = Math.round((moveEvt.clientX - startX) / currentZoom);
+            const dy = Math.round((moveEvt.clientY - startY) / currentZoom);
+
+            if (isDragging) {
+              // 4px Izgara Hizalama (Grid Snapping)
+              const snapLeft = Math.round((startLeft + dx) / 4) * 4;
+              const snapTop = Math.round((startTop + dy) / 4) * 4;
+              selectedItem.left = Math.max(0, snapLeft);
+              selectedItem.top = Math.max(0, snapTop);
+              el.style.left = `${selectedItem.left}px`;
+              el.style.top = `${selectedItem.top}px`;
+            } else if (isResizing) {
+              if (handleType.includes('e')) selectedItem.width = Math.max(12, startWidth + dx);
+              if (handleType.includes('s')) selectedItem.height = Math.max(8, startHeight + dy);
+              if (handleType.includes('w')) {
+                const newW = Math.max(12, startWidth - dx);
+                selectedItem.left = startLeft + (startWidth - newW);
+                selectedItem.width = newW;
+                el.style.left = `${selectedItem.left}px`;
+              }
+              if (handleType.includes('n')) {
+                const newH = Math.max(8, startHeight - dy);
+                selectedItem.top = startTop + (startHeight - newH);
+                selectedItem.height = newH;
+                el.style.top = `${selectedItem.top}px`;
+              }
+              el.style.width = `${selectedItem.width}px`;
+              el.style.height = `${selectedItem.height}px`;
+            }
+
+            // Status Bar Güncelle
+            const statusCoords = containerEl.querySelector('#statusCoords');
+            const statusDims = containerEl.querySelector('#statusDims');
+            if (statusCoords) statusCoords.innerHTML = `<span>X: ${selectedItem.left}, Y: ${selectedItem.top}</span>`;
+            if (statusDims) statusDims.innerHTML = `<span>W: ${selectedItem.width}, H: ${selectedItem.height}</span>`;
+          };
+
+          const onMouseUp = () => {
+            el.classList.remove('is-dragging');
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+
+            // Object Inspector'ı Güncelle
+            const propTable = containerEl.querySelector('#propTableBody');
+            if (propTable) {
+              const activePage = allPages[activePageIndex];
+              propTable.innerHTML = renderObjectInspectorProperties(selectedItem || activePage?.data);
+              bindInspectorInputs();
+            }
+          };
+
+          window.addEventListener('mousemove', onMouseMove);
+          window.addEventListener('mouseup', onMouseUp);
+        });
+      });
+    }
+
+    // ── OBJECT INSPECTOR GİRDİLERİ DİNLEYİCİSİ ─────────────────
+    function bindInspectorInputs() {
+      containerEl.querySelectorAll('.designer-prop-input, .designer-prop-select').forEach(inp => {
+        inp.addEventListener('input', (e) => {
+          if (!selectedItem) return;
+          const prop = e.target.dataset.prop;
+          let val = e.target.value;
+          if (['left', 'top', 'width', 'height', 'fontSize'].includes(prop)) {
+            val = parseFloat(val) || 0;
+          } else if (prop === 'visible' || prop === 'enabled') {
+            val = val === 'true';
+          }
+          selectedItem[prop] = val;
+          if (prop === 'text') selectedItem.caption = val;
+          if (prop === 'caption') selectedItem.text = val;
+          renderCanvasOnly();
+        });
+      });
     }
 
     // ── OLAYLARI BAĞLA (EVENT LISTENERS & RESIZING) ───────────
@@ -1325,7 +1638,15 @@
         });
       }
 
-      // 3. Zoom Kontrolleri
+      // 3. Bileşen Paleti Butonları
+      containerEl.querySelector('#btnToolAddMemo')?.addEventListener('click', () => addNewComponent('memo'));
+      containerEl.querySelector('#btnToolAddPicture')?.addEventListener('click', () => addNewComponent('picture'));
+      containerEl.querySelector('#btnToolAddLine')?.addEventListener('click', () => addNewComponent('line'));
+      containerEl.querySelector('#btnToolAddBarcode')?.addEventListener('click', () => addNewComponent('barcode'));
+      containerEl.querySelector('#btnToolAddCheckbox')?.addEventListener('click', () => addNewComponent('checkbox'));
+      containerEl.querySelector('#btnToolDeleteSelected')?.addEventListener('click', deleteSelectedComponent);
+
+      // 4. Zoom Kontrolleri
       containerEl.querySelector('#btnZoomIn')?.addEventListener('click', () => {
         currentZoom = Math.min(2.5, Math.round((currentZoom + 0.15) * 100) / 100);
         updateZoom();
@@ -1345,7 +1666,7 @@
         }
       });
 
-      // 4. Sağ Panel Sekmeleri (Object Inspector vs Data Tree)
+      // 5. Sağ Panel Sekmeleri (Object Inspector vs Data Tree)
       containerEl.querySelector('#btnTabInspector')?.addEventListener('click', () => {
         rightTab = 'inspector';
         showInspector = true;
@@ -1363,7 +1684,7 @@
         if (insp) insp.classList.add('collapsed');
       });
 
-      // 5. Object Inspector Sekmeleri (Properties / Events / Favorites)
+      // 6. Object Inspector Sekmeleri (Properties / Events / Favorites)
       containerEl.querySelectorAll('.designer-subtab').forEach(st => {
         st.addEventListener('click', () => {
           containerEl.querySelectorAll('.designer-subtab').forEach(b => b.classList.remove('active'));
@@ -1373,11 +1694,12 @@
           if (propTable) {
             const activePage = allPages[activePageIndex];
             propTable.innerHTML = renderObjectInspectorProperties(selectedItem || activePage?.data);
+            bindInspectorInputs();
           }
         });
       });
 
-      // 6. Object Inspector Resizing (Sürükleyerek Genişletme/Daraltma)
+      // 7. Object Inspector Resizing
       const resizer = containerEl.querySelector('#inspectorResizer');
       if (resizer && insp) {
         let isResizing = false;
@@ -1411,56 +1733,36 @@
         });
       }
 
-      // 7. Özellik Arama Kutusu
+      // 8. Özellik Arama Kutusu
       containerEl.querySelector('#propSearchInput')?.addEventListener('input', (e) => {
         inspectorSearchQuery = e.target.value || '';
         const propTable = containerEl.querySelector('#propTableBody');
         if (propTable) {
           const activePage = allPages[activePageIndex];
           propTable.innerHTML = renderObjectInspectorProperties(selectedItem || activePage?.data);
+          bindInspectorInputs();
         }
       });
 
-      // 8. Rapor Sayfası Elemanlarına Tıklama (Selection & Inspection)
-      containerEl.querySelectorAll('.fr-view-item').forEach(el => {
-        el.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const bandIdx = parseInt(el.dataset.bandIdx, 10);
-          const compIdx = parseInt(el.dataset.compIdx, 10);
+      // 9. Sahne boşluğuna tıklayınca sayfayı seç
+      containerEl.querySelector('#designerViewport')?.addEventListener('click', (e) => {
+        if (e.target.id === 'designerViewport' || e.target.id === 'frReportPage' || e.target.classList.contains('fr-band-box')) {
           const activePage = allPages[activePageIndex];
-          if (activePage && activePage.data.bands?.[bandIdx]?.components?.[compIdx]) {
-            selectedItem = activePage.data.bands[bandIdx].components[compIdx];
-            updateSelection();
-          }
-        });
+          selectedItem = activePage ? activePage.data : null;
+          updateSelection();
+        }
       });
 
-      // 9. Dialog Form Elemanlarına Tıklama
-      containerEl.querySelectorAll('.fr-ctrl-item').forEach(el => {
-        el.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const rawIdx = el.dataset.ctrlIdx;
-          const activePage = allPages[activePageIndex];
-          if (activePage && rawIdx !== undefined) {
-            if (rawIdx.includes('_')) {
-              const parts = rawIdx.split('_').map(n => parseInt(n, 10));
-              const parentCtrl = activePage.data.controls?.[parts[0]];
-              selectedItem = parentCtrl?.children?.[parts[1]] || parentCtrl;
-            } else {
-              const idx = parseInt(rawIdx, 10);
-              selectedItem = activePage.data.controls?.[idx];
-            }
-            updateSelection();
-          }
-        });
+      // 10. Delete Tuşu ile Seçili Bileşeni Silme
+      window.addEventListener('keydown', (e) => {
+        if ((e.key === 'Delete' || e.key === 'Backspace') && selectedItem) {
+          if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+          deleteSelectedComponent();
+        }
       });
 
-      // Sahne boşluğuna tıklayınca sayfayı seç
-      containerEl.querySelector('#designerViewport')?.addEventListener('click', () => {
-        const activePage = allPages[activePageIndex];
-        selectedItem = activePage ? activePage.data : null;
-        updateSelection();
-      });
+      bindCanvasInteraction();
+      bindInspectorInputs();
     }
 
     function updateZoom() {
@@ -1486,6 +1788,7 @@
       if (propTable) {
         const activePage = allPages[activePageIndex];
         propTable.innerHTML = renderObjectInspectorProperties(selectedItem || activePage?.data);
+        bindInspectorInputs();
       }
 
       // Status Bar Güncellemesi (Image 3)

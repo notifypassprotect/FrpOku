@@ -1541,7 +1541,13 @@ async function init() {
       zenBtn.title = 'Tam Ekran Kod Editörü Odaklanma Modu (Esc ile çıkış)';
       zenBtn.innerHTML = '⛶ Tam Ekran';
       zenBtn.addEventListener('click', toggleZenMode);
-      topbarRight.appendChild(zenBtn);
+      
+      const quickLogout = topbarRight.querySelector('#btnQuickLogout');
+      if (quickLogout) {
+        topbarRight.insertBefore(zenBtn, quickLogout);
+      } else {
+        topbarRight.appendChild(zenBtn);
+      }
     }
 
     // Auto-Save Draft interval
@@ -1905,7 +1911,6 @@ function openComplexityModal(qIdx) {
             </div>
             <div style="display:flex;align-items:center;gap:.4rem;">
               ${w.categoryLabel ? `<span class="badge" style="font-size:.7rem;">${esc(w.categoryLabel)}</span>` : ''}
-              ${rec.after ? `<button type="button" class="btn btn-sm btn-primary" style="font-size:.72rem;padding:.2rem .6rem;" onclick="window.applyDbaSuggestion(${targetIdx}, ${actualRecIdx})">⚡ Editöre Uygula</button>` : ''}
             </div>
           </div>
 
@@ -2740,25 +2745,43 @@ async function exportFrpOrSqlWithVersion(tabId, queryIndex) {
     currentVerNum = parseInt(match[3], 10) || 1;
   }
 
+  const todayDateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const suggestedVerNum = currentVerNum + 1;
   const initialFrpName = `${prefix}${sep}${suggestedVerNum}.frp`;
 
   const bodyHtml = `
-    <div style="font-size:.85rem;line-height:1.6;margin-bottom:1rem;color:var(--text-secondary);">
+    <div style="font-size:.85rem;line-height:1.6;margin-bottom:.85rem;color:var(--text-secondary);">
       Mevcut dosya adı: <strong style="color:var(--text-primary);">${esc(originalName)}</strong><br>
-      İndirmeden önce versiyon numarasını (<code>${sep}${currentVerNum}</code> kısmını) belirleyebilirsiniz:
+      İndirmeden önce versiyon son ekini veya özel revizyon adını belirleyin:
     </div>
+
+    <!-- Hızlı Versiyon Ön Ayarları -->
+    <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.85rem;">
+      <button type="button" class="btn btn-sm btn-ghost btn-ver-preset" data-ver="${suggestedVerNum}" style="font-size:.75rem;padding:.25rem .6rem;background:rgba(37,99,235,0.08);color:#2563eb;font-weight:700;">
+        ➕ +1 Artır (${suggestedVerNum})
+      </button>
+      <button type="button" class="btn btn-sm btn-ghost btn-ver-preset" data-ver="v${suggestedVerNum}" style="font-size:.75rem;padding:.25rem .6rem;background:rgba(16,185,129,0.08);color:#059669;font-weight:700;">
+        🏷️ v${suggestedVerNum}
+      </button>
+      <button type="button" class="btn btn-sm btn-ghost btn-ver-preset" data-ver="${todayDateStr}" style="font-size:.75rem;padding:.25rem .6rem;background:rgba(245,158,11,0.08);color:#d97706;font-weight:700;">
+        📅 Tarih (${todayDateStr})
+      </button>
+      <button type="button" class="btn btn-sm btn-ghost btn-ver-preset" data-ver="rev_${suggestedVerNum}" style="font-size:.75rem;padding:.25rem .6rem;background:rgba(147,51,234,0.08);color:#7e22ce;font-weight:700;">
+        🔖 rev_${suggestedVerNum}
+      </button>
+    </div>
+
     <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:1rem;background:var(--bg-raised);padding:.75rem;border-radius:10px;border:1px solid var(--border-light);">
-      <label style="font-weight:700;font-size:.82rem;color:var(--text-primary);white-space:nowrap;">Yeni Versiyon No:</label>
-      <input type="text" id="inputVersionNum" class="tag-add-input" style="width:110px;font-weight:700;font-size:.9rem;text-align:center;color:var(--accent-bright);" value="${suggestedVerNum}" />
+      <label style="font-weight:700;font-size:.82rem;color:var(--text-primary);white-space:nowrap;">Versiyon / Revizyon Eki:</label>
+      <input type="text" id="inputVersionNum" class="master-search-input" style="flex:1;font-weight:700;font-size:.9rem;color:var(--accent);font-family:var(--mono);" value="${suggestedVerNum}" placeholder="Örn: 2, v2.1, rev3, test" />
     </div>
     <div style="font-size:.82rem;background:rgba(59,130,246,.08);padding:.65rem .8rem;border-radius:8px;border:1px solid rgba(59,130,246,.2);margin-bottom:.5rem;">
-      Oluşacak FRP Dosya Adı: <strong id="previewVersionedFilename" style="color:var(--accent-bright);">${esc(initialFrpName)}</strong>
+      Oluşacak FRP Dosya Adı: <strong id="previewVersionedFilename" style="color:var(--accent);font-family:var(--mono);">${esc(initialFrpName)}</strong>
     </div>
   `;
 
   const modalPromise = showModal({
-    title: '📥 Rapor Versiyonu Güncelle & İndir',
+    title: '📥 Rapor Versiyonu Belirle & İndir',
     body: bodyHtml,
     confirmText: '💾 FRP Olarak İndir',
     cancelText: 'Vazgeç'
@@ -2780,6 +2803,13 @@ async function exportFrpOrSqlWithVersion(tabId, queryIndex) {
       };
       inp.addEventListener('input', updatePreview);
       inp.select();
+
+      modalEl.querySelectorAll('.btn-ver-preset').forEach(b => {
+        b.onclick = () => {
+          inp.value = b.getAttribute('data-ver');
+          updatePreview();
+        };
+      });
     }
   }, 80);
 
@@ -2799,6 +2829,16 @@ async function exportFrpOrSqlWithVersion(tabId, queryIndex) {
   document.body.removeChild(a); URL.revokeObjectURL(url);
 
   FrpStore.updateFileName(currentFile.id, finalFrpName);
+  if (typeof FrpStore.addDownloadHistory === 'function') {
+    FrpStore.addDownloadHistory({
+      reportId: currentFile.id,
+      reportName: currentFile.meta?.reportName || currentFile.name,
+      fileName: finalFrpName,
+      format: 'frp',
+      customVersion: inpVal
+    });
+  }
+
   currentFile.name = finalFrpName;
   const pSub = document.getElementById('pageSubTitle');
   if (pSub) pSub.textContent = finalFrpName;
@@ -2877,21 +2917,53 @@ function insertSnippetToActiveEditor(sqlText) {
 
 function promptAndAddNewQuery() {
   if (!currentFile) return;
+
+  const templates = {
+    basic: "SELECT id, adi, kod, aktif\nFROM tablo\nWHERE aktif = 1\nORDER BY id DESC",
+    join: "SELECT \n  a.id, \n  a.adi, \n  b.miktar,\n  b.birim_fiyat\nFROM ana_tablo a\nLEFT OUTER JOIN detay_tablo b ON b.ana_id = a.id\nWHERE a.tarih >= :BAS_TAR",
+    param: "SELECT * \nFROM musteri \nWHERE (:MUSTERI_ID = 0 OR id = :MUSTERI_ID)\n  AND (:DURUM IS NULL OR durum = :DURUM)",
+    dual: "SELECT 1 AS durum, CURRENT_TIMESTAMP AS suanki_zaman FROM dual"
+  };
+
   showModal({
-    title: '➕ Rapora Yeni SQL Sorgusu Ekle',
+    title: '➕ Rapora Yeni SQL Sorgusu (Dataset) Ekle',
     body: `
-      <div style="display:flex;flex-direction:column;gap:.85rem;">
-        <div>
-          <label style="display:block;font-size:.78rem;font-weight:700;margin-bottom:.35rem;color:var(--text-secondary);">Sorgu / Dataset Adı (SQL Query Name):</label>
-          <input type="text" id="inpNewQueryName" class="form-input" value="q_yeni" style="width:100%;font-family:var(--mono);font-size:.85rem;padding:.45rem .65rem;border-radius:6px;background:var(--bg-base);border:1px solid var(--border-light);color:var(--text-primary);" placeholder="Örn: qdepo, qfatura, qozet" />
+      <div style="display:flex;flex-direction:column;gap:1rem;">
+        <div style="font-size:.8rem;color:var(--text-muted);line-height:1.45;">
+          Bu rapora yeni bir SQL dataseti ekleyin. Eklenen sorgu raporun XML yapısına dahil edilir ve anında düzenlenebilir.
         </div>
+
         <div>
-          <label style="display:block;font-size:.78rem;font-weight:700;margin-bottom:.35rem;color:var(--text-secondary);">Başlangıç SQL Kodu:</label>
-          <textarea id="inpNewQuerySql" class="form-input" style="width:100%;height:140px;font-family:var(--mono);font-size:.82rem;line-height:1.45;padding:.5rem .65rem;border-radius:6px;background:var(--bg-base);border:1px solid var(--border-light);color:var(--text-primary);" placeholder="SELECT * FROM tablo WHERE 1=1"></textarea>
+          <label style="display:block;font-size:.78rem;font-weight:700;margin-bottom:.35rem;color:var(--text-secondary);">Sorgu / Dataset Adı:</label>
+          <input type="text" id="inpNewQueryName" class="master-search-input" value="q_yeni" style="width:100%;font-family:var(--mono);font-size:.88rem;font-weight:700;padding:.5rem .75rem;" placeholder="Örn: qdepo, qfatura, qozet" />
+        </div>
+
+        <!-- Hazır Şablonlar -->
+        <div>
+          <div style="font-size:.74rem;font-weight:700;color:var(--text-muted);margin-bottom:.35rem;">💡 Hızlı Başlangıç Şablonları:</div>
+          <div style="display:flex;gap:.4rem;flex-wrap:wrap;">
+            <button type="button" class="btn btn-sm btn-ghost btn-query-template" data-key="basic" style="font-size:.74rem;padding:.25rem .55rem;background:var(--bg-surface);border:1px solid var(--border-light);">
+              📊 Basit SELECT
+            </button>
+            <button type="button" class="btn btn-sm btn-ghost btn-query-template" data-key="join" style="font-size:.74rem;padding:.25rem .55rem;background:var(--bg-surface);border:1px solid var(--border-light);">
+              📦 LEFT JOIN Tablo
+            </button>
+            <button type="button" class="btn btn-sm btn-ghost btn-query-template" data-key="param" style="font-size:.74rem;padding:.25rem .55rem;background:var(--bg-surface);border:1px solid var(--border-light);">
+              👥 Parametreli Arama
+            </button>
+            <button type="button" class="btn btn-sm btn-ghost btn-query-template" data-key="dual" style="font-size:.74rem;padding:.25rem .55rem;background:var(--bg-surface);border:1px solid var(--border-light);">
+              ⚡ Boş Dual
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label style="display:block;font-size:.78rem;font-weight:700;margin-bottom:.35rem;color:var(--text-secondary);">SQL Sorgu Metni:</label>
+          <textarea id="inpNewQuerySql" class="master-search-input" style="width:100%;height:150px;font-family:var(--mono);font-size:.82rem;line-height:1.45;padding:.6rem .75rem;resize:vertical;" placeholder="SELECT * FROM tablo WHERE 1=1">${templates.basic}</textarea>
         </div>
       </div>
     `,
-    confirmText: '➕ Sorguyu Ekle',
+    confirmText: '➕ Sorguyu Rapora Ekle',
     cancelText: 'Vazgeç',
     onConfirm: () => {
       const nameInput = document.getElementById('inpNewQueryName');
@@ -2916,6 +2988,20 @@ function promptAndAddNewQuery() {
       }
     }
   });
+
+  // Şablon butonları dinleyicisi
+  setTimeout(() => {
+    document.querySelectorAll('.btn-query-template').forEach(b => {
+      b.onclick = () => {
+        const k = b.getAttribute('data-key');
+        const sqlInput = document.getElementById('inpNewQuerySql');
+        if (sqlInput && templates[k]) {
+          sqlInput.value = templates[k];
+          sqlInput.focus();
+        }
+      };
+    });
+  }, 100);
 }
 
 // ── GLOBAL EXPORTS ───────────────────────────────────────────

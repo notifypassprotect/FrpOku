@@ -173,8 +173,10 @@ window.openSettingsModal = function(initialTab = 'appearance') {
     const files = FrpStore.getAll();
     const isDark = stagedPrefs.theme === 'dark';
     const stats = FrpStore.getStats() || { total: files.length, queries: 0, storageFormatted: '0 MB' };
+    const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
+    const isAdmin = curUser && (curUser.role === 'admin' || curUser.username === 'admin');
 
-    // 7 Sekme Tanımı
+    // Sekme Tanımları
     const tabs = [
       { id: 'appearance', icon: '🎨', label: 'Görünüm & Yazı Tipi' },
       { id: 'profile',    icon: '👤', label: 'Kullanıcı & Cihaz Profili' },
@@ -184,6 +186,10 @@ window.openSettingsModal = function(initialTab = 'appearance') {
       { id: 'trash',      icon: '🗑️', label: `Çöp Kutusu (${trashItems.length})` },
       { id: 'storage',    icon: '💾', label: 'Yedekleme & Depolama' }
     ];
+
+    if (isAdmin) {
+      tabs.push({ id: 'audit', icon: '📋', label: 'İşlem Geçmişi (Audit Logs)' });
+    }
 
     const tabButtonsHtml = tabs.map(t => `
       <button type="button" class="settings-nav-btn ${t.id === activeTab ? 'active' : ''}" data-tab="${t.id}">
@@ -344,13 +350,11 @@ window.openSettingsModal = function(initialTab = 'appearance') {
               </div>
 
               <div>
-                <label style="font-size:.75rem;font-weight:700;color:var(--text-secondary);margin-bottom:.2rem;display:block;">Telefon Numarası</label>
-                <input type="text" id="profPhone" class="master-search-input" style="width:100%;" value="${escHtml(stagedProfile.phone || '')}" />
-              </div>
-
-              <div>
                 <label style="font-size:.75rem;font-weight:700;color:var(--text-secondary);margin-bottom:.2rem;display:block;">E-Posta Adresiniz</label>
-                <input type="email" id="profEmail" class="master-search-input" style="width:100%;" value="${escHtml(stagedProfile.email || '')}" />
+                <div style="display:flex;gap:.4rem;">
+                  <input type="email" id="profEmail" class="master-search-input" style="flex:1;" value="${escHtml(stagedProfile.email || '')}" />
+                  <button type="button" class="btn btn-sm btn-primary" id="btnUpdateEmailDirectly" style="font-weight:700;font-size:.75rem;padding:.3rem .65rem;">Değiştir</button>
+                </div>
               </div>
 
               <div>
@@ -493,60 +497,42 @@ window.openSettingsModal = function(initialTab = 'appearance') {
       `;
     }
 
-    // ── 3. KATEGORİLER & ÖZEL ETİKETLER ───────────────────────
+    // ── 3. KATEGORİLER & ETİKETLER ────────────────────────────
     else if (activeTab === 'categories') {
-      const catListHtml = categories.map(cat => {
-        const count = files.filter(f => (f.category || '').toLowerCase() === cat.name.toLowerCase()).length;
-        return `
-          <div class="cat-manage-row" style="display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;background:var(--bg-surface);border:1px solid var(--border-light);border-radius:12px;gap:.75rem;">
-            <div style="display:flex;align-items:center;gap:.75rem;">
-              <span style="font-size:1.4rem;">${cat.icon || '🏷️'}</span>
-              <div>
-                <div style="font-weight:800;font-size:.88rem;color:var(--text-primary);">${escHtml(cat.name)}</div>
-                <div style="font-size:.72rem;color:var(--text-muted);margin-top:.1rem;">${count} rapora atanmış</div>
-              </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:.5rem;">
-              <span style="width:16px;height:16px;border-radius:50%;background:${cat.color || '#3b82f6'};display:inline-block;"></span>
-              <button type="button" class="btn btn-sm btn-ghost btn-edit-cat" data-name="${escHtml(cat.name)}" data-color="${cat.color || '#3b82f6'}" data-icon="${cat.icon || '🏷️'}" title="Kategoriyi Düzenle" style="padding:.35rem .6rem;">✏️</button>
-              <button type="button" class="btn btn-sm btn-ghost btn-delete-cat" data-name="${escHtml(cat.name)}" style="color:#ef4444;padding:.35rem .6rem;" title="Kategoriyi Sil">🗑️</button>
-            </div>
+      const catListHtml = categories.map(cat => `
+        <div class="category-item-row" style="display:flex;align-items:center;justify-content:space-between;padding:.6rem .85rem;background:var(--bg-surface);border:1px solid var(--border-light);border-radius:9px;gap:.75rem;">
+          <div style="display:flex;align-items:center;gap:.6rem;">
+            <span style="width:14px;height:14px;border-radius:50%;background:${cat.color};display:inline-block;box-shadow:0 0 5px ${cat.color};"></span>
+            <span style="font-weight:700;font-size:.84rem;color:var(--text-primary);">${escHtml(cat.name)}</span>
           </div>
-        `;
-      }).join('');
+          <button type="button" class="btn btn-sm btn-ghost btn-delete-cat" data-id="${cat.id}" style="color:var(--red);padding:.2rem .5rem;font-size:.75rem;" title="Kategoriyi Sil">
+            🗑️ Sil
+          </button>
+        </div>
+      `).join('');
 
       const customTagsHtml = customTags.map(tag => `
-        <div style="display:inline-flex;align-items:center;gap:.4rem;background:var(--bg-raised);border:1px solid var(--border);border-radius:20px;padding:.25rem .75rem;font-size:.78rem;font-weight:700;">
+        <span class="custom-tag-chip" style="display:inline-flex;align-items:center;gap:.35rem;padding:.3rem .65rem;border-radius:8px;background:var(--bg-surface);border:1px solid var(--border-light);font-size:.78rem;font-weight:600;">
           <span>🏷️ ${escHtml(tag)}</span>
-          <button type="button" class="btn-delete-custom-tag" data-tag="${escHtml(tag)}" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:.85rem;padding:0;line-height:1;" title="Etiketi Sil">✕</button>
-        </div>
+          <button type="button" class="btn-remove-custom-tag" data-tag="${escHtml(tag)}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:.75rem;padding:0;" title="Etiketi Kaldır">✕</button>
+        </span>
       `).join('');
 
       tabContentHtml = `
         <div style="display:flex;flex-direction:column;gap:1.25rem;">
           <div>
-            <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">🏷️ Kategori & Özel Etiket Yönetimi</div>
+            <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">🏷️ Kategori & Etiket Yönetimi</div>
             <div style="font-size:.78rem;color:var(--text-muted);margin-top:.2rem;">
-              Rapor havuzunuz için kategori ve özel kullanıcı etiketlerini tanımlayın.
+              Raporlarınızı gruplandırabileceğiniz özel kategoriler ve etiketler tanımlayın.
             </div>
           </div>
 
-          <!-- Kategori Ekleme Formu -->
+          <!-- Yeni Kategori Ekle -->
           <div class="settings-card" style="display:flex;flex-direction:column;gap:.75rem;">
             <div style="font-weight:700;font-size:.85rem;">➕ Yeni Kategori Oluştur</div>
-            <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
-              <input type="text" id="newCatName" class="master-search-input" style="flex:1;min-width:180px;" placeholder="Kategori adı girin..." />
-              <input type="color" id="newCatColor" value="#3b82f6" style="width:38px;height:38px;border:none;border-radius:8px;cursor:pointer;background:none;" title="Kategori Rengi" />
-              <select id="newCatIcon" class="master-search-input" style="width:95px;">
-                <option value="🏷️">🏷️ Etiket</option>
-                <option value="💰">💰 Finans</option>
-                <option value="🏥">🏥 Klinik</option>
-                <option value="📊">📊 İstatistik</option>
-                <option value="🔬">🔬 Lab</option>
-                <option value="📦">📦 Stok</option>
-                <option value="👥">👥 Personel</option>
-                <option value="⚡">⚡ Sistem</option>
-              </select>
+            <div style="display:flex;gap:.5rem;align-items:center;">
+              <input type="text" id="newCategoryName" class="master-search-input" style="flex:1;" placeholder="Kategori adı (Örn: Finans, Ameliyathane)..." />
+              <input type="color" id="newCategoryColor" value="#3b82f6" style="width:40px;height:38px;border:none;border-radius:8px;cursor:pointer;background:none;" title="Renk Seç" />
               <button type="button" class="btn btn-sm btn-primary" id="btnSaveNewCat" style="font-weight:700;padding:.5rem 1rem;">➕ Ekle</button>
             </div>
           </div>
@@ -576,18 +562,19 @@ window.openSettingsModal = function(initialTab = 'appearance') {
       `;
     }
 
-    // ── 4. SÜTUN & TABLO TERCİHLERİ (Dosya Boyutu Dahil) ─────
+    // ── 4. SÜTUN & TABLO TERCİHLERİ (Dosya Boyutu & Son Değişiklik Dahil) ─────
     else if (activeTab === 'columns') {
       const cols = stagedPrefs.visibleColumns || {};
       const columnDefs = [
-        { id: 'reportName', label: 'Rapor Başlığı',              desc: 'Raporun ana başlığı' },
-        { id: 'fileName',   label: 'Dosya Adı (.frp)',           desc: 'Raporun disk üzerindeki orijinal dosya adı' },
-        { id: 'fileSize',   label: 'Dosya Boyutu (KB / MB)',      desc: 'Fiziksel .frp dosyasının disk üzerindeki boyutu' },
-        { id: 'category',   label: 'Kategori Etiketi',           desc: 'Rapora atanmış renkli kategori rozeti' },
-        { id: 'guid',       label: 'GUID (Benzersiz Kimlik)',    desc: 'FastReport raporunun 36 haneli benzersiz GUID kodu' },
-        { id: 'tags',       label: 'Etiketler (Tags)',           desc: 'Otomatik ve özel departman etiketleri' },
-        { id: 'queries',    label: 'SQL Sorguları Rozeti',       desc: 'İçerdiği SQL sorgu adedi rozeti' },
-        { id: 'date',       label: 'Yüklenme / Değiştirilme Tarihi', desc: 'Raporun sisteme eklenme tarihi' }
+        { id: 'reportName',   label: 'Rapor Başlığı',              desc: 'Raporun ana başlığı' },
+        { id: 'fileName',     label: 'Dosya Adı (.frp)',           desc: 'Raporun disk üzerindeki orijinal dosya adı' },
+        { id: 'fileSize',     label: 'Dosya Boyutu (KB / MB)',      desc: 'Fiziksel .frp dosyasının disk üzerindeki boyutu' },
+        { id: 'category',     label: 'Kategori Etiketi',           desc: 'Rapora atanmış renkli kategori rozeti' },
+        { id: 'guid',         label: 'GUID (Benzersiz Kimlik)',    desc: 'FastReport raporunun 36 haneli benzersiz GUID kodu' },
+        { id: 'tags',         label: 'Etiketler (Tags)',           desc: 'Otomatik ve özel departman etiketleri' },
+        { id: 'queries',      label: 'SQL Sorguları Rozeti',       desc: 'İçerdiği SQL sorgu adedi rozeti' },
+        { id: 'date',         label: 'Yüklenme Tarihi',            desc: 'Raporun sisteme ilk eklenme tarihi' },
+        { id: 'lastModified', label: 'Son Değişiklik Tarihi',      desc: 'Raporun en son düzenlenme ve güncellenme zamanı' }
       ];
 
       tabContentHtml = `
@@ -698,78 +685,74 @@ window.openSettingsModal = function(initialTab = 'appearance') {
 
       tabContentHtml = `
         <div style="display:flex;flex-direction:column;gap:1rem;">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;">
             <div>
-              <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">🗑️ Geri Dönüşüm Kutusu (${trashItems.length})</div>
-              <div style="font-size:.78rem;color:var(--text-muted);margin-top:.2rem;">
-                Silinen raporları tek tek ya da çoklu seçim yaparak geri yükleyebilir veya kalıcı olarak temizleyebilirsiniz.
+              <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">🗑️ Çöp Kutusu (${trashItems.length})</div>
+              <div style="font-size:.78rem;color:var(--green);margin-top:.2rem;font-weight:700;">
+                ⚡ Geri yükleme ve silme işlemleri anında uygulanır (Ayrıca kaydet butonuna basmaya gerek yoktur).
               </div>
             </div>
-            ${trashItems.length > 0 ? `
-              <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
-                <button type="button" class="btn btn-sm btn-primary" id="btnRestoreSelectedTrash" style="display:none;font-weight:700;">
-                  🔄 Seçilenleri Geri Yükle (<span id="trashSelectedCount">0</span>)
+            <div style="display:flex;gap:.5rem;align-items:center;">
+              <button type="button" class="btn btn-sm btn-primary" id="btnRestoreSelectedTrash" style="display:none;font-weight:700;">
+                🔄 Seçilenleri Geri Yükle (<span id="trashSelectedCount">0</span>)
+              </button>
+              <button type="button" class="btn btn-sm btn-danger" id="btnPurgeSelectedTrash" style="display:none;font-weight:700;">
+                ❌ Seçilenleri Kalıcı Sil
+              </button>
+              ${trashItems.length > 0 ? `
+                <button type="button" class="btn btn-sm btn-danger" id="btnEmptyTrashAll" style="font-weight:700;">
+                  🗑️ Çöp Kutusunu Boşalt
                 </button>
-                <button type="button" class="btn btn-sm btn-danger" id="btnPurgeSelectedTrash" style="display:none;font-weight:700;">
-                  ❌ Seçilenleri Kalıcı Sil
-                </button>
-                <button type="button" class="btn btn-sm btn-ghost" id="btnEmptyTrashAll" style="font-weight:700;color:var(--red);border:1px solid rgba(239,68,68,.3);">
-                  🗑️ Tümünü Boşalt
-                </button>
-              </div>
-            ` : ''}
+              ` : ''}
+            </div>
           </div>
 
           ${trashItems.length > 0 ? `
-            <div style="display:flex;gap:.6rem;align-items:center;">
-              <div style="flex:1;position:relative;">
+            <div style="display:flex;align-items:center;gap:.75rem;">
+              <div style="position:relative;flex:1;">
                 <input type="text" id="trashSearchInput" placeholder="🔍 Çöp kutusunda ara (Rapor adı, dosya adı)..." class="master-search-input" style="width:100%;font-size:.82rem;padding:.45rem .8rem;" />
               </div>
-            </div>
-
-            <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg-raised);padding:.45rem .85rem;border-radius:8px;border:1px solid var(--border-light);font-size:.78rem;">
-              <label style="display:flex;align-items:center;gap:.45rem;cursor:pointer;font-weight:700;user-select:none;color:var(--text-secondary);">
+              <label style="display:flex;align-items:center;gap:.4rem;font-size:.78rem;font-weight:700;cursor:pointer;color:var(--text-secondary);">
                 <input type="checkbox" id="trashSelectAll" style="width:16px;height:16px;cursor:pointer;" />
-                Tümünü Seç / Seçimi Kaldır
+                <span>Tümünü Seç</span>
               </label>
-              <span style="color:var(--text-muted);font-size:.73rem;" id="trashCountDisplay">Toplam ${trashItems.length} silinmiş rapor</span>
             </div>
-          ` : ''}
 
-          <div style="display:flex;flex-direction:column;gap:.55rem;max-height:55vh;min-height:220px;overflow-y:auto;padding-right:.3rem;" id="trashItemsList">
-            ${trashRowsHtml || `
-              <div style="background:var(--bg-raised);border-radius:12px;padding:3rem 1.5rem;text-align:center;color:var(--text-muted);border:1px dashed var(--border);">
-                <div style="font-size:2.5rem;margin-bottom:.5rem;">🗑️</div>
-                <div style="font-weight:700;font-size:.9rem;color:var(--text-primary);">Geri Dönüşüm Kutusu Boş</div>
-                <div style="font-size:.78rem;margin-top:.2rem;">Silinen raporlar güvenliğiniz için burada saklanır.</div>
-              </div>
-            `}
-          </div>
+            <div id="trashItemsListContainer" style="display:flex;flex-direction:column;gap:.45rem;max-height:360px;overflow-y:auto;padding-right:.3rem;">
+              ${trashRowsHtml}
+            </div>
+          ` : `
+            <div style="text-align:center;padding:3.5rem 1rem;background:var(--bg-surface);border-radius:12px;border:1px dashed var(--border);">
+              <div style="font-size:2.8rem;margin-bottom:.6rem;">🎉</div>
+              <div style="font-weight:800;font-size:1rem;color:var(--text-primary);">Çöp Kutusu Boş</div>
+              <div style="font-size:.78rem;color:var(--text-muted);margin-top:.2rem;">Silinmiş herhangi bir rapor bulunmuyor.</div>
+            </div>
+          `}
         </div>
       `;
     }
 
-    // ── 7. YEDEKLEME & DEPOLAMA ───────────────────────────────
+    // ── 7. YEDEKLENDİRME & DEPOLAMA ───────────────────────────
     else if (activeTab === 'storage') {
       tabContentHtml = `
         <div style="display:flex;flex-direction:column;gap:1.25rem;">
           <div>
             <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">💾 Yedekleme & Depolama Yönetimi</div>
             <div style="font-size:.78rem;color:var(--text-muted);margin-top:.2rem;">
-              Tüm rapor ve sorgu veritabanınızı yedekleyin, dışarı aktarın veya temizleyin.
+              Raporlarınızın snapshot yedeğini alın, otomatik yedekleme zamanlayın veya verileri sıfırlayın.
             </div>
           </div>
 
-          <!-- 3'lü İstatistik Kartı -->
-          <div class="settings-card">
-            <div style="font-weight:700;font-size:.85rem;margin-bottom:.6rem;">📊 Depolama & Veritabanı Durumu</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;text-align:center;">
+          <!-- Depolama İstatistikleri -->
+          <div class="settings-card" style="display:flex;flex-direction:column;gap:.6rem;">
+            <div style="font-weight:700;font-size:.85rem;">📊 Yerel Depolama Durumu</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:.6rem;text-align:center;">
               <div style="background:var(--bg-surface);padding:.8rem .6rem;border-radius:10px;border:1px solid var(--border-light);">
-                <div style="font-size:1.4rem;font-weight:800;color:var(--accent);">${stats.total !== undefined ? stats.total : files.length}</div>
-                <div style="font-size:.74rem;color:var(--text-muted);font-weight:600;margin-top:.15rem;">Aktif Rapor</div>
+                <div style="font-size:1.4rem;font-weight:800;color:var(--accent);">${stats.total || files.length}</div>
+                <div style="font-size:.74rem;color:var(--text-muted);font-weight:600;margin-top:.15rem;">Kayıtlı Rapor</div>
               </div>
               <div style="background:var(--bg-surface);padding:.8rem .6rem;border-radius:10px;border:1px solid var(--border-light);">
-                <div style="font-size:1.4rem;font-weight:800;color:var(--green);">${stats.queries !== undefined ? stats.queries : 0}</div>
+                <div style="font-size:1.4rem;font-weight:800;color:var(--green);">${stats.queries || 0}</div>
                 <div style="font-size:.74rem;color:var(--text-muted);font-weight:600;margin-top:.15rem;">SQL Sorgusu</div>
               </div>
               <div style="background:var(--bg-surface);padding:.8rem .6rem;border-radius:10px;border:1px solid var(--border-light);">
@@ -777,6 +760,22 @@ window.openSettingsModal = function(initialTab = 'appearance') {
                 <div style="font-size:.74rem;color:var(--text-muted);font-weight:600;margin-top:.15rem;">Bellek Kullanımı</div>
               </div>
             </div>
+          </div>
+
+          <!-- Otomatik Yedekleme Sıklığı -->
+          <div class="settings-card" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;">
+            <div>
+              <div style="font-weight:700;font-size:.85rem;">⏱️ Otomatik Snapshot Yedekleme</div>
+              <div style="font-size:.72rem;color:var(--text-muted);">Sistemin arka planda belirli aralıklarla otomatik yedek almasını sağlar.</div>
+            </div>
+            <select id="stagedAutoBackup" class="master-search-input" style="width:170px;font-weight:700;">
+              <option value="0" ${!stagedPrefs.autoBackupInterval ? 'selected' : ''}>Kapalı (Manuel)</option>
+              <option value="15" ${stagedPrefs.autoBackupInterval === 15 ? 'selected' : ''}>Her 15 Dakikada</option>
+              <option value="30" ${stagedPrefs.autoBackupInterval === 30 ? 'selected' : ''}>Her 30 Dakikada</option>
+              <option value="60" ${stagedPrefs.autoBackupInterval === 60 ? 'selected' : ''}>Her 1 Saatte</option>
+              <option value="360" ${stagedPrefs.autoBackupInterval === 360 ? 'selected' : ''}>Her 6 Saatte</option>
+              <option value="1440" ${stagedPrefs.autoBackupInterval === 1440 ? 'selected' : ''}>Her 24 Saatte (Günlük)</option>
+            </select>
           </div>
 
           <!-- Yedekleme Eylemleri -->
@@ -793,16 +792,66 @@ window.openSettingsModal = function(initialTab = 'appearance') {
             <input type="file" id="settingsBackupFileInput" accept=".json" style="display:none;" />
           </div>
 
-          <!-- Tehlikeli Bölge -->
+          <!-- Tehlikeli Bölge (Şifreli Silme) -->
           <div style="background:rgba(239,68,68,.05);border:1.5px solid rgba(239,68,68,.3);border-radius:12px;padding:1rem 1.15rem;display:flex;flex-direction:column;gap:.6rem;">
             <div style="font-weight:800;font-size:.85rem;color:#ef4444;">🚨 Tehlikeli Bölge (Fabrika Ayarlarına Sıfırla)</div>
             <div style="font-size:.76rem;color:var(--text-secondary);line-height:1.45;">
-              Tüm yüklenen raporları, kategorileri ve düzenleme geçmişini kalıcı olarak temizler. Bu işlem geri alınamaz.
+              Tüm yüklenen raporları, kategorileri ve veritabanını kalıcı olarak temizler. Bu işlem güvenlik doğrulaması (hesap şifresi) gerektirir.
             </div>
             <div>
               <button type="button" class="btn btn-sm btn-danger" id="btnActionResetAll" style="font-weight:700;">
                 🗑️ Tüm Raporları & Verileri Kalıcı Olarak Temizle
               </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // ── 8. ADMİN İŞLEM GEÇMİŞİ (AUDIT LOGS) ───────────────────
+    else if (activeTab === 'audit') {
+      tabContentHtml = `
+        <div style="display:flex;flex-direction:column;gap:1.1rem;">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;">
+            <div>
+              <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);display:flex;align-items:center;gap:.4rem;">
+                <span>📋</span> <span>Kullanıcı İşlem Geçmişi & Denetim Günlüğü</span>
+                <span class="badge badge-purple" style="font-size:.68rem;">Sadece Admin</span>
+              </div>
+              <div style="font-size:.76rem;color:var(--text-muted);margin-top:.2rem;">
+                Kullanıcıların gerçekleştirdiği oturum açma, rapor yükleme, silme, şifre sıfırlama ve sistem olaylarını takip edin.
+              </div>
+            </div>
+            <div style="display:flex;gap:.5rem;align-items:center;">
+              <button type="button" class="btn btn-sm btn-ghost" id="btnRefreshAuditLogs" style="font-weight:700;">
+                🔄 Yenile
+              </button>
+              <button type="button" class="btn btn-sm btn-secondary" id="btnExportAuditCsv" style="font-weight:700;">
+                📊 CSV Olarak İndir
+              </button>
+            </div>
+          </div>
+
+          <!-- Filtreler -->
+          <div style="display:grid;grid-template-columns:1fr 180px;gap:.6rem;">
+            <div style="position:relative;">
+              <input type="text" id="auditSearchInput" placeholder="🔍 Loglarda ara (Kullanıcı adı, işlem, hedef, IP)..." class="master-search-input" style="width:100%;font-size:.82rem;padding:.45rem .8rem;" />
+            </div>
+            <select id="auditActionFilter" class="master-search-input" style="font-size:.82rem;font-weight:700;">
+              <option value="">Tüm İşlemler</option>
+              <option value="LOGIN">Giriş Yapma (LOGIN)</option>
+              <option value="USER_UPDATE">Kullanıcı Güncelleme</option>
+              <option value="EMAIL_CHANGE">E-Posta Değişikliği</option>
+              <option value="DELETE">Silme İşlemleri</option>
+              <option value="AUTO_BACKUP">Otomatik Yedekleme</option>
+            </select>
+          </div>
+
+          <!-- Tablo Alanı -->
+          <div id="auditLogsContainer" style="background:var(--bg-surface);border:1px solid var(--border-light);border-radius:10px;overflow-x:auto;max-height:400px;overflow-y:auto;">
+            <div style="text-align:center;padding:2.5rem;color:var(--text-muted);">
+              <div class="splash-spinner" style="margin-bottom:.5rem;"></div>
+              <div>Denetim kayıtları yükleniyor...</div>
             </div>
           </div>
         </div>
@@ -1374,6 +1423,15 @@ window.openSettingsModal = function(initialTab = 'appearance') {
         safeToast('Tüm veriler JSON olarak yedeklendi! 💾', 'success');
       });
 
+      overlay.querySelector('#stagedAutoBackup')?.addEventListener('change', (e) => {
+        const val = parseInt(e.target.value, 10) || 0;
+        stagedPrefs.autoBackupInterval = val;
+        if (typeof FrpStore.setAutoBackupInterval === 'function') {
+          FrpStore.setAutoBackupInterval(val);
+        }
+        safeToast(val > 0 ? `Otomatik yedekleme her ${val} dakikada bir ayarlandı ⏱️` : 'Otomatik yedekleme kapatıldı.', 'info');
+      });
+
       const backupInput = overlay.querySelector('#settingsBackupFileInput');
       overlay.querySelector('#btnActionImportJson')?.addEventListener('click', () => {
         backupInput.click();
@@ -1397,21 +1455,208 @@ window.openSettingsModal = function(initialTab = 'appearance') {
       });
 
       overlay.querySelector('#btnActionResetAll')?.addEventListener('click', () => {
-        window.showConfirmDialog({
-          title: 'Tüm Verileri Sıfırla',
-          message: 'DİKKAT: Yüklenen tüm raporlar, kategoriler ve veritabanı kalıcı olarak silinecektir! Devam edilsin mi?',
-          confirmText: 'Evet, Hepsini Sil',
-          isDanger: true,
-          onConfirm: () => {
-            FrpStore.deleteAll();
-            FrpStore.emptyTrash();
-            safeToast('Tüm veriler temizlendi ve sıfırlandı.', 'info');
-            if (typeof window.refreshAll === 'function') window.refreshAll();
-            overlay.remove();
+        const authUser = window.FrpAuth?.getUser();
+        const promptPass = prompt('🚨 DİKKAT: Tüm yüklenen raporları ve veritabanını temizlemek üzeresiniz!\n\nİşlemi onaylamak için lütfen hesap şifrenizi giriniz:');
+        if (!promptPass) return;
+
+        fetch('/api/auth/verify-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: authUser?.id || 'admin', password: promptPass })
+        }).then(r => r.json()).then(res => {
+          if (!res.success || !res.verified) {
+            alert('❌ Hata: Girdiğiniz şifre hatalı! İşlem iptal edildi.');
+            return;
           }
+
+          window.showConfirmDialog({
+            title: 'Tüm Verileri Sıfırla',
+            message: 'Şifreniz doğrulandı. Tüm yüklenen raporlar, kategoriler ve veritabanı kalıcı olarak silinecektir! Devam edilsin mi?',
+            confirmText: 'Evet, Hepsini Sil',
+            isDanger: true,
+            onConfirm: () => {
+              FrpStore.deleteAll();
+              FrpStore.emptyTrash();
+              safeToast('Tüm veriler temizlendi ve sıfırlandı.', 'info');
+              if (typeof window.refreshAll === 'function') window.refreshAll();
+              overlay.remove();
+            }
+          });
+        }).catch(err => {
+          alert('Doğrulama hatası: ' + err.message);
         });
       });
     }
+
+    // 8. Admin İşlem Geçmişi (Audit Logs) Olayları
+    else if (activeTab === 'audit') {
+      let loadedLogs = [];
+      const container = overlay.querySelector('#auditLogsContainer');
+      const searchInp = overlay.querySelector('#auditSearchInput');
+      const filterSelect = overlay.querySelector('#auditActionFilter');
+      const btnRefresh = overlay.querySelector('#btnRefreshAuditLogs');
+      const btnExport = overlay.querySelector('#btnExportAuditCsv');
+
+      const renderLogTable = (logs) => {
+        if (!container) return;
+        if (!logs || logs.length === 0) {
+          container.innerHTML = `<div style="text-align:center;padding:2.5rem;color:var(--text-muted);">Herhangi bir işlem kaydı bulunamadı.</div>`;
+          return;
+        }
+
+        const actionBadges = {
+          LOGIN: 'badge-blue',
+          REGISTER: 'badge-green',
+          USER_UPDATE: 'badge-purple',
+          EMAIL_CHANGE: 'badge-amber',
+          DELETE: 'badge-red',
+          REPORT_EDIT: 'badge-blue',
+          AUTO_BACKUP: 'badge-green',
+          EXPORT: 'badge-blue'
+        };
+
+        const rows = logs.map(l => {
+          const dateStr = l.timestamp ? new Date(l.timestamp).toLocaleString('tr-TR') : '-';
+          const badgeClass = actionBadges[l.action] || 'badge-blue';
+          return `
+            <tr style="border-bottom:1px solid var(--border-light);font-size:.78rem;">
+              <td style="padding:.6rem .8rem;white-space:nowrap;color:var(--text-muted);font-family:var(--mono);">${dateStr}</td>
+              <td style="padding:.6rem .8rem;font-weight:700;color:var(--text-primary);">
+                <div style="display:flex;align-items:center;gap:.35rem;">
+                  <span>@${escHtml(l.username || 'misafir')}</span>
+                  ${l.role === 'admin' ? '<span class="badge badge-purple" style="font-size:.65rem;padding:1px 4px;">Admin</span>' : ''}
+                </div>
+              </td>
+              <td style="padding:.6rem .8rem;">
+                <span class="badge ${badgeClass}" style="font-size:.7rem;padding:.2rem .5rem;">${escHtml(l.action || 'INFO')}</span>
+              </td>
+              <td style="padding:.6rem .8rem;font-weight:600;color:var(--accent);">${escHtml(l.target || '-')}</td>
+              <td style="padding:.6rem .8rem;color:var(--text-secondary);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(l.details || '-')}</td>
+              <td style="padding:.6rem .8rem;color:var(--text-muted);font-family:var(--mono);">${escHtml(l.ip || '-')}</td>
+            </tr>
+          `;
+        }).join('');
+
+        container.innerHTML = `
+          <table style="width:100%;border-collapse:collapse;text-align:left;">
+            <thead>
+              <tr style="background:var(--bg-raised);border-bottom:1.5px solid var(--border);font-size:.75rem;font-weight:800;color:var(--text-secondary);">
+                <th style="padding:.6rem .8rem;">Zaman</th>
+                <th style="padding:.6rem .8rem;">Kullanıcı</th>
+                <th style="padding:.6rem .8rem;">İşlem Türü</th>
+                <th style="padding:.6rem .8rem;">Hedef</th>
+                <th style="padding:.6rem .8rem;">Açıklama / Detay</th>
+                <th style="padding:.6rem .8rem;">IP Adresi</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        `;
+      };
+
+      const filterAndDisplayLogs = () => {
+        const q = (searchInp?.value || '').toLowerCase().trim();
+        const act = filterSelect?.value || '';
+
+        let filtered = loadedLogs;
+        if (act) {
+          filtered = filtered.filter(l => (l.action || '').toUpperCase() === act.toUpperCase());
+        }
+        if (q) {
+          filtered = filtered.filter(l => 
+            (l.username || '').toLowerCase().includes(q) ||
+            (l.details || '').toLowerCase().includes(q) ||
+            (l.target || '').toLowerCase().includes(q) ||
+            (l.action || '').toLowerCase().includes(q) ||
+            (l.ip || '').includes(q)
+          );
+        }
+        renderLogTable(filtered);
+      };
+
+      const fetchLogs = async () => {
+        if (container) {
+          container.innerHTML = `<div style="text-align:center;padding:2.5rem;color:var(--text-muted);"><div class="splash-spinner" style="margin-bottom:.5rem;"></div><div>Kayıtlar yükleniyor...</div></div>`;
+        }
+        try {
+          const res = await fetch('/api/admin/audit-logs?limit=300', {
+            headers: window.FrpAuth ? window.FrpAuth.getAuthHeaders() : {}
+          });
+          const data = await res.json();
+          if (data && data.success && Array.isArray(data.logs)) {
+            loadedLogs = data.logs;
+          } else {
+            loadedLogs = [];
+          }
+        } catch (e) {
+          console.warn('Audit logs fetch hatası:', e.message);
+          loadedLogs = [];
+        }
+        filterAndDisplayLogs();
+      };
+
+      searchInp?.addEventListener('input', filterAndDisplayLogs);
+      filterSelect?.addEventListener('change', filterAndDisplayLogs);
+      btnRefresh?.addEventListener('click', fetchLogs);
+
+      btnExport?.addEventListener('click', () => {
+        if (!loadedLogs || loadedLogs.length === 0) {
+          safeToast('Dışa aktarılacak kayıt bulunamadı.', 'info');
+          return;
+        }
+        let csv = 'Zaman;Kullanici;Rol;Islem;Hedef;Detay;IP\n';
+        loadedLogs.forEach(l => {
+          const t = `"${(l.timestamp || '').replace(/"/g, '""')}"`;
+          const u = `"${(l.username || '').replace(/"/g, '""')}"`;
+          const r = `"${(l.role || '').replace(/"/g, '""')}"`;
+          const a = `"${(l.action || '').replace(/"/g, '""')}"`;
+          const tg = `"${(l.target || '').replace(/"/g, '""')}"`;
+          const d = `"${(l.details || '').replace(/"/g, '""')}"`;
+          const ip = `"${(l.ip || '').replace(/"/g, '""')}"`;
+          csv += `${t};${u};${r};${a};${tg};${d};${ip}\n`;
+        });
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `denetim_gunlugu_${new Date().toISOString().slice(0, 10)}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+        safeToast('Denetim günlüğü CSV olarak indirildi! 📊', 'success');
+      });
+
+      fetchLogs();
+    }
+
+    // Profil E-posta Güncelleme Butonu
+    overlay.querySelector('#btnUpdateEmailDirectly')?.addEventListener('click', async () => {
+      const emailInput = overlay.querySelector('#profEmail');
+      const newEmail = (emailInput?.value || '').trim();
+      const authUser = window.FrpAuth?.getUser();
+
+      if (!newEmail || !newEmail.includes('@')) {
+        safeToast('Lütfen geçerli bir e-posta adresi giriniz.', 'warning');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/auth/change-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: authUser?.id || 'admin', newEmail })
+        });
+        const data = await res.json();
+        if (data.success) {
+          stagedProfile.email = newEmail;
+          FrpStore.setUserProfile(stagedProfile);
+          safeToast('E-posta adresiniz başarıyla güncellendi! ✅', 'success');
+        } else {
+          safeToast(data.reason || 'E-posta güncellenemedi.', 'error');
+        }
+      } catch (e) {
+        safeToast('Hata: ' + e.message, 'error');
+      }
+    });
   }
 
   renderModal();

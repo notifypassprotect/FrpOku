@@ -857,7 +857,10 @@
                 <div style="min-width:0;flex:1;">
                   <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.2rem;">
                     <span style="font-weight:800;font-size:.95rem;color:var(--text-primary,#0f172a);">${escHtml(u.full_name || u.username)}</span>
-                    <span style="font-size:.75rem;font-weight:700;font-family:monospace;color:#2563eb;background:rgba(37,99,235,0.08);padding:.1rem .4rem;border-radius:5px;">@${escHtml(u.username)}</span>
+                    <span style="font-size:.75rem;font-weight:700;font-family:monospace;color:#2563eb;background:rgba(37,99,235,0.08);padding:.1rem .4rem;border-radius:5px;display:inline-flex;align-items:center;gap:.25rem;">
+                      @${escHtml(u.username)}
+                      <button type="button" class="btn btn-sm btn-ghost btn-edit-username" data-id="${u.id}" data-name="${escHtml(u.username)}" style="padding:0 3px;font-size:.7rem;color:#2563eb;" title="Kullanıcı Adını Değiştir">✏️</button>
+                    </span>
                     ${isUsrAdmin ? `<span class="badge badge-purple" style="font-size:.68rem;">👑 Admin</span>` : `<span class="badge badge-blue" style="font-size:.68rem;">Kullanıcı</span>`}
                     ${isPending ? `<span class="badge badge-amber" style="font-size:.68rem;">⏳ Onay Bekliyor</span>` : `<span class="badge badge-green" style="font-size:.68rem;">🟢 Aktif</span>`}
                   </div>
@@ -903,6 +906,32 @@
       applyFiltersAndRender();
 
       function bindAllUsersActions(scope) {
+        // Kullanıcı Adı Değiştirme
+        scope.querySelectorAll('.btn-edit-username').forEach(btn => {
+          btn.onclick = (e) => {
+            e.stopPropagation();
+            const uId = btn.getAttribute('data-id');
+            const curUser = btn.getAttribute('data-name');
+            const newUser = prompt(`"${curUser}" için yeni kullanıcı adını giriniz (@kullanici_adi):`, curUser);
+            if (!newUser || !newUser.trim() || newUser.trim().toLowerCase() === curUser.toLowerCase()) return;
+
+            fetch('/api/admin/change-username', {
+              method: 'POST',
+              headers: getAuthHeaders(),
+              body: JSON.stringify({ userId: uId, newUsername: newUser.trim() })
+            }).then(r => r.json()).then(data => {
+              if (data.success) {
+                if (typeof window.toast === 'function') {
+                  window.toast(`Kullanıcı adı @${data.username} olarak güncellendi! ✅`, 'success');
+                }
+                renderAllUsersTab();
+              } else {
+                alert(data.reason || 'Kullanıcı adı değiştirilemedi.');
+              }
+            }).catch(err => alert('Hata: ' + err.message));
+          };
+        });
+
         // Modern Şifre Sıfırlama
         scope.querySelectorAll('.btn-admin-reset-pass').forEach(btn => {
           btn.onclick = () => {
@@ -983,11 +1012,27 @@
     const existing = document.getElementById('modernPasswordResetDialog');
     if (existing) existing.remove();
 
-    const generateRandomPassword = () => {
+    const words = ['Demir', 'Gunes', 'Yildiz', 'Kartal', 'Deniz', 'Bahar', 'Toprak', 'Cinar', 'Bulut', 'Zirve', 'Kaplan', 'Atlas'];
+    const genComplex = () => {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%&*+=-';
+      let pass = '';
+      for (let i = 0; i < 16; i++) pass += chars.charAt(Math.floor(Math.random() * chars.length));
+      return pass;
+    };
+    const genStandard = () => {
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$';
       let pass = '';
       for (let i = 0; i < 8; i++) pass += chars.charAt(Math.floor(Math.random() * chars.length));
       return pass;
+    };
+    const genMemorable = () => {
+      const w1 = words[Math.floor(Math.random() * words.length)];
+      const w2 = words[Math.floor(Math.random() * words.length)];
+      const num = Math.floor(100 + Math.random() * 900);
+      return `${w1}-${w2}-${num}`;
+    };
+    const genPin = () => {
+      return String(Math.floor(100000 + Math.random() * 900000));
     };
 
     const dialog = document.createElement('div');
@@ -995,31 +1040,49 @@
     dialog.className = 'modern-sub-modal';
 
     dialog.innerHTML = `
-      <div class="modern-sub-card">
+      <div class="modern-sub-card" style="max-width:440px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
-          <div style="font-weight:900;font-size:1.1rem;">🔑 Şifre Sıfırla</div>
+          <div style="font-weight:900;font-size:1.1rem;display:flex;align-items:center;gap:.4rem;">
+            <span>🔑</span> <span>Şifre Sıfırlama</span>
+          </div>
           <button type="button" id="btnClosePassModal" class="btn btn-sm btn-ghost" style="border-radius:50%;width:32px;height:32px;padding:0;">✕</button>
         </div>
-        <p style="font-size:.84rem;color:#64748b;margin-bottom:1.1rem;line-height:1.45;">
-          <strong>"${escHtml(userName)}"</strong> kullanıcısı için yeni şifre belirleyin veya otomatik oluşturun:
+        <p style="font-size:.84rem;color:#64748b;margin-bottom:1rem;line-height:1.45;">
+          <strong>"${escHtml(userName)}"</strong> kullanıcısı için yeni şifre belirleyin veya hazır algoritmalardan birini seçin:
         </p>
 
-        <div style="margin-bottom:1rem;">
+        <div style="margin-bottom:.85rem;">
           <label style="display:block;font-size:.76rem;font-weight:700;margin-bottom:.35rem;color:#334155;">Yeni Şifre</label>
           <div style="display:flex;gap:.5rem;">
-            <input type="text" id="modernNewPassInput" value="${generateRandomPassword()}" style="
+            <input type="text" id="modernNewPassInput" value="${genComplex()}" style="
               flex:1;padding:.65rem .85rem;border-radius:10px;border:1.5px solid #cbd5e1;
-              font-family:monospace;font-weight:800;font-size:1rem;outline:none;background:#f8fafc;
+              font-family:monospace;font-weight:800;font-size:.95rem;outline:none;background:#f8fafc;color:#0f172a;
             " />
-            <button type="button" id="btnGenRandomPass" class="btn btn-sm btn-ghost" style="font-weight:700;font-size:.78rem;" title="Yeni Rastgele Şifre Üret">
-              🎲 Üret
+          </div>
+        </div>
+
+        <!-- Gelişmiş Şifre Algoritması Seçenekleri -->
+        <div style="margin-bottom:1.1rem;">
+          <div style="font-size:.74rem;font-weight:700;color:#64748b;margin-bottom:.35rem;">Şifre Üretme Seçenekleri:</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;">
+            <button type="button" class="btn btn-sm btn-ghost btn-pass-algo" data-type="complex" style="font-size:.74rem;padding:.3rem .5rem;justify-content:flex-start;background:rgba(37,99,235,0.06);color:#2563eb;font-weight:700;">
+              🔐 Güçlü (16 Karakter)
+            </button>
+            <button type="button" class="btn btn-sm btn-ghost btn-pass-algo" data-type="standard" style="font-size:.74rem;padding:.3rem .5rem;justify-content:flex-start;background:rgba(16,185,129,0.06);color:#059669;font-weight:700;">
+              🔡 Standart (8 Karakter)
+            </button>
+            <button type="button" class="btn btn-sm btn-ghost btn-pass-algo" data-type="memorable" style="font-size:.74rem;padding:.3rem .5rem;justify-content:flex-start;background:rgba(245,158,11,0.06);color:#d97706;font-weight:700;">
+              🧠 Akılda Kalıcı
+            </button>
+            <button type="button" class="btn btn-sm btn-ghost btn-pass-algo" data-type="pin" style="font-size:.74rem;padding:.3rem .5rem;justify-content:flex-start;background:rgba(147,51,234,0.06);color:#7e22ce;font-weight:700;">
+              🔢 PIN (6 Hane)
             </button>
           </div>
         </div>
 
         <div style="display:flex;gap:.5rem;margin-top:1.25rem;">
           <button type="button" id="btnSaveAndCopyPass" class="btn btn-primary" style="flex:1;justify-content:center;padding:.75rem;font-weight:800;">
-            💾 Kaydet ve Kopyala
+            💾 Şifreyi Kaydet ve Kopyala
           </button>
           <button type="button" id="btnCancelPassReset" class="btn btn-ghost" style="padding:.75rem .95rem;font-weight:700;">
             İptal
@@ -1031,8 +1094,15 @@
     document.body.appendChild(dialog);
 
     const input = dialog.querySelector('#modernNewPassInput');
-    const btnGen = dialog.querySelector('#btnGenRandomPass');
-    btnGen.onclick = () => { input.value = generateRandomPassword(); };
+    dialog.querySelectorAll('.btn-pass-algo').forEach(b => {
+      b.onclick = () => {
+        const type = b.getAttribute('data-type');
+        if (type === 'complex') input.value = genComplex();
+        else if (type === 'standard') input.value = genStandard();
+        else if (type === 'memorable') input.value = genMemorable();
+        else if (type === 'pin') input.value = genPin();
+      };
+    });
 
     const close = () => dialog.remove();
     dialog.querySelector('#btnClosePassModal').onclick = close;

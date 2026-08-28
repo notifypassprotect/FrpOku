@@ -1151,6 +1151,76 @@
     return '\uFEFF' + rows.map(r => r.map(csvEsc).join(';')).join('\r\n');
   }
 
+  const DOWNLOAD_HISTORY_KEY = 'frpoku_download_history';
+
+  function getDownloadHistory() {
+    try {
+      const raw = localStorage.getItem(DOWNLOAD_HISTORY_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function addDownloadHistory({ reportId, reportName, fileName, format, customVersion }) {
+    try {
+      const list = getDownloadHistory();
+      list.unshift({
+        id: 'dl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        timestamp: new Date().toISOString(),
+        reportId,
+        reportName,
+        fileName,
+        format: format || 'frp',
+        customVersion: customVersion || ''
+      });
+      const trimmed = list.slice(0, 50);
+      localStorage.setItem(DOWNLOAD_HISTORY_KEY, JSON.stringify(trimmed));
+      return trimmed;
+    } catch {
+      return [];
+    }
+  }
+
+  let _autoBackupTimer = null;
+  function startAutoBackupTimer() {
+    if (_autoBackupTimer) {
+      clearInterval(_autoBackupTimer);
+      _autoBackupTimer = null;
+    }
+    const prefs = getPreferences();
+    const intervalMinutes = prefs.autoBackupInterval;
+    if (!intervalMinutes || intervalMinutes <= 0) return;
+
+    _autoBackupTimer = setInterval(() => {
+      try {
+        const files = _read();
+        if (files.length === 0) return;
+        const backupData = {
+          version: 'frpoku_backup_v2',
+          exportedAt: new Date().toISOString(),
+          autoBackup: true,
+          count: files.length,
+          files: files,
+          categories: getCategoryObjects(),
+          customTags: getCustomTags(),
+          preferences: prefs
+        };
+        localStorage.setItem('frpoku_auto_backup_last', JSON.stringify(backupData));
+        console.log(`⏱️ [AutoBackup] ${files.length} rapor otomatik yedeklendi.`);
+      } catch (e) {
+        console.warn('Otomatik yedekleme hatası:', e.message);
+      }
+    }, intervalMinutes * 60 * 1000);
+  }
+
+  function setAutoBackupInterval(minutes) {
+    const prefs = getPreferences();
+    prefs.autoBackupInterval = minutes;
+    setPreferences(prefs);
+    startAutoBackupTimer();
+  }
+
   // ── Public Store API (Köprü ve Delegasyon) ─────────────────────
   const FrpStore = {
     getAll, getById, add, addMany, deleteOne, deleteMany, deleteAll,
@@ -1162,6 +1232,7 @@
     getTheme, setTheme, initTheme,
     getPreferences, setPreferences, applyPreferences, getUserProfile, setUserProfile,
     addRecent, getRecent, clearRecent, removeRecent,
+    getDownloadHistory, addDownloadHistory, setAutoBackupInterval, startAutoBackupTimer,
     exportAllSqls, exportAllSqlsCsv, search, getStats, isStorageNearFull,
 
     // Ortak Havuz & Çalışma Alanı
@@ -1194,5 +1265,8 @@
   };
 
   window.FrpStore = FrpStore;
-  try { applyPreferences(); } catch (e) {}
+  try { 
+    applyPreferences(); 
+    startAutoBackupTimer();
+  } catch (e) {}
 })();

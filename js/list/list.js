@@ -404,7 +404,7 @@ function renderPaginationControls(totalItems, pageSize) {
   }
 }
 
-const DEFAULT_COLUMN_ORDER = ['reportName', 'owner', 'fileName', 'fileSize', 'category', 'guid', 'tags', 'queries', 'date'];
+const DEFAULT_COLUMN_ORDER = ['reportName', 'owner', 'fileName', 'fileSize', 'category', 'guid', 'tags', 'queries', 'date', 'lastModified'];
 
 const COLUMN_DEFS = {
   reportName: {
@@ -461,7 +461,7 @@ const COLUMN_DEFS = {
   },
   category: {
     label: 'Kategori',
-    sortKey: null,
+    sortKey: 'category',
     thClass: 'col-category',
     thStyle: '',
     renderTd: (file, h) => `<td class="col-category">${h.catHtml}</td>`
@@ -498,6 +498,18 @@ const COLUMN_DEFS = {
     thClass: 'col-date',
     thStyle: 'width:145px;',
     renderTd: (file, h) => `<td class="col-date" style="white-space:nowrap; color:var(--text-muted); font-size:.8rem;">${h.date}</td>`
+  },
+  lastModified: {
+    label: 'Son Değişiklik',
+    sortKey: 'updatedAt',
+    thClass: 'col-lastModified',
+    thStyle: 'width:145px;',
+    renderTd: (file) => {
+      const dt = file.updatedAt || file.loadedAt;
+      const dObj = new Date(dt);
+      const str = dObj.toLocaleDateString('tr-TR') + ' ' + dObj.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+      return `<td class="col-lastModified" style="white-space:nowrap; color:var(--text-muted); font-size:.8rem;">${str}</td>`;
+    }
   }
 };
 
@@ -820,7 +832,9 @@ async function openRenameModal(fileId) {
 }
 window.openRenameModal = openRenameModal;
 
-// ── Tablo Satırına Tıklama ile Detay Açma ───────────────────
+// ── Tablo Satırına Tıklama ile Detay Açma & Windows Tarzı Seçim (Ctrl / Shift) ───
+let _lastSelectedRowId = null;
+
 tableBody.addEventListener('click', e => {
   const row = e.target.closest('tr[data-id]');
   if (!row) return;
@@ -833,6 +847,35 @@ tableBody.addEventListener('click', e => {
   if (checkbox || star || pin || badge) return;
 
   const id = row.dataset.id;
+  const sorted = sortFiles(allFiles);
+
+  if (e.ctrlKey || e.metaKey) {
+    // Ctrl + Click: Tekil seçimi aç/kapat
+    if (selectedIds.has(id)) selectedIds.delete(id);
+    else selectedIds.add(id);
+    _lastSelectedRowId = id;
+    renderTable();
+    if (typeof updateBulkBar === 'function') updateBulkBar();
+    return;
+  }
+
+  if (e.shiftKey && _lastSelectedRowId) {
+    // Shift + Click: Son seçilen ile şimdiki aralığı seç
+    const idx1 = sorted.findIndex(f => f.id === _lastSelectedRowId);
+    const idx2 = sorted.findIndex(f => f.id === id);
+    if (idx1 !== -1 && idx2 !== -1) {
+      const start = Math.min(idx1, idx2);
+      const end = Math.max(idx1, idx2);
+      for (let i = start; i <= end; i++) {
+        selectedIds.add(sorted[i].id);
+      }
+      renderTable();
+      if (typeof updateBulkBar === 'function') updateBulkBar();
+      return;
+    }
+  }
+
+  _lastSelectedRowId = id;
   openDetail(id);
 });
 
@@ -986,10 +1029,259 @@ document.addEventListener('change', e => {
 
 function toggleSelect(e, id) {
   if (e && e.stopPropagation) e.stopPropagation();
+  const sorted = sortFiles(allFiles);
+
+  if (e && e.shiftKey && _lastSelectedRowId) {
+    const idx1 = sorted.findIndex(f => f.id === _lastSelectedRowId);
+    const idx2 = sorted.findIndex(f => f.id === id);
+    if (idx1 !== -1 && idx2 !== -1) {
+      const start = Math.min(idx1, idx2);
+      const end = Math.max(idx1, idx2);
+      for (let i = start; i <= end; i++) {
+        selectedIds.add(sorted[i].id);
+      }
+      renderCurrentView();
+      if (typeof updateBulkBar === 'function') updateBulkBar();
+      return;
+    }
+  }
+
   if (selectedIds.has(id)) selectedIds.delete(id);
   else selectedIds.add(id);
-  renderTable();
+  _lastSelectedRowId = id;
+  renderCurrentView();
   if (typeof updateBulkBar === 'function') updateBulkBar();
+}
+
+function handleItemClick(e, id) {
+  if (e && e.target && (e.target.closest('.row-checkbox') || e.target.closest('.star-btn') || e.target.closest('.pin-btn') || e.target.closest('.badge') || e.target.closest('button'))) {
+    return;
+  }
+
+  const sorted = sortFiles(allFiles);
+
+  if (e.ctrlKey || e.metaKey) {
+    if (selectedIds.has(id)) selectedIds.delete(id);
+    else selectedIds.add(id);
+    _lastSelectedRowId = id;
+    renderCurrentView();
+    if (typeof updateBulkBar === 'function') updateBulkBar();
+    return;
+  }
+
+  if (e.shiftKey && _lastSelectedRowId) {
+    const idx1 = sorted.findIndex(f => f.id === _lastSelectedRowId);
+    const idx2 = sorted.findIndex(f => f.id === id);
+    if (idx1 !== -1 && idx2 !== -1) {
+      const start = Math.min(idx1, idx2);
+      const end = Math.max(idx1, idx2);
+      for (let i = start; i <= end; i++) {
+        selectedIds.add(sorted[i].id);
+      }
+      renderCurrentView();
+      if (typeof updateBulkBar === 'function') updateBulkBar();
+      return;
+    }
+  }
+
+  _lastSelectedRowId = id;
+  openDetail(id);
+}
+window.handleItemClick = handleItemClick;
+window.toggleSelect = toggleSelect;
+
+// ── SABİTLEME (PIN) TOGGLE ────────────────────────────────
+// ── SIRALAMA (Pin önce, sonra favori, sonra alan sıralaması) ──────────────
+function sortFiles(files) {
+  return [...files].sort((a, b) => {
+    // Önce sabitlenmişler
+    if (a.isPinned && !b.isPinned) return -1;
+    if (!a.isPinned && b.isPinned) return 1;
+    // Sonra favoriler
+    if (a.isFavorite && !b.isFavorite) return -1;
+    if (!a.isFavorite && b.isFavorite) return 1;
+
+    let va, vb;
+    switch (sortField) {
+      case 'name':
+        va = (a.meta?.reportName || a.name || '').toLowerCase();
+        vb = (b.meta?.reportName || b.name || '').toLowerCase();
+        break;
+      case 'fileName':
+        va = (a.name || '').toLowerCase();
+        vb = (b.name || '').toLowerCase();
+        break;
+      case 'sizeBytes':
+        va = Number(a.sizeBytes) || 0;
+        vb = Number(b.sizeBytes) || 0;
+        break;
+      case 'guid':
+        va = (a.meta?.guid || '').toLowerCase();
+        vb = (b.meta?.guid || '').toLowerCase();
+        break;
+      case 'category':
+        va = (a.category || '').toLowerCase();
+        vb = (b.category || '').toLowerCase();
+        break;
+      case 'ownerName':
+        va = (a.ownerName || a.owner_name || '').toLowerCase();
+        vb = (b.ownerName || b.owner_name || '').toLowerCase();
+        break;
+      case 'author':
+        va = (a.meta?.author || '').toLowerCase();
+        vb = (b.meta?.author || '').toLowerCase();
+        break;
+      case 'queries':
+        va = (a.queries || []).length;
+        vb = (b.queries || []).length;
+        break;
+      case 'updatedAt':
+      case 'lastModified':
+        va = new Date(a.updatedAt || a.loadedAt).getTime() || 0;
+        vb = new Date(b.updatedAt || b.loadedAt).getTime() || 0;
+        break;
+      case 'loadedAt':
+      default:
+        va = new Date(a.loadedAt).getTime() || 0;
+        vb = new Date(b.loadedAt).getTime() || 0;
+        break;
+    }
+    if (va < vb) return sortDir === 'asc' ? -1 : 1;
+    if (va > vb) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+}
+
+// ── KART GÖRÜNÜMÜ RENDER (TAŞMASIZ & ZENGİNLEŞTİRİLMİŞ) ───
+function renderCards(container) {
+  const sorted = sortFiles(allFiles);
+  resultCount.textContent = sorted.length + ' sonuç';
+
+  const prefs = FrpStore.getPreferences();
+  const pageSize = prefs.pageSize || 50;
+  const totalItems = sorted.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  if (currentPage > totalPages) currentPage = totalPages;
+  if (currentPage < 1) currentPage = 1;
+
+  const startIndex = (currentPage - 1) * pageSize;
+  const pagedFiles = pageSize >= 9999 ? sorted : sorted.slice(startIndex, startIndex + pageSize);
+
+  renderPaginationControls(totalItems, pageSize);
+
+  if (sorted.length === 0) {
+    container.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--text-muted);font-size:.9rem;">Sonuç bulunamadı.</div>`;
+    return;
+  }
+
+  container.style.display = 'grid';
+  container.style.gridTemplateColumns = 'repeat(auto-fill, minmax(320px, 1fr))';
+  container.style.gap = '1.1rem';
+  container.style.padding = '1rem 0';
+  container.style.boxSizing = 'border-box';
+  container.style.width = '100%';
+
+  container.innerHTML = pagedFiles.map(file => {
+    const isSelected = selectedIds.has(file.id);
+    const reportName = file.meta?.reportName || file.name;
+    const date = new Date(file.loadedAt).toLocaleDateString('tr-TR');
+    const size = file.sizeBytes > 1024 ? Math.round(file.sizeBytes / 1024) + ' KB' : file.sizeBytes + ' B';
+    const guidVal = (file.meta && file.meta.guid) ? file.meta.guid : '';
+    const guidBadge = guidVal
+      ? `<span class="badge badge-gray" onclick="event.stopPropagation();copyGuidText('${escHtml(guidVal)}')" title="Tıklayınca GUID kopyalar: ${escHtml(guidVal)}" style="cursor:pointer;font-family:var(--mono);font-size:.68rem;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle;">🔑 ${escHtml(guidVal)}</span>`
+      : '';
+
+    const oName = file.ownerName || file.owner_name || (file.userId === 'usr_admin_root' ? 'Admin' : 'Sistem');
+    const oDept = file.ownerDepartment || file.owner_department || '';
+    const ownerChip = `<span class="owner-chip" style="font-size:.72rem;padding:.15rem .5rem;" title="Yükleyen: ${escHtml(oName)}${oDept ? ' · ' + escHtml(oDept) : ''}">👤 ${escHtml(oName)}</span>`;
+
+    return `
+      <div class="report-card ${file.isPinned ? 'pinned' : ''} ${isSelected ? 'selected' : ''}" style="background:var(--bg-surface);border:${isSelected ? '2px solid var(--accent)' : '1.5px solid var(--border-light)'};border-radius:14px;padding:1.1rem;display:flex;flex-direction:column;gap:.75rem;cursor:pointer;transition:all .18s ease;box-shadow:${isSelected ? '0 0 0 2px rgba(37,99,235,0.2)' : '0 4px 14px rgba(0,0,0,.04)'};box-sizing:border-box;max-width:100%;overflow:hidden;" onclick="handleItemClick(event, '${file.id}')">
+        <div class="card-top" style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;">
+          <div style="display:flex;align-items:flex-start;gap:.5rem;min-width:0;flex:1;overflow:hidden;">
+            <input type="checkbox" class="row-checkbox" data-id="${file.id}" ${isSelected ? 'checked' : ''} onchange="toggleSelect(event, '${file.id}')" onclick="event.stopPropagation();" style="width:16px;height:16px;cursor:pointer;margin-top:2px;flex-shrink:0;" />
+            <div style="min-width:0;flex:1;overflow:hidden;">
+              <div class="card-title" style="font-weight:800;font-size:.92rem;color:var(--text-primary);line-height:1.35;word-break:break-word;">📋 ${escHtml(reportName)}</div>
+              <div style="font-size:.74rem;color:var(--text-muted);font-family:var(--font);margin-top:.25rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;" title="${escHtml(file.name)} · ${size}">
+                📄 ${escHtml(file.name)} · <strong>${size}</strong>
+              </div>
+            </div>
+          </div>
+          <div class="card-actions" onclick="event.stopPropagation();" style="display:flex;align-items:center;gap:.25rem;flex-shrink:0;">
+            <button class="pin-btn ${file.isPinned ? 'active' : ''}" onclick="togglePin(event, '${file.id}')" title="Üste Sabitle" style="background:none;border:none;cursor:pointer;font-size:1rem;opacity:${file.isPinned ? '1' : '0.35'};">📌</button>
+            <button class="star-btn ${file.isFavorite ? 'active' : ''}" onclick="toggleFav(event, '${file.id}')" title="Favori">★</button>
+          </div>
+        </div>
+
+        <div class="card-body" style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;overflow:hidden;">
+          ${ownerChip}
+          <span class="badge badge-blue">🗄️ ${file.queries.length} SQL</span>
+          ${file.pascalScript ? '<span class="badge badge-purple">✓ Pascal</span>' : ''}
+          ${file.category ? `<span class="badge badge-purple" onclick="event.stopPropagation();openCategoryModalFor('${file.id}')" style="cursor:pointer;" title="Kategori: ${escHtml(file.category)}">🏷️ ${escHtml(file.category)}</span>` : `<button class="btn btn-sm" onclick="event.stopPropagation();openCategoryModalFor('${file.id}')" style="font-size:.7rem;padding:1px 6px;border-radius:5px;opacity:.7;">+ Kategori</button>`}
+        </div>
+
+        <div class="card-footer" style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border-light);padding-top:.6rem;font-size:.74rem;color:var(--text-muted);gap:.5rem;overflow:hidden;">
+          ${guidBadge || '<span style="font-size:.72rem;">—</span>'}
+          <span style="white-space:nowrap;flex-shrink:0;">📅 ${date}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ── TIMELINE GÖRÜNÜMÜ RENDER ──────────────────────────────
+function renderTimeline(container) {
+  const sorted = sortFiles(allFiles);
+  resultCount.textContent = sorted.length + ' sonuç';
+
+  if (sorted.length === 0) {
+    container.innerHTML = `<div style="text-align:center;padding:3rem;color:var(--text-muted);">Sonuç bulunamadı.</div>`;
+    return;
+  }
+
+  // Yüklenme tarihine göre grupla (Yıl-Ay)
+  const groups = {};
+  sorted.forEach(file => {
+    const d = new Date(file.loadedAt);
+    const key = d.toLocaleString('tr-TR', { month: 'long', year: 'numeric' });
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(file);
+  });
+
+  container.innerHTML = Object.entries(groups).map(([groupTitle, items]) => `
+    <div class="timeline-group">
+      <div class="timeline-group-header">📅 ${groupTitle} (${items.length} rapor)</div>
+      <div class="timeline-items">
+        ${items.map(file => {
+          const isSelected = selectedIds.has(file.id);
+          const reportName = file.meta?.reportName || file.name;
+          const timeStr = new Date(file.loadedAt).toLocaleDateString('tr-TR');
+          const guidVal = (file.meta && file.meta.guid) ? file.meta.guid : '—';
+          const oName = file.ownerName || file.owner_name || (file.userId === 'usr_admin_root' ? 'Admin' : 'Sistem');
+          const oDept = file.ownerDepartment || file.owner_department || '';
+          const ownerChip = `<span class="owner-chip" style="font-size:.7rem;padding:.1rem .45rem;" title="Yükleyen: ${escHtml(oName)}${oDept ? ' · ' + escHtml(oDept) : ''}">👤 ${escHtml(oName)}</span>`;
+
+          return `
+            <div class="timeline-item ${isSelected ? 'selected' : ''}" onclick="handleItemClick(event, '${file.id}')" style="cursor:pointer;border-left:${isSelected ? '4px solid var(--accent)' : '3px solid var(--border)'};background:${isSelected ? 'var(--bg-raised)' : 'var(--bg-surface)'};padding:.75rem 1rem;border-radius:10px;margin-bottom:.5rem;transition:all .15s;">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:.6rem;">
+                <div style="display:flex;align-items:center;gap:.5rem;min-width:0;flex:1;">
+                  <input type="checkbox" class="row-checkbox" data-id="${file.id}" ${isSelected ? 'checked' : ''} onchange="toggleSelect(event, '${file.id}')" onclick="event.stopPropagation();" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;" />
+                  <strong style="font-size:.9rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📋 ${escHtml(reportName)}</strong>
+                </div>
+                <span style="font-size:.75rem;color:var(--text-muted);white-space:nowrap;">${timeStr}</span>
+              </div>
+              <div style="font-size:.76rem;color:var(--text-muted);margin-top:.35rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding-left:1.5rem;">
+                ${ownerChip}
+                <span>Dosya: <code style="font-family:var(--font);font-size:.76rem;">${escHtml(file.name)}</code></span>
+                <span class="badge badge-gray" style="font-family:var(--mono);font-size:.7rem;">🔑 GUID: ${escHtml(guidVal)}</span>
+                <span class="badge badge-blue" style="font-size:.7rem;">🗄️ ${file.queries.length} SQL</span>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `).join('');
 }
 
 document.getElementById('btnCompareSelected')?.addEventListener('click', () => {
