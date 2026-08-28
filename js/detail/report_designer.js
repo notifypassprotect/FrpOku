@@ -1226,8 +1226,8 @@
           { name: 'Caption / Text', val: obj.caption || obj.text || '—' },
           { name: 'DataSet', val: obj.dataSet || obj.listSource || '—' },
           { name: 'DataField', val: obj.dataField || obj.listField || '—' },
-          { name: 'Font.Color', val: formatDelphiColorName(obj.fontColor) },
-          { name: 'Frame.Color', val: formatDelphiColorName(obj.frameColor) },
+          { name: 'Font.Color', rawVal: obj.fontColor, val: formatDelphiColorName(obj.fontColor), isColor: true },
+          { name: 'Frame.Color', rawVal: obj.frameColor, val: formatDelphiColorName(obj.frameColor), isColor: true },
           { name: 'OnClick', val: obj.onClick || '—' },
           { name: 'OnBeforePrint', val: obj.onBeforePrint || '—' },
           { name: 'Visible', val: obj.visible !== false ? 'True' : 'False' }
@@ -1247,11 +1247,11 @@
           { name: 'DisplayFormat', val: obj.displayFormat || '—' },
           { name: 'Font.Name', val: obj.fontName || 'Arial' },
           { name: 'Font.Size', val: obj.fontSize || '10' },
-          { name: 'Font.Color', val: formatDelphiColorName(obj.fontColor) },
+          { name: 'Font.Color', rawVal: obj.fontColor, val: formatDelphiColorName(obj.fontColor), isColor: true, isText: true },
           { name: 'Font.Style', val: formatFontStyle(obj.fontStyle) },
-          { name: 'Fill.BackColor', val: formatDelphiColorName(obj.fillBackColor || obj.color) },
+          { name: 'Fill.BackColor', rawVal: (obj.fillBackColor || obj.color), val: formatDelphiColorName(obj.fillBackColor || obj.color), isColor: true },
           { name: 'Frame.Typ', val: formatFrameType(obj.frameTyp) },
-          { name: 'Frame.Color', val: formatDelphiColorName(obj.frameColor) },
+          { name: 'Frame.Color', rawVal: obj.frameColor, val: formatDelphiColorName(obj.frameColor), isColor: true },
           { name: 'Frame.Width', val: obj.frameWidth ?? '1' },
           { name: 'Align', val: obj.align || 'baNone' },
           { name: 'HAlign', val: obj.hAlign || 'haLeft' },
@@ -1275,9 +1275,17 @@
 
       return filtered.map(p => {
         let colorSwatch = '';
-        if (p.name.includes('Color') && p.val && p.val !== '—' && p.val !== 'clNone') {
-          const hexCol = decodeDelphiColor(p.val, false);
-          colorSwatch = `<span style="display:inline-block;width:10px;height:10px;border-radius:2px;border:1px solid rgba(255,255,255,0.4);background-color:${hexCol};margin-right:6px;vertical-align:middle;flex-shrink:0;"></span>`;
+        if (p.isColor || p.name.includes('Color')) {
+          const rawColor = p.rawVal !== undefined ? p.rawVal : p.val;
+          const isText = !!p.isText;
+          const hexCol = decodeDelphiColor(rawColor, !isText);
+          const isTransparent = !rawColor || rawColor === 'clNone' || rawColor === '536870911' || rawColor === '-1';
+
+          if (isTransparent) {
+            colorSwatch = `<span style="display:inline-block;width:12px;height:12px;border-radius:2px;border:1px dashed #94a3b8;background:transparent;margin-right:6px;vertical-align:middle;flex-shrink:0;" title="Şeffaf"></span>`;
+          } else {
+            colorSwatch = `<span style="display:inline-block;width:12px;height:12px;border-radius:2px;border:1px solid rgba(0,0,0,0.35);box-shadow:inset 0 0 0 1px rgba(255,255,255,0.4);background-color:${hexCol};margin-right:6px;vertical-align:middle;flex-shrink:0;" title="${esc(hexCol)}"></span>`;
+          }
         }
         return `
           <div class="designer-prop-row">

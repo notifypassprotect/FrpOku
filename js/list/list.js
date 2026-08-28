@@ -940,8 +940,10 @@ if (tableBody && ctxMenu) {
         case 'clone-to-personal': {
           const cloned = FrpStore.cloneReportToPersonal(fileId);
           if (cloned) {
-            toast(`"${cloned.name}" kişisel raporlarınıza kopyalandı! 📋`, 'success');
-            refreshAll();
+            toast(`"${cloned.name}" kişisel raporlarınıza kopyalandı! Açılıyor... 📋`, 'success');
+            setTimeout(() => {
+              openDetail(cloned.id);
+            }, 400);
           }
           break;
         }

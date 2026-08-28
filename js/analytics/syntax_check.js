@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  function checkPascalSyntax(code) {
+  function checkPascalSyntax(code, reportContext = null) {
     const errors = [], warnings = [];
     if (!code || !code.trim()) return { errors, warnings };
 
@@ -226,7 +226,130 @@
       errors.push({ text: `Satır ${unclosed.line}: Açılan '${unclosed.type || 'begin'}' bloğu kapatılmamış`, line: unclosed.line, suggestion: "Bloğu uygun bir 'end;' ile kapatın." });
     }
 
+    // ── RAPOR NESNE İSMİ UYUMSUZLUKLARI (Object / Component Inspector Çapraz Denetimi) ──
+    const reportComponentNames = extractReportComponentNames(reportContext);
+    if (reportComponentNames.size > 0) {
+      // Script içindeki yerel 'var' tanımlamalarını ayıkla
+      const declaredVars = new Set();
+      const varSectionRx = /\bVAR\b([\s\S]+?)(?=\bBEGIN\b|\bPROCEDURE\b|\bFUNCTION\b|\bCONST\b|\bTYPE\b|$)/gi;
+      let vm;
+      while ((vm = varSectionRx.exec(code)) !== null) {
+        const decls = vm[1].split(';');
+        decls.forEach(d => {
+          const colonIdx = d.indexOf(':');
+          if (colonIdx !== -1) {
+            const varList = d.slice(0, colonIdx).split(',');
+            varList.forEach(v => {
+              const cleanV = v.trim().toUpperCase();
+              if (cleanV) declaredVars.add(cleanV);
+            });
+          }
+        });
+      }
+
+      // Standart Delphi / FastReport anahtar kelimeleri ve yerleşik nesneleri
+      const PASCAL_BUILTINS = new Set([
+        'REPORT', 'ENGINE', 'SENDER', 'SELF', 'CANVAS', 'DIALOGPAGE', 'PAGE', 'APPLICATION', 'SCREEN',
+        'TRUNC', 'ROUND', 'INTTOSTR', 'STRTOINT', 'FLOATTOSTR', 'STRTOFLOAT', 'FORMATDATETIME',
+        'NOW', 'DATE', 'TIME', 'INCMONTH', 'TRIM', 'COPY', 'POS', 'LENGTH', 'UPPERCASE', 'LOWERCASE',
+        'SHOWMESSAGE', 'MESSAGEDLG', 'GET', 'SET', 'VARARRAYCREATE', 'VARARRAYOF', 'NULL', 'UNASSIGNED',
+        'TRUE', 'FALSE', 'RESULT', 'ITEMS', 'LINES', 'TEXT', 'CAPTION', 'VALUE', 'CLOSE', 'OPEN',
+        'TFRXMEMOVIEW', 'TFRXPICTUREVIEW', 'TFRXCHECKLISTBOXCONTROL', 'TFRXDBCHECKLISTBOXCONTROL',
+        'TSTRINGLIST', 'TLIST', 'TOBJECT', 'COMPONENT', 'OWNER'
+      ]);
+
+      const seenUnknowns = new Set();
+      strippedLines.forEach((sLine, lIdx) => {
+        const lnum = lIdx + 1;
+        // Obje çağrısı kalıpları: ObjeAdi.Property veya ObjeAdi.Method(...)
+        const memberAccessRx = /\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\.\s*([a-zA-Z_][a-zA-Z0-9_]*)\b/g;
+        let mm;
+        while ((mm = memberAccessRx.exec(sLine)) !== null) {
+          const objName = mm[1];
+          const upperObj = objName.toUpperCase();
+
+          if (PASCAL_BUILTINS.has(upperObj) || declaredVars.has(upperObj)) continue;
+
+          // Rapor tasarımındaki bileşenler arasında var mı?
+          if (!reportComponentNames.has(upperObj) && !seenUnknowns.has(upperObj)) {
+            seenUnknowns.add(upperObj);
+
+            // En yakın eşleşen nesneyi bul (Örn: DBCheckListBox -> DBCheckListBox1)
+            let closest = '';
+            for (const realComp of reportComponentNames) {
+              if (realComp.startsWith(upperObj) || upperObj.startsWith(realComp)) {
+                closest = realComp;
+                break;
+              }
+            }
+
+            errors.push({
+              text: `Satır ${lnum}: Tanımsız Rapor Nesnesi '${objName}' ➔ Rapor tasarımında '${objName}' adında bir nesne bulunamadı${closest ? ` (Tasarımda bulunan nesne: '${closest}')` : ''}`,
+              line: lnum,
+              token: objName,
+              suggestion: closest 
+                ? `'${objName}' yerine rapordaki gerçek nesne olan '${closest}' kullanın.` 
+                : `'${objName}' nesnesinin rapor tasarımında var olduğundan emin olun.`
+            });
+          }
+        }
+      });
+    }
+
     return { errors, warnings };
+  }
+
+  function extractReportComponentNames(context) {
+    const names = new Set();
+    if (!context) {
+      if (typeof window !== 'undefined' && window.currentFile) {
+        context = window.currentFile;
+      }
+    }
+    if (!context) return names;
+
+    if (Array.isArray(context)) {
+      context.forEach(n => { if (n && typeof n === 'string') names.add(n.toUpperCase()); });
+      return names;
+    }
+
+    if (context.rawXml) {
+      const nameMatches = context.rawXml.match(/\bName="([a-zA-Z0-9_]+)"/g) || [];
+      nameMatches.forEach(m => {
+        const val = m.replace(/^Name="|"$|"/g, '').trim().toUpperCase();
+        if (val) names.add(val);
+      });
+    }
+
+    if (Array.isArray(context.pages)) {
+      context.pages.forEach(p => {
+        if (p.name) names.add(p.name.toUpperCase());
+        (p.bands || []).forEach(b => {
+          if (b.name) names.add(b.name.toUpperCase());
+          (b.objects || []).forEach(o => { if (o.name) names.add(o.name.toUpperCase()); });
+        });
+      });
+    }
+
+    if (Array.isArray(context.dialogPages)) {
+      context.dialogPages.forEach(d => {
+        if (d.name) names.add(d.name.toUpperCase());
+        (d.controls || []).forEach(c => {
+          if (c.name) names.add(c.name.toUpperCase());
+          (c.children || []).forEach(ch => { if (ch.name) names.add(ch.name.toUpperCase()); });
+        });
+      });
+    }
+
+    if (Array.isArray(context.queries)) {
+      context.queries.forEach(q => { if (q.name) names.add(q.name.toUpperCase()); });
+    }
+
+    if (Array.isArray(context.datasets)) {
+      context.datasets.forEach(ds => { if (ds.name) names.add(ds.name.toUpperCase()); });
+    }
+
+    return names;
   }
 
   function checkSqlStaticSyntax(sql) {

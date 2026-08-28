@@ -27,17 +27,22 @@
     'END', 'IS', 'NULL', 'BETWEEN', 'LIKE', 'EXISTS', 'OVER', 'PARTITION',
     'MINUS', 'INTERSECT', 'FETCH', 'NEXT', 'ROWS', 'ONLY', 'CONNECT',
     'START', 'PRIOR', 'ASC', 'DESC', 'NULLS', 'FIRST', 'LAST',
-    'COUNT', 'SUM', 'MAX', 'MIN', 'AVG', 'COALESCE', 'NVL', 'DECODE',
+    'COUNT', 'SUM', 'MAX', 'MIN', 'AVG', 'COALESCE', 'NVL', 'NULLIF', 'NVL2', 'LNNVL', 'DECODE',
     'TO_CHAR', 'TO_DATE', 'TO_NUMBER', 'TRUNC', 'ROUND', 'SYSDATE',
-    'ROW_NUMBER', 'RANK', 'DENSE_RANK', 'LEAD', 'LAG'
+    'ROW_NUMBER', 'RANK', 'DENSE_RANK', 'LEAD', 'LAG', 'GREATEST', 'LEAST',
+    'REGEXP_LIKE', 'REGEXP_SUBSTR', 'REGEXP_REPLACE', 'REGEXP_INSTR', 'SYS_GUID', 'SYS_CONTEXT'
   ];
 
   /**
    * Verilen SQL metnini güzelleştirir.
-   * Yorum satırlarını (-- ve /* *\/) ve String literal'leri ('...') %100 aynen korur.
+   * @param {string} raw - Ham SQL
+   * @param {object|string} options - { mode: 'expanded' | 'compact', uppercase: boolean } veya doğrudan mod adı
    */
-  function formatSQL(raw) {
+  function formatSQL(raw, options = {}) {
     if (!raw || !raw.trim()) return raw;
+
+    const mode = typeof options === 'string' ? options : (options.mode || 'expanded');
+    const uppercase = typeof options === 'object' ? !!options.uppercase : false;
 
     const comments = [];
     const literals = [];
@@ -73,21 +78,32 @@
       s = s.replace(rx, '\n' + clause);
     });
 
-    // 5. WHERE / HAVING altında AND/OR'ları girintili yeni satıra al
-    s = s.replace(/\n(WHERE|HAVING)\s/gi, '\nWHERE\n  ');
-    s = s.replace(/\bAND\b(?!\s*\()/gi, '\n  AND');
-    s = s.replace(/\bOR\b(?!\s*\()/gi, '\n  OR');
+    if (mode === 'compact') {
+      // ── KOMPAKT FORMAT (Daha Az Satır Sayısı - Kolonlar & Gruplar Yan Yana) ──
+      // WHERE, GROUP BY, ORDER BY, HAVING ana başlıklarını yeni satıra al, kolonları tek satırda tut
+      s = s.replace(/\n(WHERE|HAVING|GROUP\s+BY|ORDER\s+BY|SET|VALUES)\s+/gi, (m, g1) => `\n${g1.toUpperCase()} `);
+      s = s.replace(/\nSELECT\s+/gi, '\nSELECT ');
+      s = s.replace(/,\s+/g, ', ');
+      s = s.replace(/\bAND\b(?!\s*\()/gi, '\n  AND');
+      s = s.replace(/\bOR\b(?!\s*\()/gi, '\n  OR');
+    } else {
+      // ── GENİŞLETİLMİŞ FORMAT (Standart - Her Kolon ve Koşul Ayrı Satırda) ──
+      // 5. WHERE / HAVING altında AND/OR'ları girintili yeni satıra al
+      s = s.replace(/\n(WHERE|HAVING)\s/gi, '\nWHERE\n  ');
+      s = s.replace(/\bAND\b(?!\s*\()/gi, '\n  AND');
+      s = s.replace(/\bOR\b(?!\s*\()/gi, '\n  OR');
 
-    // 6. CASE/WHEN/THEN/ELSE/END girintileme
-    s = s.replace(/\bCASE\b/gi, '\n  CASE');
-    s = s.replace(/\bWHEN\b/gi, '\n    WHEN');
-    s = s.replace(/\bTHEN\b/gi, ' THEN');
-    s = s.replace(/\bELSE\b(?!\s*IF)/gi, '\n    ELSE');
-    s = s.replace(/\bEND\b(?!\s*(CASE|IF))/gi, '\n  END');
+      // 6. CASE/WHEN/THEN/ELSE/END girintileme
+      s = s.replace(/\bCASE\b/gi, '\n  CASE');
+      s = s.replace(/\bWHEN\b/gi, '\n    WHEN');
+      s = s.replace(/\bTHEN\b/gi, ' THEN');
+      s = s.replace(/\bELSE\b(?!\s*IF)/gi, '\n    ELSE');
+      s = s.replace(/\bEND\b(?!\s*(CASE|IF))/gi, '\n  END');
 
-    // 7. SELECT sütunlarını virgül sonrası yeni satır + girinti
-    s = s.replace(/\nSELECT\s+/gi, '\nSELECT\n  ');
-    s = s.replace(/,(?=[^\n]*\n(FROM|WHERE|GROUP|ORDER|HAVING|LIMIT|UNION|\n))/g, ',\n  ');
+      // 7. SELECT sütunlarını virgül sonrası yeni satır + girinti
+      s = s.replace(/\nSELECT\s+/gi, '\nSELECT\n  ');
+      s = s.replace(/,(?=[^\n]*\n(FROM|WHERE|GROUP|ORDER|HAVING|LIMIT|UNION|\n))/g, ',\n  ');
+    }
 
     // 8. Literal'leri ve Yorumları geri yükle
     literals.forEach((lit, i) => {
@@ -98,6 +114,10 @@
       s = s.replace(`__LINE_COMMENT_${i}__`, c);
       s = s.replace(`__BLOCK_COMMENT_${i}__`, c);
     });
+
+    if (uppercase && typeof window.convertSqlKeywords === 'function') {
+      s = window.convertSqlKeywords(s, 'upper');
+    }
 
     return s.trim();
   }

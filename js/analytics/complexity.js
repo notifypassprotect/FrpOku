@@ -231,27 +231,51 @@
       });
     }
 
-    // Geniş GROUP BY Listesi
-    const groupByMatch = cleanSql.match(/\bGROUP\s+BY\s+([\s\S]+?)(?:\bORDER\b|\bHAVING\b|$)/i);
-    if (groupByMatch) {
-      const groupCols = groupByMatch[1].split(',').map(c => c.trim()).filter(Boolean);
-      if (groupCols.length >= 6) {
-        warnings.push({
-          type: 'warning',
-          category: 'groupby',
-          categoryLabel: 'Ağır GROUP BY',
-          title: `Geniş GROUP BY Listesi (${groupCols.length} Kolon)`,
-          text: `Sorguda ${groupCols.length} kolon üzerinden gruplama yapılıyor. Bu durum veritabanında yüksek TEMP tablespace ve PGA sıralama belleği tüketebilir.`
-        });
+    // ── GENİŞ GROUP BY LİSTESİ ANALİZİ (HER BLOK AYRI AYRI PARSE EDİLİR) ──
+    let maxGroupByCols = 0;
+    let worstGroupBySnippet = '';
+    const groupByRegex = /\bGROUP\s+BY\s+([\s\S]+?)(?=\bHAVING\b|\bORDER\s+BY\b|\bUNION\b|\bFETCH\b|\bLIMIT\b|\bOFFSET\b|\)|\;|$)/gi;
+    let gbm;
+    while ((gbm = groupByRegex.exec(cleanSql)) !== null) {
+      const rawClause = gbm[1].trim();
+      let depth = 0;
+      let colCount = 0;
+      let currentChunk = '';
+      for (let i = 0; i < rawClause.length; i++) {
+        const char = rawClause[i];
+        if (char === '(') depth++;
+        else if (char === ')') depth = Math.max(0, depth - 1);
+        else if (char === ',' && depth === 0) {
+          if (currentChunk.trim()) colCount++;
+          currentChunk = '';
+          continue;
+        }
+        currentChunk += char;
+      }
+      if (currentChunk.trim()) colCount++;
+      if (colCount > maxGroupByCols) {
+        maxGroupByCols = colCount;
+        worstGroupBySnippet = rawClause.replace(/\s+/g, ' ').slice(0, 90);
       }
     }
 
+    if (maxGroupByCols >= 8) {
+      warnings.push({
+        type: 'warning',
+        category: 'groupby',
+        categoryLabel: 'Ağır GROUP BY',
+        title: `Geniş GROUP BY Listesi (${maxGroupByCols} Kolon)`,
+        text: `Sorgudaki bir gruplama bloğunda ${maxGroupByCols} adet kolon üzerinden gruplama yapılıyor ('${worstGroupBySnippet}...'). Bu durum veritabanında yüksek TEMP tablespace ve PGA sıralama belleği tüketebilir.`
+      });
+    }
+
     // Puanlama Hesabı (0 - 100)
+    // Karmaşıklık Skoru: Yapısal büyüklüğü ve kod yoğunluğunu ölçer
     let rawScore = (totalJoins * 3.5) + (subqCount * 5) + (unionCount * 4) + (caseCount * 2) + (andOrCount * 0.4) + (paramCount * 1.5) + (cteCount * 2) + (lines * 0.08);
     let score = Math.max(0, Math.min(100, Math.round(rawScore)));
 
-    // Sağlık Skoru: Hem yapısal ağırlık hem de riskli anti-pattern cezaları dengeli hesaplanır
-    const structuralDeduction = Math.min(45, Math.round(score * 0.45));
+    // Sağlık Skoru: Performans ve temiz SQL kurallarına uygunluğu ölçer (100 = Kusursuz)
+    const structuralDeduction = Math.min(40, Math.round(score * 0.35));
     const dangerDeduction = warnings.filter(w => w.type === 'danger').length * 15;
     const warningDeduction = warnings.filter(w => w.type === 'warning').length * 8;
     let healthScore = Math.max(10, Math.min(100, 100 - structuralDeduction - dangerDeduction - warningDeduction));
@@ -269,18 +293,23 @@
       level = 'Aşırı Karmaşık (Kritik Risk)'; color = '#ef4444'; grade = 'D';
     }
 
+    const scoreExplanation = `Karmaşıklık Puanı (${score}/100), sorgunun yapısal büyüklüğünü temsil eder: ${totalJoins} Tablo Bağlantısı (JOIN), ${subqCount} Alt Sorgu (Subquery), ${unionCount} UNION kümesi, ${andOrCount} Mantıksal Koşul (AND/OR) ve ${lines} satır SQL kodu içeriyor.`;
+    const healthExplanation = `Sağlık Notu (${healthScore}/100), sorgunun optimizasyon kalitesini ölçer: Tespit edilen ${warnings.length} adet potansiyel performans/indeks riski ve yapısal yükten puan kırılarak hesaplanmıştır.`;
+
     return {
       score,
       healthScore,
       level,
       color,
       grade,
+      scoreExplanation,
+      healthExplanation,
       details: {
         totalJoins, innerJoinCount, leftJoinCount, rightJoinCount, fullJoinCount, crossJoinCount,
         subqCount, caseCount, unionCount, unionAllCount, unionPureCount,
         andOrCount, orCount, paramCount, distinctCount,
         orderCount, groupCount, havingCount, windowCount, cteCount, cteNames,
-        existsCount, inSubqCount, notInSubqCount, lines
+        existsCount, inSubqCount, notInSubqCount, lines, maxGroupByCols
       },
       warnings,
       recommendations

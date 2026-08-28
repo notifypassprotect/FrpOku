@@ -535,8 +535,20 @@ function addTab(cfg) {
         </div>
         <div style="display:flex;gap:.4rem;flex-wrap:wrap;">
           ${cfg.type === 'sql' ? `
-            <button class="btn-copy" onclick="formatSqlInTab('${esc(cfg.id)}')" title="SQL Güzelleştir (Büyük harf & Girintileme)">🎨 Formatla</button>
-            <button class="btn-copy" onclick="minifySqlInTab('${esc(cfg.id)}')" title="SQL'i Tek Satıra İndir">⚡ Minify</button>
+            <div class="topbar-dropdown" style="display:inline-flex;padding-bottom:0;margin-bottom:0;">
+              <button class="btn-copy topbar-dropdown-toggle" style="background:linear-gradient(135deg, #3b82f6, #6366f1);color:#fff;border:none;font-weight:700;" title="SQL Biçimlendirme Seçenekleri">🎨 Formatla</button>
+              <div class="topbar-dropdown-menu" style="left:0;right:auto;min-width:220px;z-index:9999;">
+                <button class="topbar-dropdown-item" onclick="formatSqlInTab('${esc(cfg.id)}', 'expanded')">
+                  <span>📐</span> <span>Standart Format (Geniş)</span>
+                </button>
+                <button class="topbar-dropdown-item" onclick="formatSqlInTab('${esc(cfg.id)}', 'compact')">
+                  <span>📄</span> <span>Kompakt Format (Az Satır)</span>
+                </button>
+                <button class="topbar-dropdown-item" onclick="minifySqlInTab('${esc(cfg.id)}')">
+                  <span>⚡</span> <span>Tek Satır (Minify)</span>
+                </button>
+              </div>
+            </div>
             <button class="btn-copy" id="${esc(cfg.id)}_casetogglebtn" onclick="changeSqlCaseInTab('${esc(cfg.id)}')" title="SQL Anahtar Kelimelerini BÜYÜK / KÜÇÜK Harfe Dönüştür">🔠 BÜYÜK</button>
             <button class="btn-copy" onclick="openComplexityModal(${cfg.queryIndex})" title="SQL Karmaşıklık Puanı & Zeki Analiz">📊 Karmaşıklık</button>
             <button class="btn-copy" onclick="addToSnippetLibrary(${cfg.queryIndex})">📌 Kütüphaneye Ekle</button>
@@ -1472,31 +1484,36 @@ async function init() {
     }
 
     if (btnCloneFromPool) {
-      btnCloneFromPool.onclick = () => {
-        const cloned = FrpStore.cloneReportToPersonal(file.id);
-        if (cloned) {
-          showToast(`"${cloned.name}" kişisel raporlarınıza kopyalandı! 📋`, 'success');
-          setTimeout(() => {
-            window.location.href = `detail.html?id=${encodeURIComponent(cloned.id)}`;
-          }, 800);
-        }
-      };
+      if (isOwner) {
+        btnCloneFromPool.style.display = 'none';
+      } else {
+        btnCloneFromPool.style.display = 'inline-flex';
+        btnCloneFromPool.onclick = () => {
+          const cloned = FrpStore.cloneReportToPersonal(file.id);
+          if (cloned) {
+            showToast(`"${cloned.name}" kişisel raporlarınıza kopyalandı! Açılıyor... 📋`, 'success');
+            setTimeout(() => {
+              window.location.href = `detail.html?id=${encodeURIComponent(cloned.id)}`;
+            }, 500);
+          }
+        };
+      }
     }
 
     if (btnTogglePoolDetail) {
-      btnTogglePoolDetail.style.display = 'inline-flex';
-      btnTogglePoolDetail.textContent = isPublic ? '🔒 Havuzdan Kaldır' : '🌐 Havuzda Paylaş';
-      btnTogglePoolDetail.className = isPublic ? 'btn btn-sm btn-ghost' : 'btn btn-sm btn-primary';
+      if (isOwnerOrAdmin) {
+        btnTogglePoolDetail.style.display = 'inline-flex';
+        btnTogglePoolDetail.textContent = isPublic ? '🔒 Havuzdan Kaldır' : '🌐 Havuzda Paylaş';
+        btnTogglePoolDetail.className = isPublic ? 'btn btn-sm btn-ghost' : 'btn btn-sm btn-primary';
 
-      btnTogglePoolDetail.onclick = () => {
-        if (!isOwnerOrAdmin) {
-          showToast('Bu raporu yalnızca sahibi veya Admin havuzdan çekebilir.', 'warning');
-          return;
-        }
-        const newState = FrpStore.toggleReportPool(file.id, !isPublic);
-        showToast(newState ? 'Rapor Ortak Havuzda Paylaşıldı! 🌐' : 'Rapor havuzdan kaldırıldı ve gizlendi 🔒', 'success');
-        setTimeout(() => location.reload(), 600);
-      };
+        btnTogglePoolDetail.onclick = () => {
+          const newState = FrpStore.toggleReportPool(file.id, !isPublic);
+          showToast(newState ? 'Rapor Ortak Havuzda Paylaşıldı! 🌐' : 'Rapor havuzdan kaldırıldı ve gizlendi 🔒', 'success');
+          setTimeout(() => location.reload(), 600);
+        };
+      } else {
+        btnTogglePoolDetail.style.display = 'none';
+      }
     }
 
     // Topbar'a Tema Seçici ve Zen Butonu Ekle
@@ -1572,7 +1589,7 @@ function applyCodeUpdateInTab(tabId, newCode) {
 }
 
 // ── SQL FORMATTER ENTEGRASYONU ───────────────────────────
-function formatSqlInTab(tabId) {
+function formatSqlInTab(tabId, mode = 'expanded') {
   const panel = document.getElementById(tabId + '_panel');
   const cfg = (panel && panel._tabCfg) || activeTabs.find(t => t.id === tabId);
   if (!cfg) return;
@@ -1582,20 +1599,28 @@ function formatSqlInTab(tabId) {
   const isEditing = editWrap ? (editWrap.style.display !== 'none') : (editArea && editArea.style.display !== 'none');
   const rawSql = isEditing ? editArea.value : cfg.rawCode;
 
-  if (cfg._formatApplied) {
+  // Aynı mod zaten uygulandıysa toggle ile geri al
+  if (cfg._formatApplied && cfg._currentFormatMode === mode) {
     const restored = cfg._formatOriginalCode != null ? cfg._formatOriginalCode : rawSql;
     applyCodeUpdateInTab(tabId, restored);
     cfg._formatApplied = false;
+    cfg._currentFormatMode = null;
     cfg._formatOriginalCode = null;
-    showToast('SQL eski haline döndürüldü ↩️', 'info');
+    showToast('SQL orijinal haline döndürüldü ↩️', 'info');
     return;
   }
 
-  const formatted = window.formatSQL ? window.formatSQL(rawSql) : rawSql;
-  cfg._formatOriginalCode = rawSql;
+  if (!cfg._formatApplied) {
+    cfg._formatOriginalCode = rawSql;
+  }
+
+  const formatted = window.formatSQL ? window.formatSQL(rawSql, { mode }) : rawSql;
   cfg._formatApplied = true;
+  cfg._currentFormatMode = mode;
   applyCodeUpdateInTab(tabId, formatted);
-  showToast('SQL güzelleştirildi. Tekrar basınca eski haline döner 🎨', 'success');
+
+  const modeLabel = mode === 'compact' ? 'Kompakt (Az Satır) Formatlandı 📄' : 'Standart (Geniş) Formatlandı 🎨';
+  showToast(`${modeLabel} (Tekrar basınca orijinaline döner)`, 'success');
 }
 
 // ── SQL MINIFIER (TEK SATIRA İNDİRME - TOGGLE DESTEKLİ) ───
@@ -1639,15 +1664,19 @@ const SQL_KW_SET = new Set([
   'GROUP', 'BY', 'ORDER', 'HAVING', 'LIMIT', 'OFFSET', 'INSERT', 'INTO', 'VALUES',
   'UPDATE', 'SET', 'DELETE', 'CREATE', 'TABLE', 'DROP', 'ALTER', 'CASE', 'WHEN',
   'THEN', 'ELSE', 'END', 'IS', 'NULL', 'BETWEEN', 'LIKE', 'EXISTS', 'COALESCE',
-  'NVL', 'AVG', 'SUM', 'COUNT', 'MIN', 'MAX', 'TRUNC', 'SYSDATE', 'TO_DATE',
+  'NVL', 'NULLIF', 'NVL2', 'LNNVL', 'AVG', 'SUM', 'COUNT', 'MIN', 'MAX', 'TRUNC', 'SYSDATE', 'TO_DATE',
   'TO_CHAR', 'SUBSTR', 'ROUND', 'ROWNUM', 'REPLACE', 'LPAD', 'RPAD', 'TRIM',
   'INSTR', 'ASC', 'DESC', 'OVER', 'PARTITION', 'FETCH', 'FIRST', 'ROWS', 'ONLY',
   'DECODE', 'GREATEST', 'LEAST', 'ROW_NUMBER', 'RANK', 'DENSE_RANK', 'LISTAGG',
   'XMLAGG', 'XMLELEMENT', 'CONNECT', 'PRIOR', 'START', 'DUAL', 'UPPER', 'LOWER',
-  'LENGTH', 'TO_NUMBER', 'NVL2', 'CAST', 'EXTRACT', 'YEAR', 'MONTH', 'DAY',
+  'LENGTH', 'TO_NUMBER', 'CAST', 'EXTRACT', 'YEAR', 'MONTH', 'DAY',
   'HOUR', 'MINUTE', 'SECOND', 'INTERVAL', 'MERGE', 'USING', 'MATCHED', 'RETURNING',
   'EXEC', 'EXECUTE', 'BEGIN', 'COMMIT', 'ROLLBACK', 'GRANT', 'REVOKE', 'VIEW',
-  'INDEX', 'PRIMARY', 'KEY', 'FOREIGN', 'REFERENCES', 'CHECK', 'DEFAULT', 'CONSTRAINT', 'UNIQUE'
+  'INDEX', 'PRIMARY', 'KEY', 'FOREIGN', 'REFERENCES', 'CHECK', 'DEFAULT', 'CONSTRAINT', 'UNIQUE',
+  'REGEXP_LIKE', 'REGEXP_SUBSTR', 'REGEXP_REPLACE', 'REGEXP_INSTR', 'SYS_GUID', 'SYS_CONTEXT',
+  'MOD', 'ABS', 'CEIL', 'FLOOR', 'SIGN', 'POWER', 'SQRT', 'CONCAT', 'INITCAP', 'CHR', 'ASCII',
+  'ADD_MONTHS', 'LAST_DAY', 'MONTHS_BETWEEN', 'NEXT_DAY', 'LAG', 'LEAD', 'FIRST_VALUE', 'LAST_VALUE',
+  'RATIO_TO_REPORT', 'CUME_DIST', 'PERCENT_RANK', 'MEDIAN', 'STDDEV', 'VARIANCE'
 ]);
 
 function convertSqlKeywords(text, targetMode) {
@@ -1919,7 +1948,7 @@ function openComplexityModal(qIdx) {
     <div style="display:flex;flex-direction:column;gap:1.1rem;max-height:75vh;overflow-y:auto;padding-right:.3rem;">
       
       <!-- Skor Özeti & Termometre Barı -->
-      <div style="background:var(--bg-raised);border-radius:12px;border:1px solid var(--border-light);padding:1rem 1.25rem;">
+      <div style="background:var(--bg-raised);border-radius:12px;border:1px solid var(--border-light);padding:1.1rem 1.25rem;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
           <div>
             <div style="font-size:.76rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;">SQL Karmaşıklık & Sağlık Skoru</div>
@@ -1931,7 +1960,7 @@ function openComplexityModal(qIdx) {
           <div style="text-align:right;display:flex;align-items:center;gap:.8rem;">
             <div>
               <div style="font-size:.72rem;color:var(--text-muted);font-weight:600;">Sağlık Notu</div>
-              <div style="font-size:.85rem;font-weight:700;color:var(--green);">${comp.healthScore || 100} / 100</div>
+              <div style="font-size:.88rem;font-weight:800;color:${comp.healthScore >= 75 ? 'var(--green)' : (comp.healthScore >= 50 ? 'var(--orange)' : 'var(--red)')};">${comp.healthScore || 100} / 100</div>
             </div>
             <div style="display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:50%;background:${comp.color};color:#fff;font-size:1.4rem;font-weight:900;box-shadow:0 6px 16px ${comp.color}40;">
               ${comp.grade || 'A'}
@@ -1951,6 +1980,19 @@ function openComplexityModal(qIdx) {
           <span>65 Karmaşık (B)</span>
           <span>85 Çok Karmaşık (C)</span>
           <span>100 Kritik (F)</span>
+        </div>
+
+        <!-- 💡 SKORLAR ARASINDAKİ FARK VE PUANLAMA MANTIĞI KARTI -->
+        <div style="margin-top:.85rem;padding:.75rem .9rem;background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.25);border-radius:10px;font-size:.78rem;line-height:1.45;color:var(--text-primary);display:flex;flex-direction:column;gap:.4rem;">
+          <div style="font-weight:800;color:var(--accent-bright);display:flex;align-items:center;gap:.35rem;">
+            <span>ℹ️</span> <span>Skorlar Arasındaki Fark & Puanlama Mantığı:</span>
+          </div>
+          <div>
+            <strong>1. Karmaşıklık Skoru (${comp.score}/100):</strong> Sorgunun <em>yapısal büyüklüğünü ve hacmini</em> ölçer (${d.totalJoins || 0} JOIN, ${d.subqCount || 0} Alt Sorgu, ${d.unionCount || 0} UNION, ${d.lines || 0} satır). Büyük sorgularda bu skorun yüksek olması doğaldır ve tek başına hata anlamına gelmez.
+          </div>
+          <div>
+            <strong>2. Sağlık Notu (${comp.healthScore || 100}/100):</strong> Sorgunun <em>performans kalitesini ve DBA iyi pratiklerine uyumunu</em> ölçer (100 puandan başlar; indeks iptali, kartezyen riski gibi anti-pattern'lerden puan kırılır).
+          </div>
         </div>
       </div>
 
@@ -2238,7 +2280,7 @@ function refreshPascalSyntaxButtonState() {
   }
 
   const res = (window.FrpStore && window.FrpStore.checkPascalSyntax) 
-    ? FrpStore.checkPascalSyntax(code) 
+    ? FrpStore.checkPascalSyntax(code, currentFile) 
     : { errors: [], warnings: [] };
 
   if (res.errors && res.errors.length > 0) {
@@ -2260,7 +2302,7 @@ function checkPascalSyntaxInTab() {
   const editArea = document.getElementById('tab_pascal_editarea');
   const codeToCheck = (editArea && editArea.style.display !== 'none') ? editArea.value : (currentFile ? currentFile.pascalScript : '');
   if (!codeToCheck) return;
-  const res = FrpStore.checkPascalSyntax(codeToCheck);
+  const res = FrpStore.checkPascalSyntax(codeToCheck, currentFile);
 
   refreshPascalSyntaxButtonState();
 

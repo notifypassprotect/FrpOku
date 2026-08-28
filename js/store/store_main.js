@@ -1174,7 +1174,7 @@
     getTableUsage: () => window.FrpTableUsage ? window.FrpTableUsage.getTableUsage(_read()) : [],
     findDuplicateQueries: () => window.FrpTableUsage ? window.FrpTableUsage.findDuplicateQueries(_read()) : [],
     getParameterUsage: () => window.FrpParamUsage ? window.FrpParamUsage.getParameterUsage(_read()) : [],
-    checkPascalSyntax: (code) => window.FrpSyntaxCheck ? window.FrpSyntaxCheck.checkPascalSyntax(code) : { errors: [], warnings: [] },
+    checkPascalSyntax: (code, reportContext) => window.FrpSyntaxCheck ? window.FrpSyntaxCheck.checkPascalSyntax(code, reportContext) : { errors: [], warnings: [] },
     checkSqlStaticSyntax: (sql) => window.FrpSyntaxCheck ? window.FrpSyntaxCheck.checkSqlStaticSyntax(sql) : { errors: [], warnings: [] },
     bumpVersionFilename: (name, count) => window.FrpTags ? window.FrpTags.bumpVersionFilename(name, count) : name,
 
