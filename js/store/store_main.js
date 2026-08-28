@@ -364,10 +364,36 @@
   }
 
   // ── 5. Çöp Kutusu (Soft Delete) Metotları ─────────────────────
+  const TRASH_KEY = 'frpoku_trash';
+
+  function _readTrash() {
+    if (_trashStore && _trashStore.length > 0) return _trashStore;
+    try {
+      const raw = localStorage.getItem(TRASH_KEY);
+      _trashStore = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(_trashStore)) _trashStore = [];
+      return _trashStore;
+    } catch {
+      _trashStore = [];
+      return _trashStore;
+    }
+  }
+
+  function _writeTrash(items) {
+    _trashStore = Array.isArray(items) ? items : [];
+    try {
+      localStorage.setItem(TRASH_KEY, JSON.stringify(_trashStore));
+    } catch (e) {
+      console.warn('Trash localStorage write error:', e);
+    }
+    syncTrashToIndexedDB(_trashStore);
+  }
+
   function getTrash() {
+    const list = _readTrash();
     const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
-    if (!curUser) return _trashStore;
-    return _trashStore.filter(t => t.userId === curUser.id || !t.userId || t.userId === 'public');
+    if (!curUser) return list;
+    return list.filter(t => t.userId === curUser.id || !t.userId || t.userId === 'public' || curUser.role === 'admin');
   }
 
   async function moveToTrash(id) {
@@ -381,9 +407,9 @@
     files.splice(idx, 1);
     _write(files);
 
-    _trashStore = _trashStore.filter(t => t.id !== id);
-    _trashStore.unshift(fileToTrash);
-    syncTrashToIndexedDB(_trashStore);
+    const trash = _readTrash().filter(t => t.id !== id);
+    trash.unshift(fileToTrash);
+    _writeTrash(trash);
 
     if (window.FrpCloud && typeof window.FrpCloud.moveToTrash === 'function') {
       await window.FrpCloud.moveToTrash(id, fileToTrash);
@@ -398,14 +424,15 @@
     const remaining = files.filter(f => !idSet.has(f.id));
 
     const now = new Date().toISOString();
+    let trash = _readTrash();
     toTrash.forEach(f => {
       f.deletedAt = now;
-      _trashStore = _trashStore.filter(t => t.id !== f.id);
-      _trashStore.unshift(f);
+      trash = trash.filter(t => t.id !== f.id);
+      trash.unshift(f);
     });
 
     _write(remaining);
-    syncTrashToIndexedDB(_trashStore);
+    _writeTrash(trash);
 
     if (window.FrpCloud && typeof window.FrpCloud.moveManyToTrash === 'function') {
       await window.FrpCloud.moveManyToTrash(ids);
@@ -414,14 +441,15 @@
   }
 
   async function restoreFromTrash(id) {
-    const idx = _trashStore.findIndex(t => t.id === id);
+    let trash = _readTrash();
+    const idx = trash.findIndex(t => t.id === id);
     if (idx < 0) return false;
 
-    const restoredFile = _trashStore[idx];
+    const restoredFile = trash[idx];
     delete restoredFile.deletedAt;
 
-    _trashStore.splice(idx, 1);
-    syncTrashToIndexedDB(_trashStore);
+    trash.splice(idx, 1);
+    _writeTrash(trash);
 
     const files = _read();
     files.unshift(restoredFile);
@@ -435,9 +463,10 @@
 
   async function restoreManyFromTrash(ids) {
     const idSet = new Set(ids);
-    const toRestore = _trashStore.filter(t => idSet.has(t.id));
-    _trashStore = _trashStore.filter(t => !idSet.has(t.id));
-    syncTrashToIndexedDB(_trashStore);
+    let trash = _readTrash();
+    const toRestore = trash.filter(t => idSet.has(t.id));
+    trash = trash.filter(t => !idSet.has(t.id));
+    _writeTrash(trash);
 
     const files = _read();
     toRestore.forEach(f => {
@@ -453,8 +482,9 @@
   }
 
   async function purgeFromTrash(id) {
-    _trashStore = _trashStore.filter(t => t.id !== id);
-    syncTrashToIndexedDB(_trashStore);
+    let trash = _readTrash();
+    trash = trash.filter(t => t.id !== id);
+    _writeTrash(trash);
 
     if (window.FrpCloud && typeof window.FrpCloud.purgeReport === 'function') {
       await window.FrpCloud.purgeReport(id);
@@ -464,8 +494,9 @@
 
   async function purgeManyFromTrash(ids) {
     const idSet = new Set(ids);
-    _trashStore = _trashStore.filter(t => !idSet.has(t.id));
-    syncTrashToIndexedDB(_trashStore);
+    let trash = _readTrash();
+    trash = trash.filter(t => !idSet.has(t.id));
+    _writeTrash(trash);
 
     if (window.FrpCloud && typeof window.FrpCloud.purgeManyReports === 'function') {
       await window.FrpCloud.purgeManyReports(ids);
@@ -474,8 +505,7 @@
   }
 
   async function emptyTrash() {
-    _trashStore = [];
-    syncTrashToIndexedDB([]);
+    _writeTrash([]);
 
     if (window.FrpCloud && typeof window.FrpCloud.emptyTrash === 'function') {
       await window.FrpCloud.emptyTrash();

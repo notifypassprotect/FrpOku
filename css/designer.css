@@ -1267,3 +1267,20 @@ body.theme-light .designer-prop-select {
 .frp-toast-undo-btn:hover {
   background: #1d4ed8 !important;
 }
+
+/* Seçili Bant Vurgusu (Selected Band Highlight) */
+.fr-band-container.selected-band {
+  outline: 2px dashed #2563eb !important;
+  outline-offset: -1px;
+  background: rgba(37, 99, 235, 0.04) !important;
+}
+
+.fr-band-container.selected-band .fr-band-header {
+  box-shadow: 0 0 12px rgba(37, 99, 235, 0.45) inset !important;
+  font-weight: 800;
+}
+
+.fr-vband-box.selected-band {
+  outline: 2px dashed #2563eb !important;
+  box-shadow: 0 0 10px rgba(37, 99, 235, 0.3) !important;
+}

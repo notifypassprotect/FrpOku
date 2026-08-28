@@ -506,7 +506,9 @@ const COLUMN_DEFS = {
     thStyle: 'width:145px;',
     renderTd: (file) => {
       const dt = file.updatedAt || file.loadedAt;
+      if (!dt) return `<td class="col-lastModified" style="white-space:nowrap; color:var(--text-muted); font-size:.8rem;">—</td>`;
       const dObj = new Date(dt);
+      if (isNaN(dObj.getTime())) return `<td class="col-lastModified" style="white-space:nowrap; color:var(--text-muted); font-size:.8rem;">—</td>`;
       const str = dObj.toLocaleDateString('tr-TR') + ' ' + dObj.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
       return `<td class="col-lastModified" style="white-space:nowrap; color:var(--text-muted); font-size:.8rem;">${str}</td>`;
     }
@@ -526,6 +528,9 @@ function renderTableHeader(prefs, visibleCols) {
     const reportNameIdx = currentOrder.indexOf('reportName');
     if (reportNameIdx !== -1) currentOrder.splice(reportNameIdx + 1, 0, 'fileName');
     else currentOrder.unshift('fileName');
+  }
+  if (!currentOrder.includes('lastModified')) {
+    currentOrder.push('lastModified');
   }
 
   let headersHtml = `
@@ -652,7 +657,7 @@ function renderTable() {
 
   renderPaginationControls(totalItems, pageSize);
 
-  const visibleCols = prefs.visibleColumns || {
+  const visibleCols = {
     reportName: true,
     fileName: true,
     fileSize: true,
@@ -660,7 +665,9 @@ function renderTable() {
     guid: true,
     tags: true,
     queries: false,
-    date: true
+    date: true,
+    lastModified: true,
+    ...(prefs.visibleColumns || {})
   };
 
   renderTableHeader(prefs, visibleCols);
@@ -709,6 +716,9 @@ function renderTable() {
     const reportNameIdx = currentOrder.indexOf('reportName');
     if (reportNameIdx !== -1) currentOrder.splice(reportNameIdx + 1, 0, 'fileName');
     else currentOrder.unshift('fileName');
+  }
+  if (!currentOrder.includes('lastModified')) {
+    currentOrder.push('lastModified');
   }
 
   tableBody.innerHTML = pagedFiles.map(file => {

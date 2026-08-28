@@ -1342,11 +1342,19 @@ window.openSettingsModal = function(initialTab = 'appearance') {
         updateTrashBulkUI();
       });
 
-      btnRestoreSel?.addEventListener('click', () => {
+      btnRestoreSel?.addEventListener('click', async () => {
         const ids = [...selectedTrashIds];
         if (ids.length === 0) return;
-        const restored = FrpStore.restoreManyFromTrash(ids);
-        safeToast(`${restored} rapor başarıyla geri yüklendi! 🔄`, 'success');
+        await FrpStore.restoreManyFromTrash(ids);
+        if (window.FrpAudit) {
+          window.FrpAudit.logAction({
+            action: 'TRASH_RESTORE',
+            target: `${ids.length} Rapor`,
+            details: `${ids.length} adet rapor çöp kutusundan geri yüklendi.`
+          });
+        }
+        selectedTrashIds.clear();
+        safeToast(`${ids.length} rapor başarıyla geri yüklendi! 🔄`, 'success');
         if (typeof window.refreshAll === 'function') window.refreshAll();
         renderModal();
       });
@@ -1359,18 +1367,35 @@ window.openSettingsModal = function(initialTab = 'appearance') {
           message: `Seçilen <strong>${ids.length} rapor</strong> kalıcı olarak silinecektir. Bu işlem geri alınamaz. Devam etmek istiyor musunuz?`,
           confirmText: `${ids.length} Raporu Kalıcı Sil`,
           isDanger: true,
-          onConfirm: () => {
-            FrpStore.purgeManyFromTrash(ids);
-            safeToast(`${ids.length} rapor kalıcı olarak silindi.`, 'info');
+          onConfirm: async () => {
+            await FrpStore.purgeManyFromTrash(ids);
+            if (window.FrpAudit) {
+              window.FrpAudit.logAction({
+                action: 'TRASH_PURGE',
+                target: `${ids.length} Rapor`,
+                details: `${ids.length} adet rapor çöp kutusundan kalıcı olarak temizlendi.`
+              });
+            }
+            selectedTrashIds.clear();
+            safeToast(`${ids.length} rapor kalıcı olarak silindi. 🗑️`, 'info');
+            if (typeof window.refreshAll === 'function') window.refreshAll();
             renderModal();
           }
         });
       });
 
       overlay.querySelectorAll('.btn-restore-item').forEach(btn => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', async () => {
           const id = btn.dataset.id;
-          FrpStore.restoreFromTrash(id);
+          await FrpStore.restoreFromTrash(id);
+          if (window.FrpAudit) {
+            window.FrpAudit.logAction({
+              action: 'TRASH_RESTORE',
+              target: id,
+              details: `Rapor (${id}) çöp kutusundan geri yüklendi.`
+            });
+          }
+          selectedTrashIds.delete(id);
           safeToast('Rapor başarıyla geri yüklendi! 🔄', 'success');
           if (typeof window.refreshAll === 'function') window.refreshAll();
           renderModal();
@@ -1385,9 +1410,18 @@ window.openSettingsModal = function(initialTab = 'appearance') {
             message: 'Bu raporu kalıcı olarak silmek istediğinize emin misiniz? Bu işlem geri alınamaz.',
             confirmText: 'Kalıcı Olarak Sil',
             isDanger: true,
-            onConfirm: () => {
-              FrpStore.purgeFromTrash(id);
-              safeToast('Rapor kalıcı olarak silindi.', 'info');
+            onConfirm: async () => {
+              await FrpStore.purgeFromTrash(id);
+              if (window.FrpAudit) {
+                window.FrpAudit.logAction({
+                  action: 'TRASH_PURGE',
+                  target: id,
+                  details: `Rapor (${id}) çöp kutusundan kalıcı olarak silindi.`
+                });
+              }
+              selectedTrashIds.delete(id);
+              safeToast('Rapor kalıcı olarak silindi. 🗑️', 'info');
+              if (typeof window.refreshAll === 'function') window.refreshAll();
               renderModal();
             }
           });
@@ -1397,12 +1431,21 @@ window.openSettingsModal = function(initialTab = 'appearance') {
       overlay.querySelector('#btnEmptyTrashAll')?.addEventListener('click', () => {
         window.showConfirmDialog({
           title: 'Çöp Kutusunu Boşalt',
-          message: 'Çöp kutusundaki tüm raporları kalıcı olarak temizlemek istediğinize emin misiniz?',
+          message: 'Çöp kutusundaki tüm raporları kalıcı olarak temizlemek istediğinize emin misiniz? Bu işlem geri alınamaz.',
           confirmText: 'Tümünü Temizle',
           isDanger: true,
-          onConfirm: () => {
-            FrpStore.emptyTrash();
+          onConfirm: async () => {
+            await FrpStore.emptyTrash();
+            if (window.FrpAudit) {
+              window.FrpAudit.logAction({
+                action: 'TRASH_EMPTY',
+                target: 'Tüm Çöp Kutusu',
+                details: 'Çöp kutusundaki tüm raporlar kalıcı olarak temizlendi.'
+              });
+            }
+            selectedTrashIds.clear();
             safeToast('Çöp kutusu tamamen boşaltıldı. 🗑️', 'info');
+            if (typeof window.refreshAll === 'function') window.refreshAll();
             renderModal();
           }
         });

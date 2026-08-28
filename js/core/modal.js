@@ -87,14 +87,17 @@ function showModal({
       }
     }
 
-    // Dışarı tıklama (Backdrop)
-    overlay.addEventListener('click', e => {
-      if (e.target === overlay) {
-        if (closeOnBackdrop) {
-          overlay.remove();
-          resolve(false);
-        }
+    // Dışarı tıklama (Backdrop) - Sadece doğrudan arkaplanda başlayıp biten tıklamalarda kapat
+    let isMouseDownOnBackdrop = false;
+    overlay.addEventListener('mousedown', e => {
+      isMouseDownOnBackdrop = (e.target === overlay);
+    });
+    overlay.addEventListener('mouseup', e => {
+      if (isMouseDownOnBackdrop && e.target === overlay && closeOnBackdrop) {
+        overlay.remove();
+        resolve(false);
       }
+      isMouseDownOnBackdrop = false;
     });
 
     // ESC Tuşu ile Güvenli Kapatma

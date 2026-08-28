@@ -103,10 +103,14 @@ async function downloadSingleReport(id) {
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
           <label style="font-size:.82rem;font-weight:700;color:var(--text-primary);">Versiyon Numarası Artırımı:</label>
           <div style="display:flex;align-items:center;gap:.4rem;" id="versionQuickBtns">
-            <button type="button" class="btn btn-sm btn-ghost v-btn" data-v="0" style="padding:3px 10px;font-size:.78rem;">Değiştirme (0)</button>
-            <button type="button" class="btn btn-sm btn-primary v-btn active" data-v="1" style="padding:3px 10px;font-size:.78rem;font-weight:800;">+1 Artır</button>
+            <button type="button" class="btn btn-sm btn-ghost v-btn" data-v="0" style="padding:3px 10px;font-size:.78rem;">0 (Aynı)</button>
+            <button type="button" class="btn btn-sm btn-primary v-btn active" data-v="1" style="padding:3px 10px;font-size:.78rem;font-weight:800;">+1</button>
             <button type="button" class="btn btn-sm btn-ghost v-btn" data-v="2" style="padding:3px 10px;font-size:.78rem;">+2</button>
             <button type="button" class="btn btn-sm btn-ghost v-btn" data-v="5" style="padding:3px 10px;font-size:.78rem;">+5</button>
+            <div style="display:flex;align-items:center;gap:.25rem;background:var(--bg-surface);padding:1px 6px;border-radius:6px;border:1px solid var(--border);">
+              <span style="font-size:.72rem;font-weight:700;color:var(--text-muted);">Özel:</span>
+              <input type="number" id="singleCustomBumpInp" min="0" max="999" style="width:48px;font-size:.78rem;font-weight:700;border:none;background:transparent;text-align:center;color:var(--accent);" placeholder="+" />
+            </div>
           </div>
         </div>
 
@@ -129,6 +133,7 @@ async function downloadSingleReport(id) {
     onOpen: (modalEl) => {
       const nameInp = modalEl.querySelector('#targetFileNameInp');
       const vBtns = modalEl.querySelectorAll('.v-btn');
+      const customInp = modalEl.querySelector('#singleCustomBumpInp');
 
       function updateTargetName() {
         let baseName = currentFilename;
@@ -149,9 +154,20 @@ async function downloadSingleReport(id) {
           });
           btn.classList.add('active', 'btn-primary');
           btn.classList.remove('btn-ghost');
+          if (customInp) customInp.value = '';
           versionBump = parseInt(btn.dataset.v, 10) || 0;
           updateTargetName();
         });
+      });
+
+      customInp?.addEventListener('input', () => {
+        const val = parseInt(customInp.value, 10);
+        vBtns.forEach(b => {
+          b.classList.remove('active', 'btn-primary');
+          b.classList.add('btn-ghost');
+        });
+        versionBump = isNaN(val) ? 0 : Math.max(0, val);
+        updateTargetName();
       });
     },
     onConfirm: (modalEl) => {
@@ -355,10 +371,14 @@ async function downloadBulkReports() {
           <div style="font-size:.72rem;color:var(--text-muted);">Örn: <code>rapor_v1.frp</code> ➔ <code>rapor_v2.frp</code></div>
         </div>
         <div style="display:flex;align-items:center;gap:.35rem;" id="bulkVersionBtns">
-          <button type="button" class="btn btn-sm btn-ghost bv-btn" data-v="0" style="padding:3px 9px;font-size:.74rem;">Değiştirme (0)</button>
-          <button type="button" class="btn btn-sm btn-primary bv-btn active" data-v="1" style="padding:3px 9px;font-size:.74rem;font-weight:800;">+1 Artır</button>
+          <button type="button" class="btn btn-sm btn-ghost bv-btn" data-v="0" style="padding:3px 9px;font-size:.74rem;">0 (Aynı)</button>
+          <button type="button" class="btn btn-sm btn-primary bv-btn active" data-v="1" style="padding:3px 9px;font-size:.74rem;font-weight:800;">+1</button>
           <button type="button" class="btn btn-sm btn-ghost bv-btn" data-v="2" style="padding:3px 9px;font-size:.74rem;">+2</button>
           <button type="button" class="btn btn-sm btn-ghost bv-btn" data-v="5" style="padding:3px 9px;font-size:.74rem;">+5</button>
+          <div style="display:flex;align-items:center;gap:.25rem;background:var(--bg-surface);padding:1px 6px;border-radius:6px;border:1px solid var(--border);">
+            <span style="font-size:.72rem;font-weight:700;color:var(--text-muted);">Özel:</span>
+            <input type="number" id="bulkCustomBumpInp" min="0" max="999" style="width:48px;font-size:.78rem;font-weight:700;border:none;background:transparent;text-align:center;color:var(--accent);" placeholder="+" />
+          </div>
         </div>
       </div>
     </div>
@@ -377,6 +397,7 @@ async function downloadBulkReports() {
       const folderCb = modalEl.querySelector('#bulkFolderCb');
       const methodCards = modalEl.querySelectorAll('.bulk-method-card');
       const bvBtns = modalEl.querySelectorAll('.bv-btn');
+      const customInp = modalEl.querySelector('#bulkCustomBumpInp');
 
       function renderPreview() {
         if (!previewList) return;
@@ -407,9 +428,20 @@ async function downloadBulkReports() {
           });
           btn.classList.add('active', 'btn-primary');
           btn.classList.remove('btn-ghost');
+          if (customInp) customInp.value = '';
           versionBump = parseInt(btn.dataset.v, 10) || 0;
           renderPreview();
         });
+      });
+
+      customInp?.addEventListener('input', () => {
+        const val = parseInt(customInp.value, 10);
+        bvBtns.forEach(b => {
+          b.classList.remove('active', 'btn-primary');
+          b.classList.add('btn-ghost');
+        });
+        versionBump = isNaN(val) ? 0 : Math.max(0, val);
+        renderPreview();
       });
 
       folderCb?.addEventListener('change', () => {

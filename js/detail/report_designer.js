@@ -6,75 +6,95 @@
 (function(window) {
   'use strict';
 
-  // ── DELPHI RENK DÖNÜŞTÜRÜCÜ & ETİKETLEYİCİ ─────────────────
-  function decodeDelphiColor(val, isBackground = true) {
+  // ── DELPHI RENK DÖNÜŞTÜRÜCÜ & ETİKETLEYİCİ (BGR <-> RGB/HEX) ─────────────────
+  function delphiColorToRgb(val, isBackground = true) {
     if (!val || val === 'clNone' || val === 'None' || val === '-1' || val === '536870911') {
-      return isBackground ? 'transparent' : '#000000';
+      return { r: 255, g: 255, b: 255, a: 0, isNone: true, hex: '#ffffff', rgb: 'clNone', label: 'clNone (Şeffaf)' };
     }
-    if (val === '-16777208' || val === 'clWindowText') {
-      return isBackground ? 'transparent' : '#000000';
-    }
-    if (val === '0' || val === 'clBlack') {
-      return isBackground ? 'transparent' : '#000000';
+    if (val === '-16777208' || val === 'clWindowText' || val === '0' || val === 'clBlack') {
+      return { r: 0, g: 0, b: 0, a: 1, isNone: false, hex: '#000000', rgb: 'rgb(0, 0, 0)', label: 'clWindowText (Siyah)' };
     }
     if (val === '16777215' || val === 'clWhite' || val === '-16777211' || val === 'clWindow') {
-      return '#ffffff';
+      return { r: 255, g: 255, b: 255, a: 1, isNone: false, hex: '#ffffff', rgb: 'rgb(255, 255, 255)', label: 'clWhite (Beyaz)' };
     }
     if (val === '-16777201' || val === 'clBtnFace') {
-      return isBackground ? '#ece9d8' : '#000000';
+      return { r: 236, g: 233, b: 216, a: 1, isNone: false, hex: '#ece9d8', rgb: 'rgb(236, 233, 216)', label: 'clBtnFace (Form Grisi)' };
     }
     if (val === '-16777188' || val === 'clMenuHighlight') {
-      return isBackground ? '#5bc0de' : '#000000'; // Sky Cyan (Image 4)
+      return { r: 91, g: 192, b: 222, a: 1, isNone: false, hex: '#5bc0de', rgb: 'rgb(91, 192, 222)', label: 'Sky Cyan' };
     }
-    if (val === 'clRed' || val === '255') return isBackground ? '#fca5a5' : '#dc2626';
-    if (val === 'clYellow' || val === '65535') return isBackground ? '#fef08a' : '#ca8a04';
-    if (val === 'clGreen' || val === '65280') return isBackground ? '#bbf7d0' : '#16a34a';
-    if (val === 'clBlue' || val === '16711680') return isBackground ? '#bfdbfe' : '#2563eb';
-    if (val === 'clSkyBlue' || val === '15780518') return isBackground ? '#e0f2fe' : '#0284c7';
-    if (val === 'clMoneyGreen' || val === '12639424') return isBackground ? '#dcfce7' : '#15803d';
+    if (val === 'clRed' || val === '255') return { r: 220, g: 38, b: 38, a: 1, isNone: false, hex: '#dc2626', rgb: 'rgb(220, 38, 38)', label: 'clRed (Kırmızı)' };
+    if (val === 'clYellow' || val === '65535') return { r: 202, g: 138, b: 4, a: 1, isNone: false, hex: '#ca8a04', rgb: 'rgb(202, 138, 4)', label: 'clYellow (Sarı)' };
+    if (val === 'clGreen' || val === '65280') return { r: 22, g: 163, b: 74, a: 1, isNone: false, hex: '#16a34a', rgb: 'rgb(22, 163, 74)', label: 'clGreen (Yeşil)' };
+    if (val === 'clBlue' || val === '16711680') return { r: 37, g: 99, b: 235, a: 1, isNone: false, hex: '#2563eb', rgb: 'rgb(37, 99, 235)', label: 'clBlue (Mavi)' };
+    if (val === 'clSkyBlue' || val === '15780518') return { r: 2, g: 132, b: 199, a: 1, isNone: false, hex: '#0284c7', rgb: 'rgb(2, 132, 199)', label: 'clSkyBlue (Gök Mavisi)' };
+    if (val === 'clMoneyGreen' || val === '12639424') return { r: 21, g: 128, b: 61, a: 1, isNone: false, hex: '#15803d', rgb: 'rgb(21, 128, 61)', label: 'clMoneyGreen (Nane Yeşili)' };
 
-    // Hex string ($00RRGGBB / 0x00BBGGRR)
+    // Hex string (#RRGGBB veya $00BBGGRR)
+    if (typeof val === 'string' && val.startsWith('#')) {
+      const clean = val.slice(1).padEnd(6, '0');
+      const r = parseInt(clean.substring(0, 2), 16) || 0;
+      const g = parseInt(clean.substring(2, 4), 16) || 0;
+      const b = parseInt(clean.substring(4, 6), 16) || 0;
+      return { r, g, b, a: 1, isNone: false, hex: val, rgb: `rgb(${r}, ${g}, ${b})`, label: `rgb(${r}, ${g}, ${b})` };
+    }
+
     if (typeof val === 'string' && (val.startsWith('$') || val.startsWith('0x'))) {
-      const hex = val.replace(/^\$|^0x/, '').padStart(6, '0');
-      const hexNum = parseInt(hex, 16);
+      const hexStr = val.replace(/^\$|^0x/, '').padStart(6, '0');
+      const hexNum = parseInt(hexStr, 16);
       if (!isNaN(hexNum)) {
         const r = hexNum & 0xFF;
         const g = (hexNum >> 8) & 0xFF;
         const b = (hexNum >> 16) & 0xFF;
-        return `rgb(${r}, ${g}, ${b})`;
+        const pad = n => n.toString(16).padStart(2, '0');
+        const hex = `#${pad(r)}${pad(g)}${pad(b)}`;
+        return { r, g, b, a: 1, isNone: false, hex, rgb: `rgb(${r}, ${g}, ${b})`, label: `rgb(${r}, ${g}, ${b})` };
       }
     }
 
     const num = parseInt(val, 10);
-    if (isNaN(num) || num < 0) return isBackground ? 'transparent' : '#000000';
+    if (isNaN(num)) return { r: 0, g: 0, b: 0, a: 1, isNone: false, hex: '#000000', rgb: String(val), label: String(val) };
 
-    // Delphi integer BGR formatındadır
+    // Delphi Integer BGR formatındadır: Red = num & 0xFF, Green = (num >> 8) & 0xFF, Blue = (num >> 16) & 0xFF
     const r = num & 0xFF;
     const g = (num >> 8) & 0xFF;
     const b = (num >> 16) & 0xFF;
-    return `rgb(${r}, ${g}, ${b})`;
+    const pad = n => n.toString(16).padStart(2, '0');
+    const hex = `#${pad(r)}${pad(g)}${pad(b)}`;
+    return { r, g, b, a: 1, isNone: false, hex, rgb: `rgb(${r}, ${g}, ${b})`, label: `rgb(${r}, ${g}, ${b})` };
+  }
+
+  function decodeDelphiColor(val, isBackground = true) {
+    const info = delphiColorToRgb(val, isBackground);
+    if (info.isNone) return isBackground ? 'transparent' : '#000000';
+    return info.rgb;
+  }
+
+  function hexToDelphiColor(hexOrRgb) {
+    if (!hexOrRgb || hexOrRgb === 'clNone' || hexOrRgb === 'transparent' || hexOrRgb === 'None') return 'clNone';
+    
+    // rgb(r, g, b) metni girilmişse
+    const rgbMatch = String(hexOrRgb).match(/rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
+    if (rgbMatch) {
+      const r = Math.min(255, Math.max(0, parseInt(rgbMatch[1], 10)));
+      const g = Math.min(255, Math.max(0, parseInt(rgbMatch[2], 10)));
+      const b = Math.min(255, Math.max(0, parseInt(rgbMatch[3], 10)));
+      const delphiInt = (b << 16) | (g << 8) | r;
+      return String(delphiInt);
+    }
+
+    const clean = String(hexOrRgb).replace('#', '').trim();
+    if (clean.length < 6) return '0';
+    const r = parseInt(clean.substring(0, 2), 16) || 0;
+    const g = parseInt(clean.substring(2, 4), 16) || 0;
+    const b = parseInt(clean.substring(4, 6), 16) || 0;
+    const delphiInt = (b << 16) | (g << 8) | r;
+    return String(delphiInt);
   }
 
   function formatDelphiColorName(val) {
-    if (!val || val === 'clNone' || val === 'None' || val === '536870911' || val === '-1') return 'clNone (Şeffaf / Yok)';
-    if (val === '-16777208' || val === 'clWindowText') return 'clWindowText (Siyah / #000000)';
-    if (val === '-16777211' || val === 'clWindow' || val === '16777215' || val === 'clWhite') return 'clWhite (Beyaz / #ffffff)';
-    if (val === '-16777201' || val === '-16777188' || val === 'clBtnFace') return 'clBtnFace (Form Grisi / #ece9d8)';
-    if (val === '0' || val === 'clBlack') return 'clBlack (Siyah / #000000)';
-    if (val === 'clRed' || val === '255') return 'clRed (Kırmızı)';
-    if (val === 'clYellow' || val === '65535') return 'clYellow (Sarı)';
-    if (val === 'clBlue' || val === '16711680') return 'clBlue (Mavi)';
-    if (val === 'clGreen' || val === '65280') return 'clGreen (Yeşil)';
-    if (val === 'clSkyBlue' || val === '15780518') return 'clSkyBlue (Gök Mavisi)';
-    
-    const num = parseInt(val, 10);
-    if (!isNaN(num)) {
-      const r = num & 0xFF;
-      const g = (num >> 8) & 0xFF;
-      const b = (num >> 16) & 0xFF;
-      return `RGB(${r}, ${g}, ${b}) [${val}]`;
-    }
-    return String(val);
+    const info = delphiColorToRgb(val, true);
+    return info.label;
   }
 
   function formatFrameType(typ) {
@@ -1280,6 +1300,7 @@
       if (!obj) return '<div style="padding:1rem;color:var(--text-muted);font-size:.78rem;">Seçili bileşen yok.</div>';
 
       let propList = [];
+      const isBand = (obj.type && (BAND_META[obj.type] || obj.type.includes('Band') || obj.type.includes('Header') || obj.type.includes('Footer') || obj.type === 'TfrxMasterData' || obj.type === 'TfrxReportTitle'));
 
       if (inspectorTab === 'events') {
         propList = [
@@ -1288,9 +1309,24 @@
           { name: 'OnChange', val: obj.onChange || '', propKey: 'onChange', editable: isDesignEditing },
           { name: 'OnAfterPrint', val: obj.onAfterPrint || '', propKey: 'onAfterPrint', editable: isDesignEditing },
           { name: 'OnPreviewClick', val: obj.onPreviewClick || '', propKey: 'onPreviewClick', editable: isDesignEditing },
+          { name: 'OnMasterDetail', val: obj.onMasterDetail || '', propKey: 'onMasterDetail', editable: isDesignEditing },
           { name: 'OnEnter', val: obj.onEnter || '', propKey: 'onEnter', editable: isDesignEditing },
           { name: 'OnExit', val: obj.onExit || '', propKey: 'onExit', editable: isDesignEditing },
           { name: 'OnKeyDown', val: obj.onKeyDown || '', propKey: 'onKeyDown', editable: isDesignEditing }
+        ];
+      } else if (isBand) {
+        // BANT NESNESİ ÖZELLİKLERİ
+        propList = [
+          { name: 'Name', val: obj.name || '', propKey: 'name', editable: isDesignEditing },
+          { name: 'Class', val: obj.type || 'TfrxBand', readOnly: true },
+          { name: 'Top', val: obj.top ?? 0, propKey: 'top', isNumber: true, editable: isDesignEditing },
+          { name: 'Height', val: obj.height ?? 0, propKey: 'height', isNumber: true, editable: isDesignEditing },
+          { name: 'DataSet', val: obj.dataSet || '', propKey: 'dataSet', editable: isDesignEditing },
+          { name: 'Condition', val: obj.condition || '', propKey: 'condition', editable: isDesignEditing },
+          { name: 'KeepTogether', val: obj.keepTogether !== false ? 'true' : 'false', propKey: 'keepTogether', isSelect: isDesignEditing, options: ['true', 'false'] },
+          { name: 'StartNewPage', val: obj.startNewPage ? 'true' : 'false', propKey: 'startNewPage', isSelect: isDesignEditing, options: ['true', 'false'] },
+          { name: 'PrintIfDetailEmpty', val: obj.printIfDetailEmpty ? 'true' : 'false', propKey: 'printIfDetailEmpty', isSelect: isDesignEditing, options: ['true', 'false'] },
+          { name: 'Visible', val: obj.visible !== false ? 'true' : 'false', propKey: 'visible', isSelect: isDesignEditing, options: ['true', 'false'] }
         ];
       } else if (inspectorTab === 'favorites') {
         propList = [
@@ -1298,8 +1334,8 @@
           { name: 'Caption / Text', val: obj.caption || obj.text || '', propKey: 'text', editable: isDesignEditing },
           { name: 'DataSet', val: obj.dataSet || obj.listSource || '', propKey: 'dataSet', editable: isDesignEditing },
           { name: 'DataField', val: obj.dataField || obj.listField || '', propKey: 'dataField', editable: isDesignEditing },
-          { name: 'Font.Color', rawVal: obj.fontColor, val: obj.fontColor || '-16777208', propKey: 'fontColor', editable: isDesignEditing },
-          { name: 'Fill.BackColor', rawVal: obj.fillBackColor || obj.color, val: obj.fillBackColor || obj.color || 'clNone', propKey: 'fillBackColor', editable: isDesignEditing },
+          { name: 'Font.Color', rawVal: obj.fontColor, val: obj.fontColor || '-16777208', propKey: 'fontColor', isColor: true, editable: isDesignEditing },
+          { name: 'Fill.BackColor', rawVal: obj.fillBackColor || obj.color, val: obj.fillBackColor || obj.color || 'clNone', propKey: 'fillBackColor', isColor: true, editable: isDesignEditing },
           { name: 'Visible', val: obj.visible !== false ? 'true' : 'false', propKey: 'visible', isSelect: isDesignEditing, options: ['true', 'false'] }
         ];
       } else {
@@ -1315,8 +1351,9 @@
           { name: 'DataField', val: obj.dataField || obj.listField || '', propKey: 'dataField', editable: isDesignEditing },
           { name: 'Font.Name', val: obj.fontName || 'Arial', propKey: 'fontName', isSelect: isDesignEditing, options: ['Arial', 'Segoe UI', 'Tahoma', 'Courier New', 'Times New Roman', 'Consolas', 'Roboto'] },
           { name: 'Font.Size', val: obj.fontSize || 10, propKey: 'fontSize', isNumber: true, editable: isDesignEditing },
-          { name: 'Font.Color', rawVal: obj.fontColor, val: obj.fontColor || '-16777208', propKey: 'fontColor', editable: isDesignEditing },
-          { name: 'Fill.BackColor', rawVal: (obj.fillBackColor || obj.color), val: obj.fillBackColor || obj.color || 'clNone', propKey: 'fillBackColor', editable: isDesignEditing },
+          { name: 'Font.Color', rawVal: obj.fontColor, val: obj.fontColor || '-16777208', propKey: 'fontColor', isColor: true, editable: isDesignEditing },
+          { name: 'Fill.BackColor', rawVal: (obj.fillBackColor || obj.color), val: obj.fillBackColor || obj.color || 'clNone', propKey: 'fillBackColor', isColor: true, editable: isDesignEditing },
+          { name: 'Frame.Color', rawVal: obj.frameColor, val: obj.frameColor || '-16777208', propKey: 'frameColor', isColor: true, editable: isDesignEditing },
           { name: 'Visible', val: obj.visible !== false ? 'true' : 'false', propKey: 'visible', isSelect: isDesignEditing, options: ['true', 'false'] },
           { name: 'Enabled', val: obj.enabled !== false ? 'true' : 'false', propKey: 'enabled', isSelect: isDesignEditing, options: ['true', 'false'] }
         ];
@@ -1328,7 +1365,36 @@
 
       return filtered.map(p => {
         let inputControl = '';
-        if (p.isSelect && isDesignEditing) {
+        if (p.isColor) {
+          const cInfo = delphiColorToRgb(p.rawVal || p.val, true);
+          if (isDesignEditing && p.editable) {
+            inputControl = `
+              <div style="display:flex;align-items:center;gap:.35rem;width:100%;">
+                <input type="color" class="designer-color-picker" data-prop="${p.propKey}" value="${cInfo.isNone ? '#ffffff' : cInfo.hex}" style="width:24px;height:22px;padding:0;border:1px solid var(--border);border-radius:4px;cursor:pointer;flex-shrink:0;" title="Renk Seçici" />
+                <input type="text" class="designer-prop-input" data-prop="${p.propKey}" data-is-color="true" value="${cInfo.label}" style="flex:1;min-width:0;font-family:var(--mono);font-size:.76rem;padding:.2rem .4rem;" placeholder="rgb(r, g, b) veya #hex" />
+                <select class="designer-color-presets" data-prop="${p.propKey}" style="max-width:85px;font-size:.72rem;padding:.15rem .25rem;">
+                  <option value="">Palet 🎨</option>
+                  <option value="clNone">Şeffaf</option>
+                  <option value="#bad3fe">Açık Mavi (#bad3fe)</option>
+                  <option value="#ffffff">Beyaz (#ffffff)</option>
+                  <option value="#000000">Siyah (#000000)</option>
+                  <option value="#dc2626">Kırmızı (#dc2626)</option>
+                  <option value="#16a34a">Yeşil (#16a34a)</option>
+                  <option value="#2563eb">Mavi (#2563eb)</option>
+                  <option value="#ca8a04">Sarı (#ca8a04)</option>
+                  <option value="#ece9d8">Form Grisi (#ece9d8)</option>
+                </select>
+              </div>
+            `;
+          } else {
+            inputControl = `
+              <div style="display:flex;align-items:center;gap:.4rem;">
+                <span style="width:14px;height:14px;border-radius:3px;border:1px solid rgba(0,0,0,.25);background-color:${cInfo.hex};display:inline-block;flex-shrink:0;"></span>
+                <span style="font-weight:700;color:var(--text-primary);font-size:.78rem;">${cInfo.label}</span>
+              </div>
+            `;
+          }
+        } else if (p.isSelect && isDesignEditing) {
           inputControl = `
             <select class="designer-prop-select" data-prop="${p.propKey}">
               ${p.options.map(opt => `<option value="${opt}" ${String(p.val) === opt ? 'selected' : ''}>${opt}</option>`).join('')}
@@ -1352,6 +1418,99 @@
           </div>
         `;
       }).join('');
+    }
+
+    // ── OBJECT INSPECTOR CANLI DÜZENLEME DİNLEYİCİSİ ──────────
+    function bindInspectorInputs() {
+      if (!isDesignEditing || !selectedItem) return;
+
+      const propTable = containerEl.querySelector('#propTableBody');
+      if (!propTable) return;
+
+      // 1. Text & Number Inputs
+      propTable.querySelectorAll('.designer-prop-input').forEach(inp => {
+        inp.addEventListener('change', () => {
+          const prop = inp.dataset.prop;
+          const isColor = inp.dataset.isColor === 'true';
+          let val = inp.value;
+
+          if (isColor) {
+            val = hexToDelphiColor(val);
+          } else if (inp.type === 'number') {
+            val = parseFloat(val) || 0;
+          }
+
+          pushUndoState();
+          selectedItem[prop] = val;
+          renderCanvasOnly();
+          updateSelection();
+          pushUndoState();
+        });
+      });
+
+      // 2. Select Dropdowns
+      propTable.querySelectorAll('.designer-prop-select').forEach(sel => {
+        sel.addEventListener('change', () => {
+          const prop = sel.dataset.prop;
+          let val = sel.value;
+          if (val === 'true') val = true;
+          else if (val === 'false') val = false;
+
+          pushUndoState();
+          selectedItem[prop] = val;
+          renderCanvasOnly();
+          updateSelection();
+          pushUndoState();
+        });
+      });
+
+      // 3. Color Pickers (<input type="color">)
+      propTable.querySelectorAll('.designer-color-picker').forEach(cp => {
+        cp.addEventListener('input', (e) => {
+          const prop = cp.dataset.prop;
+          const hex = e.target.value;
+          const delphiVal = hexToDelphiColor(hex);
+          selectedItem[prop] = delphiVal;
+          
+          const textInp = cp.parentElement.querySelector('.designer-prop-input');
+          if (textInp) textInp.value = delphiColorToRgb(delphiVal).label;
+          
+          renderCanvasOnly();
+        });
+
+        cp.addEventListener('change', (e) => {
+          pushUndoState();
+          const prop = cp.dataset.prop;
+          const hex = e.target.value;
+          const delphiVal = hexToDelphiColor(hex);
+          selectedItem[prop] = delphiVal;
+          renderCanvasOnly();
+          pushUndoState();
+        });
+      });
+
+      // 4. Color Presets Dropdown
+      propTable.querySelectorAll('.designer-color-presets').forEach(sel => {
+        sel.addEventListener('change', (e) => {
+          const choice = e.target.value;
+          if (!choice) return;
+          const prop = sel.dataset.prop;
+          const delphiVal = hexToDelphiColor(choice);
+          
+          pushUndoState();
+          selectedItem[prop] = delphiVal;
+
+          const textInp = sel.parentElement.querySelector('.designer-prop-input');
+          const cpInp = sel.parentElement.querySelector('.designer-color-picker');
+          const info = delphiColorToRgb(delphiVal);
+          if (textInp) textInp.value = info.label;
+          if (cpInp && !info.isNone) cpInp.value = info.hex;
+
+          sel.value = '';
+          renderCanvasOnly();
+          pushUndoState();
+        });
+      });
     }
 
     // ── GERİ AL / İLERİ AL MOTORU (Undo / Redo Engine) ────────
@@ -1778,28 +1937,22 @@
           };
 
           window.addEventListener('mousemove', onMouseMove);
+          window.addEventListener('mousemove', onMouseMove);
           window.addEventListener('mouseup', onMouseUp);
         });
       });
-    }
 
-    // ── OBJECT INSPECTOR GİRDİLERİ DİNLEYİCİSİ ─────────────────
-    function bindInspectorInputs() {
-      containerEl.querySelectorAll('.designer-prop-input, .designer-prop-select').forEach(inp => {
-        inp.addEventListener('input', (e) => {
-          if (!isDesignEditing || !selectedItem) return;
-          const prop = e.target.dataset.prop;
-          let val = e.target.value;
-          if (['left', 'top', 'width', 'height', 'fontSize'].includes(prop)) {
-            val = parseFloat(val) || 0;
-          } else if (prop === 'visible' || prop === 'enabled') {
-            val = val === 'true';
+      // 2. Bantlara (Header, Footer, ReportTitle, MasterData vb.) Tıklama Dinleyicisi
+      containerEl.querySelectorAll('.fr-band-container, .fr-band-header, .fr-vband-box').forEach(bEl => {
+        bEl.addEventListener('click', (e) => {
+          if (e.target.closest('.fr-view-item') || e.target.closest('.fr-ctrl-item')) return;
+          e.stopPropagation();
+          const bandIdx = parseInt(bEl.dataset.bandIdx, 10);
+          const activePage = allPages[activePageIndex];
+          if (activePage && activePage.type === 'report' && activePage.data.bands?.[bandIdx]) {
+            selectedItem = activePage.data.bands[bandIdx];
+            updateSelection();
           }
-          selectedItem[prop] = val;
-          if (prop === 'text') selectedItem.caption = val;
-          if (prop === 'caption') selectedItem.text = val;
-          renderCanvasOnly();
-          pushUndoState();
         });
       });
     }
@@ -2037,12 +2190,24 @@
     }
 
     function updateSelection() {
-      containerEl.querySelectorAll('.fr-view-item.selected, .fr-ctrl-item.selected').forEach(el => el.classList.remove('selected'));
+      containerEl.querySelectorAll('.fr-view-item.selected, .fr-ctrl-item.selected, .fr-band-container.selected-band, .fr-band-header.selected-band, .fr-vband-box.selected-band').forEach(el => {
+        el.classList.remove('selected', 'selected-band');
+      });
       
       // YALNIZCA Tasarımcı modundaysa ve seçim varsa sınıf ekle
-      if (selectedItem && currentMode === 'designer') {
-        const targetEl = containerEl.querySelector(`[title*="${selectedItem.name}"]`) || containerEl.querySelector(`[data-ctrl-idx]`);
-        if (targetEl) targetEl.classList.add('selected');
+      if (selectedItem) {
+        const isBand = (selectedItem.type && (BAND_META[selectedItem.type] || selectedItem.type.includes('Band') || selectedItem.type.includes('Header') || selectedItem.type.includes('Footer') || selectedItem.type === 'TfrxMasterData' || selectedItem.type === 'TfrxReportTitle'));
+        if (isBand) {
+          const activePage = allPages[activePageIndex];
+          const bIdx = (activePage?.data?.bands || []).indexOf(selectedItem);
+          if (bIdx !== -1) {
+            const targetBandEl = containerEl.querySelector(`.fr-band-container[data-band-idx="${bIdx}"]`) || containerEl.querySelector(`.fr-vband-box[data-band-idx="${bIdx}"]`);
+            if (targetBandEl) targetBandEl.classList.add('selected-band');
+          }
+        } else if (currentMode === 'designer') {
+          const targetEl = containerEl.querySelector(`[title*="${selectedItem.name}"]`) || containerEl.querySelector(`[data-ctrl-idx]`);
+          if (targetEl) targetEl.classList.add('selected');
+        }
       }
 
       const compTypeBadge = containerEl.querySelector('#inspectorCompType');

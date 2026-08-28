@@ -2984,44 +2984,119 @@ function promptAndAddNewQuery() {
 
   showModal({
     title: '➕ Rapora Yeni SQL Sorgusu (Dataset) Ekle',
+    maxWidth: '860px',
     body: `
-      <div style="display:flex;flex-direction:column;gap:1rem;">
-        <div style="font-size:.8rem;color:var(--text-muted);line-height:1.45;">
-          Bu rapora yeni bir SQL dataseti ekleyin. Eklenen sorgu raporun XML yapısına dahil edilir ve anında düzenlenebilir.
+      <div style="display:flex;flex-direction:column;gap:1.15rem;">
+        <div style="font-size:.82rem;color:var(--text-secondary);line-height:1.5;background:var(--bg-raised);padding:.75rem 1rem;border-radius:10px;border:1px solid var(--border-light);">
+          Bu rapora yeni bir FastReport SQL dataseti ekleyin. Eklenen sorgu doğrudan raporun XML yapısına dahil edilir ve anında düzenlenebilir.
         </div>
 
-        <div>
-          <label style="display:block;font-size:.78rem;font-weight:700;margin-bottom:.35rem;color:var(--text-secondary);">Sorgu / Dataset Adı:</label>
-          <input type="text" id="inpNewQueryName" class="master-search-input" value="q_yeni" style="width:100%;font-family:var(--mono);font-size:.88rem;font-weight:700;padding:.5rem .75rem;" placeholder="Örn: qdepo, qfatura, qozet" />
+        <div style="display:grid;grid-template-columns:1fr auto;gap:1rem;align-items:flex-end;">
+          <div>
+            <label style="display:block;font-size:.8rem;font-weight:700;margin-bottom:.35rem;color:var(--text-primary);">Sorgu / Dataset Adı:</label>
+            <input type="text" id="inpNewQueryName" class="master-search-input" value="q_yeni" style="width:100%;font-family:var(--mono);font-size:.9rem;font-weight:700;padding:.5rem .75rem;" placeholder="Örn: qdepo, qfatura, qozet" />
+          </div>
+          <div style="font-size:.74rem;color:var(--text-muted);padding-bottom:.5rem;" id="newQueryNameHint">
+            Format: <code>q_sorgu_adi</code>
+          </div>
         </div>
 
-        <!-- Hazır Şablonlar -->
-        <div>
-          <div style="font-size:.74rem;font-weight:700;color:var(--text-muted);margin-bottom:.35rem;">💡 Hızlı Başlangıç Şablonları:</div>
-          <div style="display:flex;gap:.4rem;flex-wrap:wrap;">
-            <button type="button" class="btn btn-sm btn-ghost btn-query-template" data-key="basic" style="font-size:.74rem;padding:.25rem .55rem;background:var(--bg-surface);border:1px solid var(--border-light);">
+        <!-- Hızlı Başlangıç Şablonları & Araçlar -->
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.6rem;background:var(--bg-surface);padding:.65rem .85rem;border-radius:10px;border:1px solid var(--border-light);">
+          <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;">
+            <span style="font-size:.74rem;font-weight:700;color:var(--text-muted);">💡 Şablonlar:</span>
+            <button type="button" class="btn btn-sm btn-ghost btn-query-template" data-key="basic" style="font-size:.74rem;padding:.25rem .6rem;">
               📊 Basit SELECT
             </button>
-            <button type="button" class="btn btn-sm btn-ghost btn-query-template" data-key="join" style="font-size:.74rem;padding:.25rem .55rem;background:var(--bg-surface);border:1px solid var(--border-light);">
-              📦 LEFT JOIN Tablo
+            <button type="button" class="btn btn-sm btn-ghost btn-query-template" data-key="join" style="font-size:.74rem;padding:.25rem .6rem;">
+              📦 LEFT JOIN
             </button>
-            <button type="button" class="btn btn-sm btn-ghost btn-query-template" data-key="param" style="font-size:.74rem;padding:.25rem .55rem;background:var(--bg-surface);border:1px solid var(--border-light);">
-              👥 Parametreli Arama
+            <button type="button" class="btn btn-sm btn-ghost btn-query-template" data-key="param" style="font-size:.74rem;padding:.25rem .6rem;">
+              👥 Parametreli
             </button>
-            <button type="button" class="btn btn-sm btn-ghost btn-query-template" data-key="dual" style="font-size:.74rem;padding:.25rem .55rem;background:var(--bg-surface);border:1px solid var(--border-light);">
-              ⚡ Boş Dual
+            <button type="button" class="btn btn-sm btn-ghost btn-query-template" data-key="dual" style="font-size:.74rem;padding:.25rem .6rem;">
+              ⚡ Dual
+            </button>
+          </div>
+          <div style="display:flex;align-items:center;gap:.35rem;">
+            <button type="button" class="btn btn-sm btn-ghost" id="btnFormatNewSql" style="font-size:.74rem;padding:.25rem .6rem;font-weight:700;" title="SQL Kodunu Formatla">
+              ✨ Formatla
+            </button>
+            <button type="button" class="btn btn-sm btn-ghost" id="btnUpperNewSql" style="font-size:.74rem;padding:.25rem .6rem;font-weight:700;" title="SQL Komutlarını Büyük Harfe Çevir">
+              🔠 BÜYÜK HARF
             </button>
           </div>
         </div>
 
         <div>
-          <label style="display:block;font-size:.78rem;font-weight:700;margin-bottom:.35rem;color:var(--text-secondary);">SQL Sorgu Metni:</label>
-          <textarea id="inpNewQuerySql" class="master-search-input" style="width:100%;height:150px;font-family:var(--mono);font-size:.82rem;line-height:1.45;padding:.6rem .75rem;resize:vertical;" placeholder="SELECT * FROM tablo WHERE 1=1">${templates.basic}</textarea>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.35rem;">
+            <label style="font-size:.8rem;font-weight:700;color:var(--text-primary);">SQL Sorgu Metni:</label>
+            <span style="font-size:.72rem;color:var(--text-muted);" id="newQueryParamCount">0 Parametre Tespit Edildi</span>
+          </div>
+          <textarea id="inpNewQuerySql" class="master-search-input" style="width:100%;height:220px;font-family:var(--mono);font-size:.84rem;line-height:1.55;padding:.75rem;resize:vertical;background:var(--bg-raised);color:var(--text-primary);" placeholder="SELECT * FROM tablo WHERE 1=1">${templates.basic}</textarea>
         </div>
       </div>
     `,
     confirmText: '➕ Sorguyu Rapora Ekle',
     cancelText: 'Vazgeç',
+    onOpen: (modalEl) => {
+      const nameInput = modalEl.querySelector('#inpNewQueryName');
+      const sqlInput = modalEl.querySelector('#inpNewQuerySql');
+      const paramCountEl = modalEl.querySelector('#newQueryParamCount');
+      const nameHint = modalEl.querySelector('#newQueryNameHint');
+
+      function updateParams() {
+        const sql = sqlInput?.value || '';
+        const matches = sql.match(/:\b[A-Za-z0-9_]+\b/g) || [];
+        const unique = [...new Set(matches)];
+        if (paramCountEl) {
+          paramCountEl.textContent = unique.length > 0
+            ? `🏷️ ${unique.length} Parametre: ${unique.join(', ')}`
+            : '0 Parametre';
+        }
+      }
+
+      sqlInput?.addEventListener('input', updateParams);
+      updateParams();
+
+      nameInput?.addEventListener('input', () => {
+        const val = nameInput.value.trim();
+        const exists = (currentFile.queries || []).some(q => q.name.toLowerCase() === val.toLowerCase());
+        if (nameHint) {
+          if (exists) {
+            nameHint.innerHTML = '<span style="color:var(--red);font-weight:700;">⚠️ Bu isimde bir sorgu zaten var!</span>';
+          } else {
+            nameHint.innerHTML = 'Format: <code>q_sorgu_adi</code>';
+          }
+        }
+      });
+
+      modalEl.querySelector('#btnFormatNewSql')?.addEventListener('click', () => {
+        if (sqlInput && window.FrpFormatter && typeof window.FrpFormatter.formatSql === 'function') {
+          sqlInput.value = window.FrpFormatter.formatSql(sqlInput.value);
+          updateParams();
+        }
+      });
+
+      modalEl.querySelector('#btnUpperNewSql')?.addEventListener('click', () => {
+        if (sqlInput) {
+          const keywords = /\b(SELECT|FROM|WHERE|AND|OR|LEFT|JOIN|RIGHT|INNER|OUTER|ON|GROUP\s+BY|ORDER\s+BY|HAVING|UNION|ALL|AS|IN|NOT|LIKE|IS|NULL|BETWEEN|CASE|WHEN|THEN|ELSE|END|LIMIT|OFFSET|DISTINCT|INSERT|INTO|UPDATE|SET|DELETE)\b/gi;
+          sqlInput.value = sqlInput.value.replace(keywords, m => m.toUpperCase());
+          updateParams();
+        }
+      });
+
+      modalEl.querySelectorAll('.btn-query-template').forEach(b => {
+        b.onclick = () => {
+          const k = b.getAttribute('data-key');
+          if (sqlInput && templates[k]) {
+            sqlInput.value = templates[k];
+            sqlInput.focus();
+            updateParams();
+          }
+        };
+      });
+    },
     onConfirm: () => {
       const nameInput = document.getElementById('inpNewQueryName');
       const sqlInput = document.getElementById('inpNewQuerySql');
@@ -3031,7 +3106,6 @@ function promptAndAddNewQuery() {
       const createdName = addSnippetAsNewQueryToReport(qName, qSql);
       if (createdName) {
         showToast(`'${createdName}' sorgusu başarıyla rapora eklendi! ➕`, 'success');
-        // Yeni eklenen sorgu sekmesinde düzenleme modunu aç
         const newIndex = currentFile.queries.length - 1;
         const newTabId = 'tab_sql_' + newIndex;
         setTimeout(() => {
@@ -3045,20 +3119,6 @@ function promptAndAddNewQuery() {
       }
     }
   });
-
-  // Şablon butonları dinleyicisi
-  setTimeout(() => {
-    document.querySelectorAll('.btn-query-template').forEach(b => {
-      b.onclick = () => {
-        const k = b.getAttribute('data-key');
-        const sqlInput = document.getElementById('inpNewQuerySql');
-        if (sqlInput && templates[k]) {
-          sqlInput.value = templates[k];
-          sqlInput.focus();
-        }
-      };
-    });
-  }, 100);
 }
 
 // ── GLOBAL EXPORTS ───────────────────────────────────────────
