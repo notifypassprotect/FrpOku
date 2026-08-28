@@ -16,14 +16,14 @@ window.FrpSettingsTabs.categories = {
           <span style="font-weight:700;font-size:.84rem;color:var(--text-primary);">${escHtml(cat.name)}</span>
         </div>
         <button type="button" class="btn btn-sm btn-ghost btn-delete-cat" data-id="${cat.id}" style="color:var(--red);padding:.2rem .5rem;font-size:.75rem;" title="Kategoriyi Sil">
-          🗑️ Sil
+          Sil
         </button>
       </div>
     `).join('');
 
     const customTagsHtml = customTags.map(tag => `
       <span class="custom-tag-chip" style="display:inline-flex;align-items:center;gap:.35rem;padding:.3rem .65rem;border-radius:8px;background:var(--bg-surface);border:1px solid var(--border-light);font-size:.78rem;font-weight:600;">
-        <span>🏷️ ${escHtml(tag)}</span>
+        <span>${escHtml(tag)}</span>
         <button type="button" class="btn-remove-custom-tag" data-tag="${escHtml(tag)}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:.75rem;padding:0;" title="Etiketi Kaldır">✕</button>
       </span>
     `).join('');
@@ -31,7 +31,7 @@ window.FrpSettingsTabs.categories = {
     return `
       <div style="display:flex;flex-direction:column;gap:1.25rem;">
         <div>
-          <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">🏷️ Kategori & Etiket Yönetimi</div>
+          <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">Kategori & Etiket Yönetimi</div>
           <div style="font-size:.78rem;color:var(--text-muted);margin-top:.2rem;">
             Raporlarınızı gruplandırabileceğiniz özel kategoriler ve etiketler tanımlayın.
           </div>
@@ -39,11 +39,11 @@ window.FrpSettingsTabs.categories = {
 
         <!-- Yeni Kategori Ekle -->
         <div class="settings-card" style="display:flex;flex-direction:column;gap:.75rem;">
-          <div style="font-weight:700;font-size:.85rem;">➕ Yeni Kategori Oluştur</div>
+          <div style="font-weight:700;font-size:.85rem;">Yeni Kategori Oluştur</div>
           <div style="display:flex;gap:.5rem;align-items:center;">
-            <input type="text" id="newCategoryName" class="master-search-input" style="flex:1;" placeholder="Kategori adı (Örn: Finans, Ameliyathane)..." />
+            <input type="text" id="newCategoryName" class="master-search-input" style="flex:1;" placeholder="Kategori adı (Örn: Finans, Satış, Muhasebe)..." />
             <input type="color" id="newCategoryColor" value="#3b82f6" style="width:40px;height:38px;border:none;border-radius:8px;cursor:pointer;background:none;" title="Renk Seç" />
-            <button type="button" class="btn btn-sm btn-primary" id="btnSaveNewCat" style="font-weight:700;padding:.5rem 1rem;">➕ Ekle</button>
+            <button type="button" class="btn btn-sm btn-primary" id="btnAddNewCategory" style="font-weight:700;padding:.5rem 1rem;">Oluştur</button>
           </div>
         </div>
 

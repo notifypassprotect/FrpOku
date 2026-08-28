@@ -28,7 +28,7 @@ window.FrpListRenderers = window.FrpListRenderers || {};
 
   function renderTag(tag) {
     const c = tagColor(tag);
-    return `<span class="tag-pill" style="background:${c.bg};color:${c.color};border:1px solid ${c.border};padding:.15rem .45rem;border-radius:6px;font-size:.72rem;font-weight:600;display:inline-flex;align-items:center;gap:.25rem;white-space:nowrap;">🏷️ ${escHtml(tag)}</span>`;
+    return `<span class="tag-pill" style="background:${c.bg};color:${c.color};border:1px solid ${c.border};padding:.12rem .45rem;border-radius:6px;font-size:.72rem;font-weight:600;display:inline-flex;align-items:center;white-space:nowrap;">${escHtml(tag)}</span>`;
   }
   window.renderTag = renderTag;
 
@@ -51,19 +51,18 @@ window.FrpListRenderers = window.FrpListRenderers || {};
       sortField: 'name',
       renderTd: (file, { reportName, hasNote }) => {
         const isPublic = !!(file.isPublic || file.is_public);
-        const poolBadge = isPublic ? `<span class="badge badge-pool" style="font-size:.68rem;padding:1px 6px;border-radius:10px;margin-left:.25rem;" title="Ortak Havuzda Paylaşıldı">🌐 Havuzda</span>` : '';
+        const poolBadge = isPublic ? `<span class="badge badge-pool" style="font-size:.68rem;padding:1px 6px;border-radius:10px;margin-left:.25rem;" title="Ortak Havuzda Paylaşıldı">Havuzda</span>` : '';
         const oName = file.ownerName || file.owner_name || (file.userId === 'usr_admin_root' ? 'Admin' : 'Sistem');
         const oDept = file.ownerDepartment || file.owner_department || '';
-        const ownerChip = `<span class="owner-chip" style="font-size:.72rem;padding:.12rem .5rem;border-radius:6px;margin-left:.35rem;" title="Yükleyen: ${escHtml(oName)}${oDept ? ' · ' + escHtml(oDept) : ''}">👤 ${escHtml(oName)}</span>`;
+        const ownerChip = `<span class="owner-chip" style="font-size:.72rem;padding:.12rem .5rem;border-radius:6px;margin-left:.35rem;" title="Yükleyen: ${escHtml(oName)}${oDept ? ' · ' + escHtml(oDept) : ''}">${escHtml(oName)}</span>`;
 
         return `
           <td class="col-reportName" style="cursor:pointer;max-width:320px;">
             <div class="file-name" style="display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;">
-              <span>📋</span>
               <span class="report-name-title" style="font-weight:700;font-size:.88rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(reportName)}">${escHtml(reportName)}</span>
               ${poolBadge}
               ${ownerChip}
-              ${hasNote ? `<span title="Not mevcut" style="font-size:.75rem;cursor:help;">📝</span>` : ''}
+              ${hasNote ? `<span title="Not mevcut" style="font-size:.72rem;color:var(--accent);font-weight:700;">[Not]</span>` : ''}
             </div>
           </td>
         `;
@@ -75,7 +74,7 @@ window.FrpListRenderers = window.FrpListRenderers || {};
       sortField: 'fileName',
       renderTd: (file) => `
         <td class="col-fileName" style="color:var(--text-secondary);font-size:.8rem;font-family:var(--font);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(file.name)}">
-          📄 ${escHtml(file.name)}
+          ${escHtml(file.name)}
         </td>
       `
     },
@@ -171,7 +170,7 @@ window.FrpListRenderers = window.FrpListRenderers || {};
       <th style="width:36px;text-align:center;padding:0 .5rem;">
         <input type="checkbox" id="selectAll" style="cursor:pointer;" title="Tümünü Seç / Kaldır" />
       </th>
-      <th style="width:58px;text-align:center;padding:0 .3rem;">★ 📌</th>
+      <th style="width:58px;text-align:center;padding:0 .3rem;">★</th>
     `;
 
     currentOrder.forEach(colKey => {

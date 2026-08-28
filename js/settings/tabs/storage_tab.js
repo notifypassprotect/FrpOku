@@ -12,7 +12,7 @@ window.FrpSettingsTabs.storage = {
     return `
       <div style="display:flex;flex-direction:column;gap:1.25rem;">
         <div>
-          <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">💾 Yedekleme & Depolama Yönetimi</div>
+          <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">Yedekleme & Depolama Yönetimi</div>
           <div style="font-size:.78rem;color:var(--text-muted);margin-top:.2rem;">
             Raporlarınızın snapshot yedeğini alın, otomatik yedekleme zamanlayın veya verileri sıfırlayın.
           </div>
@@ -20,7 +20,7 @@ window.FrpSettingsTabs.storage = {
 
         <!-- Depolama İstatistikleri -->
         <div class="settings-card" style="display:flex;flex-direction:column;gap:.6rem;">
-          <div style="font-weight:700;font-size:.85rem;">📊 Yerel Depolama Durumu</div>
+          <div style="font-weight:700;font-size:.85rem;">Yerel Depolama Durumu</div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:.6rem;text-align:center;">
             <div style="background:var(--bg-surface);padding:.8rem .6rem;border-radius:10px;border:1px solid var(--border-light);">
               <div style="font-size:1.4rem;font-weight:800;color:var(--accent);">${stats.total || files.length}</div>
@@ -40,7 +40,7 @@ window.FrpSettingsTabs.storage = {
         <!-- Otomatik Yedekleme Sıklığı -->
         <div class="settings-card" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;">
           <div>
-            <div style="font-weight:700;font-size:.85rem;">⏱️ Otomatik Snapshot Yedekleme</div>
+            <div style="font-weight:700;font-size:.85rem;">Otomatik Snapshot Yedekleme</div>
             <div style="font-size:.72rem;color:var(--text-muted);">Sistemin arka planda belirli aralıklarla otomatik yedek almasını sağlar.</div>
           </div>
           <select id="stagedAutoBackup" class="master-search-input" style="width:170px;font-weight:700;">
@@ -55,14 +55,14 @@ window.FrpSettingsTabs.storage = {
 
         <!-- Yedekleme Eylemleri -->
         <div class="settings-card" style="display:flex;flex-direction:column;gap:.75rem;">
-          <div style="font-weight:700;font-size:.85rem;">💾 JSON Yedekleme & İçe Aktarma</div>
+          <div style="font-weight:700;font-size:.85rem;">JSON Yedekleme & İçe Aktarma</div>
           <div style="display:flex;gap:.65rem;flex-wrap:wrap;">
             <button type="button" class="btn btn-sm btn-primary" id="btnActionExportJson" style="font-weight:700;padding:.5rem 1rem;">
-              📥 Tümünü Yedekle (JSON İndir)
+              Tümünü Yedekle (JSON İndir)
             </button>
             <input type="file" id="settingsBackupFileInput" accept=".json" style="display:none;" />
             <button type="button" class="btn btn-sm btn-ghost" id="btnActionImportJson" style="font-weight:700;padding:.5rem 1rem;border:1px solid var(--border);">
-              📤 Yedekten Geri Yükle (JSON Yükle)
+              Yedekten Geri Yükle (JSON Yükle)
             </button>
           </div>
         </div>

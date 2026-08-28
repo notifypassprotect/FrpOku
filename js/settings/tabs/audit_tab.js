@@ -1,5 +1,5 @@
 // ============================================================
-//  audit_tab.js — Kullanıcı İşlem Geçmişi & Denetim Günlüğü (Geniş & Net UX)
+//  audit_tab.js — Kullanıcı İşlem Geçmişi & Denetim Günlüğü
 // ============================================================
 
 window.FrpSettingsTabs = window.FrpSettingsTabs || {};
@@ -9,78 +9,78 @@ window.FrpSettingsTabs.audit = {
 
   render() {
     return `
-      <div style="display:flex;flex-direction:column;gap:1.25rem;">
+      <div style="display:flex;flex-direction:column;gap:1.15rem;width:100%;box-sizing:border-box;">
         
         <!-- Üst Başlık ve Eylem Barı -->
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;padding-bottom:.5rem;border-bottom:1px solid var(--border-light);">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;padding-bottom:.65rem;border-bottom:1px solid var(--border-light);width:100%;box-sizing:border-box;">
           <div>
-            <div style="font-size:1.2rem;font-weight:900;color:var(--text-primary);display:flex;align-items:center;gap:.5rem;">
-              <span>📋</span> <span>Kullanıcı İşlem Geçmişi & Denetim Günlüğü</span>
-              <span class="badge badge-purple" style="font-size:.7rem;padding:.2rem .5rem;">Canlı Sistem Logları</span>
+            <div style="font-size:1.18rem;font-weight:900;color:var(--text-primary);display:flex;align-items:center;gap:.5rem;">
+              <span>Kullanıcı İşlem Geçmişi & Denetim Günlüğü</span>
+              <span class="badge badge-purple" style="font-size:.7rem;padding:.2rem .55rem;border-radius:6px;">Canlı Kayıtlar</span>
             </div>
-            <div style="font-size:.82rem;color:var(--text-muted);margin-top:.3rem;">
-              Kullanıcıların oturum açma, rapor yükleme, indirme, silme, havuz paylaşımı ve sistem olaylarını takip edin.
+            <div style="font-size:.8rem;color:var(--text-muted);margin-top:.25rem;">
+              Oturum açma, rapor yükleme, indirme, silme, havuz paylaşımı ve sistem denetim kayıtları.
             </div>
           </div>
-          <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;">
-            <button type="button" class="btn btn-sm btn-ghost" id="btnRefreshAuditLogs" style="font-weight:700;padding:.5rem .85rem;border:1px solid var(--border);">
-              🔄 Yenile
+          <div style="display:flex;gap:.55rem;align-items:center;flex-wrap:wrap;">
+            <button type="button" class="btn btn-sm btn-ghost" id="btnRefreshAuditLogs" style="font-weight:700;padding:.45rem .85rem;border:1px solid var(--border);">
+              Yenile
             </button>
-            <button type="button" class="btn btn-sm btn-primary" id="btnExportAuditExcel" style="font-weight:800;background:linear-gradient(135deg,#059669,#10b981);border:none;box-shadow:0 3px 10px rgba(16,185,129,0.35);padding:.5rem 1.1rem;">
-              📊 Excel (.xls) Olarak İndir
+            <button type="button" class="btn btn-sm btn-primary" id="btnExportAuditExcel" style="font-weight:800;background:linear-gradient(135deg,#059669,#10b981);border:none;box-shadow:0 3px 10px rgba(16,185,129,0.35);padding:.45rem 1.1rem;">
+              Excel (.xls) Olarak İndir
             </button>
           </div>
         </div>
 
-        <!-- KPI Özet Sayaç Kartları (4 Sütunlu Geniş Düzen) -->
-        <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:.85rem;" id="auditKpiRow">
-          <div style="background:var(--bg-raised);border:1.5px solid var(--border-light);border-radius:12px;padding:.85rem 1.1rem;display:flex;flex-direction:column;gap:.25rem;box-shadow:0 2px 6px rgba(0,0,0,0.03);">
-            <div style="font-size:.74rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Toplam Kayıt</div>
-            <div id="kpiAuditTotal" style="font-size:1.6rem;font-weight:900;color:var(--accent);">0</div>
+        <!-- KPI Özet Sayaç Kartları (4 Eşit Sütun) -->
+        <div style="display:grid;grid-template-columns:repeat(4, minmax(0, 1fr));gap:.75rem;width:100%;box-sizing:border-box;" id="auditKpiRow">
+          <div style="background:var(--bg-raised);border:1.5px solid var(--border-light);border-radius:12px;padding:.8rem 1rem;display:flex;flex-direction:column;gap:.2rem;box-shadow:0 2px 6px rgba(0,0,0,0.03);">
+            <div style="font-size:.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Toplam Kayıt</div>
+            <div id="kpiAuditTotal" style="font-size:1.5rem;font-weight:900;color:var(--accent);">0</div>
           </div>
-          <div style="background:var(--bg-raised);border:1.5px solid var(--border-light);border-radius:12px;padding:.85rem 1.1rem;display:flex;flex-direction:column;gap:.25rem;box-shadow:0 2px 6px rgba(0,0,0,0.03);">
-            <div style="font-size:.74rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Yükleme / İndirme</div>
-            <div id="kpiAuditFiles" style="font-size:1.6rem;font-weight:900;color:var(--green);">0</div>
+          <div style="background:var(--bg-raised);border:1.5px solid var(--border-light);border-radius:12px;padding:.8rem 1rem;display:flex;flex-direction:column;gap:.2rem;box-shadow:0 2px 6px rgba(0,0,0,0.03);">
+            <div style="font-size:.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Yükleme / İndirme</div>
+            <div id="kpiAuditFiles" style="font-size:1.5rem;font-weight:900;color:var(--green);">0</div>
           </div>
-          <div style="background:var(--bg-raised);border:1.5px solid var(--border-light);border-radius:12px;padding:.85rem 1.1rem;display:flex;flex-direction:column;gap:.25rem;box-shadow:0 2px 6px rgba(0,0,0,0.03);">
-            <div style="font-size:.74rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Kod / Tasarım</div>
-            <div id="kpiAuditEdits" style="font-size:1.6rem;font-weight:900;color:var(--purple);">0</div>
+          <div style="background:var(--bg-raised);border:1.5px solid var(--border-light);border-radius:12px;padding:.8rem 1rem;display:flex;flex-direction:column;gap:.2rem;box-shadow:0 2px 6px rgba(0,0,0,0.03);">
+            <div style="font-size:.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Kod / Tasarım</div>
+            <div id="kpiAuditEdits" style="font-size:1.5rem;font-weight:900;color:var(--purple);">0</div>
           </div>
-          <div style="background:var(--bg-raised);border:1.5px solid var(--border-light);border-radius:12px;padding:.85rem 1.1rem;display:flex;flex-direction:column;gap:.25rem;box-shadow:0 2px 6px rgba(0,0,0,0.03);">
-            <div style="font-size:.74rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Silme & Çöp</div>
-            <div id="kpiAuditDeletes" style="font-size:1.6rem;font-weight:900;color:var(--red);">0</div>
+          <div style="background:var(--bg-raised);border:1.5px solid var(--border-light);border-radius:12px;padding:.8rem 1rem;display:flex;flex-direction:column;gap:.2rem;box-shadow:0 2px 6px rgba(0,0,0,0.03);">
+            <div style="font-size:.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Silme & Çöp</div>
+            <div id="kpiAuditDeletes" style="font-size:1.5rem;font-weight:900;color:var(--red);">0</div>
           </div>
         </div>
 
         <!-- Arama ve Filtre Kontrolleri -->
-        <div style="display:grid;grid-template-columns:1fr 240px;gap:.75rem;">
-          <div style="position:relative;">
-            <input type="text" id="auditSearchInput" placeholder="🔍 Loglarda anında ara (Kullanıcı, işlem türü, hedef rapor, IP adresi, detay)..." class="master-search-input" style="width:100%;font-size:.88rem;padding:.6rem .95rem;box-sizing:border-box;border-radius:10px;" />
+        <div style="display:flex;gap:.75rem;width:100%;box-sizing:border-box;">
+          <div style="flex:1;">
+            <input type="text" id="auditSearchInput" placeholder="Loglarda filtrele (Kullanıcı, işlem türü, hedef rapor, IP adresi, detay)..." class="master-search-input" style="width:100%;font-size:.85rem;padding:.55rem .85rem;box-sizing:border-box;border-radius:10px;" />
           </div>
-          <select id="auditActionFilter" class="master-search-input" style="font-size:.85rem;font-weight:700;border-radius:10px;padding:.55rem .8rem;">
+          <select id="auditActionFilter" class="master-search-input" style="width:230px;font-size:.84rem;font-weight:700;border-radius:10px;padding:.5rem .75rem;">
             <option value="">Tüm İşlem Türleri</option>
-            <option value="FRP_DOWNLOAD">📥 İndirmeler (FRP_DOWNLOAD)</option>
-            <option value="REPORT_UPLOAD">📤 Yüklemeler (REPORT_UPLOAD)</option>
-            <option value="REPORT_UPDATE">🔄 Güncellemeler (REPORT_UPDATE)</option>
-            <option value="POOL_ADD">🌐 Havuz Paylaşımı (POOL_ADD)</option>
-            <option value="POOL_REMOVE">🔒 Havuzdan Kaldırma (POOL_REMOVE)</option>
-            <option value="REPORT_DELETE">🗑️ Çöp Kutusuna Taşıma</option>
-            <option value="TRASH_RESTORE">♻️ Çöpten Geri Yükleme</option>
-            <option value="TRASH_PURGE">❌ Kalıcı Silme (TRASH_PURGE)</option>
-            <option value="TRASH_EMPTY">🧹 Çöp Kutusunu Boşaltma</option>
-            <option value="DESIGN_EDIT">🎨 Tasarım Düzenleme</option>
-            <option value="SQL_EDIT">🗄️ SQL Sorgu Düzenleme</option>
-            <option value="PASCAL_EDIT">📜 Pascal Script Düzenleme</option>
-            <option value="USERNAME_CHANGE">✏️ Kullanıcı Adı Değişikliği</option>
-            <option value="LOGIN">🔐 Giriş Yapma (LOGIN)</option>
-            <option value="USER_UPDATE">👤 Profil Güncelleme</option>
-            <option value="EMAIL_CHANGE">✉️ E-Posta Değişikliği</option>
-            <option value="DATA_RESET">🚨 Tüm Verileri Sıfırlama</option>
+            <option value="FRP_DOWNLOAD">İndirmeler (FRP_DOWNLOAD)</option>
+            <option value="REPORT_UPLOAD">Yüklemeler (REPORT_UPLOAD)</option>
+            <option value="REPORT_UPDATE">Güncellemeler (REPORT_UPDATE)</option>
+            <option value="POOL_ADD">Havuz Paylaşımı (POOL_ADD)</option>
+            <option value="POOL_REMOVE">Havuzdan Kaldırma (POOL_REMOVE)</option>
+            <option value="REPORT_DELETE">Çöp Kutusuna Taşıma</option>
+            <option value="TRASH_RESTORE">Çöpten Geri Yükleme</option>
+            <option value="TRASH_PURGE">Kalıcı Silme (TRASH_PURGE)</option>
+            <option value="TRASH_EMPTY">Çöp Kutusunu Boşaltma</option>
+            <option value="DESIGN_EDIT">Tasarım Düzenleme</option>
+            <option value="SQL_EDIT">SQL Sorgu Düzenleme</option>
+            <option value="PASCAL_EDIT">Pascal Script Düzenleme</option>
+            <option value="USERNAME_CHANGE">Kullanıcı Adı Değişikliği</option>
+            <option value="LOGIN">Giriş Yapma (LOGIN)</option>
+            <option value="USER_UPDATE">Profil Güncelleme</option>
+            <option value="EMAIL_CHANGE">E-Posta Değişikliği</option>
+            <option value="DATA_RESET">Tüm Verileri Sıfırlama</option>
           </select>
         </div>
 
         <!-- Geniş Tablo Alanı -->
-        <div id="auditLogsContainer" style="background:var(--bg-surface);border:1.5px solid var(--border-light);border-radius:14px;overflow-x:auto;max-height:520px;overflow-y:auto;box-shadow:inset 0 1px 4px rgba(0,0,0,0.04);">
+        <div id="auditLogsContainer" style="background:var(--bg-surface);border:1.5px solid var(--border-light);border-radius:14px;overflow-x:auto;max-height:480px;overflow-y:auto;box-shadow:inset 0 1px 4px rgba(0,0,0,0.04);width:100%;box-sizing:border-box;">
           <div style="text-align:center;padding:3.5rem;color:var(--text-muted);">
             <div class="splash-spinner" style="margin-bottom:.8rem;"></div>
             <div style="font-weight:700;">Denetim kayıtları yükleniyor...</div>
@@ -100,7 +100,7 @@ window.FrpSettingsTabs.audit = {
       <div class="modal" style="max-width:580px;width:92vw;padding:1.75rem;border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,.45);border:1.5px solid var(--border);background:var(--bg-surface);animation:fadeIn .18s ease-out;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;border-bottom:1px solid var(--border-light);padding-bottom:.75rem;">
           <div style="font-size:1.12rem;font-weight:800;color:var(--text-primary);display:flex;align-items:center;gap:.5rem;">
-            <span>🔍 Denetim İşlem Detayı</span>
+            <span>Denetim Kayıt Detayı</span>
             <span class="badge badge-blue" style="font-size:.76rem;padding:.2rem .55rem;">${esc(log.action)}</span>
           </div>
           <button type="button" class="btn btn-sm btn-ghost btn-close-detail" style="font-size:1.1rem;padding:2px 10px;border-radius:50%;">✕</button>
@@ -178,7 +178,7 @@ window.FrpSettingsTabs.audit = {
     const renderLogTable = (logs) => {
       if (!container) return;
       if (!logs || logs.length === 0) {
-        container.innerHTML = `<div style="text-align:center;padding:3.5rem;color:var(--text-muted);"><div style="font-size:2.2rem;margin-bottom:.5rem;">🔍</div>Herhangi bir işlem kaydı bulunamadı.</div>`;
+        container.innerHTML = `<div style="text-align:center;padding:3.5rem;color:var(--text-muted);">Herhangi bir işlem kaydı bulunamadı.</div>`;
         return;
       }
 
@@ -227,7 +227,7 @@ window.FrpSettingsTabs.audit = {
               </div>
             </td>
             <td style="padding:.75rem .95rem;">
-              <span class="badge ${badgeClass}" style="font-size:.72rem;padding:.25rem .6rem;">${escHtml(l.action || 'INFO')}</span>
+              <span class="badge ${badgeClass}" style="font-size:.72rem;padding:.22rem .55rem;">${escHtml(l.action || 'INFO')}</span>
             </td>
             <td style="padding:.75rem .95rem;font-weight:700;color:var(--accent);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(l.target || '')}">
               ${escHtml(l.target || '-')}
@@ -246,19 +246,18 @@ window.FrpSettingsTabs.audit = {
         <table style="width:100%;border-collapse:collapse;text-align:left;">
           <thead>
             <tr style="background:var(--bg-raised);border-bottom:2px solid var(--border);font-size:.78rem;font-weight:800;color:var(--text-secondary);position:sticky;top:0;z-index:2;">
-              <th style="padding:.8rem .95rem;width:160px;">Zaman</th>
-              <th style="padding:.8rem .95rem;width:140px;">Kullanıcı</th>
-              <th style="padding:.8rem .95rem;width:150px;">İşlem Türü</th>
-              <th style="padding:.8rem .95rem;width:190px;">Hedef</th>
+              <th style="padding:.8rem .95rem;width:155px;">Zaman</th>
+              <th style="padding:.8rem .95rem;width:130px;">Kullanıcı</th>
+              <th style="padding:.8rem .95rem;width:145px;">İşlem Türü</th>
+              <th style="padding:.8rem .95rem;width:180px;">Hedef</th>
               <th style="padding:.8rem .95rem;">Açıklama / Detay</th>
-              <th style="padding:.8rem .95rem;width:120px;">IP Adresi</th>
+              <th style="padding:.8rem .95rem;width:115px;">IP Adresi</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
       `;
 
-      // Satıra tıklayınca detay popup aç
       container.querySelectorAll('.audit-row').forEach(tr => {
         tr.addEventListener('click', () => {
           const idx = parseInt(tr.dataset.logIdx, 10);
@@ -320,7 +319,7 @@ window.FrpSettingsTabs.audit = {
     filterSelect?.addEventListener('change', filterAndDisplayLogs);
     btnRefresh?.addEventListener('click', fetchLogs);
 
-    // EXCEL İNDİRME MOTORU
+    // EXCEL İNDİRME
     btnExportExcel?.addEventListener('click', () => {
       if (!this.loadedLogs || this.loadedLogs.length === 0) {
         safeToast('Dışa aktarılacak denetim kaydı bulunamadı.', 'info');
@@ -379,7 +378,7 @@ window.FrpSettingsTabs.audit = {
       link.download = `denetim_gunlugu_${new Date().toISOString().slice(0, 10)}.xls`;
       link.click();
       URL.revokeObjectURL(url);
-      safeToast('Denetim günlüğü Excel tablosu (.xls) olarak indirildi! 📊', 'success');
+      safeToast('Denetim günlüğü Excel tablosu (.xls) olarak indirildi.', 'success');
     });
 
     fetchLogs();

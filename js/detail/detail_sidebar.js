@@ -67,7 +67,7 @@ window.FrpDetailSidebar = window.FrpDetailSidebar || {};
         FrpStore.updateMeta(fileId, { [field]: newVal });
         deactivateMetaEdit(rowEl, esc(newVal));
         if (typeof showToast === 'function') {
-          showToast(`${field === 'reportName' ? 'Rapor adı' : field === 'author' ? 'Yazar' : 'Açıklama'} güncellendi. ✏️`, 'success');
+          showToast(`${field === 'reportName' ? 'Rapor adı' : field === 'author' ? 'Yazar' : 'Açıklama'} güncellendi.`, 'success');
         }
         if (field === 'reportName') {
           const pTitle = document.getElementById('pageTitle');
@@ -102,14 +102,14 @@ window.FrpDetailSidebar = window.FrpDetailSidebar || {};
     const paramPillsHtml = [...allParams].map(p => `<span class="param-pill">${esc(p)}</span>`).join('');
     const tagsList = tags.map(t => `
       <span class="tag-pill">
-        🏷️ ${esc(t)}
+        ${esc(t)}
         <span class="tag-pill-remove" onclick="removeTagFromDetail('${esc(t)}')">×</span>
       </span>
     `).join('');
 
     sb.innerHTML = `
       <div class="sidebar-section">
-        <div class="sidebar-heading">📋 Rapor Bilgileri</div>
+        <div class="sidebar-heading">Rapor Bilgileri</div>
         ${makeEditableMetaRow('Rapor Adı', 'reportName', meta.reportName || file.name, file.id)}
         ${makeEditableMetaRow('Açıklama', 'description', meta.description || '', file.id)}
         ${makeEditableMetaRow('Yazar', 'author', meta.author || '', file.id)}
@@ -120,7 +120,7 @@ window.FrpDetailSidebar = window.FrpDetailSidebar || {};
       </div>
 
       <div class="sidebar-section">
-        <div class="sidebar-heading">🏷️ Etiketler & Kategoriler</div>
+        <div class="sidebar-heading">Etiketler & Kategoriler</div>
         <div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.5rem;">${tagsList || '<span style="color:var(--text-muted);font-size:.75rem;">Etiket yok</span>'}</div>
         <div class="meta-row">
           <div class="meta-label">Kategori</div>
@@ -130,7 +130,7 @@ window.FrpDetailSidebar = window.FrpDetailSidebar || {};
 
       ${allParams.size > 0 ? `
         <div class="sidebar-section">
-          <div class="sidebar-heading">⚡ SQL Parametreleri (${allParams.size})</div>
+          <div class="sidebar-heading">SQL Parametreleri (${allParams.size})</div>
           <div style="display:flex;flex-wrap:wrap;gap:.3rem;">${paramPillsHtml}</div>
         </div>
       ` : ''}

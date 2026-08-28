@@ -20,19 +20,19 @@ window.FrpSettingsTabs.trash = {
           <div style="display:flex;align-items:center;gap:.65rem;min-width:0;flex:1;">
             <input type="checkbox" class="trash-item-cb" data-id="${item.id}" ${isSelected ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer;" />
             <div style="min-width:0;flex:1;">
-              <div style="font-weight:700;font-size:.85rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📋 ${escHtml(repName)}</div>
+              <div style="font-weight:700;font-size:.85rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(repName)}</div>
               <div style="font-size:.72rem;color:var(--text-muted);margin-top:.15rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
-                <span>📄 ${escHtml(item.name)}</span>
-                <span>🗑️ Silinme: ${delTime}</span>
+                <span>${escHtml(item.name)}</span>
+                <span>Silinme: ${delTime}</span>
               </div>
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:.35rem;flex-shrink:0;">
             <button type="button" class="btn btn-sm btn-ghost btn-restore-item" data-id="${item.id}" style="color:var(--green);font-weight:700;padding:.3rem .6rem;" title="Geri Yükle">
-              🔄 Kurtar
+              Kurtar
             </button>
             <button type="button" class="btn btn-sm btn-ghost btn-purge-item" data-id="${item.id}" style="color:var(--red);font-weight:700;padding:.3rem .6rem;" title="Kalıcı Olarak Sil">
-              ❌ Sil
+              Sil
             </button>
           </div>
         </div>
@@ -43,21 +43,21 @@ window.FrpSettingsTabs.trash = {
       <div style="display:flex;flex-direction:column;gap:1rem;">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;">
           <div>
-            <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">🗑️ Çöp Kutusu (${trashItems.length})</div>
+            <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">Çöp Kutusu (${trashItems.length})</div>
             <div style="font-size:.78rem;color:var(--green);margin-top:.2rem;font-weight:700;">
-              ⚡ Geri yükleme ve silme işlemleri anında uygulanır (Ayrıca kaydet butonuna basmaya gerek yoktur).
+              Geri yükleme ve silme işlemleri anında uygulanır.
             </div>
           </div>
           <div style="display:flex;gap:.5rem;align-items:center;">
             <button type="button" class="btn btn-sm btn-primary" id="btnRestoreSelectedTrash" style="display:${this.selectedTrashIds.size > 0 ? 'inline-flex' : 'none'};font-weight:700;">
-              🔄 Seçilenleri Geri Yükle (<span id="trashSelectedCount">${this.selectedTrashIds.size}</span>)
+              Seçilenleri Geri Yükle (<span id="trashSelectedCount">${this.selectedTrashIds.size}</span>)
             </button>
             <button type="button" class="btn btn-sm btn-danger" id="btnPurgeSelectedTrash" style="display:${this.selectedTrashIds.size > 0 ? 'inline-flex' : 'none'};font-weight:700;">
-              ❌ Seçilenleri Kalıcı Sil
+              Seçilenleri Kalıcı Sil
             </button>
             ${trashItems.length > 0 ? `
               <button type="button" class="btn btn-sm btn-danger" id="btnEmptyTrashAll" style="font-weight:700;">
-                🗑️ Çöp Kutusunu Boşalt
+                Çöp Kutusunu Boşalt
               </button>
             ` : ''}
           </div>

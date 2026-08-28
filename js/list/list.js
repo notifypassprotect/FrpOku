@@ -1,6 +1,6 @@
 // ============================================================
-//  list.js — Ana Sayfa (index.html) Orkestratörü v5
-//  Modüler Mimaride Tüm Etkileşimler, Sürükle-Bırak, Toplu Eylemler ve Gezinme
+//  list.js — Ana Sayfa (index.html) Orkestratörü v6
+//  Sağ Tık Menüsü, Toplu İşlemler, Çalışma Alanı, Sürükle-Bırak & Filtreler
 // ============================================================
 
 let allFiles        = [];
@@ -24,10 +24,14 @@ const tableBody          = document.getElementById('tableBody');
 const searchInput        = document.getElementById('searchInput');
 const fieldSelect        = document.getElementById('fieldSelect') || document.getElementById('searchFieldSelect');
 const tagSelect          = document.getElementById('tagSelect');
+const catSelect          = document.getElementById('catSelect');
 const btnFavOnly         = document.getElementById('btnFavOnly');
 const bulkBar            = document.getElementById('bulkBar');
 const resultCount        = document.getElementById('resultCount');
 const btnThemeToggle     = document.getElementById('btnThemeToggle');
+const ctxMenu            = document.getElementById('tableContextMenu');
+
+let contextTargetId = null;
 
 function escHtml(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -39,8 +43,7 @@ function toast(msg, type = 'info', duration = 3500) {
   if (!stack) return;
   const el = document.createElement('div');
   el.className = 'toast-item ' + type;
-  const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
-  el.innerHTML = `<span>${icons[type] || 'ℹ️'}</span><span>${escHtml(msg)}</span>`;
+  el.innerHTML = `<span>${escHtml(msg)}</span>`;
   stack.appendChild(el);
   setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateX(40px)'; el.style.transition = '.3s'; setTimeout(() => el.remove(), 350); }, duration);
 }
@@ -50,7 +53,7 @@ window.toast = toast;
 function updateThemeBtn() {
   if (!btnThemeToggle) return;
   const cur = FrpStore.getTheme();
-  btnThemeToggle.textContent = cur === 'dark' ? '☀️ Aydınlık Mod' : '🌙 Koyu Mod';
+  btnThemeToggle.textContent = cur === 'dark' ? 'Aydınlık Mod' : 'Koyu Mod';
 }
 
 if (btnThemeToggle) {
@@ -156,7 +159,6 @@ async function handleFiles(fileList) {
   if (validFiles.length === 0) return;
 
   const resultsToSave = [];
-  const isBulk = validFiles.length > 1;
 
   for (let i = 0; i < validFiles.length; i++) {
     const file = validFiles[i];
@@ -174,7 +176,7 @@ async function handleFiles(fileList) {
     const res = FrpStore.addMany(resultsToSave);
     const added = res.added || resultsToSave.length;
     const updated = res.updated || 0;
-    toast(`🎉 ${added} rapor başarıyla yüklendi!${updated > 0 ? ` (${updated} güncellendi)` : ''}`, 'success');
+    toast(`${added} rapor başarıyla yüklendi.${updated > 0 ? ` (${updated} güncellendi)` : ''}`, 'success');
     if (window.FrpAudit) {
       window.FrpAudit.logAction({
         action: 'REPORT_UPLOAD',
@@ -275,10 +277,20 @@ function applySearch() {
   });
 
   renderCurrentView();
+  updateWorkspaceCounts();
 }
 window.applySearch = applySearch;
 
-// ── Görünüm Değiştirici (Tablo, Kartlar, Zaman Tüneli) ─────
+function updateWorkspaceCounts() {
+  const myCount = (FrpStore.getMyReports ? FrpStore.getMyReports() : FrpStore.getAll()).length;
+  const poolCount = (FrpStore.getPoolReports ? FrpStore.getPoolReports() : []).length;
+  const myBadge = document.getElementById('badgeMyCount');
+  const poolBadge = document.getElementById('badgePoolCount');
+  if (myBadge) myBadge.textContent = myCount;
+  if (poolBadge) poolBadge.textContent = poolCount;
+}
+
+// ── Görünüm Değiştirici ─────────────────────────────────────
 function renderCurrentView() {
   const tableEl = document.getElementById('reportTable');
   let cardsEl   = document.getElementById('cardsView');
@@ -361,7 +373,7 @@ function renderTable() {
       if (curSelectAll.checked) pagedFiles.forEach(f => selectedIds.add(f.id));
       else pagedFiles.forEach(f => selectedIds.delete(f.id));
       renderCurrentView();
-      if (typeof updateBulkBar === 'function') updateBulkBar();
+      updateBulkBar();
     };
   }
 
@@ -371,7 +383,6 @@ function renderTable() {
     tableBody.innerHTML = `
       <tr><td colspan="10">
         <div class="empty-state">
-          <div class="empty-icon">${searchQuery || selectedTag || onlyFavorites || onlyPinned || onlyNotes ? '🔍' : '📂'}</div>
           <div class="empty-title">${searchQuery || selectedTag || onlyFavorites || onlyPinned || onlyNotes ? 'Sonuç bulunamadı' : 'Henüz rapor yüklenmedi'}</div>
           <div class="empty-sub">${searchQuery || selectedTag || onlyFavorites || onlyPinned || onlyNotes ? 'Arama veya filtre kriterlerini değiştirin.' : 'Rapor eklemek için yukarıdaki butonları kullanın.'}</div>
         </div>
@@ -390,16 +401,15 @@ function renderTable() {
     const reportName = file.meta?.reportName || file.name;
     const hasNote = !!(file.userNote && file.userNote.trim());
     
-    // Tag renklendirme (TAG_PALETTE)
-    const tagsHtml = (file.tags || []).map(t => window.renderTag ? window.renderTag(t) : `<span class="tag-pill">🏷️ ${escHtml(t)}</span>`).join(' ');
+    const tagsHtml = (file.tags || []).map(t => window.renderTag ? window.renderTag(t) : `<span class="tag-pill">${escHtml(t)}</span>`).join(' ');
     
     const guidVal = (file.meta && file.meta.guid) ? file.meta.guid : '';
     const guidColHtml = guidVal
-      ? `<span class="badge badge-gray" onclick="event.stopPropagation();copyGuidText('${escHtml(guidVal)}')" title="Tıklayınca GUID kopyalar" style="cursor:pointer;font-family:var(--mono);font-size:.72rem;">🔑 ${escHtml(guidVal)}</span>`
+      ? `<span class="badge badge-gray" onclick="event.stopPropagation();copyGuidText('${escHtml(guidVal)}')" title="Tıklayınca GUID kopyalar" style="cursor:pointer;font-family:var(--mono);font-size:.72rem;">${escHtml(guidVal)}</span>`
       : `<span style="color:var(--text-muted);font-size:.75rem;">—</span>`;
       
     const catHtml = file.category
-      ? `<span class="badge badge-purple" onclick="event.stopPropagation();openCategoryModalFor('${file.id}')" style="cursor:pointer;">🏷️ ${escHtml(file.category)}</span>`
+      ? `<span class="badge badge-purple" onclick="event.stopPropagation();openCategoryModalFor('${file.id}')" style="cursor:pointer;">${escHtml(file.category)}</span>`
       : `<button class="btn btn-sm" onclick="event.stopPropagation();openCategoryModalFor('${file.id}')" style="padding:1px 6px;font-size:.72rem;">+ Kategori</button>`;
 
     const helperData = { reportName, size, date, hasNote, tagsHtml, guidColHtml, catHtml };
@@ -422,7 +432,7 @@ function renderTable() {
     `;
   }).join('');
 
-  if (typeof updateBulkBar === 'function') updateBulkBar();
+  updateBulkBar();
   bindTableSortHeaders();
 }
 window.renderTable = renderTable;
@@ -509,7 +519,7 @@ function handleItemClick(e, id) {
     else selectedIds.add(id);
     _lastSelectedRowId = id;
     renderCurrentView();
-    if (typeof updateBulkBar === 'function') updateBulkBar();
+    updateBulkBar();
     return;
   }
 
@@ -521,7 +531,7 @@ function handleItemClick(e, id) {
       const end = Math.max(idx1, idx2);
       for (let i = start; i <= end; i++) selectedIds.add(sorted[i].id);
       renderCurrentView();
-      if (typeof updateBulkBar === 'function') updateBulkBar();
+      updateBulkBar();
       return;
     }
   }
@@ -541,14 +551,14 @@ function toggleSelect(e, id) {
   if (selectedIds.has(id)) selectedIds.delete(id);
   else selectedIds.add(id);
   renderCurrentView();
-  if (typeof updateBulkBar === 'function') updateBulkBar();
+  updateBulkBar();
 }
 window.toggleSelect = toggleSelect;
 
 function toggleFav(e, id) {
   if (e && e.stopPropagation) e.stopPropagation();
   const newState = FrpStore.toggleFavorite(id);
-  toast(newState ? 'Favorilere eklendi ⭐' : 'Favorilerden çıkarıldı', 'info');
+  toast(newState ? 'Favorilere eklendi' : 'Favorilerden çıkarıldı', 'info');
   refreshAll();
 }
 window.toggleFav = toggleFav;
@@ -556,27 +566,165 @@ window.toggleFav = toggleFav;
 function togglePin(e, id) {
   if (e && e.stopPropagation) e.stopPropagation();
   const newState = FrpStore.togglePin(id);
-  toast(newState ? 'Rapor üste sabitlendi 📌' : 'Sabitleme kaldırıldı', 'info');
+  toast(newState ? 'Rapor üste sabitlendi' : 'Sabitleme kaldırıldı', 'info');
   refreshAll();
 }
 window.togglePin = togglePin;
 
 function copyGuidText(guid) {
-  navigator.clipboard.writeText(guid).then(() => toast(`GUID kopyalandı: ${guid} 📋`, 'success'));
+  navigator.clipboard.writeText(guid).then(() => toast(`GUID kopyalandı: ${guid}`, 'success'));
 }
 window.copyGuidText = copyGuidText;
 
-// ── Kategori & Etiket Modal Tetikleyicileri ─────────────────
+// ── Toplu İşlemler Çubuğu (Bulk Bar) ────────────────────────
+function updateBulkBar() {
+  if (!bulkBar) return;
+  const count = selectedIds.size;
+  if (count > 0) {
+    bulkBar.classList.add('visible');
+    const info = document.getElementById('bulkInfo');
+    if (info) info.textContent = `${count} rapor seçildi`;
+  } else {
+    bulkBar.classList.remove('visible');
+  }
+}
+window.updateBulkBar = updateBulkBar;
+
+// ── SAĞ TIK CONTEXT MENÜSÜ BAĞLANTISI ───────────────────────
+function hideContextMenu() {
+  if (ctxMenu) ctxMenu.style.display = 'none';
+  contextTargetId = null;
+}
+
+function setupContextMenu() {
+  if (!tableBody || !ctxMenu) return;
+
+  tableBody.addEventListener('contextmenu', e => {
+    const row = e.target.closest('tr[data-id]');
+    if (!row) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    contextTargetId = row.dataset.id;
+    const file = FrpStore.getById(contextTargetId);
+    if (!file) return;
+
+    const titleEl = document.getElementById('ctxMenuReportTitle');
+    if (titleEl) titleEl.textContent = file.meta?.reportName || file.name;
+
+    const isPublic = !!(file.isPublic || file.is_public);
+    const textTogglePool = document.getElementById('ctxTextTogglePool');
+    if (textTogglePool) textTogglePool.textContent = isPublic ? 'Havuzdan Kaldır' : 'Ortak Havuzda Paylaş';
+
+    // Konumlandırma
+    ctxMenu.style.display = 'flex';
+    const x = Math.min(e.clientX, window.innerWidth - 220);
+    const y = Math.min(e.clientY, window.innerHeight - 280);
+    ctxMenu.style.left = `${x}px`;
+    ctxMenu.style.top = `${y}px`;
+  });
+
+  document.addEventListener('click', (e) => {
+    if (ctxMenu && !ctxMenu.contains(e.target)) hideContextMenu();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') hideContextMenu();
+  });
+
+  // Menü içi buton aksiyonları
+  ctxMenu.querySelectorAll('.ctx-item').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const action = btn.dataset.action;
+      const id = contextTargetId;
+      hideContextMenu();
+      if (!id) return;
+
+      const file = FrpStore.getById(id);
+      if (!file) return;
+
+      switch (action) {
+        case 'view':
+          openDetail(id);
+          break;
+        case 'toggle-pool':
+          if (FrpStore.togglePublicPool) {
+            const isPub = FrpStore.togglePublicPool(id);
+            toast(isPub ? 'Rapor ortak havuza eklendi.' : 'Rapor ortak havuzdan kaldırıldı.', 'info');
+            refreshAll();
+          }
+          break;
+        case 'rename':
+          openRenameModal(id);
+          break;
+        case 'download':
+          if (typeof downloadSingleFRP === 'function') downloadSingleFRP(id);
+          break;
+        case 'fav':
+          toggleFav(null, id);
+          break;
+        case 'pin':
+          togglePin(null, id);
+          break;
+        case 'category':
+          openCategoryModalFor(id);
+          break;
+        case 'delete':
+          if (window.showConfirmDialog) {
+            window.showConfirmDialog({
+              title: 'Raporu Sil',
+              message: `"${file.meta?.reportName || file.name}" adlı rapor çöp kutusuna taşınacaktır.`,
+              confirmText: 'Çöp Kutusuna Taşı',
+              isDanger: true,
+              onConfirm: () => {
+                FrpStore.moveToTrash(id);
+                selectedIds.delete(id);
+                toast('Rapor çöp kutusuna taşındı.', 'info');
+                refreshAll();
+              }
+            });
+          }
+          break;
+      }
+    });
+  });
+}
+
+// ── Rapor Adını Düzenleme Modalı ────────────────────────────
+async function openRenameModal(fileId) {
+  const file = FrpStore.getById(fileId);
+  if (!file) return;
+  const currentName = file.meta?.reportName || file.name;
+
+  if (window.showPromptDialog) {
+    window.showPromptDialog({
+      title: 'Rapor Adını Düzenle',
+      message: `Orijinal Dosya: ${file.name}`,
+      defaultValue: currentName,
+      confirmText: 'Kaydet',
+      onConfirm: (newName) => {
+        if (newName && newName !== currentName) {
+          FrpStore.updateMeta(fileId, { reportName: newName });
+          toast(`Rapor adı "${newName}" olarak güncellendi.`, 'success');
+          refreshAll();
+        }
+      }
+    });
+  }
+}
+window.openRenameModal = openRenameModal;
+
+// ── Kategori Ata Modalı ─────────────────────────────────────
 async function openCategoryModalFor(fileId) {
   const file = FrpStore.getById(fileId);
   if (!file) return;
   const currentCat = file.category || '';
   const cats = FrpStore.getCategories ? FrpStore.getCategories() : [];
-  const catOptions = cats.map(c => `<option value="${escHtml(c)}" ${c === currentCat ? 'selected' : ''}>📁 ${escHtml(c)}</option>`).join('');
+  const catOptions = cats.map(c => `<option value="${escHtml(c)}" ${c === currentCat ? 'selected' : ''}>${escHtml(c)}</option>`).join('');
 
   if (typeof window.showModal === 'function') {
     await window.showModal({
-      title: '🏷️ Kategori Ata',
+      title: 'Kategori Ata',
       body: `
         <div style="font-size:.85rem;color:var(--text-secondary);margin-bottom:.8rem;">
           <strong>${escHtml(file.meta?.reportName || file.name)}</strong> için kategori seçin:
@@ -596,7 +744,7 @@ async function openCategoryModalFor(fileId) {
           const inp = modalEl.querySelector('#singleNewCatInput');
           const finalCat = (inp && inp.value.trim()) ? inp.value.trim() : (sel ? sel.value : '');
           FrpStore.setCategory(fileId, finalCat);
-          toast(`Kategori güncellendi: ${finalCat || 'Kaldırıldı'} 📁`, 'success');
+          toast(`Kategori güncellendi: ${finalCat || 'Kaldırıldı'}`, 'success');
           refreshAll();
         });
       }
@@ -617,6 +765,24 @@ window.refreshAll = refreshAll;
 document.addEventListener('DOMContentLoaded', async () => {
   if (window.FrpStoreReady) await window.FrpStoreReady;
   refreshAll();
+  setupContextMenu();
+
+  // Çalışma Alanı Değiştirici
+  document.getElementById('tabWsPersonal')?.addEventListener('click', () => {
+    document.getElementById('tabWsPersonal')?.classList.add('active');
+    document.getElementById('tabWsPool')?.classList.remove('active');
+    if (FrpStore.setActiveWorkspace) FrpStore.setActiveWorkspace('personal');
+    document.getElementById('poolNotice').style.display = 'none';
+    applySearch();
+  });
+
+  document.getElementById('tabWsPool')?.addEventListener('click', () => {
+    document.getElementById('tabWsPool')?.classList.add('active');
+    document.getElementById('tabWsPersonal')?.classList.remove('active');
+    if (FrpStore.setActiveWorkspace) FrpStore.setActiveWorkspace('pool');
+    document.getElementById('poolNotice').style.display = 'block';
+    applySearch();
+  });
 
   // Dosya Ekleme Butonları
   const fileInputSingle  = document.getElementById('fileInputSingle');
@@ -630,6 +796,59 @@ document.addEventListener('DOMContentLoaded', async () => {
   fileInputSingle?.addEventListener('change', e => { handleFiles(e.target.files); e.target.value = ''; });
   fileInputMulti?.addEventListener('change', e => { handleFiles(e.target.files); e.target.value = ''; });
   fileInputFolder?.addEventListener('change', e => { handleFiles(e.target.files); e.target.value = ''; });
+
+  // Toplu Eylemler Barı
+  document.getElementById('btnClearSelection')?.addEventListener('click', () => {
+    selectedIds.clear();
+    const selAll = document.getElementById('selectAll');
+    if (selAll) selAll.checked = false;
+    renderCurrentView();
+    updateBulkBar();
+  });
+
+  document.getElementById('btnBulkFav')?.addEventListener('click', () => {
+    if (selectedIds.size === 0) return;
+    selectedIds.forEach(id => FrpStore.toggleFavorite(id));
+    toast(`${selectedIds.size} rapor favorilere eklendi.`, 'success');
+    refreshAll();
+  });
+
+  document.getElementById('btnDeleteBulk')?.addEventListener('click', () => {
+    if (selectedIds.size === 0) return;
+    const n = selectedIds.size;
+    if (window.showConfirmDialog) {
+      window.showConfirmDialog({
+        title: 'Toplu Silme',
+        message: `${n} adet rapor çöp kutusuna taşınacaktır. İstediğiniz zaman kurtarabilirsiniz.`,
+        confirmText: 'Çöp Kutusuna Taşı',
+        isDanger: true,
+        onConfirm: () => {
+          FrpStore.moveManyToTrash([...selectedIds]);
+          selectedIds.clear();
+          toast(`${n} rapor çöp kutusuna taşındı.`, 'info');
+          refreshAll();
+        }
+      });
+    }
+  });
+
+  document.getElementById('btnBulkSharePool')?.addEventListener('click', () => {
+    if (selectedIds.size === 0) return;
+    if (FrpStore.addManyToPool) {
+      FrpStore.addManyToPool([...selectedIds]);
+      toast(`${selectedIds.size} rapor ortak havuzda paylaşıldı.`, 'success');
+      refreshAll();
+    }
+  });
+
+  document.getElementById('btnBulkRemovePool')?.addEventListener('click', () => {
+    if (selectedIds.size === 0) return;
+    if (FrpStore.removeManyFromPool) {
+      FrpStore.removeManyFromPool([...selectedIds]);
+      toast(`${selectedIds.size} rapor ortak havuzdan kaldırıldı.`, 'info');
+      refreshAll();
+    }
+  });
 
   // Sürükle-Bırak Olayları
   window.addEventListener('dragover', e => e.preventDefault());
@@ -653,6 +872,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   tagSelect?.addEventListener('change', (e) => {
     selectedTag = e.target.value;
+    applySearch();
+  });
+
+  catSelect?.addEventListener('change', (e) => {
+    selectedCategory = e.target.value;
     applySearch();
   });
 
@@ -680,6 +904,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     selectedTag = '';
     if (tagSelect) tagSelect.value = '';
     selectedCategory = '';
+    if (catSelect) catSelect.value = '';
     onlyFavorites = false;
     btnFavOnly?.classList.remove('active');
     onlyPinned = false;

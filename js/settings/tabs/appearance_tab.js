@@ -40,21 +40,21 @@ window.FrpSettingsTabs.appearance = {
     return `
       <div style="display:flex;flex-direction:column;gap:1.25rem;">
         <div>
-          <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">🎨 Görünüm & Tipografi Tercihleri</div>
+          <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">Görünüm & Tipografi Tercihleri</div>
           <div style="font-size:.78rem;color:var(--text-muted);margin-top:.2rem;">
-            Yazı tipi ailesi, arayüz boyutu ve tema seçimlerinizi belirleyin (Değişiklikler kaydet butonuna basıldığında uygulanır).
+            Yazı tipi ailesi, arayüz boyutu ve tema seçimlerinizi belirleyin.
           </div>
         </div>
 
         <!-- Tema Seçimi -->
         <div class="settings-card">
-          <div style="font-weight:700;font-size:.85rem;margin-bottom:.6rem;">🌓 Arayüz Teması</div>
+          <div style="font-weight:700;font-size:.85rem;margin-bottom:.6rem;">Arayüz Teması</div>
           <div style="display:flex;gap:.75rem;">
             <button type="button" class="btn btn-sm ${isDark ? 'btn-primary' : 'btn-ghost'}" id="btnStagedThemeDark" style="flex:1;padding:.55rem;font-weight:700;">
-              🌙 Koyu Tema (Dark)
+              Koyu Tema (Dark)
             </button>
             <button type="button" class="btn btn-sm ${!isDark ? 'btn-primary' : 'btn-ghost'}" id="btnStagedThemeLight" style="flex:1;padding:.55rem;font-weight:700;">
-              ☀️ Açık Tema (Light)
+              Açık Tema (Light)
             </button>
           </div>
         </div>

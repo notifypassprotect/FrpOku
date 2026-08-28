@@ -94,37 +94,37 @@
         </button>
         <div class="topbar-dropdown-menu">
           <button class="topbar-dropdown-item" id="btnComplexityCenter" title="Tüm Raporların SQL Karmaşıklık ve Statik Anti-Pattern Analizi">
-            <span>🧠</span> <span>Karmaşıklık Analizi</span>
+            <span>Karmaşıklık Analizi</span>
           </button>
           <button class="topbar-dropdown-item" id="btnDependencies" title="Tablo Bağımlılık Haritası">
-            <span>🕸️</span> <span>Bağımlılık Haritası</span>
+            <span>Bağımlılık Haritası</span>
           </button>
           <button class="topbar-dropdown-item" id="btnParams" title="Tüm Raporlardaki Parametreler">
-            <span>⚙️</span> <span>Parametreler</span>
+            <span>Parametreler</span>
           </button>
           <button class="topbar-dropdown-item" id="btnSnippets" title="Kaydedilmiş SQL Sorgu Kütüphanesi">
-            <span>📌</span> <span>Kayıtlı Sorgular</span>
+            <span>Kayıtlı Sorgular</span>
           </button>
           <button class="topbar-dropdown-item" id="btnTableAnalysis" title="Veritabanı Tablo Kullanım Analizi">
-            <span>📊</span> <span>Tablo Kullanım Analizi</span>
+            <span>Tablo Kullanım Analizi</span>
           </button>
         </div>
       </div>
 
-      <!-- ➕ Rapor Ekle (Dropdown) -->
+      <!-- Rapor Ekle (Dropdown) -->
       <div class="topbar-dropdown" id="dropdownAddReports">
         <button class="btn btn-sm btn-primary topbar-dropdown-toggle" title="Rapor Dosyası Yükle">
-          ➕ Rapor Ekle
+          Rapor Ekle
         </button>
         <div class="topbar-dropdown-menu">
           <button class="topbar-dropdown-item" id="btnAddSingle" title="Tek .frp dosyası seç">
-            <span>📄</span> <span>Tek Dosya Ekle</span>
+            <span>Tek Dosya Ekle</span>
           </button>
           <button class="topbar-dropdown-item" id="btnAddMulti" title="Birden fazla .frp seç">
-            <span>📋</span> <span>Çoklu Dosya Ekle</span>
+            <span>Çoklu Dosya Ekle</span>
           </button>
           <button class="topbar-dropdown-item" id="btnAddFolder" title="Klasördeki tüm .frp dosyaları">
-            <span>📂</span> <span>Klasör Ekle</span>
+            <span>Klasör Ekle</span>
           </button>
         </div>
       </div>
@@ -132,10 +132,10 @@
       <span style="width:1px;height:22px;background:var(--border-light);margin:0 .15rem;"></span>
 
       <!-- Tema Butonu -->
-      <button class="theme-switch-pill" id="btnThemeToggle" title="Gece / Gündüz Teması">🌙 Koyu Mod</button>
+      <button class="theme-switch-pill" id="btnThemeToggle" title="Gece / Gündüz Teması">Koyu Mod</button>
 
       <!-- Ayarlar Butonu -->
-      <button class="btn btn-sm" id="btnOpenSettingsModal" style="font-weight:700;background:var(--bg-surface);border:1.5px solid var(--border);" title="Görünüm, Kategoriler, Sütunlar, Çöp Kutusu, Yedekleme">⚙️ Ayarlar</button>
+      <button class="btn btn-sm" id="btnOpenSettingsModal" style="font-weight:700;background:var(--bg-surface);border:1.5px solid var(--border);" title="Görünüm, Kategoriler, Sütunlar, Çöp Kutusu, Yedekleme">Ayarlar</button>
 
       <!-- Mobil Menü Butonu (Sadece mobilde görünür) -->
       <button class="btn btn-sm btn-mobile-menu" id="btnMobileMenuToggle" title="Mobil Menüyü Aç" aria-label="Menü">
@@ -148,59 +148,59 @@
   <div class="mobile-drawer-overlay" id="mobileDrawerOverlay"></div>
   <div class="mobile-drawer" id="mobileDrawer">
     <div class="mobile-drawer-header">
-      <h3>📋 FrpOku Menü</h3>
+      <h3>FrpOku Menü</h3>
       <button class="mobile-drawer-close" id="btnMobileDrawerClose" aria-label="Kapat">✕</button>
     </div>
     
     <div class="mobile-drawer-section">
-      <div class="mobile-drawer-section-title">⚡ Hızlı İşlemler</div>
+      <div class="mobile-drawer-section-title">Hızlı İşlemler</div>
       <button class="mobile-drawer-item" id="btnMobAddSingle">
-        <span>➕</span> <span>Tek Dosya Ekle (.frp)</span>
+        <span>Tek Dosya Ekle (.frp)</span>
       </button>
       <button class="mobile-drawer-item" id="btnMobAddMulti">
-        <span>📋</span> <span>Çoklu Dosya Ekle</span>
+        <span>Çoklu Dosya Ekle</span>
       </button>
       <button class="mobile-drawer-item" id="btnMobAddFolder">
-        <span>📂</span> <span>Klasör Yükle</span>
+        <span>Klasör Yükle</span>
       </button>
     </div>
 
     <div class="mobile-drawer-section">
-      <div class="mobile-drawer-section-title">🧠 Analiz Araçları</div>
+      <div class="mobile-drawer-section-title">Analiz Araçları</div>
       <button class="mobile-drawer-item" id="btnMobComplexity">
-        <span>🧠</span> <span>SQL Karmaşıklık Analizi</span>
+        <span>SQL Karmaşıklık Analizi</span>
       </button>
       <button class="mobile-drawer-item" id="btnMobDependencies">
-        <span>🕸️</span> <span>Tablo Bağımlılık Haritası</span>
+        <span>Tablo Bağımlılık Haritası</span>
       </button>
       <button class="mobile-drawer-item" id="btnMobParams">
-        <span>⚙️</span> <span>Tüm Parametreler</span>
+        <span>Tüm Parametreler</span>
       </button>
       <button class="mobile-drawer-item" id="btnMobSnippets">
-        <span>📌</span> <span>Kayıtlı SQL Kütüphanesi</span>
+        <span>Kayıtlı SQL Kütüphanesi</span>
       </button>
       <button class="mobile-drawer-item" id="btnMobTableAnalysis">
-        <span>📊</span> <span>Tablo Kullanım Analizi</span>
+        <span>Tablo Kullanım Analizi</span>
       </button>
     </div>
 
     <div class="mobile-drawer-section">
-      <div class="mobile-drawer-section-title">⚙️ Sistem & Ayarlar</div>
+      <div class="mobile-drawer-section-title">Sistem & Ayarlar</div>
       <button class="mobile-drawer-item" id="btnMobRecent">
-        <span>🕒</span> <span>Son Açılan Raporlar</span>
+        <span>Son Açılan Raporlar</span>
       </button>
       <button class="mobile-drawer-item" id="btnMobDashboard" style="display:none;">
-        <span>📊</span> <span>Yönetim Paneli (Admin)</span>
+        <span>Yönetim Paneli (Admin)</span>
       </button>
       <button class="mobile-drawer-item" id="btnMobSettings">
-        <span>⚙️</span> <span>Sistem & Görünüm Ayarları</span>
+        <span>Sistem & Görünüm Ayarları</span>
       </button>
     </div>
   </div>
 
   <!-- MOBİL HIZLI RAPOR EKLEME BUTONU (FAB) -->
   <button class="mobile-fab-btn" id="btnMobileFab" title="Hızlı Rapor Ekle">
-    <span>➕</span> <span>Rapor Ekle</span>
+    <span>Rapor Ekle</span>
   </button>
 
   <!-- Gizli file input'lar -->
@@ -215,17 +215,17 @@
     <div class="workspace-bar">
       <div class="workspace-switcher" id="workspaceSwitcher">
         <button type="button" class="workspace-tab-btn active" id="tabWsPersonal" data-ws="personal" title="Sadece kendi yüklediğiniz raporlar">
-          <span>📁 Kişisel Raporlarım</span>
+          <span>Kişisel Raporlarım</span>
           <span class="pool-count-badge" id="badgeMyCount">0</span>
         </button>
         <button type="button" class="workspace-tab-btn" id="tabWsPool" data-ws="pool" title="Tüm kullanıcıların paylaştığı ortak havuz">
-          <span>🌐 Ortak Rapor Havuzu</span>
+          <span>Ortak Rapor Havuzu</span>
           <span class="pool-count-badge" id="badgePoolCount">0</span>
         </button>
       </div>
 
       <div id="poolNotice" style="font-size:.78rem;font-weight:700;color:var(--text-secondary);display:none;">
-        <span style="color:#059669;">🌐 Ortak Havuz:</span> Tüm personelin paylaştığı kütüphane (Salt-Okunur)
+        <span style="color:#059669;">Ortak Havuz:</span> Tüm personelin paylaştığı kütüphane (Salt-Okunur)
       </div>
     </div>
 
@@ -239,7 +239,7 @@
                  placeholder="Rapor ara... (Ctrl+F)" autocomplete="off" />
           <button class="regex-btn" id="regexBtn" title=".* Regex Arama Modu (Tıklayınca bilgi verir)">.* Regex</button>
         </div>
-        <div class="regex-error-msg" id="regexErrMsg">⚠️ Geçersiz Regex İfadesi</div>
+        <div class="regex-error-msg" id="regexErrMsg">Geçersiz Regex İfadesi</div>
 
         <!-- Arama alanı seçici -->
         <select class="select-field" id="fieldSelect" title="Arama Alanı">
@@ -263,22 +263,22 @@
         </select>
 
         <!-- Hızlı Filtre Butonları -->
-        <button class="filter-chip" id="btnFavOnly" title="Sadece favorileri göster">⭐ Favoriler</button>
-        <button class="filter-chip" id="btnPinnedOnly" title="Sadece sabitlenmişleri göster">📌 Sabitlenmişler</button>
-        <button class="filter-chip" id="btnNotesOnly" title="Sadece not girilen raporları göster">📝 Notlular</button>
+        <button class="filter-chip" id="btnFavOnly" title="Sadece favorileri göster">Favoriler</button>
+        <button class="filter-chip" id="btnPinnedOnly" title="Sadece sabitlenmişleri göster">Sabitlenmişler</button>
+        <button class="filter-chip" id="btnNotesOnly" title="Sadece not girilen raporları göster">Notlular</button>
 
         <!-- Filtreleri Temizle Butonu -->
         <button class="btn btn-sm btn-ghost" id="btnResetFilters" style="display:none;color:var(--text-muted);font-size:.78rem;" title="Tüm filtreleri ve aramayı sıfırla">
-          ✕ Filtreleri Temizle
+          Filtreleri Temizle
         </button>
       </div>
 
       <div class="toolbar-right">
         <!-- Görünüm Seçici -->
         <div class="view-mode-toggle" id="viewModeToggle">
-          <button class="view-btn active" data-view="table" id="btnViewTable" title="Tablo Görünümü (F6)">📋 Tablo</button>
-          <button class="view-btn" data-view="cards" id="btnViewCards" title="Kart Görünümü (F6)">🎴 Kart</button>
-          <button class="view-btn" data-view="timeline" id="btnViewTimeline" title="Zaman Çizelgesi (F6)">⏳ Zaman Çizelgesi</button>
+          <button class="view-btn active" data-view="table" id="btnViewTable" title="Tablo Görünümü (F6)">Tablo</button>
+          <button class="view-btn" data-view="cards" id="btnViewCards" title="Kart Görünümü (F6)">Kart</button>
+          <button class="view-btn" data-view="timeline" id="btnViewTimeline" title="Zaman Çizelgesi (F6)">Zaman Çizelgesi</button>
         </div>
 
         <div class="result-count" id="resultCount">0 sonuç</div>
@@ -290,15 +290,15 @@
     <div class="bulk-bar" id="bulkBar">
       <span class="bulk-count" id="bulkInfo">0 rapor seçildi</span>
       <div class="bulk-actions">
-        <button class="btn btn-sm btn-ghost" id="btnBulkSharePool" title="Seçilenleri Ortak Havuzda Paylaş">🌐 Havuza Ekle</button>
-        <button class="btn btn-sm btn-ghost" id="btnBulkRemovePool" title="Seçilenleri Ortak Havuzdan Kaldır">🔒 Havuzdan Kaldır</button>
-        <button class="btn btn-sm btn-ghost" id="btnBulkFav">⭐ Favorilere Ekle</button>
-        <button class="btn btn-sm btn-ghost" id="btnBulkTag">🏷️ Etiket Ekle</button>
-        <button class="btn btn-sm btn-ghost" id="btnBulkCategory">📁 Kategori Ata</button>
-        <button class="btn btn-sm btn-ghost" id="btnDownloadSelected">📥 Toplu İndir</button>
-        <button class="btn btn-sm btn-ghost" id="btnCompareSelected" style="display:none;">🔀 Karşılaştır</button>
-        <button class="btn btn-sm btn-danger" id="btnDeleteBulk">🗑️ Seçilenleri Sil</button>
-        <button class="btn btn-sm btn-ghost" id="btnClearSelection">✕ Seçimi Kaldır</button>
+        <button class="btn btn-sm btn-ghost" id="btnBulkSharePool" title="Seçilenleri Ortak Havuzda Paylaş">Havuza Ekle</button>
+        <button class="btn btn-sm btn-ghost" id="btnBulkRemovePool" title="Seçilenleri Ortak Havuzdan Kaldır">Havuzdan Kaldır</button>
+        <button class="btn btn-sm btn-ghost" id="btnBulkFav">Favorilere Ekle</button>
+        <button class="btn btn-sm btn-ghost" id="btnBulkTag">Etiket Ekle</button>
+        <button class="btn btn-sm btn-ghost" id="btnBulkCategory">Kategori Ata</button>
+        <button class="btn btn-sm btn-ghost" id="btnDownloadSelected">Toplu İndir</button>
+        <button class="btn btn-sm btn-ghost" id="btnCompareSelected" style="display:none;">Karşılaştır</button>
+        <button class="btn btn-sm btn-danger" id="btnDeleteBulk">Seçilenleri Sil</button>
+        <button class="btn btn-sm btn-ghost" id="btnClearSelection">Seçimi Kaldır</button>
       </div>
     </div>
 
@@ -310,7 +310,7 @@
         <thead>
           <tr id="tableHeaderRow">
             <th style="width:40px;"><input type="checkbox" class="row-checkbox" id="selectAll" title="Tümünü Seç/Kaldır" /></th>
-            <th style="width:58px;text-align:center;">⭐ 📌</th>
+            <th style="width:58px;text-align:center;">Favori</th>
             <th class="sortable sort-asc col-reportName" data-sort="name">Rapor Adı</th>
             <th class="sortable col-fileName" data-sort="fileName">Dosya Adı</th>
             <th class="sortable col-fileSize" data-sort="sizeBytes" style="width:95px;text-align:right;">Boyut</th>
@@ -327,18 +327,18 @@
 
     <!-- SAĞ TIK CONTEXT MENÜSÜ -->
     <div id="tableContextMenu" class="table-context-menu" style="display:none;">
-      <div class="ctx-header" id="ctxMenuReportTitle">📋 Rapor</div>
-      <button class="ctx-item" data-action="view"><span class="ctx-icon">👁️</span><span>Görüntüle (Detay)</span></button>
-      <button class="ctx-item" data-action="toggle-pool" id="ctxBtnTogglePool"><span class="ctx-icon">🌐</span><span id="ctxTextTogglePool">Ortak Havuzda Paylaş</span></button>
-      <button class="ctx-item" data-action="clone-to-personal" id="ctxBtnClonePersonal" style="display:none;"><span class="ctx-icon">📋</span><span>Kişisel Alanıma Kopyala</span></button>
-      <button class="ctx-item" data-action="rename"><span class="ctx-icon">✏️</span><span>Adını Düzenle</span></button>
-      <button class="ctx-item" data-action="download"><span class="ctx-icon">📥</span><span>FRP Olarak İndir</span></button>
+      <div class="ctx-header" id="ctxMenuReportTitle">Rapor</div>
+      <button class="ctx-item" data-action="view"><span>Görüntüle (Detay)</span></button>
+      <button class="ctx-item" data-action="toggle-pool" id="ctxBtnTogglePool"><span id="ctxTextTogglePool">Ortak Havuzda Paylaş</span></button>
+      <button class="ctx-item" data-action="clone-to-personal" id="ctxBtnClonePersonal" style="display:none;"><span>Kişisel Alanıma Kopyala</span></button>
+      <button class="ctx-item" data-action="rename"><span>Adını Düzenle</span></button>
+      <button class="ctx-item" data-action="download"><span>FRP Olarak İndir</span></button>
       <div class="ctx-divider"></div>
-      <button class="ctx-item" data-action="fav"><span class="ctx-icon">⭐</span><span>Favorilere Ekle / Kaldır</span></button>
-      <button class="ctx-item" data-action="pin"><span class="ctx-icon">📌</span><span>Üste Sabitle / Kaldır</span></button>
-      <button class="ctx-item" data-action="category"><span class="ctx-icon">🏷️</span><span>Kategori Ata</span></button>
+      <button class="ctx-item" data-action="fav"><span>Favorilere Ekle / Kaldır</span></button>
+      <button class="ctx-item" data-action="pin"><span>Üste Sabitle / Kaldır</span></button>
+      <button class="ctx-item" data-action="category"><span>Kategori Ata</span></button>
       <div class="ctx-divider"></div>
-      <button class="ctx-item ctx-danger" data-action="delete" id="ctxBtnDelete"><span class="ctx-icon">🗑️</span><span>Raporu Sil</span></button>
+      <button class="ctx-item ctx-danger" data-action="delete" id="ctxBtnDelete"><span>Raporu Sil</span></button>
     </div>
 
   </div><!-- /flex wrapper -->

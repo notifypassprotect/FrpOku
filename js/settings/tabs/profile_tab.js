@@ -53,7 +53,7 @@ window.FrpSettingsTabs.profile = {
     return `
       <div style="display:flex;flex-direction:column;gap:1.25rem;">
         <div>
-          <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">👤 Kullanıcı & Cihaz Profili</div>
+          <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">Kullanıcı & Cihaz Profili</div>
           <div style="font-size:.78rem;color:var(--text-muted);margin-top:.2rem;">
             Oturum güvenliği, yetkilendirme ve sunucu ortamı için kayıtlı profil bilgileri.
           </div>

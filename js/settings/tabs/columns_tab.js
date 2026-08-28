@@ -23,7 +23,7 @@ window.FrpSettingsTabs.columns = {
     return `
       <div style="display:flex;flex-direction:column;gap:1.25rem;">
         <div>
-          <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">👁️ Liste & Sütun Görünürlüğü</div>
+          <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">Liste & Sütun Görünürlüğü</div>
           <div style="font-size:.78rem;color:var(--text-muted);margin-top:.2rem;">
             Ana sayfadaki rapor listesinde görmek istediğiniz sütunları ve sayfalama limitini ayarlayın.
           </div>
