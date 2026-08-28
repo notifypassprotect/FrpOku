@@ -857,9 +857,11 @@
                 <div style="min-width:0;flex:1;">
                   <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.2rem;">
                     <span style="font-weight:800;font-size:.95rem;color:var(--text-primary,#0f172a);">${escHtml(u.full_name || u.username)}</span>
-                    <span style="font-size:.75rem;font-weight:700;font-family:monospace;color:#2563eb;background:rgba(37,99,235,0.08);padding:.1rem .4rem;border-radius:5px;display:inline-flex;align-items:center;gap:.25rem;">
+                    <span style="font-size:.78rem;font-weight:700;font-family:monospace;color:#2563eb;background:rgba(37,99,235,0.08);padding:.15rem .45rem;border-radius:6px;display:inline-flex;align-items:center;gap:.35rem;">
                       @${escHtml(u.username)}
-                      <button type="button" class="btn btn-sm btn-ghost btn-edit-username" data-id="${u.id}" data-name="${escHtml(u.username)}" style="padding:0 3px;font-size:.7rem;color:#2563eb;" title="Kullanıcı Adını Değiştir">✏️</button>
+                      <button type="button" class="btn btn-sm btn-ghost btn-edit-username" data-id="${u.id}" data-name="${escHtml(u.username)}" style="padding:1px 6px;font-size:.72rem;font-weight:700;color:#2563eb;background:#ffffff;border:1px solid rgba(37,99,235,0.25);border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;gap:2px;box-shadow:0 1px 3px rgba(0,0,0,0.06);" title="Kullanıcı Adını Değiştir">
+                        <span>✏️</span><span>Düzenle</span>
+                      </button>
                     </span>
                     ${isUsrAdmin ? `<span class="badge badge-purple" style="font-size:.68rem;">👑 Admin</span>` : `<span class="badge badge-blue" style="font-size:.68rem;">Kullanıcı</span>`}
                     ${isPending ? `<span class="badge badge-amber" style="font-size:.68rem;">⏳ Onay Bekliyor</span>` : `<span class="badge badge-green" style="font-size:.68rem;">🟢 Aktif</span>`}

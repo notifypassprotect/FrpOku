@@ -893,13 +893,15 @@
       }).join('');
 
       // Dikey Çapraz Bantlar (Vertical Cross-Tab Bands - Image 3) - YALNIZCA Dikey Kolon Olarak Çizilir!
-      const vBandsHtml = (currentMode === 'designer' && verticalBands.length > 0) ? verticalBands.map(vBand => {
+      const vBandsHtml = (currentMode === 'designer' && verticalBands.length > 0) ? verticalBands.map((vBand, vIdx) => {
+        const origBandIdx = (page.bands || []).indexOf(vBand);
         const meta = BAND_META[vBand.type] || { label: vBand.type, icon: '▶', class: 'fr-band-masterdata' };
         const vLeft = vBand.left || 0;
         const vWidth = Math.max(18, vBand.width || 90);
+        const isSelected = selectedItem === vBand || (selectedItem && selectedItem.name === vBand.name);
         return `
-          <div class="fr-vertical-band-overlay" style="left:${vLeft}px; width:${vWidth}px;">
-            <div class="fr-vertical-band-header ${meta.class}" style="left:0;" title="${esc(meta.label)}: ${esc(vBand.name)} ${vBand.dataSet ? '(' + esc(vBand.dataSet) + ')' : ''}">
+          <div class="fr-vertical-band-overlay ${isSelected ? 'selected-band' : ''}" data-band-idx="${origBandIdx}" data-vband-idx="${vIdx}" style="left:${vLeft}px; width:${vWidth}px;">
+            <div class="fr-vertical-band-header ${meta.class} ${isSelected ? 'selected-band' : ''}" data-band-idx="${origBandIdx}" data-vband-idx="${vIdx}" style="left:0; cursor:pointer;" title="${esc(meta.label)}: ${esc(vBand.name)} ${vBand.dataSet ? '(' + esc(vBand.dataSet) + ')' : ''}">
               ${meta.icon} ${esc(meta.label)}: ${esc(vBand.name)} ${vBand.dataSet ? '🗄️ ' + esc(vBand.dataSet) : ''}
             </div>
           </div>
@@ -1261,8 +1263,8 @@
       // Dialog form genişlik ve yüksekliği (Tüm kontrolleri tam kapsar)
       const dWidth = Math.max(360, Math.max(dialog.width || 360, Math.ceil(maxCtrlRight + 20)));
       const dHeight = Math.max(200, Math.max(dialog.height || 240, Math.ceil(maxCtrlBottom + 45)));
-      const dialogColorVal = dialog.color || '-16777188';
-      const dialogBg = decodeDelphiColor(dialogColorVal, true) || '#5bc0de';
+      const dialogColorVal = dialog.fillBackColor || dialog.color || '-16777188';
+      const dialogBg = decodeDelphiColor(dialogColorVal, true) || '#ece9d8';
 
       const controlsHtml = (dialog.controls || []).map((ctrl, cIdx) => renderDialogControlItem(ctrl, cIdx)).join('');
 
@@ -1442,6 +1444,8 @@
 
           pushUndoState();
           selectedItem[prop] = val;
+          if (prop === 'fillBackColor') selectedItem.color = val;
+          if (prop === 'color') selectedItem.fillBackColor = val;
           renderCanvasOnly();
           updateSelection();
           pushUndoState();
@@ -1471,6 +1475,8 @@
           const hex = e.target.value;
           const delphiVal = hexToDelphiColor(hex);
           selectedItem[prop] = delphiVal;
+          if (prop === 'fillBackColor') selectedItem.color = delphiVal;
+          if (prop === 'color') selectedItem.fillBackColor = delphiVal;
           
           const textInp = cp.parentElement.querySelector('.designer-prop-input');
           if (textInp) textInp.value = delphiColorToRgb(delphiVal).label;
@@ -1484,6 +1490,8 @@
           const hex = e.target.value;
           const delphiVal = hexToDelphiColor(hex);
           selectedItem[prop] = delphiVal;
+          if (prop === 'fillBackColor') selectedItem.color = delphiVal;
+          if (prop === 'color') selectedItem.fillBackColor = delphiVal;
           renderCanvasOnly();
           pushUndoState();
         });
@@ -1499,6 +1507,8 @@
           
           pushUndoState();
           selectedItem[prop] = delphiVal;
+          if (prop === 'fillBackColor') selectedItem.color = delphiVal;
+          if (prop === 'color') selectedItem.fillBackColor = delphiVal;
 
           const textInp = sel.parentElement.querySelector('.designer-prop-input');
           const cpInp = sel.parentElement.querySelector('.designer-color-picker');
@@ -1942,9 +1952,9 @@
         });
       });
 
-      // 2. Bantlara (Header, Footer, ReportTitle, MasterData vb.) Tıklama Dinleyicisi
-      // ALL band-related elements: container, header, body - both designer and preview mode
-      containerEl.querySelectorAll('.fr-band-container, .fr-band-header, .fr-band-body, .fr-vband-box').forEach(bEl => {
+      // 2. Bantlara (Header, Footer, ReportTitle, MasterData, Dikey Bantlar vb.) Tıklama Dinleyicisi
+      // ALL band-related elements: container, header, body, vertical overlay & header - both designer and preview mode
+      containerEl.querySelectorAll('.fr-band-container, .fr-band-header, .fr-band-body, .fr-vertical-band-header, .fr-vertical-band-overlay, .fr-vband-box').forEach(bEl => {
         bEl.addEventListener('click', (e) => {
           if (e.target.closest('.fr-view-item') || e.target.closest('.fr-ctrl-item')) return;
           e.stopPropagation();
@@ -2215,19 +2225,26 @@
     }
 
     function updateSelection() {
-      containerEl.querySelectorAll('.fr-view-item.selected, .fr-ctrl-item.selected, .fr-band-container.selected-band, .fr-band-header.selected-band, .fr-vband-box.selected-band').forEach(el => {
+      containerEl.querySelectorAll('.fr-view-item.selected, .fr-ctrl-item.selected, .fr-band-container.selected-band, .fr-band-header.selected-band, .fr-vertical-band-overlay.selected-band, .fr-vertical-band-header.selected-band, .fr-vband-box.selected-band').forEach(el => {
         el.classList.remove('selected', 'selected-band');
       });
       
       // YALNIZCA Tasarımcı modundaysa ve seçim varsa sınıf ekle
       if (selectedItem) {
-        const isBand = (selectedItem.type && (BAND_META[selectedItem.type] || selectedItem.type.includes('Band') || selectedItem.type.includes('Header') || selectedItem.type.includes('Footer') || selectedItem.type === 'TfrxMasterData' || selectedItem.type === 'TfrxReportTitle'));
+        const isBand = (selectedItem.type && (BAND_META[selectedItem.type] || selectedItem.type.includes('Band') || selectedItem.type.includes('Header') || selectedItem.type.includes('Footer') || selectedItem.type === 'TfrxMasterData' || selectedItem.type === 'TfrxReportTitle' || selectedItem.vertical || String(selectedItem.rawAttrs || '').includes('Vertical="True"')));
         if (isBand) {
           const activePage = allPages[activePageIndex];
           const bIdx = (activePage?.data?.bands || []).indexOf(selectedItem);
           if (bIdx !== -1) {
-            const targetBandEl = containerEl.querySelector(`.fr-band-container[data-band-idx="${bIdx}"]`) || containerEl.querySelector(`.fr-vband-box[data-band-idx="${bIdx}"]`);
-            if (targetBandEl) targetBandEl.classList.add('selected-band');
+            const targetBandEl = containerEl.querySelector(`.fr-band-container[data-band-idx="${bIdx}"]`) ||
+                                 containerEl.querySelector(`.fr-vertical-band-header[data-band-idx="${bIdx}"]`) ||
+                                 containerEl.querySelector(`.fr-vertical-band-overlay[data-band-idx="${bIdx}"]`) ||
+                                 containerEl.querySelector(`.fr-vband-box[data-band-idx="${bIdx}"]`);
+            if (targetBandEl) {
+              targetBandEl.classList.add('selected-band');
+              const overlayParent = targetBandEl.closest('.fr-vertical-band-overlay');
+              if (overlayParent) overlayParent.classList.add('selected-band');
+            }
           }
         } else if (currentMode === 'designer') {
           const targetEl = containerEl.querySelector(`[title*="${selectedItem.name}"]`) || containerEl.querySelector(`[data-ctrl-idx]`);

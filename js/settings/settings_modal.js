@@ -216,6 +216,11 @@ window.openSettingsModal = function(initialTab = 'appearance') {
         { id: 'outfit', name: 'Outfit (Ferah & Yuvarlak)', sample: 'Rapor listesi ve sorgular', fontCss: "'Outfit', sans-serif" },
         { id: 'roboto', name: 'Roboto (Klasik Okunaklı)', sample: 'Rapor listesi ve sorgular', fontCss: "'Roboto', sans-serif" },
         { id: 'poppins', name: 'Poppins (Geometrik Şık)', sample: 'Rapor listesi ve sorgular', fontCss: "'Poppins', sans-serif" },
+        { id: 'montserrat', name: 'Montserrat (Modern & Güçlü)', sample: 'Rapor listesi ve sorgular', fontCss: "'Montserrat', sans-serif" },
+        { id: 'nunito', name: 'Nunito (Yumuşak & Dostane)', sample: 'Rapor listesi ve sorgular', fontCss: "'Nunito', sans-serif" },
+        { id: 'raleway', name: 'Raleway (Zarif & Prestijli)', sample: 'Rapor listesi ve sorgular', fontCss: "'Raleway', sans-serif" },
+        { id: 'ubuntu', name: 'Ubuntu (Dinamik & Açık)', sample: 'Rapor listesi ve sorgular', fontCss: "'Ubuntu', sans-serif" },
+        { id: 'sourcesans', name: 'Source Sans 3 (Kurumsal Standart)', sample: 'Rapor listesi ve sorgular', fontCss: "'Source Sans 3', sans-serif" },
         { id: 'opensans', name: 'Open Sans (Dengeli Nötr)', sample: 'Rapor listesi ve sorgular', fontCss: "'Open Sans', sans-serif" },
         { id: 'jetbrains', name: 'JetBrains Mono (Geliştirici)', sample: 'SELECT * FROM rapor', fontCss: "'JetBrains Mono', monospace" },
         { id: 'fira', name: 'Fira Code (Ligatürlü)', sample: 'SELECT count(1) >= 0', fontCss: "'Fira Code', monospace" },
@@ -224,10 +229,14 @@ window.openSettingsModal = function(initialTab = 'appearance') {
       ];
 
       const codeFonts = [
-        { id: 'jetbrains', name: 'JetBrains Mono', sample: 'SELECT count(1) FROM rapor\nWHERE aktif = 1' },
-        { id: 'fira',      name: 'Fira Code',      sample: 'SELECT * FROM musteri\nWHERE bakiye != 0' },
-        { id: 'cascadia',  name: 'Cascadia Code',  sample: 'procedure RaporHazirla;\nbegin Engine.Start; end;' },
-        { id: 'consolas',  name: 'Consolas',       sample: 'SELECT p.id, p.adi_soyadi\nFROM personel p' }
+        { id: 'jetbrains', name: 'JetBrains Mono (Gelişmiş)', sample: 'SELECT count(1) FROM rapor\nWHERE aktif = 1' },
+        { id: 'fira',      name: 'Fira Code (Ligatürlü)',      sample: 'SELECT * FROM musteri\nWHERE bakiye != 0' },
+        { id: 'cascadia',  name: 'Cascadia Code (Modern)',  sample: 'procedure RaporHazirla;\nbegin Engine.Start; end;' },
+        { id: 'inconsolata', name: 'Inconsolata (Net)',      sample: 'SELECT id, unvan FROM cariler\nWHERE borc > 0' },
+        { id: 'sourcecode', name: 'Source Code Pro (Adobe)', sample: 'SELECT k.id, k.adi FROM kullanicilar k' },
+        { id: 'monaco',    name: 'Monaco / Menlo (Terminal)', sample: 'UPDATE rapor SET versiyon = versiyon + 1;' },
+        { id: 'courierprime', name: 'Courier Prime (Klasik)', sample: 'CREATE TABLE raporlar (id INT PRIMARY KEY);' },
+        { id: 'consolas',  name: 'Consolas (Windows Standart)', sample: 'SELECT p.id, p.adi_soyadi\nFROM personel p' }
       ];
 
       tabContentHtml = `
@@ -822,34 +831,56 @@ window.openSettingsModal = function(initialTab = 'appearance') {
         <div style="display:flex;flex-direction:column;gap:1.1rem;">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;">
             <div>
-              <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);display:flex;align-items:center;gap:.4rem;">
+              <div style="font-size:1.15rem;font-weight:800;color:var(--text-primary);display:flex;align-items:center;gap:.5rem;">
                 <span>📋</span> <span>Kullanıcı İşlem Geçmişi & Denetim Günlüğü</span>
-                <span class="badge badge-purple" style="font-size:.68rem;">Sadece Admin</span>
+                <span class="badge badge-purple" style="font-size:.68rem;">Canlı Kayıtlar</span>
               </div>
-              <div style="font-size:.76rem;color:var(--text-muted);margin-top:.2rem;">
-                Kullanıcıların gerçekleştirdiği oturum açma, rapor yükleme, silme, şifre sıfırlama ve sistem olaylarını takip edin.
+              <div style="font-size:.78rem;color:var(--text-muted);margin-top:.25rem;">
+                Kullanıcıların gerçekleştirdiği oturum açma, rapor yükleme, indirme, silme, havuz paylaşımı ve sistem olaylarını takip edin.
               </div>
             </div>
             <div style="display:flex;gap:.5rem;align-items:center;">
               <button type="button" class="btn btn-sm btn-ghost" id="btnRefreshAuditLogs" style="font-weight:700;">
                 🔄 Yenile
               </button>
-              <button type="button" class="btn btn-sm btn-secondary" id="btnExportAuditCsv" style="font-weight:700;">
-                📊 CSV Olarak İndir
+              <button type="button" class="btn btn-sm btn-primary" id="btnExportAuditExcel" style="font-weight:700;background:linear-gradient(135deg,#059669,#10b981);border:none;box-shadow:0 2px 8px rgba(16,185,129,0.3);">
+                📊 Excel (.xls) Olarak İndir
               </button>
             </div>
           </div>
 
-          <!-- Filtreler -->
-          <div style="display:grid;grid-template-columns:1fr 180px;gap:.6rem;">
+          <!-- KPI Özet Kartları -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:.65rem;" id="auditKpiRow">
+            <div style="background:var(--bg-surface);border:1px solid var(--border-light);border-radius:10px;padding:.75rem 1rem;display:flex;flex-direction:column;gap:.2rem;">
+              <div style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Toplam Kayıt</div>
+              <div id="kpiAuditTotal" style="font-size:1.35rem;font-weight:900;color:var(--accent);">0</div>
+            </div>
+            <div style="background:var(--bg-surface);border:1px solid var(--border-light);border-radius:10px;padding:.75rem 1rem;display:flex;flex-direction:column;gap:.2rem;">
+              <div style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Yükleme / İndirme</div>
+              <div id="kpiAuditFiles" style="font-size:1.35rem;font-weight:900;color:var(--green);">0</div>
+            </div>
+            <div style="background:var(--bg-surface);border:1px solid var(--border-light);border-radius:10px;padding:.75rem 1rem;display:flex;flex-direction:column;gap:.2rem;">
+              <div style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Kod / Tasarım</div>
+              <div id="kpiAuditEdits" style="font-size:1.35rem;font-weight:900;color:var(--purple);">0</div>
+            </div>
+            <div style="background:var(--bg-surface);border:1px solid var(--border-light);border-radius:10px;padding:.75rem 1rem;display:flex;flex-direction:column;gap:.2rem;">
+              <div style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Silme & Çöp</div>
+              <div id="kpiAuditDeletes" style="font-size:1.35rem;font-weight:900;color:var(--red);">0</div>
+            </div>
+          </div>
+
+          <!-- Filtreler & Arama -->
+          <div style="display:grid;grid-template-columns:1fr 220px;gap:.65rem;">
             <div style="position:relative;">
-              <input type="text" id="auditSearchInput" placeholder="🔍 Loglarda ara (Kullanıcı adı, işlem, hedef, IP)..." class="master-search-input" style="width:100%;font-size:.82rem;padding:.45rem .8rem;" />
+              <input type="text" id="auditSearchInput" placeholder="🔍 Loglarda ara (Kullanıcı adı, işlem, hedef, IP, açıklama)..." class="master-search-input" style="width:100%;font-size:.84rem;padding:.5rem .85rem;" />
             </div>
             <select id="auditActionFilter" class="master-search-input" style="font-size:.82rem;font-weight:700;">
               <option value="">Tüm İşlemler</option>
               <option value="FRP_DOWNLOAD">📥 İndirmeler (FRP_DOWNLOAD)</option>
               <option value="REPORT_UPLOAD">📤 Yüklemeler (REPORT_UPLOAD)</option>
               <option value="REPORT_UPDATE">🔄 Güncellemeler (REPORT_UPDATE)</option>
+              <option value="POOL_ADD">🌐 Havuz Paylaşımı (POOL_ADD)</option>
+              <option value="POOL_REMOVE">🔒 Havuzdan Kaldırma (POOL_REMOVE)</option>
               <option value="REPORT_DELETE">🗑️ Çöp Kutusuna Taşıma</option>
               <option value="TRASH_RESTORE">♻️ Çöpten Geri Yükleme</option>
               <option value="TRASH_PURGE">❌ Kalıcı Silme (TRASH_PURGE)</option>
@@ -857,6 +888,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
               <option value="DESIGN_EDIT">🎨 Tasarım Düzenleme</option>
               <option value="SQL_EDIT">🗄️ SQL Sorgu Düzenleme</option>
               <option value="PASCAL_EDIT">📜 Pascal Script Düzenleme</option>
+              <option value="USERNAME_CHANGE">✏️ Kullanıcı Adı Değişikliği</option>
               <option value="LOGIN">🔐 Giriş Yapma (LOGIN)</option>
               <option value="USER_UPDATE">👤 Profil Güncelleme</option>
               <option value="EMAIL_CHANGE">✉️ E-Posta Değişikliği</option>
@@ -865,9 +897,9 @@ window.openSettingsModal = function(initialTab = 'appearance') {
           </div>
 
           <!-- Tablo Alanı -->
-          <div id="auditLogsContainer" style="background:var(--bg-surface);border:1px solid var(--border-light);border-radius:10px;overflow-x:auto;max-height:400px;overflow-y:auto;">
-            <div style="text-align:center;padding:2.5rem;color:var(--text-muted);">
-              <div class="splash-spinner" style="margin-bottom:.5rem;"></div>
+          <div id="auditLogsContainer" style="background:var(--bg-surface);border:1px solid var(--border-light);border-radius:12px;overflow-x:auto;max-height:500px;overflow-y:auto;box-shadow:inset 0 1px 3px rgba(0,0,0,0.05);">
+            <div style="text-align:center;padding:3rem;color:var(--text-muted);">
+              <div class="splash-spinner" style="margin-bottom:.6rem;"></div>
               <div>Denetim kayıtları yükleniyor...</div>
             </div>
           </div>
@@ -1555,12 +1587,30 @@ window.openSettingsModal = function(initialTab = 'appearance') {
       const searchInp = overlay.querySelector('#auditSearchInput');
       const filterSelect = overlay.querySelector('#auditActionFilter');
       const btnRefresh = overlay.querySelector('#btnRefreshAuditLogs');
-      const btnExport = overlay.querySelector('#btnExportAuditCsv');
+      const btnExportExcel = overlay.querySelector('#btnExportAuditExcel');
+
+      const updateKpis = (logs) => {
+        const totalEl = overlay.querySelector('#kpiAuditTotal');
+        const filesEl = overlay.querySelector('#kpiAuditFiles');
+        const editsEl = overlay.querySelector('#kpiAuditEdits');
+        const delsEl = overlay.querySelector('#kpiAuditDeletes');
+        if (!totalEl) return;
+
+        const total = (logs || []).length;
+        const fileOps = (logs || []).filter(l => ['REPORT_UPLOAD', 'REPORT_UPDATE', 'FRP_DOWNLOAD', 'BULK_DOWNLOAD', 'POOL_ADD', 'POOL_REMOVE', 'POOL_CLONE'].includes(l.action)).length;
+        const editOps = (logs || []).filter(l => ['DESIGN_EDIT', 'SQL_EDIT', 'PASCAL_EDIT', 'USERNAME_CHANGE', 'USER_UPDATE'].includes(l.action)).length;
+        const delOps = (logs || []).filter(l => ['REPORT_DELETE', 'REPORT_DELETE_BULK', 'TRASH_PURGE', 'TRASH_EMPTY', 'DATA_RESET'].includes(l.action)).length;
+
+        totalEl.textContent = total;
+        if (filesEl) filesEl.textContent = fileOps;
+        if (editsEl) editsEl.textContent = editOps;
+        if (delsEl) delsEl.textContent = delOps;
+      };
 
       const renderLogTable = (logs) => {
         if (!container) return;
         if (!logs || logs.length === 0) {
-          container.innerHTML = `<div style="text-align:center;padding:2.5rem;color:var(--text-muted);">Herhangi bir işlem kaydı bulunamadı.</div>`;
+          container.innerHTML = `<div style="text-align:center;padding:3rem;color:var(--text-muted);"><div style="font-size:2rem;margin-bottom:.5rem;">🔍</div>Herhangi bir işlem kaydı bulunamadı.</div>`;
           return;
         }
 
@@ -1568,6 +1618,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
           LOGIN: 'badge-blue',
           REGISTER: 'badge-green',
           USER_UPDATE: 'badge-purple',
+          USERNAME_CHANGE: 'badge-purple',
           EMAIL_CHANGE: 'badge-amber',
           DELETE: 'badge-red',
           REPORT_DELETE: 'badge-red',
@@ -1578,6 +1629,12 @@ window.openSettingsModal = function(initialTab = 'appearance') {
           REPORT_UPLOAD: 'badge-green',
           REPORT_UPDATE: 'badge-blue',
           FRP_DOWNLOAD: 'badge-purple',
+          BULK_DOWNLOAD: 'badge-purple',
+          POOL_ADD: 'badge-green',
+          POOL_ADD_BULK: 'badge-green',
+          POOL_REMOVE: 'badge-amber',
+          POOL_REMOVE_BULK: 'badge-amber',
+          POOL_CLONE: 'badge-blue',
           DESIGN_EDIT: 'badge-blue',
           SQL_EDIT: 'badge-purple',
           PASCAL_EDIT: 'badge-amber',
@@ -1591,20 +1648,20 @@ window.openSettingsModal = function(initialTab = 'appearance') {
           const dateStr = l.timestamp ? new Date(l.timestamp).toLocaleString('tr-TR') : '-';
           const badgeClass = actionBadges[l.action] || 'badge-blue';
           return `
-            <tr style="border-bottom:1px solid var(--border-light);font-size:.78rem;">
-              <td style="padding:.6rem .8rem;white-space:nowrap;color:var(--text-muted);font-family:var(--mono);">${dateStr}</td>
-              <td style="padding:.6rem .8rem;font-weight:700;color:var(--text-primary);">
+            <tr style="border-bottom:1px solid var(--border-light);font-size:.78rem;transition:background .12s;">
+              <td style="padding:.65rem .85rem;white-space:nowrap;color:var(--text-muted);font-family:var(--mono);">${dateStr}</td>
+              <td style="padding:.65rem .85rem;font-weight:700;color:var(--text-primary);">
                 <div style="display:flex;align-items:center;gap:.35rem;">
                   <span>@${escHtml(l.username || 'misafir')}</span>
                   ${l.role === 'admin' ? '<span class="badge badge-purple" style="font-size:.65rem;padding:1px 4px;">Admin</span>' : ''}
                 </div>
               </td>
-              <td style="padding:.6rem .8rem;">
+              <td style="padding:.65rem .85rem;">
                 <span class="badge ${badgeClass}" style="font-size:.7rem;padding:.2rem .5rem;">${escHtml(l.action || 'INFO')}</span>
               </td>
-              <td style="padding:.6rem .8rem;font-weight:600;color:var(--accent);">${escHtml(l.target || '-')}</td>
-              <td style="padding:.6rem .8rem;color:var(--text-secondary);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(l.details || '')}">${escHtml(l.details || '-')}</td>
-              <td style="padding:.6rem .8rem;color:var(--text-muted);font-family:var(--mono);">${escHtml(l.ip || '-')}</td>
+              <td style="padding:.65rem .85rem;font-weight:600;color:var(--accent);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(l.target || '')}">${escHtml(l.target || '-')}</td>
+              <td style="padding:.65rem .85rem;color:var(--text-secondary);max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(l.details || '')}">${escHtml(l.details || '-')}</td>
+              <td style="padding:.65rem .85rem;color:var(--text-muted);font-family:var(--mono);">${escHtml(l.ip || '-')}</td>
             </tr>
           `;
         }).join('');
@@ -1612,13 +1669,13 @@ window.openSettingsModal = function(initialTab = 'appearance') {
         container.innerHTML = `
           <table style="width:100%;border-collapse:collapse;text-align:left;">
             <thead>
-              <tr style="background:var(--bg-raised);border-bottom:1.5px solid var(--border);font-size:.75rem;font-weight:800;color:var(--text-secondary);">
-                <th style="padding:.6rem .8rem;">Zaman</th>
-                <th style="padding:.6rem .8rem;">Kullanıcı</th>
-                <th style="padding:.6rem .8rem;">İşlem Türü</th>
-                <th style="padding:.6rem .8rem;">Hedef</th>
-                <th style="padding:.6rem .8rem;">Açıklama / Detay</th>
-                <th style="padding:.6rem .8rem;">IP Adresi</th>
+              <tr style="background:var(--bg-raised);border-bottom:1.5px solid var(--border);font-size:.75rem;font-weight:800;color:var(--text-secondary);position:sticky;top:0;z-index:2;">
+                <th style="padding:.7rem .85rem;">Zaman</th>
+                <th style="padding:.7rem .85rem;">Kullanıcı</th>
+                <th style="padding:.7rem .85rem;">İşlem Türü</th>
+                <th style="padding:.7rem .85rem;">Hedef</th>
+                <th style="padding:.7rem .85rem;">Açıklama / Detay</th>
+                <th style="padding:.7rem .85rem;">IP Adresi</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
@@ -1648,13 +1705,13 @@ window.openSettingsModal = function(initialTab = 'appearance') {
 
       const fetchLogs = async () => {
         if (container) {
-          container.innerHTML = `<div style="text-align:center;padding:2.5rem;color:var(--text-muted);"><div class="splash-spinner" style="margin-bottom:.5rem;"></div><div>Kayıtlar yükleniyor...</div></div>`;
+          container.innerHTML = `<div style="text-align:center;padding:3rem;color:var(--text-muted);"><div class="splash-spinner" style="margin-bottom:.6rem;"></div><div>Kayıtlar yükleniyor...</div></div>`;
         }
         try {
           if (window.FrpAudit && typeof window.FrpAudit.getLogs === 'function') {
             loadedLogs = await window.FrpAudit.getLogs();
           } else {
-            const res = await fetch('/api/admin/audit-logs?limit=300', {
+            const res = await fetch('/api/admin/audit-logs?limit=500', {
               headers: window.FrpAuth ? window.FrpAuth.getAuthHeaders() : {}
             });
             const data = await res.json();
@@ -1673,6 +1730,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
             loadedLogs = [];
           }
         }
+        updateKpis(loadedLogs);
         filterAndDisplayLogs();
       };
 
@@ -1680,30 +1738,78 @@ window.openSettingsModal = function(initialTab = 'appearance') {
       filterSelect?.addEventListener('change', filterAndDisplayLogs);
       btnRefresh?.addEventListener('click', fetchLogs);
 
-      btnExport?.addEventListener('click', () => {
+      // 📊 EXCEL İNDİRME MOTORU (.xls / XML Spreadsheet)
+      btnExportExcel?.addEventListener('click', () => {
         if (!loadedLogs || loadedLogs.length === 0) {
-          safeToast('Dışa aktarılacak kayıt bulunamadı.', 'info');
+          safeToast('Dışa aktarılacak denetim kaydı bulunamadı.', 'info');
           return;
         }
-        let csv = 'Zaman;Kullanici;Rol;Islem;Hedef;Detay;IP\n';
-        loadedLogs.forEach(l => {
-          const t = `"${(l.timestamp || '').replace(/"/g, '""')}"`;
-          const u = `"${(l.username || '').replace(/"/g, '""')}"`;
-          const r = `"${(l.role || '').replace(/"/g, '""')}"`;
-          const a = `"${(l.action || '').replace(/"/g, '""')}"`;
-          const tg = `"${(l.target || '').replace(/"/g, '""')}"`;
-          const d = `"${(l.details || '').replace(/"/g, '""')}"`;
-          const ip = `"${(l.ip || '').replace(/"/g, '""')}"`;
-          csv += `${t};${u};${r};${a};${tg};${d};${ip}\n`;
-        });
-        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+
+        const tableRows = loadedLogs.map(l => `
+          <tr>
+            <td style="border:1px solid #cbd5e1;padding:6px;font-family:Consolas,monospace;">${l.timestamp ? new Date(l.timestamp).toLocaleString('tr-TR') : '-'}</td>
+            <td style="border:1px solid #cbd5e1;padding:6px;font-weight:bold;">@${escHtml(l.username || 'misafir')}</td>
+            <td style="border:1px solid #cbd5e1;padding:6px;">${escHtml(l.role || 'user')}</td>
+            <td style="border:1px solid #cbd5e1;padding:6px;color:#1e40af;font-weight:bold;">${escHtml(l.action || '-')}</td>
+            <td style="border:1px solid #cbd5e1;padding:6px;font-weight:bold;">${escHtml(l.target || '-')}</td>
+            <td style="border:1px solid #cbd5e1;padding:6px;">${escHtml(l.details || '-')}</td>
+            <td style="border:1px solid #cbd5e1;padding:6px;font-family:Consolas,monospace;">${escHtml(l.ip || '-')}</td>
+          </tr>
+        `).join('');
+
+        const excelContent = `
+          <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+          <head>
+            <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+            <!--[if gte mso 9]>
+            <xml>
+              <x:ExcelWorkbook>
+                <x:ExcelWorksheets>
+                  <x:ExcelWorksheet>
+                    <x:Name>Denetim Günlüğü</x:Name>
+                    <x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+                  </x:ExcelWorksheet>
+                </x:ExcelWorksheets>
+              </x:ExcelWorkbook>
+            </xml>
+            <![endif]-->
+            <style>
+              th { background-color: #1e3a8a; color: #ffffff; font-weight: bold; font-family: Segoe UI, sans-serif; font-size: 11pt; padding: 8px; border: 1px solid #93c5fd; }
+              td { font-family: Segoe UI, sans-serif; font-size: 10pt; vertical-align: middle; }
+              tr:nth-child(even) td { background-color: #f8fafc; }
+            </style>
+          </head>
+          <body>
+            <h2 style="font-family:Segoe UI,sans-serif;color:#1e3a8a;margin-bottom:4px;">FrpOku - Kullanıcı İşlem Geçmişi & Denetim Günlüğü</h2>
+            <p style="font-family:Segoe UI,sans-serif;font-size:10pt;color:#64748b;margin-top:0;">Dışa Aktarma Tarihi: ${new Date().toLocaleString('tr-TR')} | Toplam Kayıt: ${loadedLogs.length}</p>
+            <table style="border-collapse:collapse;width:100%;">
+              <thead>
+                <tr>
+                  <th style="width:160px;">Zaman</th>
+                  <th style="width:140px;">Kullanıcı</th>
+                  <th style="width:100px;">Rol</th>
+                  <th style="width:160px;">İşlem Türü</th>
+                  <th style="width:200px;">Hedef</th>
+                  <th style="width:380px;">Açıklama / Detay</th>
+                  <th style="width:120px;">IP Adresi</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${tableRows}
+              </tbody>
+            </table>
+          </body>
+          </html>
+        `;
+
+        const blob = new Blob(['\uFEFF' + excelContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `denetim_gunlugu_${new Date().toISOString().slice(0, 10)}.csv`;
+        link.download = `denetim_gunlugu_${new Date().toISOString().slice(0, 10)}.xls`;
         link.click();
         URL.revokeObjectURL(url);
-        safeToast('Denetim günlüğü CSV olarak indirildi! 📊', 'success');
+        safeToast('Denetim günlüğü Excel tablosu (.xls) olarak indirildi! 📊', 'success');
       });
 
       fetchLogs();

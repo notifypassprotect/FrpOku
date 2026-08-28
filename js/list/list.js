@@ -1849,11 +1849,17 @@ function renderCards(container) {
     const oDept = file.ownerDepartment || file.owner_department || '';
     const ownerChip = `<span class="owner-chip" style="font-size:.72rem;padding:.15rem .5rem;" title="Yükleyen: ${escHtml(oName)}${oDept ? ' · ' + escHtml(oDept) : ''}">👤 ${escHtml(oName)}</span>`;
 
+    const isPublic = !!(file.isPublic || file.is_public);
+    const poolBadge = isPublic ? `<span class="badge badge-pool" style="font-size:.7rem;padding:.12rem .4rem;" title="Ortak Havuzda Paylaşıldı">🌐 Havuzda</span>` : '';
+
     return `
       <div class="report-card ${file.isPinned ? 'pinned' : ''}" style="background:var(--bg-surface);border:1.5px solid var(--border-light);border-radius:14px;padding:1.1rem;display:flex;flex-direction:column;gap:.75rem;cursor:pointer;transition:transform .18s ease, box-shadow .18s ease;box-shadow:0 4px 14px rgba(0,0,0,.04);box-sizing:border-box;max-width:100%;overflow:hidden;" onclick="openDetail('${file.id}')">
         <div class="card-top" style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;">
           <div style="min-width:0;flex:1;overflow:hidden;">
-            <div class="card-title" style="font-weight:800;font-size:.92rem;color:var(--text-primary);line-height:1.35;word-break:break-word;">📋 ${escHtml(reportName)}</div>
+            <div class="card-title" style="font-weight:800;font-size:.92rem;color:var(--text-primary);line-height:1.35;word-break:break-word;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;">
+              <span>📋 ${escHtml(reportName)}</span>
+              ${poolBadge}
+            </div>
             <div style="font-size:.74rem;color:var(--text-muted);font-family:var(--font);margin-top:.25rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;" title="${escHtml(file.name)} · ${size}">
               📄 ${escHtml(file.name)} · <strong>${size}</strong>
             </div>
@@ -1910,11 +1916,16 @@ function renderTimeline(container) {
           const oName = file.ownerName || file.owner_name || (file.userId === 'usr_admin_root' ? 'Admin' : 'Sistem');
           const oDept = file.ownerDepartment || file.owner_department || '';
           const ownerChip = `<span class="owner-chip" style="font-size:.7rem;padding:.1rem .45rem;" title="Yükleyen: ${escHtml(oName)}${oDept ? ' · ' + escHtml(oDept) : ''}">👤 ${escHtml(oName)}</span>`;
+          const isPublic = !!(file.isPublic || file.is_public);
+          const poolBadge = isPublic ? `<span class="badge badge-pool" style="font-size:.68rem;padding:.1rem .35rem;" title="Ortak Havuzda Paylaşıldı">🌐 Havuzda</span>` : '';
 
           return `
             <div class="timeline-item" onclick="openDetail('${file.id}')" style="cursor:pointer;">
-              <div style="display:flex;justify-content:space-between;align-items:center;">
-                <strong style="font-size:.9rem;color:var(--text-primary);">📋 ${escHtml(reportName)}</strong>
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;">
+                <div style="display:flex;align-items:center;gap:.4rem;">
+                  <strong style="font-size:.9rem;color:var(--text-primary);">📋 ${escHtml(reportName)}</strong>
+                  ${poolBadge}
+                </div>
                 <span style="font-size:.75rem;color:var(--text-muted);">${timeStr}</span>
               </div>
               <div style="font-size:.76rem;color:var(--text-muted);margin-top:.35rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
@@ -3262,8 +3273,26 @@ function updateBulkBar() {
   const btnDeleteBulk = document.getElementById('btnDeleteBulk');
   const btnCompare = document.getElementById('btnCompareSelected') || document.getElementById('btnBulkCompare');
 
-  if (btnBulkShare) btnBulkShare.style.display = curWs === 'personal' ? 'inline-flex' : 'none';
-  if (btnBulkRemove) btnBulkRemove.style.display = (curWs === 'pool' && (isAdmin || true)) ? 'inline-flex' : 'none';
+  // Havuz Durumu Analizi: Seçili raporların hepsi havuzda mı?
+  const selectedFiles = Array.from(selectedIds).map(id => FrpStore.getById(id)).filter(Boolean);
+  const allInPool = selectedFiles.length > 0 && selectedFiles.every(f => !!(f.isPublic || f.is_public));
+
+  if (btnBulkShare) {
+    btnBulkShare.style.display = 'inline-flex';
+    if (allInPool) {
+      btnBulkShare.innerHTML = '🔒 Havuzdan Kaldır';
+      btnBulkShare.title = 'Seçilen raporları Ortak Havuzdan kaldır';
+      btnBulkShare.dataset.targetAction = 'remove';
+    } else {
+      btnBulkShare.innerHTML = '🌐 Havuza Ekle';
+      btnBulkShare.title = 'Seçilen raporları Ortak Havuzda paylaş';
+      btnBulkShare.dataset.targetAction = 'add';
+    }
+  }
+
+  if (btnBulkRemove) {
+    btnBulkRemove.style.display = (curWs === 'pool' && !allInPool) ? 'inline-flex' : 'none';
+  }
   if (btnDeleteBulk) btnDeleteBulk.style.display = (curWs === 'personal' || isAdmin) ? 'inline-flex' : 'none';
 
   // 🔀 Karşılaştırma Butonu (2 veya 3 rapor seçildiğinde aktifleşir)
@@ -3310,8 +3339,14 @@ function setupWorkspaceSwitcher() {
   document.getElementById('btnBulkSharePool')?.addEventListener('click', () => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
-    const count = FrpStore.bulkToggleReportPool(ids, true);
-    toast(`${count} adet rapor Ortak Havuzda Paylaşıldı! 🌐`, 'success');
+    const btn = document.getElementById('btnBulkSharePool');
+    const shouldMakePublic = btn?.dataset.targetAction !== 'remove';
+    const count = FrpStore.bulkToggleReportPool(ids, shouldMakePublic);
+    if (shouldMakePublic) {
+      toast(`${count} adet rapor Ortak Havuzda Paylaşıldı! 🌐`, 'success');
+    } else {
+      toast(`${count} adet rapor Ortak Havuzdan kaldırıldı 🔒`, 'info');
+    }
     selectedIds.clear();
     refreshAll();
   });

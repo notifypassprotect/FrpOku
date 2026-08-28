@@ -706,6 +706,14 @@
       } : null).catch(() => {});
     }
 
+    if (window.FrpAudit) {
+      window.FrpAudit.logAction({
+        action: makePublic ? 'POOL_ADD' : 'POOL_REMOVE',
+        target: files[idx]?.meta?.reportName || files[idx]?.name || id,
+        details: `'${files[idx]?.name}' raporu ${makePublic ? 'Ortak Havuzda paylaşıldı.' : 'Ortak Havuzdan kaldırıldı.'}`
+      });
+    }
+
     return files[idx].isPublic;
   }
 
@@ -742,6 +750,14 @@
           department: curUser.department
         } : null).catch(() => {});
       }
+
+      if (window.FrpAudit) {
+        window.FrpAudit.logAction({
+          action: makePublic ? 'POOL_ADD_BULK' : 'POOL_REMOVE_BULK',
+          target: `${count} Rapor`,
+          details: `${count} adet rapor ${makePublic ? 'toplu olarak Ortak Havuzda paylaşıldı.' : 'toplu olarak Ortak Havuzdan kaldırıldı.'}`
+        });
+      }
     }
     return count;
   }
@@ -763,6 +779,14 @@
     clonedRecord.ownerDepartment = curUser ? (curUser.department || 'Bilgi İşlem') : '';
     clonedRecord.isPublic = false;
     clonedRecord.is_public = false;
+
+    if (window.FrpAudit) {
+      window.FrpAudit.logAction({
+        action: 'POOL_CLONE',
+        target: original.meta?.reportName || original.name,
+        details: `'${original.name}' raporu Ortak Havuzdan kişisel çalışma alanına klonlandı.`
+      });
+    }
     clonedRecord.sharedAt = null;
     clonedRecord.loadedAt = new Date().toISOString();
 
@@ -1016,13 +1040,18 @@
     if (typeof document === 'undefined' || !document.documentElement) return;
     const root = document.documentElement;
 
-    // 2. Genel Font Ailesi (10 Popüler Font)
+    // 2. Genel Font Ailesi (Genişletilmiş Popüler Fontlar)
     const fontMap = {
       'inter': "'Inter', sans-serif",
       'jakarta': "'Plus Jakarta Sans', sans-serif",
       'outfit': "'Outfit', sans-serif",
       'roboto': "'Roboto', sans-serif",
       'poppins': "'Poppins', sans-serif",
+      'montserrat': "'Montserrat', sans-serif",
+      'nunito': "'Nunito', sans-serif",
+      'raleway': "'Raleway', sans-serif",
+      'ubuntu': "'Ubuntu', sans-serif",
+      'sourcesans': "'Source Sans 3', sans-serif",
       'opensans': "'Open Sans', sans-serif",
       'jetbrains': "'JetBrains Mono', monospace",
       'fira': "'Fira Code', monospace",
@@ -1033,11 +1062,15 @@
       root.style.setProperty('--font', fontMap[prefs.fontFamily]);
     }
 
-    // 3. Kod Editörü Fontu
+    // 3. Kod Editörü Fontu (Genişletilmiş Geliştirici Fontları)
     const codeFontMap = {
       'jetbrains': "'JetBrains Mono', monospace",
       'fira': "'Fira Code', monospace",
       'cascadia': "'Cascadia Code', monospace",
+      'inconsolata': "'Inconsolata', monospace",
+      'sourcecode': "'Source Code Pro', monospace",
+      'monaco': "'Monaco', 'Menlo', monospace",
+      'courierprime': "'Courier Prime', monospace",
       'consolas': "'Consolas', monospace"
     };
     if (prefs.codeFont && codeFontMap[prefs.codeFont]) {

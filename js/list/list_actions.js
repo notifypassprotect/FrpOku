@@ -469,6 +469,13 @@ async function downloadBulkReports() {
       renderPreview();
     },
     onConfirm: (modalEl) => {
+      const folderCb = modalEl.querySelector('#bulkFolderCb');
+      if (folderCb) useFolders = folderCb.checked;
+      const customBumpInp = modalEl.querySelector('#bulkCustomBumpInp');
+      if (customBumpInp && customBumpInp.value) {
+        const val = parseInt(customBumpInp.value, 10);
+        if (!isNaN(val) && val >= 0) versionBump = val;
+      }
       const zipNameInp = modalEl.querySelector('#bulkZipNameInp');
       let entered = (zipNameInp?.value || '').trim();
       if (entered) {
@@ -496,8 +503,9 @@ async function downloadBulkReports() {
         if (versionBump > 0 && typeof FrpStore.bumpVersionFilename === 'function') {
           fName = FrpStore.bumpVersionFilename(fName, versionBump);
         }
-        if (useFolders && file.category) {
-          fName = `${file.category.replace(/[/\\?%*:|"<>]/g, '_')}/${fName}`;
+        if (useFolders) {
+          const cat = (file.category && file.category.trim()) ? file.category.trim().replace(/[/\\?%*:|"<>]/g, '_') : 'Kategorisiz';
+          fName = `${cat}/${fName}`;
         }
         const xml = window.buildUpdatedFrpXml ? window.buildUpdatedFrpXml(file, null) : (file.rawXml || '');
         zip.addFile(fName, xml);

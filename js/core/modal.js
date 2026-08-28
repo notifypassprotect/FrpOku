@@ -23,6 +23,14 @@ function showModal({
   return new Promise(resolve => {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
+    
+    // Dynamic highest z-index (supports stacking over admin & settings modals)
+    let highestZ = 10000;
+    document.querySelectorAll('.modal-overlay, [id*="ModalOverlay"], [id*="Modal"]').forEach(el => {
+      const z = parseInt(window.getComputedStyle(el).zIndex, 10);
+      if (!isNaN(z) && z >= highestZ) highestZ = z + 10;
+    });
+    overlay.style.zIndex = String(Math.max(105000, highestZ + 100));
 
     let actionsHtml = '';
     if (Array.isArray(buttons) && buttons.length > 0) {
