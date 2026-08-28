@@ -991,6 +991,15 @@ function buildOracleConnectString({ host, port = 1521, serviceName, sid }) {
   return `${host}:${port}/xe`;
 }
 
+function formatOracleError(err, host) {
+  const msg = err.message || String(err);
+  const isPrivateIp = /^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(String(host || ''));
+  if (/timed out|NJS-510/i.test(msg) && isPrivateIp) {
+    return `Zaman aşımı (Timeout): "${host}" adresi kurum içi kapalı ağ (Intranet / VPN) IP'sidir. Genel bulut sunucusu (Render) iç ağınıza doğrudan erişemez. Bu bağlantıyı test etmek için lütfen projeyi kendi bilgisayarınızda (baslat.bat ile http://localhost:3000 üzerinden) çalıştırınız.`;
+  }
+  return msg;
+}
+
 // 1. Oracle Bağlantı Testi
 app.post('/api/oracle/test-connection', async (req, res) => {
   if (!oracledb) {
@@ -1025,7 +1034,7 @@ app.post('/api/oracle/test-connection', async (req, res) => {
   } catch (err) {
     res.status(500).json({
       success: false,
-      reason: 'Oracle bağlantı hatası: ' + err.message
+      reason: formatOracleError(err, host)
     });
   } finally {
     if (connection) {
@@ -1099,7 +1108,7 @@ app.post('/api/oracle/execute-query', async (req, res) => {
     const durationMs = Date.now() - startTime;
     res.status(500).json({
       success: false,
-      reason: err.message,
+      reason: formatOracleError(err, host),
       durationMs
     });
   } finally {
