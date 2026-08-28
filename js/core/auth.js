@@ -907,28 +907,59 @@
 
       function bindAllUsersActions(scope) {
         // Kullanıcı Adı Değiştirme
+        // Kullanıcı Adı Değiştirme (Modern Modal)
         scope.querySelectorAll('.btn-edit-username').forEach(btn => {
-          btn.onclick = (e) => {
+          btn.onclick = async (e) => {
             e.stopPropagation();
             const uId = btn.getAttribute('data-id');
             const curUser = btn.getAttribute('data-name');
-            const newUser = prompt(`"${curUser}" için yeni kullanıcı adını giriniz (@kullanici_adi):`, curUser);
+            
+            let newUser = null;
+            if (typeof window.showPromptModal === 'function') {
+              newUser = await window.showPromptModal({
+                title: 'Kullanıcı Adı Değiştir',
+                message: `<strong>@${curUser}</strong> kullanıcısı için yeni kullanıcı adını giriniz:`,
+                defaultValue: curUser,
+                placeholder: 'ornek_kullanici',
+                confirmText: '💾 Güncelle',
+                cancelText: 'Vazgeç',
+                badge: '✏️'
+              });
+            } else {
+              newUser = prompt(`"${curUser}" için yeni kullanıcı adını giriniz (@kullanici_adi):`, curUser);
+            }
+
             if (!newUser || !newUser.trim() || newUser.trim().toLowerCase() === curUser.toLowerCase()) return;
 
-            fetch('/api/admin/change-username', {
-              method: 'POST',
-              headers: getAuthHeaders(),
-              body: JSON.stringify({ userId: uId, newUsername: newUser.trim() })
-            }).then(r => r.json()).then(data => {
+            try {
+              const res = await fetch('/api/admin/change-username', {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ userId: uId, newUsername: newUser.trim() })
+              });
+              const data = await res.json();
               if (data.success) {
-                if (typeof window.toast === 'function') {
+                if (window.FrpNotify) {
+                  window.FrpNotify.success(`Kullanıcı adı @${data.username} olarak güncellendi! ✅`);
+                } else if (typeof window.toast === 'function') {
                   window.toast(`Kullanıcı adı @${data.username} olarak güncellendi! ✅`, 'success');
+                }
+                if (window.FrpAudit) {
+                  window.FrpAudit.logAction({
+                    action: 'USERNAME_CHANGE',
+                    target: `@${data.username}`,
+                    details: `Yönetici tarafından kullanıcı adı değiştirildi: @${curUser} ➔ @${data.username}`
+                  });
                 }
                 renderAllUsersTab();
               } else {
-                alert(data.reason || 'Kullanıcı adı değiştirilemedi.');
+                if (window.FrpNotify) window.FrpNotify.error(data.reason || 'Kullanıcı adı değiştirilemedi.');
+                else alert(data.reason || 'Kullanıcı adı değiştirilemedi.');
               }
-            }).catch(err => alert('Hata: ' + err.message));
+            } catch (err) {
+              if (window.FrpNotify) window.FrpNotify.error('Hata: ' + err.message);
+              else alert('Hata: ' + err.message);
+            }
           };
         });
 
@@ -1903,6 +1934,80 @@
       }
     }
   });
+
+  // ── Global Denetim Günlüğü API (FrpAudit) ────────────────────
+  window.FrpAudit = {
+    async logAction({ action, target = '', details = '', extra = {} }) {
+      const user = getUser();
+      const logEntry = {
+        id: 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        userId: user ? user.id : 'guest',
+        username: user ? user.username : 'Misafir',
+        fullName: user ? (user.full_name || user.fullName || user.username) : 'Misafir',
+        role: user ? (user.role || 'user') : 'guest',
+        action: action || 'GENERAL',
+        target: target || '',
+        details: details || '',
+        timestamp: new Date().toISOString(),
+        ...extra
+      };
+
+      // 1. Yerel Depolama
+      try {
+        let localLogs = [];
+        const stored = localStorage.getItem('frp_audit_logs');
+        if (stored) {
+          try { localLogs = JSON.parse(stored) || []; } catch {}
+        }
+        localLogs.unshift(logEntry);
+        if (localLogs.length > 500) localLogs = localLogs.slice(0, 500);
+        localStorage.setItem('frp_audit_logs', JSON.stringify(localLogs));
+      } catch (e) {}
+
+      // 2. Sunucuya Gönder
+      try {
+        fetch('/api/audit-log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(logEntry)
+        }).catch(() => {});
+      } catch (e) {}
+
+      return logEntry;
+    },
+
+    async getLogs(filter = {}) {
+      let serverLogs = [];
+      try {
+        const res = await fetch('/api/admin/audit-logs' + (filter.q ? `?q=${encodeURIComponent(filter.q)}` : ''), {
+          headers: getAuthHeaders()
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.logs)) serverLogs = data.logs;
+        }
+      } catch (e) {}
+
+      let localLogs = [];
+      try {
+        const stored = localStorage.getItem('frp_audit_logs');
+        if (stored) localLogs = JSON.parse(stored) || [];
+      } catch (e) {}
+
+      const all = [...serverLogs, ...localLogs];
+      const seen = new Set();
+      const unique = [];
+      for (const l of all) {
+        const key = l.id || `${l.timestamp}_${l.action}_${l.target}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          unique.push(l);
+        }
+      }
+      unique.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      return unique;
+    }
+  };
 
   // ── Public Auth API ──────────────────────────────────────────
   window.FrpAuth = {

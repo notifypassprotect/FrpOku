@@ -184,6 +184,24 @@ async function downloadSingleReport(id) {
       URL.revokeObjectURL(url);
     }, 150);
 
+    if (typeof FrpStore.addDownloadHistory === 'function') {
+      FrpStore.addDownloadHistory({
+        reportId: file.id,
+        reportName: reportName,
+        fileName: finalChosenName,
+        format: 'frp',
+        customVersion: versionBump > 0 ? `+${versionBump}` : ''
+      });
+    }
+
+    if (window.FrpAudit) {
+      window.FrpAudit.logAction({
+        action: 'FRP_DOWNLOAD',
+        target: finalChosenName,
+        details: `'${file.name}' raporu (${finalChosenName}) olarak indirildi.`
+      });
+    }
+
     hideProgressModal();
     toast(`'${finalChosenName}' başarıyla indirildi. 📥`, 'success');
   } catch (err) {
@@ -192,7 +210,60 @@ async function downloadSingleReport(id) {
   }
 }
 
+// ── SON İNDİRİLENLER MODALI ──────────────────────────────────────
+async function showDownloadHistoryModal() {
+  const history = typeof FrpStore.getDownloadHistory === 'function' ? FrpStore.getDownloadHistory() : [];
+  
+  const bodyHtml = history.length === 0 ? `
+    <div style="padding:2.5rem 1rem;text-align:center;color:var(--text-muted);">
+      <div style="font-size:2.5rem;margin-bottom:.5rem;">📥</div>
+      <div style="font-weight:700;font-size:1rem;color:var(--text-secondary);">Henüz İndirilen Dosya Yok</div>
+      <div style="font-size:.8rem;margin-top:.25rem;">İndirdiğiniz tekli veya toplu raporlar burada listelenecektir.</div>
+    </div>
+  ` : `
+    <div style="display:flex;flex-direction:column;gap:.6rem;max-height:420px;overflow-y:auto;padding-right:.25rem;">
+      ${history.map(item => {
+        const timeStr = new Date(item.timestamp).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const formatBadge = item.format === 'zip' ? '📦 ZIP' : (item.format === 'sql' ? '🗄️ SQL' : (item.format === 'html' ? '🌐 HTML' : '📄 FRP'));
+        return `
+          <div style="background:var(--bg-raised);padding:.75rem .95rem;border-radius:10px;border:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between;gap:.8rem;">
+            <div style="min-width:0;flex:1;">
+              <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.2rem;">
+                <span class="badge badge-blue" style="font-size:.68rem;padding:2px 6px;">${formatBadge}</span>
+                <span style="font-weight:800;font-size:.85rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(item.fileName)}</span>
+              </div>
+              <div style="font-size:.72rem;color:var(--text-muted);display:flex;align-items:center;gap:.6rem;">
+                <span>🕒 ${timeStr}</span>
+                ${item.reportName && item.reportName !== item.fileName ? `<span>• 📋 ${escHtml(item.reportName)}</span>` : ''}
+              </div>
+            </div>
+            ${item.reportId && item.reportId !== 'bulk' ? `
+              <button type="button" class="btn btn-sm btn-ghost" onclick="window.downloadSingleReport && window.downloadSingleReport('${item.reportId}')" title="Tekrar İndir" style="font-size:.72rem;padding:.25rem .55rem;">
+                📥 İndir
+              </button>
+            ` : ''}
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+
+  await showModal({
+    title: '📥 Son İndirilenler & İndirme Geçmişi',
+    body: bodyHtml,
+    confirmText: 'Tamam',
+    cancelText: history.length > 0 ? '🗑️ Geçmişi Temizle' : null,
+    maxWidth: '560px'
+  }).then(res => {
+    if (res === false && history.length > 0) {
+      localStorage.removeItem('frpoku_download_history');
+      toast('İndirme geçmişi temizlendi. 🗑️', 'info');
+    }
+  });
+}
+
 window.downloadSingleReport = downloadSingleReport;
+window.showDownloadHistoryModal = showDownloadHistoryModal;
 window.showProgressModal = showProgressModal;
 window.updateProgressModal = updateProgressModal;
 window.hideProgressModal = hideProgressModal;
@@ -420,6 +491,25 @@ async function downloadBulkReports() {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }, 150);
+
+      if (typeof FrpStore.addDownloadHistory === 'function') {
+        FrpStore.addDownloadHistory({
+          reportId: 'bulk',
+          reportName: `${successCount} Adet Rapor`,
+          fileName: customZipName,
+          format: 'zip',
+          customVersion: versionBump > 0 ? `+${versionBump}` : ''
+        });
+      }
+
+      if (window.FrpAudit) {
+        window.FrpAudit.logAction({
+          action: 'BULK_DOWNLOAD',
+          target: customZipName,
+          details: `${successCount} adet rapor ZIP arşivi olarak indirildi.`
+        });
+      }
+
       hideProgressModal();
       toast(`📦 ${successCount} rapor '${customZipName}' olarak indirildi!`, 'success');
     } else {
@@ -447,12 +537,31 @@ async function downloadBulkReports() {
           URL.revokeObjectURL(url);
         }, 150);
         successCount++;
+
+        if (typeof FrpStore.addDownloadHistory === 'function') {
+          FrpStore.addDownloadHistory({
+            reportId: file.id,
+            reportName: file.meta?.reportName || file.name,
+            fileName: fName,
+            format: 'frp',
+            customVersion: versionBump > 0 ? `+${versionBump}` : ''
+          });
+        }
       } catch (err) {
         errors.push(`${file.name}: ${err.message}`);
       }
       updateProgressModal(i + 1, count, file.name);
-      await new Promise(r => setTimeout(r, 120));
+      if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
     }
+
+    if (window.FrpAudit) {
+      window.FrpAudit.logAction({
+        action: 'BULK_DOWNLOAD',
+        target: `${successCount} Dosya`,
+        details: `${successCount} adet rapor ayrı ayrı indirildi.`
+      });
+    }
+
     hideProgressModal();
     toast(`📄 ${successCount} rapor ayrı ayrı indirildi!`, 'success');
   }

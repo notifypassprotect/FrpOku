@@ -1628,14 +1628,20 @@ window.openSettingsModal = function(initialTab = 'appearance') {
       fetchLogs();
     }
 
-    // Profil E-posta Güncelleme Butonu
+    // Profil E-posta Güncelleme Butonu (Geri Al Destekli)
     overlay.querySelector('#btnUpdateEmailDirectly')?.addEventListener('click', async () => {
       const emailInput = overlay.querySelector('#profEmail');
       const newEmail = (emailInput?.value || '').trim();
       const authUser = window.FrpAuth?.getUser();
+      const oldEmail = authUser?.email || stagedProfile.email || '';
 
       if (!newEmail || !newEmail.includes('@')) {
         safeToast('Lütfen geçerli bir e-posta adresi giriniz.', 'warning');
+        return;
+      }
+
+      if (newEmail.toLowerCase() === oldEmail.toLowerCase()) {
+        safeToast('Girilen e-posta adresi zaten mevcut adresinizle aynı.', 'info');
         return;
       }
 
@@ -1649,7 +1655,56 @@ window.openSettingsModal = function(initialTab = 'appearance') {
         if (data.success) {
           stagedProfile.email = newEmail;
           FrpStore.setUserProfile(stagedProfile);
-          safeToast('E-posta adresiniz başarıyla güncellendi! ✅', 'success');
+          if (window.FrpAuth && typeof window.FrpAuth.updateSession === 'function') {
+            window.FrpAuth.updateSession({ email: newEmail });
+          }
+
+          if (window.FrpAudit) {
+            window.FrpAudit.logAction({
+              action: 'EMAIL_CHANGE',
+              target: newEmail,
+              details: `Kullanıcı e-posta adresi güncellendi: ${oldEmail} ➔ ${newEmail}`
+            });
+          }
+
+          if (typeof window.showUndoToast === 'function') {
+            window.showUndoToast({
+              title: 'E-Posta Güncellendi ✅',
+              message: `Yeni e-posta adresiniz '${newEmail}' olarak kaydedildi.`,
+              undoText: '↩️ Geri Al',
+              duration: 8500,
+              onUndo: async () => {
+                try {
+                  const revRes = await fetch('/api/auth/change-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: authUser?.id || 'admin', newEmail: oldEmail })
+                  });
+                  const revData = await revRes.json();
+                  if (revData.success) {
+                    stagedProfile.email = oldEmail;
+                    FrpStore.setUserProfile(stagedProfile);
+                    if (window.FrpAuth && typeof window.FrpAuth.updateSession === 'function') {
+                      window.FrpAuth.updateSession({ email: oldEmail });
+                    }
+                    if (emailInput) emailInput.value = oldEmail;
+                    if (window.FrpAudit) {
+                      window.FrpAudit.logAction({
+                        action: 'EMAIL_CHANGE',
+                        target: oldEmail,
+                        details: `E-posta değişikliği geri alındı: ${newEmail} ➔ ${oldEmail}`
+                      });
+                    }
+                    safeToast(`E-posta adresi geri alındı: ${oldEmail} ↩️`, 'info');
+                  }
+                } catch (revErr) {
+                  safeToast('Geri alma hatası: ' + revErr.message, 'error');
+                }
+              }
+            });
+          } else {
+            safeToast('E-posta adresiniz başarıyla güncellendi! ✅', 'success');
+          }
         } else {
           safeToast(data.reason || 'E-posta güncellenemedi.', 'error');
         }

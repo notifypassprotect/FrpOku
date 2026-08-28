@@ -183,6 +183,12 @@
     let inspectorTab = 'properties'; // 'properties' | 'events' | 'favorites'
     let inspectorWidth = parseInt(localStorage.getItem('frp_inspector_width') || '330', 10);
 
+    // Canlı Tasarım Düzenleme Modu & Geri Al (Undo/Redo) Durumu
+    let isDesignEditing = false;
+    let undoStack = [];
+    let redoStack = [];
+    let initialPagesBackup = null;
+
     // Sayfaları hazırla
     const pages = Array.isArray(file.pages) ? file.pages : [];
     const dialogPages = Array.isArray(file.dialogPages) ? file.dialogPages : [];
@@ -229,7 +235,7 @@
             <div class="designer-toolbar-group">
               ${activePage.type === 'report' ? `
                 <div class="designer-mode-toggle">
-                  <button type="button" class="designer-mode-btn ${currentMode === 'designer' ? 'active' : ''}" id="btnModeDesigner" title="Tasarımcı Görünümü (Bantlar &amp; Izgara &amp; Canlı Düzenleme)">
+                  <button type="button" class="designer-mode-btn ${currentMode === 'designer' ? 'active' : ''}" id="btnModeDesigner" title="Tasarımcı Görünümü (Bantlar &amp; Izgara)">
                     📐 Tasarımcı Modu
                   </button>
                   <button type="button" class="designer-mode-btn ${currentMode === 'preview' ? 'active' : ''}" id="btnModePreview" title="Baskı Sayfası Önizleme (Temiz Çıktı)">
@@ -243,27 +249,48 @@
               `}
             </div>
 
-            <!-- CANLI BİLEŞEN EKLEME PALETİ (Component Palette) -->
-            ${currentMode === 'designer' ? `
+            <!-- DÜZENLEME & KAYIT BUTONLARI (SQL & Pascal ile Birebir Aynı Deneyim) -->
+            <div class="designer-toolbar-group">
+              ${!isDesignEditing ? `
+                <button type="button" class="btn btn-sm btn-primary" id="btnStartDesignEdit" style="font-weight:700;display:inline-flex;align-items:center;gap:5px;padding:.32rem .85rem;border-radius:6px;" title="Tasarımı düzenleme moduna al">
+                  ✏️ Tasarımı Düzenle
+                </button>
+              ` : `
+                <div class="designer-edit-bar">
+                  <button type="button" class="designer-palette-btn success" id="btnSaveDesignEdit" title="Değişiklikleri Kalıcı Olarak Kaydet">
+                    💾 Tasarımı Kaydet
+                  </button>
+                  <button type="button" class="designer-palette-btn" id="btnCancelDesignEdit" title="Değişiklikleri İptal Et ve Geri Dön">
+                    ❌ İptal Et
+                  </button>
+                  <div style="width:1px;height:16px;background:rgba(255,255,255,0.15);margin:0 2px;"></div>
+                  <button type="button" class="designer-palette-btn undo-redo" id="btnUndoDesign" title="Geri Al (Ctrl+Z)" ${undoStack.length <= 1 ? 'disabled' : ''}>
+                    ↩️ Geri Al
+                  </button>
+                  <button type="button" class="designer-palette-btn undo-redo" id="btnRedoDesign" title="İleri Al (Ctrl+Y)" ${redoStack.length === 0 ? 'disabled' : ''}>
+                    ↪️ İleri Al
+                  </button>
+                </div>
+              `}
+            </div>
+
+            <!-- GENİŞLETİLMİŞ BİLEŞEN PALETİ (YALNIZCA Düzenleme Modunda Aktif) -->
+            ${(currentMode === 'designer' && isDesignEditing) ? `
               <div class="designer-comp-palette">
-                <button type="button" class="designer-palette-btn" id="btnToolAddMemo" title="Yeni Metin / Memo Ekle">
-                  📝 Memo
-                </button>
-                <button type="button" class="designer-palette-btn" id="btnToolAddPicture" title="Yeni Resim / Logo Ekle">
-                  🖼️ Resim
-                </button>
-                <button type="button" class="designer-palette-btn" id="btnToolAddLine" title="Yeni Çizgi Ekle">
-                  ➖ Çizgi
-                </button>
-                <button type="button" class="designer-palette-btn" id="btnToolAddBarcode" title="Yeni Barkod Ekle">
-                  📊 Barkod
-                </button>
-                <button type="button" class="designer-palette-btn" id="btnToolAddCheckbox" title="Yeni CheckBox Ekle">
-                  ☑️ CheckBox
-                </button>
-                <button type="button" class="designer-palette-btn danger" id="btnToolDeleteSelected" title="Seçili Bileşeni Sil (Delete)">
-                  🗑️ Sil
-                </button>
+                <button type="button" class="designer-palette-btn" id="btnToolAddMemo" title="Yeni Metin / Memo Ekle">📝 Memo</button>
+                <button type="button" class="designer-palette-btn" id="btnToolAddPicture" title="Yeni Resim / Logo Ekle">🖼️ Resim</button>
+                <button type="button" class="designer-palette-btn" id="btnToolAddLine" title="Yeni Çizgi Ekle">➖ Çizgi</button>
+                <button type="button" class="designer-palette-btn" id="btnToolAddBarcode" title="Yeni Barkod Ekle">📊 Barkod</button>
+                <button type="button" class="designer-palette-btn" id="btnToolAddShape" title="Yeni Şekil Ekle">🔲 Şekil</button>
+                <button type="button" class="designer-palette-btn" id="btnToolAddChart" title="Yeni Grafik Ekle">📈 Grafik</button>
+                <button type="button" class="designer-palette-btn" id="btnToolAddBand" title="Yeni Bant Ekle">📄 Bant</button>
+                <button type="button" class="designer-palette-btn" id="btnToolAddCheckbox" title="Yeni Onay Kutusu Ekle">☑️ CheckBox</button>
+                <button type="button" class="designer-palette-btn" id="btnToolAddRadio" title="Yeni Radyo Butonu Ekle">🔘 Radio</button>
+                <button type="button" class="designer-palette-btn" id="btnToolAddEdit" title="Yeni Metin Girişi Ekle">🔤 Edit</button>
+                <button type="button" class="designer-palette-btn" id="btnToolAddDateEdit" title="Yeni Tarih Seçici Ekle">📅 Tarih</button>
+                <button type="button" class="designer-palette-btn" id="btnToolAddCombobox" title="Yeni Açılır Liste Ekle">📋 Combo</button>
+                <button type="button" class="designer-palette-btn" id="btnToolAddPanel" title="Yeni Panel Ekle">🗂️ Panel</button>
+                <button type="button" class="designer-palette-btn danger" id="btnToolDeleteSelected" title="Seçili Bileşeni Sil (Delete)">🗑️ Sil</button>
               </div>
             ` : ''}
 
@@ -490,7 +517,7 @@
       const finalPageMinHeight = Math.max(stdPaperHeight, totalBandsHeight + 250);
 
       function renderResizeHandles(isSelected) {
-        if (!isSelected || currentMode !== 'designer') return '';
+        if (!isSelected || currentMode !== 'designer' || !isDesignEditing) return '';
         return `
           <div class="fr-resize-handle fr-resize-nw" data-handle="nw"></div>
           <div class="fr-resize-handle fr-resize-n" data-handle="n"></div>
@@ -1248,7 +1275,7 @@
       `;
     }
 
-    // ── NESNE DENETÇİSİ ÖZELLİK TABLOSU (Object Inspector - Canlı Düzenlenebilir) ─────
+    // ── NESNE DENETÇİSİ ÖZELLİK TABLOSU (Object Inspector) ─────
     function renderObjectInspectorProperties(obj) {
       if (!obj) return '<div style="padding:1rem;color:var(--text-muted);font-size:.78rem;">Seçili bileşen yok.</div>';
 
@@ -1256,42 +1283,42 @@
 
       if (inspectorTab === 'events') {
         propList = [
-          { name: 'OnClick', val: obj.onClick || '', propKey: 'onClick', editable: true },
-          { name: 'OnBeforePrint', val: obj.onBeforePrint || '', propKey: 'onBeforePrint', editable: true },
-          { name: 'OnChange', val: obj.onChange || '', propKey: 'onChange', editable: true },
-          { name: 'OnAfterPrint', val: obj.onAfterPrint || '', propKey: 'onAfterPrint', editable: true },
-          { name: 'OnPreviewClick', val: obj.onPreviewClick || '', propKey: 'onPreviewClick', editable: true },
-          { name: 'OnEnter', val: obj.onEnter || '', propKey: 'onEnter', editable: true },
-          { name: 'OnExit', val: obj.onExit || '', propKey: 'onExit', editable: true },
-          { name: 'OnKeyDown', val: obj.onKeyDown || '', propKey: 'onKeyDown', editable: true }
+          { name: 'OnClick', val: obj.onClick || '', propKey: 'onClick', editable: isDesignEditing },
+          { name: 'OnBeforePrint', val: obj.onBeforePrint || '', propKey: 'onBeforePrint', editable: isDesignEditing },
+          { name: 'OnChange', val: obj.onChange || '', propKey: 'onChange', editable: isDesignEditing },
+          { name: 'OnAfterPrint', val: obj.onAfterPrint || '', propKey: 'onAfterPrint', editable: isDesignEditing },
+          { name: 'OnPreviewClick', val: obj.onPreviewClick || '', propKey: 'onPreviewClick', editable: isDesignEditing },
+          { name: 'OnEnter', val: obj.onEnter || '', propKey: 'onEnter', editable: isDesignEditing },
+          { name: 'OnExit', val: obj.onExit || '', propKey: 'onExit', editable: isDesignEditing },
+          { name: 'OnKeyDown', val: obj.onKeyDown || '', propKey: 'onKeyDown', editable: isDesignEditing }
         ];
       } else if (inspectorTab === 'favorites') {
         propList = [
-          { name: 'Name', val: obj.name || '', propKey: 'name', editable: true },
-          { name: 'Caption / Text', val: obj.caption || obj.text || '', propKey: 'text', editable: true },
-          { name: 'DataSet', val: obj.dataSet || obj.listSource || '', propKey: 'dataSet', editable: true },
-          { name: 'DataField', val: obj.dataField || obj.listField || '', propKey: 'dataField', editable: true },
-          { name: 'Font.Color', rawVal: obj.fontColor, val: obj.fontColor || '-16777208', propKey: 'fontColor', editable: true },
-          { name: 'Fill.BackColor', rawVal: obj.fillBackColor || obj.color, val: obj.fillBackColor || obj.color || 'clNone', propKey: 'fillBackColor', editable: true },
-          { name: 'Visible', val: obj.visible !== false ? 'true' : 'false', propKey: 'visible', isSelect: true, options: ['true', 'false'] }
+          { name: 'Name', val: obj.name || '', propKey: 'name', editable: isDesignEditing },
+          { name: 'Caption / Text', val: obj.caption || obj.text || '', propKey: 'text', editable: isDesignEditing },
+          { name: 'DataSet', val: obj.dataSet || obj.listSource || '', propKey: 'dataSet', editable: isDesignEditing },
+          { name: 'DataField', val: obj.dataField || obj.listField || '', propKey: 'dataField', editable: isDesignEditing },
+          { name: 'Font.Color', rawVal: obj.fontColor, val: obj.fontColor || '-16777208', propKey: 'fontColor', editable: isDesignEditing },
+          { name: 'Fill.BackColor', rawVal: obj.fillBackColor || obj.color, val: obj.fillBackColor || obj.color || 'clNone', propKey: 'fillBackColor', editable: isDesignEditing },
+          { name: 'Visible', val: obj.visible !== false ? 'true' : 'false', propKey: 'visible', isSelect: isDesignEditing, options: ['true', 'false'] }
         ];
       } else {
         propList = [
-          { name: 'Name', val: obj.name || '', propKey: 'name', editable: true },
+          { name: 'Name', val: obj.name || '', propKey: 'name', editable: isDesignEditing },
           { name: 'Class', val: obj.type || 'TfrxComponent', readOnly: true },
-          { name: 'Left', val: obj.left ?? 0, propKey: 'left', isNumber: true, editable: true },
-          { name: 'Top', val: obj.top ?? 0, propKey: 'top', isNumber: true, editable: true },
-          { name: 'Width', val: obj.width ?? 0, propKey: 'width', isNumber: true, editable: true },
-          { name: 'Height', val: obj.height ?? 0, propKey: 'height', isNumber: true, editable: true },
-          { name: 'Caption / Text', val: obj.caption || obj.text || '', propKey: 'text', editable: true },
-          { name: 'DataSet', val: obj.dataSet || obj.listSource || '', propKey: 'dataSet', editable: true },
-          { name: 'DataField', val: obj.dataField || obj.listField || '', propKey: 'dataField', editable: true },
-          { name: 'Font.Name', val: obj.fontName || 'Arial', propKey: 'fontName', isSelect: true, options: ['Arial', 'Segoe UI', 'Tahoma', 'Courier New', 'Times New Roman', 'Consolas', 'Roboto'] },
-          { name: 'Font.Size', val: obj.fontSize || 10, propKey: 'fontSize', isNumber: true, editable: true },
-          { name: 'Font.Color', rawVal: obj.fontColor, val: obj.fontColor || '-16777208', propKey: 'fontColor', editable: true },
-          { name: 'Fill.BackColor', rawVal: (obj.fillBackColor || obj.color), val: obj.fillBackColor || obj.color || 'clNone', propKey: 'fillBackColor', editable: true },
-          { name: 'Visible', val: obj.visible !== false ? 'true' : 'false', propKey: 'visible', isSelect: true, options: ['true', 'false'] },
-          { name: 'Enabled', val: obj.enabled !== false ? 'true' : 'false', propKey: 'enabled', isSelect: true, options: ['true', 'false'] }
+          { name: 'Left', val: obj.left ?? 0, propKey: 'left', isNumber: true, editable: isDesignEditing },
+          { name: 'Top', val: obj.top ?? 0, propKey: 'top', isNumber: true, editable: isDesignEditing },
+          { name: 'Width', val: obj.width ?? 0, propKey: 'width', isNumber: true, editable: isDesignEditing },
+          { name: 'Height', val: obj.height ?? 0, propKey: 'height', isNumber: true, editable: isDesignEditing },
+          { name: 'Caption / Text', val: obj.caption || obj.text || '', propKey: 'text', editable: isDesignEditing },
+          { name: 'DataSet', val: obj.dataSet || obj.listSource || '', propKey: 'dataSet', editable: isDesignEditing },
+          { name: 'DataField', val: obj.dataField || obj.listField || '', propKey: 'dataField', editable: isDesignEditing },
+          { name: 'Font.Name', val: obj.fontName || 'Arial', propKey: 'fontName', isSelect: isDesignEditing, options: ['Arial', 'Segoe UI', 'Tahoma', 'Courier New', 'Times New Roman', 'Consolas', 'Roboto'] },
+          { name: 'Font.Size', val: obj.fontSize || 10, propKey: 'fontSize', isNumber: true, editable: isDesignEditing },
+          { name: 'Font.Color', rawVal: obj.fontColor, val: obj.fontColor || '-16777208', propKey: 'fontColor', editable: isDesignEditing },
+          { name: 'Fill.BackColor', rawVal: (obj.fillBackColor || obj.color), val: obj.fillBackColor || obj.color || 'clNone', propKey: 'fillBackColor', editable: isDesignEditing },
+          { name: 'Visible', val: obj.visible !== false ? 'true' : 'false', propKey: 'visible', isSelect: isDesignEditing, options: ['true', 'false'] },
+          { name: 'Enabled', val: obj.enabled !== false ? 'true' : 'false', propKey: 'enabled', isSelect: isDesignEditing, options: ['true', 'false'] }
         ];
       }
 
@@ -1301,19 +1328,19 @@
 
       return filtered.map(p => {
         let inputControl = '';
-        if (p.isSelect) {
+        if (p.isSelect && isDesignEditing) {
           inputControl = `
             <select class="designer-prop-select" data-prop="${p.propKey}">
               ${p.options.map(opt => `<option value="${opt}" ${String(p.val) === opt ? 'selected' : ''}>${opt}</option>`).join('')}
             </select>
           `;
-        } else if (p.editable) {
+        } else if (p.editable && isDesignEditing) {
           const typeAttr = p.isNumber ? 'type="number"' : 'type="text"';
           inputControl = `
             <input ${typeAttr} class="designer-prop-input" data-prop="${p.propKey}" value="${esc(String(p.val))}" />
           `;
         } else {
-          inputControl = `<span style="font-weight:600;color:#38bdf8;">${esc(String(p.val))}</span>`;
+          inputControl = `<span style="font-weight:600;color:var(--text-primary,#f8fafc);">${esc(String(p.val))}</span>`;
         }
 
         return `
@@ -1327,6 +1354,53 @@
       }).join('');
     }
 
+    // ── GERİ AL / İLERİ AL MOTORU (Undo / Redo Engine) ────────
+    function pushUndoState() {
+      if (!isDesignEditing) return;
+      const stateStr = JSON.stringify(allPages.map(p => p.data));
+      if (undoStack.length > 0 && undoStack[undoStack.length - 1] === stateStr) return;
+      undoStack.push(stateStr);
+      if (undoStack.length > 50) undoStack.shift();
+      redoStack = [];
+      updateUndoRedoButtonStates();
+    }
+
+    function undo() {
+      if (!isDesignEditing || undoStack.length <= 1) return;
+      const cur = undoStack.pop();
+      redoStack.push(cur);
+      const prevStr = undoStack[undoStack.length - 1];
+      const prevData = JSON.parse(prevStr);
+      allPages.forEach((p, idx) => {
+        if (prevData[idx]) p.data = prevData[idx];
+      });
+      renderCanvasOnly();
+      updateUndoRedoButtonStates();
+      if (window.FrpNotify) window.FrpNotify.info('İşlem geri alındı (Undo) ↩️');
+      else if (typeof toast === 'function') toast('İşlem geri alındı ↩️', 'info');
+    }
+
+    function redo() {
+      if (!isDesignEditing || redoStack.length === 0) return;
+      const nextStr = redoStack.pop();
+      undoStack.push(nextStr);
+      const nextData = JSON.parse(nextStr);
+      allPages.forEach((p, idx) => {
+        if (nextData[idx]) p.data = nextData[idx];
+      });
+      renderCanvasOnly();
+      updateUndoRedoButtonStates();
+      if (window.FrpNotify) window.FrpNotify.info('İşlem ileri alındı (Redo) ↪️');
+      else if (typeof toast === 'function') toast('İşlem ileri alındı ↪️', 'info');
+    }
+
+    function updateUndoRedoButtonStates() {
+      const uBtn = containerEl.querySelector('#btnUndoDesign');
+      const rBtn = containerEl.querySelector('#btnRedoDesign');
+      if (uBtn) uBtn.disabled = undoStack.length <= 1;
+      if (rBtn) rBtn.disabled = redoStack.length === 0;
+    }
+
     // ── CANLI SAHNE YENİLEME (Lightweight Canvas Re-render) ────
     function renderCanvasOnly() {
       const vp = containerEl.querySelector('#designerViewport');
@@ -1337,10 +1411,13 @@
       }
     }
 
-    // ── BİLEŞEN EKLEME METODU ─────────────────────────────────
+    // ── BİLEŞEN EKLEME METODU (Genişletilmiş 14 Nesne Türü) ──
     function addNewComponent(type) {
+      if (!isDesignEditing) return;
       const activePage = allPages[activePageIndex];
       if (!activePage) return;
+
+      pushUndoState();
 
       const randomId = Math.floor(100 + Math.random() * 900);
       let newComp = null;
@@ -1390,6 +1467,48 @@
           text: '1234567890',
           barType: 'bcCode128'
         };
+      } else if (type === 'shape') {
+        newComp = {
+          name: `Shape${randomId}`,
+          type: 'TfrxShapeView',
+          left: 60,
+          top: 30,
+          width: 120,
+          height: 50,
+          shape: 'skRectangle',
+          fillBackColor: 'clNone',
+          frameWidth: 1
+        };
+      } else if (type === 'chart') {
+        newComp = {
+          name: `Chart${randomId}`,
+          type: 'TfrxChartView',
+          left: 60,
+          top: 30,
+          width: 280,
+          height: 150,
+          seriesType: 'FastLineSeries',
+          dataSet: file.queries?.[0]?.name || ''
+        };
+      } else if (type === 'band') {
+        if (activePage.type === 'report') {
+          if (!activePage.data.bands) activePage.data.bands = [];
+          const newBand = {
+            name: `MasterData${activePage.data.bands.length + 1}`,
+            type: 'TfrxMasterData',
+            left: 0,
+            top: 0,
+            width: 794,
+            height: 60,
+            components: []
+          };
+          activePage.data.bands.push(newBand);
+          selectedItem = newBand;
+          render();
+          pushUndoState();
+          if (window.FrpNotify) window.FrpNotify.success(`Yeni Bant eklendi: '${newBand.name}' ➕`);
+          return;
+        }
       } else if (type === 'checkbox') {
         newComp = {
           name: `CheckBox${randomId}`,
@@ -1400,6 +1519,57 @@
           height: 20,
           caption: 'Seçenek',
           checked: false
+        };
+      } else if (type === 'radio') {
+        newComp = {
+          name: `RadioButton${randomId}`,
+          type: 'TfrxRadioButtonControl',
+          left: 60,
+          top: 30,
+          width: 120,
+          height: 20,
+          caption: 'Seçenek 1',
+          checked: false
+        };
+      } else if (type === 'edit') {
+        newComp = {
+          name: `Edit${randomId}`,
+          type: 'TfrxEditControl',
+          left: 60,
+          top: 30,
+          width: 130,
+          height: 24,
+          text: ''
+        };
+      } else if (type === 'dateedit') {
+        newComp = {
+          name: `DateEdit${randomId}`,
+          type: 'TfrxDateEditControl',
+          left: 60,
+          top: 30,
+          width: 130,
+          height: 24,
+          date: new Date().toISOString().slice(0, 10)
+        };
+      } else if (type === 'combobox') {
+        newComp = {
+          name: `ComboBox${randomId}`,
+          type: 'TfrxComboBoxControl',
+          left: 60,
+          top: 30,
+          width: 140,
+          height: 24,
+          items: 'Seçenek 1\nSeçenek 2\nSeçenek 3'
+        };
+      } else if (type === 'panel') {
+        newComp = {
+          name: `Panel${randomId}`,
+          type: 'TfrxPanelControl',
+          left: 60,
+          top: 30,
+          width: 200,
+          height: 100,
+          caption: ''
         };
       }
 
@@ -1428,12 +1598,14 @@
 
       selectedItem = newComp;
       render();
-      if (typeof toast === 'function') toast(`'${newComp.name}' eklendi ➕`, 'success');
-      else if (typeof showToast === 'function') showToast(`'${newComp.name}' eklendi ➕`, 'success');
+      pushUndoState();
+      if (window.FrpNotify) window.FrpNotify.success(`'${newComp.name}' eklendi ➕`);
+      else if (typeof toast === 'function') toast(`'${newComp.name}' eklendi ➕`, 'success');
     }
 
     // ── BİLEŞEN SİLME METODU ──────────────────────────────────
     function deleteSelectedComponent() {
+      if (!isDesignEditing) return;
       if (!selectedItem) {
         if (typeof toast === 'function') toast('Silinecek bir bileşen seçilmedi.', 'info');
         return;
@@ -1441,6 +1613,8 @@
 
       const activePage = allPages[activePageIndex];
       if (!activePage) return;
+
+      pushUndoState();
 
       let deleted = false;
       if (activePage.type === 'report') {
@@ -1463,8 +1637,9 @@
         const delName = selectedItem.name;
         selectedItem = null;
         render();
-        if (typeof toast === 'function') toast(`'${delName}' silindi 🗑️`, 'info');
-        else if (typeof showToast === 'function') showToast(`'${delName}' silindi 🗑️`, 'info');
+        pushUndoState();
+        if (window.FrpNotify) window.FrpNotify.info(`'${delName}' silindi 🗑️`);
+        else if (typeof toast === 'function') toast(`'${delName}' silindi 🗑️`, 'info');
       }
     }
 
@@ -1494,13 +1669,27 @@
           }
         });
 
-        // Çift Tıklama ile Metin Düzenleme (In-place Text Edit)
-        el.addEventListener('dblclick', (e) => {
+        // Çift Tıklama ile Metin Düzenleme (In-place Text Edit with Modern Modal)
+        el.addEventListener('dblclick', async (e) => {
           e.stopPropagation();
-          if (!selectedItem || currentMode !== 'designer') return;
+          if (!isDesignEditing || !selectedItem || currentMode !== 'designer') return;
           const oldText = selectedItem.text || selectedItem.caption || '';
-          const newText = prompt(`"${selectedItem.name}" metnini düzenleyin:`, oldText);
+          
+          let newText = null;
+          if (typeof window.showPromptModal === 'function') {
+            newText = await window.showPromptModal({
+              title: `"${selectedItem.name}" Metnini Düzenle`,
+              message: 'Memo bileşeni metnini veya alan ifadesini düzenleyin:',
+              defaultValue: oldText,
+              isTextarea: true,
+              badge: '📝'
+            });
+          } else {
+            newText = prompt(`"${selectedItem.name}" metnini düzenleyin:`, oldText);
+          }
+
           if (newText !== null && newText !== oldText) {
+            pushUndoState();
             selectedItem.text = newText;
             selectedItem.caption = newText;
             renderCanvasOnly();
@@ -1510,12 +1699,13 @@
               propTable.innerHTML = renderObjectInspectorProperties(selectedItem || activePage?.data);
               bindInspectorInputs();
             }
+            pushUndoState();
           }
         });
 
         // Sürükle & Boyutlandır Başlangıcı (MouseDown)
         el.addEventListener('mousedown', (e) => {
-          if (currentMode !== 'designer' || !selectedItem) return;
+          if (!isDesignEditing || currentMode !== 'designer' || !selectedItem) return;
           if (e.target.closest('.designer-prop-input') || e.target.closest('.designer-prop-select')) return;
 
           const resizeHandle = e.target.closest('.fr-resize-handle');
@@ -1576,6 +1766,8 @@
             window.removeEventListener('mousemove', onMouseMove);
             window.removeEventListener('mouseup', onMouseUp);
 
+            pushUndoState();
+
             // Object Inspector'ı Güncelle
             const propTable = containerEl.querySelector('#propTableBody');
             if (propTable) {
@@ -1595,7 +1787,7 @@
     function bindInspectorInputs() {
       containerEl.querySelectorAll('.designer-prop-input, .designer-prop-select').forEach(inp => {
         inp.addEventListener('input', (e) => {
-          if (!selectedItem) return;
+          if (!isDesignEditing || !selectedItem) return;
           const prop = e.target.dataset.prop;
           let val = e.target.value;
           if (['left', 'top', 'width', 'height', 'fontSize'].includes(prop)) {
@@ -1607,6 +1799,7 @@
           if (prop === 'text') selectedItem.caption = val;
           if (prop === 'caption') selectedItem.text = val;
           renderCanvasOnly();
+          pushUndoState();
         });
       });
     }
@@ -1638,15 +1831,76 @@
         });
       }
 
-      // 3. Bileşen Paleti Butonları
+      // 3. Düzenleme / Kaydetme / İptal Etme Butonları
+      containerEl.querySelector('#btnStartDesignEdit')?.addEventListener('click', () => {
+        isDesignEditing = true;
+        initialPagesBackup = JSON.parse(JSON.stringify(allPages.map(p => p.data)));
+        undoStack = [JSON.stringify(allPages.map(p => p.data))];
+        redoStack = [];
+        render();
+        if (window.FrpNotify) window.FrpNotify.info('Tasarım düzenleme modu aktif ✏️. Değişiklikleri yaptıktan sonra "Tasarımı Kaydet" butonuna basınız.');
+      });
+
+      containerEl.querySelector('#btnSaveDesignEdit')?.addEventListener('click', () => {
+        if (!isDesignEditing) return;
+        file.pages = allPages.filter(p => p.type === 'report').map(p => p.data);
+        file.dialogPages = allPages.filter(p => p.type === 'dialog').map(p => p.data);
+        
+        if (window.FrpStore && typeof window.FrpStore.saveFile === 'function') {
+          window.FrpStore.saveFile(file);
+        }
+
+        if (window.FrpAudit) {
+          window.FrpAudit.logAction({
+            action: 'DESIGN_EDIT',
+            target: file.name || 'Rapor',
+            details: `Görsel rapor sayfası tasarımı (${file.pages.length} sayfa) düzenlendi ve kaydedildi.`
+          });
+        }
+
+        isDesignEditing = false;
+        undoStack = [];
+        redoStack = [];
+        initialPagesBackup = null;
+        render();
+        if (window.FrpNotify) window.FrpNotify.success('Rapor tasarımı başarıyla kaydedildi! 💾');
+        else if (typeof toast === 'function') toast('Rapor tasarımı kaydedildi! 💾', 'success');
+      });
+
+      containerEl.querySelector('#btnCancelDesignEdit')?.addEventListener('click', () => {
+        if (initialPagesBackup) {
+          allPages.forEach((p, idx) => {
+            if (initialPagesBackup[idx]) p.data = initialPagesBackup[idx];
+          });
+        }
+        isDesignEditing = false;
+        undoStack = [];
+        redoStack = [];
+        initialPagesBackup = null;
+        render();
+        if (window.FrpNotify) window.FrpNotify.info('Tasarım değişiklikleri iptal edildi. ↩️');
+      });
+
+      containerEl.querySelector('#btnUndoDesign')?.addEventListener('click', undo);
+      containerEl.querySelector('#btnRedoDesign')?.addEventListener('click', redo);
+
+      // 4. Genişletilmiş Bileşen Paleti Butonları
       containerEl.querySelector('#btnToolAddMemo')?.addEventListener('click', () => addNewComponent('memo'));
       containerEl.querySelector('#btnToolAddPicture')?.addEventListener('click', () => addNewComponent('picture'));
       containerEl.querySelector('#btnToolAddLine')?.addEventListener('click', () => addNewComponent('line'));
       containerEl.querySelector('#btnToolAddBarcode')?.addEventListener('click', () => addNewComponent('barcode'));
+      containerEl.querySelector('#btnToolAddShape')?.addEventListener('click', () => addNewComponent('shape'));
+      containerEl.querySelector('#btnToolAddChart')?.addEventListener('click', () => addNewComponent('chart'));
+      containerEl.querySelector('#btnToolAddBand')?.addEventListener('click', () => addNewComponent('band'));
       containerEl.querySelector('#btnToolAddCheckbox')?.addEventListener('click', () => addNewComponent('checkbox'));
+      containerEl.querySelector('#btnToolAddRadio')?.addEventListener('click', () => addNewComponent('radio'));
+      containerEl.querySelector('#btnToolAddEdit')?.addEventListener('click', () => addNewComponent('edit'));
+      containerEl.querySelector('#btnToolAddDateEdit')?.addEventListener('click', () => addNewComponent('dateedit'));
+      containerEl.querySelector('#btnToolAddCombobox')?.addEventListener('click', () => addNewComponent('combobox'));
+      containerEl.querySelector('#btnToolAddPanel')?.addEventListener('click', () => addNewComponent('panel'));
       containerEl.querySelector('#btnToolDeleteSelected')?.addEventListener('click', deleteSelectedComponent);
 
-      // 4. Zoom Kontrolleri
+      // 5. Zoom Kontrolleri
       containerEl.querySelector('#btnZoomIn')?.addEventListener('click', () => {
         currentZoom = Math.min(2.5, Math.round((currentZoom + 0.15) * 100) / 100);
         updateZoom();
@@ -1666,7 +1920,7 @@
         }
       });
 
-      // 5. Sağ Panel Sekmeleri (Object Inspector vs Data Tree)
+      // 6. Sağ Panel Sekmeleri (Object Inspector vs Data Tree)
       containerEl.querySelector('#btnTabInspector')?.addEventListener('click', () => {
         rightTab = 'inspector';
         showInspector = true;
@@ -1684,7 +1938,7 @@
         if (insp) insp.classList.add('collapsed');
       });
 
-      // 6. Object Inspector Sekmeleri (Properties / Events / Favorites)
+      // 7. Object Inspector Sekmeleri (Properties / Events / Favorites)
       containerEl.querySelectorAll('.designer-subtab').forEach(st => {
         st.addEventListener('click', () => {
           containerEl.querySelectorAll('.designer-subtab').forEach(b => b.classList.remove('active'));
@@ -1699,7 +1953,7 @@
         });
       });
 
-      // 7. Object Inspector Resizing
+      // 8. Object Inspector Resizing
       const resizer = containerEl.querySelector('#inspectorResizer');
       if (resizer && insp) {
         let isResizing = false;
@@ -1733,7 +1987,7 @@
         });
       }
 
-      // 8. Özellik Arama Kutusu
+      // 9. Özellik Arama Kutusu
       containerEl.querySelector('#propSearchInput')?.addEventListener('input', (e) => {
         inspectorSearchQuery = e.target.value || '';
         const propTable = containerEl.querySelector('#propTableBody');
@@ -1744,7 +1998,7 @@
         }
       });
 
-      // 9. Sahne boşluğuna tıklayınca sayfayı seç
+      // 10. Sahne boşluğuna tıklayınca sayfayı seç
       containerEl.querySelector('#designerViewport')?.addEventListener('click', (e) => {
         if (e.target.id === 'designerViewport' || e.target.id === 'frReportPage' || e.target.classList.contains('fr-band-box')) {
           const activePage = allPages[activePageIndex];
@@ -1753,11 +2007,21 @@
         }
       });
 
-      // 10. Delete Tuşu ile Seçili Bileşeni Silme
+      // 11. Klavye Kısayolları (Ctrl+Z: Geri Al, Ctrl+Y: İleri Al, Delete: Sil)
       window.addEventListener('keydown', (e) => {
-        if ((e.key === 'Delete' || e.key === 'Backspace') && selectedItem) {
-          if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
-          deleteSelectedComponent();
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+        
+        if (isDesignEditing) {
+          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+            e.preventDefault();
+            undo();
+          } else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
+            e.preventDefault();
+            redo();
+          } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedItem) {
+            e.preventDefault();
+            deleteSelectedComponent();
+          }
         }
       });
 
@@ -1775,7 +2039,7 @@
     function updateSelection() {
       containerEl.querySelectorAll('.fr-view-item.selected, .fr-ctrl-item.selected').forEach(el => el.classList.remove('selected'));
       
-      // YALNIZCA Tasarımcı modundaysa seçim sınıfını ekle
+      // YALNIZCA Tasarımcı modundaysa ve seçim varsa sınıf ekle
       if (selectedItem && currentMode === 'designer') {
         const targetEl = containerEl.querySelector(`[title*="${selectedItem.name}"]`) || containerEl.querySelector(`[data-ctrl-idx]`);
         if (targetEl) targetEl.classList.add('selected');

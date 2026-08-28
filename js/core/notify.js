@@ -89,6 +89,60 @@
     return toast;
   }
 
+  function showUndoToast({ title = 'Güncelleme Yapıldı', message, undoText = '↩️ Geri Al', onUndo, duration = 8000 }) {
+    const parent = ensureContainer();
+    const toast = document.createElement('div');
+    toast.className = 'frp-toast frp-toast-info frp-toast-undo';
+
+    toast.innerHTML = `
+      <div class="frp-toast-icon">ℹ️</div>
+      <div class="frp-toast-content" style="flex:1;">
+        <div class="frp-toast-title">${escapeHtml(title)}</div>
+        <div class="frp-toast-msg">${escapeHtml(message || '')}</div>
+      </div>
+      <button type="button" class="btn btn-xs btn-primary frp-toast-undo-btn" style="padding:4px 10px;font-weight:700;font-size:11.5px;border-radius:6px;margin:0 6px;white-space:nowrap;">${escapeHtml(undoText)}</button>
+      <button class="frp-toast-close" title="Kapat" aria-label="Kapat">&times;</button>
+      <div class="frp-toast-progress" style="animation-duration: ${duration}ms;"></div>
+    `;
+
+    function closeToast() {
+      if (toast.classList.contains('toast-hiding')) return;
+      toast.classList.add('toast-hiding');
+      setTimeout(() => {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+      }, 220);
+    }
+
+    toast.querySelector('.frp-toast-close').addEventListener('click', closeToast);
+    toast.querySelector('.frp-toast-undo-btn').addEventListener('click', async () => {
+      closeToast();
+      if (typeof onUndo === 'function') {
+        try {
+          await onUndo();
+        } catch (err) {
+          console.error('Undo error:', err);
+        }
+      }
+    });
+
+    let timer = setTimeout(closeToast, duration);
+
+    toast.addEventListener('mouseenter', () => {
+      if (timer) clearTimeout(timer);
+      const prog = toast.querySelector('.frp-toast-progress');
+      if (prog) prog.style.animationPlayState = 'paused';
+    });
+
+    toast.addEventListener('mouseleave', () => {
+      timer = setTimeout(closeToast, 2500);
+      const prog = toast.querySelector('.frp-toast-progress');
+      if (prog) prog.style.animationPlayState = 'running';
+    });
+
+    parent.appendChild(toast);
+    return toast;
+  }
+
   function escapeHtml(str) {
     if (typeof str !== 'string') return String(str || '');
     return str
@@ -101,12 +155,15 @@
 
   window.FrpNotify = {
     show,
+    showUndoToast,
     info: (message, title, duration) => show({ type: 'info', message, title, duration }),
     success: (message, title, duration) => show({ type: 'success', message, title, duration }),
     warn: (message, title, duration) => show({ type: 'warning', message, title, duration: duration || 5500 }),
     error: (message, title, duration) => show({ type: 'error', message, title, duration: duration || 6500 }),
     security: (message, title, duration) => show({ type: 'security', message, title, duration: duration || 8000 })
   };
+
+  window.showUndoToast = showUndoToast;
 
   // Eski toast çağrıları için global köprü
   window.showToast = function (msg, type = 'info') {

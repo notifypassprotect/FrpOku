@@ -3719,6 +3719,15 @@ if (window.FrpStoreReady) {
     topRecentBtn.addEventListener('click', openRecentModal);
   }
   window.openRecentReportsModal = openRecentModal;
+
+  const topRecentDownloadsBtn = document.getElementById('btnRecentDownloadsModal');
+  if (topRecentDownloadsBtn) {
+    topRecentDownloadsBtn.addEventListener('click', () => {
+      if (typeof window.showDownloadHistoryModal === 'function') {
+        window.showDownloadHistoryModal();
+      }
+    });
+  }
 })();
 
 // ── Kullanıcı Rozeti & Sync Durumu (Topbar) ────────────────────────
