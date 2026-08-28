@@ -181,6 +181,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
       { id: 'categories', icon: '🏷️', label: `Kategoriler & Etiketler` },
       { id: 'columns',    icon: '👁️', label: 'Sütun & Tablo' },
       { id: 'shortcuts',  icon: '⌨️', label: 'Klavye Kısayolları' },
+      { id: 'oracle',     icon: '⚡', label: 'Oracle Veritabanı' },
       { id: 'trash',      icon: '🗑️', label: `Çöp Kutusu (${trashItems.length})` },
       { id: 'storage',    icon: '💾', label: 'Yedekleme & Depolama' }
     ];
@@ -808,6 +809,86 @@ window.openSettingsModal = function(initialTab = 'appearance') {
         </div>
       `;
     }
+    
+    // ── 8. ORACLE VERİTABANI BAĞLANTISI ─────────────────────────
+    else if (activeTab === 'oracle') {
+      const oracleCfg = window.FrpOracle ? window.FrpOracle.getConfig() : {
+        host: 'localhost', port: 1521, connType: 'serviceName', serviceName: 'ORCL', sid: 'ORCL', user: '', password: ''
+      };
+
+      tabContentHtml = `
+        <div style="display:flex;flex-direction:column;gap:1.25rem;">
+          <div>
+            <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);display:flex;align-items:center;gap:.5rem;">
+              <span>⚡ Oracle Veritabanı Entegrasyonu</span>
+              <span style="font-size:.72rem;background:rgba(217,119,6,0.15);color:var(--orange,#d97706);padding:.15rem .5rem;border-radius:6px;font-weight:800;">Pure JS Thin Mode</span>
+            </div>
+            <div style="font-size:.78rem;color:var(--text-muted);margin-top:.2rem;">
+              FRP raporlarındaki SQL sorgularını doğrudan canlı Oracle veritabanınızda çalıştırmak ve test etmek için bağlantı bilgilerinizi kaydedin.
+            </div>
+          </div>
+
+          <!-- Durum ve Test Bildirimi -->
+          <div id="oracleSettingsAlertBox" style="display:none;padding:.75rem 1rem;border-radius:10px;font-size:.82rem;font-weight:600;"></div>
+
+          <div class="settings-card" style="display:flex;flex-direction:column;gap:1rem;">
+            <div style="font-weight:700;font-size:.88rem;color:var(--text-primary);border-bottom:1px solid var(--border-light);padding-bottom:.5rem;">
+              🔌 Sunucu & Bağlantı Parametreleri
+            </div>
+
+            <div style="display:grid;grid-template-columns:2fr 1fr;gap:.75rem;">
+              <div>
+                <label style="font-size:.76rem;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:.3rem;">Sunucu Adresi (Host / IP)</label>
+                <input type="text" id="oracleInputHost" class="master-search-input" style="width:100%;font-size:.84rem;" value="${escHtml(oracleCfg.host || 'localhost')}" placeholder="Örn: 192.168.1.50 veya localhost" />
+              </div>
+              <div>
+                <label style="font-size:.76rem;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:.3rem;">Port</label>
+                <input type="number" id="oracleInputPort" class="master-search-input" style="width:100%;font-size:.84rem;" value="${oracleCfg.port || 1521}" placeholder="1521" />
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 2fr;gap:.75rem;">
+              <div>
+                <label style="font-size:.76rem;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:.3rem;">Bağlantı Tipi</label>
+                <select id="oracleInputConnType" style="width:100%;padding:.45rem .6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text-primary);font-size:.84rem;font-weight:600;">
+                  <option value="serviceName" ${oracleCfg.connType !== 'sid' ? 'selected' : ''}>Service Name</option>
+                  <option value="sid" ${oracleCfg.connType === 'sid' ? 'selected' : ''}>SID</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:.76rem;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:.3rem;">Servis Adı / SID (Database Name)</label>
+                <input type="text" id="oracleInputDbName" class="master-search-input" style="width:100%;font-size:.84rem;" value="${escHtml(oracleCfg.connType === 'sid' ? (oracleCfg.sid || 'ORCL') : (oracleCfg.serviceName || 'ORCL'))}" placeholder="Örn: ORCL, XEPDB1" />
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+              <div>
+                <label style="font-size:.76rem;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:.3rem;">Kullanıcı Adı (Schema / User)</label>
+                <input type="text" id="oracleInputUser" class="master-search-input" style="width:100%;font-size:.84rem;" value="${escHtml(oracleCfg.user || '')}" placeholder="Örn: SYSTEM veya HBYS" />
+              </div>
+              <div>
+                <label style="font-size:.76rem;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:.3rem;">Şifre (Password)</label>
+                <input type="password" id="oracleInputPassword" class="master-search-input" style="width:100%;font-size:.84rem;" value="${escHtml(oracleCfg.password || '')}" placeholder="••••••••" />
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-top:.4rem;padding-top:.75rem;border-top:1px solid var(--border-light);flex-wrap:wrap;">
+              <div style="font-size:.74rem;color:var(--text-muted);">
+                🔒 Bağlantı bilgileriniz yalnızca tarayıcınızda yerel oturumunuzda güvenle tutulur.
+              </div>
+              <div style="display:flex;gap:.5rem;">
+                <button type="button" class="btn btn-sm" id="btnTestOracleConnInSettings" style="background:rgba(59,130,246,0.12);color:var(--accent-bright,#2563eb);border:1px solid var(--accent);font-weight:800;padding:.45rem 1rem;cursor:pointer;">
+                  🔄 Bağlantıyı Test Et
+                </button>
+                <button type="button" class="btn btn-sm btn-primary" id="btnSaveOracleConfigOnly" style="font-weight:800;padding:.45rem 1.1rem;cursor:pointer;">
+                  💾 Bilgileri Kaydet
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
 
     // Modal Ana İskeleti & Alt Kaydet Kontrol Barı
     overlay.innerHTML = `
@@ -946,7 +1027,78 @@ window.openSettingsModal = function(initialTab = 'appearance') {
       } catch (err) {
         btn.disabled = false;
         btn.textContent = '🔐 Şifremi Güncelle';
-        showStatus('Sunucu hatası: ' + err.message, 'error');
+    // ⚡ ORACLE BAĞLANTI TESTİ VE KAYDETME
+    const getOracleInputs = () => {
+      const host = (overlay.querySelector('#oracleInputHost')?.value || '').trim();
+      const port = parseInt(overlay.querySelector('#oracleInputPort')?.value, 10) || 1521;
+      const connType = overlay.querySelector('#oracleInputConnType')?.value || 'serviceName';
+      const dbName = (overlay.querySelector('#oracleInputDbName')?.value || '').trim();
+      const user = (overlay.querySelector('#oracleInputUser')?.value || '').trim();
+      const password = overlay.querySelector('#oracleInputPassword')?.value || '';
+
+      return {
+        host,
+        port,
+        connType,
+        serviceName: connType === 'serviceName' ? dbName : undefined,
+        sid: connType === 'sid' ? dbName : undefined,
+        user,
+        password
+      };
+    };
+
+    overlay.querySelector('#btnTestOracleConnInSettings')?.addEventListener('click', async () => {
+      const alertBox = overlay.querySelector('#oracleSettingsAlertBox');
+      const testBtn = overlay.querySelector('#btnTestOracleConnInSettings');
+      const cfg = getOracleInputs();
+
+      if (!cfg.host || !cfg.user || !cfg.password) {
+        if (alertBox) {
+          alertBox.style.display = 'block';
+          alertBox.style.background = '#fef2f2'; alertBox.style.border = '1px solid #fecaca'; alertBox.style.color = '#b91c1c';
+          alertBox.textContent = '⚠️ Lütfen Sunucu, Kullanıcı Adı ve Şifre alanlarını doldurunuz.';
+        }
+        return;
+      }
+
+      testBtn.disabled = true;
+      testBtn.textContent = 'Bağlanılıyor... ⏳';
+      if (alertBox) alertBox.style.display = 'none';
+
+      try {
+        const res = await (window.FrpOracle ? window.FrpOracle.testConnection(cfg) : fetch('/api/oracle/test-connection', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg)
+        }).then(r => r.json()));
+
+        testBtn.disabled = false;
+        testBtn.textContent = '🔄 Bağlantıyı Test Et';
+
+        if (alertBox) {
+          alertBox.style.display = 'block';
+          if (res.success) {
+            alertBox.style.background = '#f0fdf4'; alertBox.style.border = '1px solid #bbf7d0'; alertBox.style.color = '#15803d';
+            alertBox.innerHTML = `<strong>${res.message}</strong><br><span style="font-size:.76rem;opacity:.9;">${res.dbVersion || ''}</span>`;
+            safeToast('Oracle bağlantı testi başarılı! ⚡', 'success');
+          } else {
+            alertBox.style.background = '#fef2f2'; alertBox.style.border = '1px solid #fecaca'; alertBox.style.color = '#b91c1c';
+            alertBox.innerHTML = `<strong>Bağlantı Başarısız:</strong> ${res.reason || 'Sunucuya ulaşılamadı.'}`;
+          }
+        }
+      } catch (err) {
+        testBtn.disabled = false;
+        testBtn.textContent = '🔄 Bağlantıyı Test Et';
+        if (alertBox) {
+          alertBox.style.display = 'block';
+          alertBox.style.background = '#fef2f2'; alertBox.style.border = '1px solid #fecaca'; alertBox.style.color = '#b91c1c';
+          alertBox.textContent = 'Bağlantı hatası: ' + err.message;
+        }
+      }
+    });
+
+    overlay.querySelector('#btnSaveOracleConfigOnly')?.addEventListener('click', () => {
+      const cfg = getOracleInputs();
+      if (window.FrpOracle && window.FrpOracle.saveConfig(cfg)) {
+        safeToast('Oracle bağlantı bilgileri kaydedildi! ⚡', 'success');
       }
     });
 
@@ -1015,6 +1167,11 @@ window.openSettingsModal = function(initialTab = 'appearance') {
           } catch (syncErr) {
             console.warn('Profile sync error:', syncErr.message);
           }
+        }
+
+        if (activeTab === 'oracle') {
+          const cfg = getOracleInputs();
+          if (window.FrpOracle) window.FrpOracle.saveConfig(cfg);
         }
 
         FrpStore.setUserProfile(stagedProfile);

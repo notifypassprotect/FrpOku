@@ -973,6 +973,142 @@ app.post('/api/reports/bulk-toggle-pool', async (req, res) => {
   }
 });
 
+// ── ORACLE DATABASE ENTEGRASYONU (Thin Mode & Canlı Sorgu Motoru) ──
+let oracledb = null;
+try {
+  oracledb = require('oracledb');
+} catch (e) {
+  console.log('ℹ️ oracledb modülü yerel ortamda henüz kurulu değil (npm install oracledb gerekebilir).');
+}
+
+function buildOracleConnectString({ host, port = 1521, serviceName, sid }) {
+  if (serviceName) {
+    return `${host}:${port}/${serviceName}`;
+  }
+  if (sid) {
+    return `(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=${host})(PORT=${port}))(CONNECT_DATA=(SID=${sid})))`;
+  }
+  return `${host}:${port}/xe`;
+}
+
+// 1. Oracle Bağlantı Testi
+app.post('/api/oracle/test-connection', async (req, res) => {
+  if (!oracledb) {
+    return res.status(500).json({
+      success: false,
+      reason: 'Sunucuda `oracledb` sürücüsü yüklü değil. Lütfen `npm install oracledb` komutunu çalıştırınız.'
+    });
+  }
+
+  const { host, port = 1521, serviceName, sid, user, password } = req.body;
+  if (!host || !user || !password) {
+    return res.status(400).json({ success: false, reason: 'Sunucu adresi (Host), Kullanıcı adı ve Şifre zorunludur.' });
+  }
+
+  let connection;
+  try {
+    const connectString = buildOracleConnectString({ host, port, serviceName, sid });
+    connection = await oracledb.getConnection({
+      user,
+      password,
+      connectString
+    });
+
+    const result = await connection.execute("SELECT banner FROM v$version WHERE ROWNUM = 1", [], { outFormat: oracledb.OUT_FORMAT_ARRAY });
+    const versionBanner = (result.rows && result.rows[0] && result.rows[0][0]) || 'Oracle Database Connected';
+
+    res.json({
+      success: true,
+      message: '✅ Oracle veritabanına başarıyla bağlanıldı!',
+      dbVersion: versionBanner
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      reason: 'Oracle bağlantı hatası: ' + err.message
+    });
+  } finally {
+    if (connection) {
+      try { await connection.close(); } catch (e) {}
+    }
+  }
+});
+
+// 2. Oracle Güvenli Canlı Sorgu Çalıştırma (Read-Only Guard & Param Binding)
+app.post('/api/oracle/execute-query', async (req, res) => {
+  if (!oracledb) {
+    return res.status(500).json({
+      success: false,
+      reason: 'Sunucuda `oracledb` sürücüsü yüklü değil.'
+    });
+  }
+
+  const { host, port = 1521, serviceName, sid, user, password, sql, params = {}, maxRows = 250 } = req.body;
+  if (!host || !user || !password || !sql) {
+    return res.status(400).json({ success: false, reason: 'Veritabanı bilgileri ve SQL sorgusu zorunludur.' });
+  }
+
+  // Güvenlik: Yıkıcı DML/DDL işlemlerini engelle (Read-Only Guard)
+  const trimmedSql = sql.trim().replace(/^(\/\*[\s\S]*?\*\/|--[^\r\n]*\r?\n)*/g, '').trim();
+  const isDestructive = /^\s*(DROP|DELETE|UPDATE|TRUNCATE|ALTER|CREATE|GRANT|REVOKE|INSERT)\b/i.test(trimmedSql);
+  if (isDestructive) {
+    return res.status(403).json({
+      success: false,
+      reason: '⛔ Güvenlik Engeli: FrpOku üzerinden yalnızca salt-okunur (SELECT / WITH) sorguları çalıştırılabilir. Veri değiştirme veya şema değiştirme komutlarına izin verilmez.'
+    });
+  }
+
+  let connection;
+  const startTime = Date.now();
+  try {
+    const connectString = buildOracleConnectString({ host, port, serviceName, sid });
+    connection = await oracledb.getConnection({
+      user,
+      password,
+      connectString
+    });
+
+    // Parametreleri Oracle Bind değişkenlerine bağla
+    const bindParams = {};
+    if (params && typeof params === 'object') {
+      for (const [key, val] of Object.entries(params)) {
+        const cleanKey = key.replace(/^:/, '');
+        bindParams[cleanKey] = val;
+      }
+    }
+
+    const rowLimit = Math.min(Math.max(parseInt(maxRows, 10) || 100, 1), 1000);
+    const result = await connection.execute(sql, bindParams, {
+      outFormat: oracledb.OUT_FORMAT_OBJECT,
+      maxRows: rowLimit
+    });
+
+    const durationMs = Date.now() - startTime;
+    const columns = (result.metaData || []).map(m => m.name);
+    const rows = result.rows || [];
+
+    res.json({
+      success: true,
+      columns,
+      rows,
+      rowCount: rows.length,
+      durationMs,
+      truncated: rows.length >= rowLimit
+    });
+  } catch (err) {
+    const durationMs = Date.now() - startTime;
+    res.status(500).json({
+      success: false,
+      reason: err.message,
+      durationMs
+    });
+  } finally {
+    if (connection) {
+      try { await connection.close(); } catch (e) {}
+    }
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`FrpOku Supabase Bulut Sunucusu http://localhost:${PORT} üzerinde çalışıyor.`);
 });

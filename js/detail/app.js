@@ -527,10 +527,11 @@ function addTab(cfg) {
           ${cfg.type === 'sql' ? `
             <button class="btn-copy" onclick="formatSqlInTab('${esc(cfg.id)}')" title="SQL Güzelleştir (Büyük harf & Girintileme)">🎨 Formatla</button>
             <button class="btn-copy" onclick="minifySqlInTab('${esc(cfg.id)}')" title="SQL'i Tek Satıra İndir">⚡ Minify</button>
-            <button class="btn-copy" onclick="changeSqlCaseInTab('${esc(cfg.id)}', 'upper')" title="SQL Anahtar Kelimelerini BÜYÜK HARF Yap">🔠 BÜYÜK</button>
+            <button class="btn-copy" id="${esc(cfg.id)}_casetogglebtn" onclick="changeSqlCaseInTab('${esc(cfg.id)}')" title="SQL Anahtar Kelimelerini BÜYÜK / KÜÇÜK Harfe Dönüştür">🔠 BÜYÜK</button>
             <button class="btn-copy" onclick="openComplexityModal(${cfg.queryIndex})" title="SQL Karmaşıklık Puanı & Zeki Analiz">📊 Karmaşıklık</button>
             <button class="btn-copy" onclick="addToSnippetLibrary(${cfg.queryIndex})">📌 Kütüphaneye Ekle</button>
             <button class="btn-copy" onclick="openParamInjector(${cfg.queryIndex})">⚡ SQL Testi</button>
+            <button class="btn-copy" onclick="openOracleRunner(${cfg.queryIndex})" title="Sorguyu Canlı Oracle Veritabanında Çalıştır" style="background:rgba(217,119,6,0.1);color:var(--orange,#d97706);border-color:rgba(217,119,6,0.3);font-weight:700;">⚡ Oracle'da Çalıştır</button>
           ` : ''}
           ${cfg.type === 'pascal' ? `
             <button class="btn-copy" id="btnCheckPascalSyntax" onclick="checkPascalSyntaxInTab()" title="PascalScript Sözdizimi Kontrolü">🔍 Sözdizimi Kontrol</button>
@@ -1623,8 +1624,38 @@ function minifySqlInTab(tabId) {
   }
 }
 
-// ── SQL HARF BÜYÜKLÜĞÜ DÖNÜŞTÜRÜCÜ (TOGGLE & SEÇİM DESTEKLİ) ─────
-function changeSqlCaseInTab(tabId, mode = 'upper') {
+// ── SQL HARF BÜYÜKLÜĞÜ DÖNÜŞTÜRÜCÜ (AKILLI TOGGLE & STRING KORUMALI) ───
+const SQL_KW_SET = new Set([
+  'SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'NOT', 'IN', 'ON', 'JOIN', 'LEFT', 'RIGHT',
+  'INNER', 'OUTER', 'FULL', 'CROSS', 'UNION', 'ALL', 'DISTINCT', 'AS', 'WITH',
+  'GROUP', 'BY', 'ORDER', 'HAVING', 'LIMIT', 'OFFSET', 'INSERT', 'INTO', 'VALUES',
+  'UPDATE', 'SET', 'DELETE', 'CREATE', 'TABLE', 'DROP', 'ALTER', 'CASE', 'WHEN',
+  'THEN', 'ELSE', 'END', 'IS', 'NULL', 'BETWEEN', 'LIKE', 'EXISTS', 'COALESCE',
+  'NVL', 'AVG', 'SUM', 'COUNT', 'MIN', 'MAX', 'TRUNC', 'SYSDATE', 'TO_DATE',
+  'TO_CHAR', 'SUBSTR', 'ROUND', 'ROWNUM', 'REPLACE', 'LPAD', 'RPAD', 'TRIM',
+  'INSTR', 'ASC', 'DESC', 'OVER', 'PARTITION', 'FETCH', 'FIRST', 'ROWS', 'ONLY',
+  'DECODE', 'GREATEST', 'LEAST', 'ROW_NUMBER', 'RANK', 'DENSE_RANK', 'LISTAGG',
+  'XMLAGG', 'XMLELEMENT', 'CONNECT', 'PRIOR', 'START', 'DUAL', 'UPPER', 'LOWER',
+  'LENGTH', 'TO_NUMBER', 'NVL2', 'CAST', 'EXTRACT', 'YEAR', 'MONTH', 'DAY',
+  'HOUR', 'MINUTE', 'SECOND', 'INTERVAL', 'MERGE', 'USING', 'MATCHED', 'RETURNING',
+  'EXEC', 'EXECUTE', 'BEGIN', 'COMMIT', 'ROLLBACK', 'GRANT', 'REVOKE', 'VIEW',
+  'INDEX', 'PRIMARY', 'KEY', 'FOREIGN', 'REFERENCES', 'CHECK', 'DEFAULT', 'CONSTRAINT', 'UNIQUE'
+]);
+
+function convertSqlKeywords(text, targetMode) {
+  if (!text) return text;
+  // Tek tırnaklı metinleri ('...'), tek satır açıklamaları (--...) ve blok açıklamaları (/*...*/) koru
+  return text.replace(/('(?:''|[^'])*')|(--[^\r\n]*)|(\/\*[\s\S]*?\*\/)|(\b[a-zA-Z_][a-zA-Z0-9_]*\b)/g, (match, str, lineComm, blockComm, word) => {
+    if (str || lineComm || blockComm) return match;
+    const upperWord = word.toUpperCase();
+    if (SQL_KW_SET.has(upperWord)) {
+      return targetMode === 'upper' ? upperWord : upperWord.toLowerCase();
+    }
+    return match;
+  });
+}
+
+function changeSqlCaseInTab(tabId, forcedMode = null) {
   const panel = document.getElementById(tabId + '_panel');
   const cfg = (panel && panel._tabCfg) || activeTabs.find(t => t.id === tabId);
   if (!cfg) return;
@@ -1632,132 +1663,83 @@ function changeSqlCaseInTab(tabId, mode = 'upper') {
   const editWrap = document.getElementById(tabId + '_editorwrap');
   const editArea = document.getElementById(tabId + '_editarea');
   const isEditing = editWrap ? (editWrap.style.display !== 'none') : (editArea && editArea.style.display !== 'none');
+  const currentCode = isEditing && editArea ? editArea.value : (cfg.rawCode || '');
 
-  const SQL_KW = [
-    'SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'NOT', 'IN', 'ON', 'JOIN', 'LEFT', 'RIGHT',
-    'INNER', 'OUTER', 'FULL', 'CROSS', 'UNION', 'ALL', 'DISTINCT', 'AS', 'WITH',
-    'GROUP', 'BY', 'ORDER', 'HAVING', 'LIMIT', 'OFFSET', 'INSERT', 'INTO', 'VALUES',
-    'UPDATE', 'SET', 'DELETE', 'CREATE', 'TABLE', 'DROP', 'ALTER', 'CASE', 'WHEN',
-    'THEN', 'ELSE', 'END', 'IS', 'NULL', 'BETWEEN', 'LIKE', 'EXISTS', 'COALESCE',
-    'NVL', 'AVG', 'SUM', 'COUNT', 'MIN', 'MAX', 'TRUNC', 'SYSDATE', 'TO_DATE',
-    'TO_CHAR', 'SUBSTR', 'ROUND', 'ROWNUM', 'REPLACE', 'LPAD', 'RPAD', 'TRIM',
-    'INSTR', 'ASC', 'DESC', 'OVER', 'PARTITION', 'FETCH', 'FIRST', 'ROWS', 'ONLY',
-    'DECODE', 'GREATEST', 'LEAST', 'ROW_NUMBER', 'RANK', 'DENSE_RANK', 'LISTAGG',
-    'XMLAGG', 'XMLELEMENT', 'CONNECT', 'PRIOR', 'START', 'DUAL', 'UPPER', 'LOWER',
-    'LENGTH', 'TO_NUMBER', 'NVL2', 'CAST', 'EXTRACT', 'YEAR', 'MONTH', 'DAY',
-    'HOUR', 'MINUTE', 'SECOND', 'INTERVAL', 'MERGE', 'USING', 'MATCHED', 'RETURNING',
-    'EXEC', 'EXECUTE', 'BEGIN', 'COMMIT', 'ROLLBACK', 'GRANT', 'REVOKE', 'VIEW',
-    'INDEX', 'PRIMARY', 'KEY', 'FOREIGN', 'REFERENCES', 'CHECK', 'DEFAULT', 'CONSTRAINT', 'UNIQUE'
-  ];
+  // Hedef modu belirle (forcedMode yoksa akıllı toggle)
+  let targetMode = forcedMode;
+  if (!targetMode) {
+    if (cfg._sqlCase === 'upper') {
+      targetMode = 'lower';
+    } else if (cfg._sqlCase === 'lower') {
+      targetMode = 'upper';
+    } else {
+      // Metin içindeki anahtar kelimelerin mevcut durumunu say
+      let upperCount = 0;
+      let lowerCount = 0;
+      const matches = currentCode.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) || [];
+      for (const w of matches) {
+        const up = w.toUpperCase();
+        if (SQL_KW_SET.has(up)) {
+          if (w === up) upperCount++;
+          else if (w === up.toLowerCase()) lowerCount++;
+        }
+      }
+      targetMode = (upperCount >= lowerCount) ? 'lower' : 'upper';
+    }
+  }
 
-  function convertKeywords(text, targetMode) {
-    let out = text;
-    SQL_KW.forEach(kw => {
-      const rx = new RegExp('\\b' + kw + '\\b', 'gi');
-      out = out.replace(rx, targetMode === 'upper' ? kw.toUpperCase() : kw.toLowerCase());
-    });
-    return out;
+  function updateButtonUi(mode) {
+    const btn = document.getElementById(tabId + '_casetogglebtn');
+    if (btn) {
+      if (mode === 'upper') {
+        btn.innerHTML = '🔡 KÜÇÜK';
+        btn.title = 'SQL Anahtar Kelimelerini küçük harf yap';
+        btn.style.background = 'rgba(59, 130, 246, 0.12)';
+        btn.style.borderColor = 'var(--accent-bright, #3b82f6)';
+      } else {
+        btn.innerHTML = '🔠 BÜYÜK';
+        btn.title = 'SQL Anahtar Kelimelerini BÜYÜK harf yap';
+        btn.style.background = '';
+        btn.style.borderColor = '';
+      }
+    }
   }
 
   // 1. Canlı Düzenleme Modundaysa (Edit Area)
   if (isEditing && editArea) {
     const selStart = editArea.selectionStart;
     const selEnd = editArea.selectionEnd;
-    const currentVal = editArea.value;
 
-    // A) Metin seçilmişse: Sadece seçili alanı dönüştür / geri al (Toggle)
+    // A) Metin seçilmişse: Sadece seçili alanı dönüştür
     if (typeof selStart === 'number' && typeof selEnd === 'number' && selStart !== selEnd) {
-      const selectedText = currentVal.substring(selStart, selEnd);
-      const isAlreadyUpper = (cfg._lastSelectedText === selectedText && cfg._selectedIsUpper);
-
-      if (isAlreadyUpper) {
-        const restoredSelected = cfg._selectedOriginal || convertKeywords(selectedText, 'lower');
-        const newVal = currentVal.substring(0, selStart) + restoredSelected + currentVal.substring(selEnd);
-        applyCodeUpdateInTab(tabId, newVal);
-        editArea.selectionStart = selStart;
-        editArea.selectionEnd = selStart + restoredSelected.length;
-        editArea.focus();
-        cfg._selectedIsUpper = false;
-        cfg._lastSelectedText = null;
-        cfg._selectedOriginal = null;
-        showToast('Seçili alan geri alındı ↩️', 'info');
-        return;
-      }
-
-      cfg._selectedOriginal = selectedText;
-      let transformed = convertKeywords(selectedText, 'upper');
-      if (transformed === selectedText) {
-        transformed = selectedText.toLocaleUpperCase('tr-TR');
-      }
-      const newVal = currentVal.substring(0, selStart) + transformed + currentVal.substring(selEnd);
+      const selectedText = currentCode.substring(selStart, selEnd);
+      const transformed = convertSqlKeywords(selectedText, targetMode);
+      const newVal = currentCode.substring(0, selStart) + transformed + currentCode.substring(selEnd);
       applyCodeUpdateInTab(tabId, newVal);
       editArea.selectionStart = selStart;
       editArea.selectionEnd = selStart + transformed.length;
       editArea.focus();
-      cfg._selectedIsUpper = true;
-      cfg._lastSelectedText = transformed;
-      showToast('Seçili alan BÜYÜK yapıldı 🔠 (Tekrar basarak geri alabilirsiniz)', 'success');
+      cfg._sqlCase = targetMode;
+      updateButtonUi(targetMode);
+      showToast(targetMode === 'upper' ? 'Seçili SQL anahtar kelimeleri BÜYÜK yapıldı 🔠' : 'Seçili SQL anahtar kelimeleri küçük yapıldı 🔡', 'success');
       return;
     }
 
-    // B) Seçim yoksa: Tüm editör metnini dönüştür (Toggle Destekli)
-    if (cfg._isUpper) {
-      const restored = cfg._originalCode != null ? cfg._originalCode : convertKeywords(currentVal, 'lower');
-      applyCodeUpdateInTab(tabId, restored);
-      cfg._isUpper = false;
-      cfg._originalCode = null;
-      cfg._formatApplied = false;
-      cfg._formatOriginalCode = null;
-      showToast('SQL harf biçimlendirmesi geri alındı ↩️', 'info');
-    } else {
-      cfg._originalCode = currentVal;
-      const res = convertKeywords(currentVal, 'upper');
-      if (res === currentVal) {
-        const lowerRes = convertKeywords(currentVal, 'lower');
-        applyCodeUpdateInTab(tabId, lowerRes);
-        cfg._isUpper = false;
-        cfg._originalCode = currentVal;
-        showToast('SQL anahtar kelimeleri küçük harf yapıldı 🔡 (Tekrar basarak BÜYÜK yapabilirsiniz)', 'info');
-      } else {
-        applyCodeUpdateInTab(tabId, res);
-        cfg._isUpper = true;
-        cfg._isMinified = false;
-        cfg._formatApplied = false;
-        cfg._formatOriginalCode = null;
-        showToast('SQL anahtar kelimeleri BÜYÜK yapıldı 🔠 (Tekrar basarak geri alabilirsiniz)', 'success');
-      }
-    }
+    // B) Seçim yoksa: Tüm editör metnini dönüştür
+    const newFull = convertSqlKeywords(currentCode, targetMode);
+    applyCodeUpdateInTab(tabId, newFull);
+    cfg._sqlCase = targetMode;
+    updateButtonUi(targetMode);
+    showToast(targetMode === 'upper' ? 'SQL anahtar kelimeleri BÜYÜK yapıldı 🔠' : 'SQL anahtar kelimeleri küçük yapıldı 🔡', 'success');
     return;
   }
 
   // 2. Görüntüleme Modundaysa (View Mode)
-  const currentCode = cfg.rawCode || '';
-  if (cfg._isUpper) {
-    const restored = cfg._originalCode != null ? cfg._originalCode : convertKeywords(currentCode, 'lower');
-    applyCodeUpdateInTab(tabId, restored);
-    cfg._isUpper = false;
-    cfg._originalCode = null;
-    cfg._formatApplied = false;
-    cfg._formatOriginalCode = null;
-    showToast('SQL harf biçimlendirmesi geri alındı ↩️', 'info');
-  } else {
-    cfg._originalCode = currentCode;
-    const res = convertKeywords(currentCode, 'upper');
-    if (res === currentCode) {
-      const lowerRes = convertKeywords(currentCode, 'lower');
-      applyCodeUpdateInTab(tabId, lowerRes);
-      cfg._isUpper = false;
-      cfg._originalCode = currentCode;
-      showToast('SQL anahtar kelimeleri küçük harf yapıldı 🔡 (Tekrar basarak BÜYÜK yapabilirsiniz)', 'info');
-    } else {
-      applyCodeUpdateInTab(tabId, res);
-      cfg._isUpper = true;
-      cfg._isMinified = false;
-      cfg._formatApplied = false;
-      cfg._formatOriginalCode = null;
-      showToast('SQL anahtar kelimeleri BÜYÜK yapıldı 🔠 (Tekrar basarak geri alabilirsiniz)', 'success');
-    }
-  }
+  const newFull = convertSqlKeywords(currentCode, targetMode);
+  applyCodeUpdateInTab(tabId, newFull);
+  cfg._sqlCase = targetMode;
+  updateButtonUi(targetMode);
+  showToast(targetMode === 'upper' ? 'SQL anahtar kelimeleri BÜYÜK yapıldı 🔠' : 'SQL anahtar kelimeleri küçük yapıldı 🔡', 'success');
 }
 
 // ── RENKLENDİRME YARDIMCISI ─────────────────────────────────────
