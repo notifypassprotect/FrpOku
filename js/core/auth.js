@@ -270,7 +270,6 @@
       if (btnProfile) {
         btnProfile.innerHTML = `
           <span style="display:inline-flex;align-items:center;gap:.4rem;">
-            <span style="font-size:1.05rem;">${user.avatar || (user.role === 'admin' ? '👑' : '👤')}</span>
             <span style="font-weight:700;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${user.full_name || user.username}</span>
             <span style="width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 6px #10b981;"></span>
           </span>
@@ -285,13 +284,13 @@
           background: rgba(239, 68, 68, 0.08); color: #ef4444; border: 1.5px solid rgba(239, 68, 68, 0.3);
           display: inline-flex; align-items: center; gap: .35rem; cursor: pointer; margin-left: .2rem;
         `;
-        quickLogoutBtn.innerHTML = `<span>🚪</span> <span class="btn-text">Çıkış</span>`;
+        quickLogoutBtn.innerHTML = `<span class="btn-text">Çıkış</span>`;
         quickLogoutBtn.onclick = confirmLogout;
         topbarRight.appendChild(quickLogoutBtn);
       }
     } else {
       if (btnProfile) {
-        btnProfile.innerHTML = `<span>🔑</span> <span style="font-weight:700;">Giriş Yap</span>`;
+        btnProfile.innerHTML = `<span style="font-weight:700;">Giriş Yap</span>`;
       }
       if (quickLogoutBtn) quickLogoutBtn.remove();
     }
@@ -324,10 +323,10 @@
 
     if (pendingCount > 0) {
       adminBtn.classList.add('has-pending');
-      adminBtn.innerHTML = `<span>🔔</span> <span>Yeni Kayıt</span> <span class="admin-pending-badge">${pendingCount}</span>`;
+      adminBtn.innerHTML = `<span>Yeni Kayıt</span> <span class="admin-pending-badge">${pendingCount}</span>`;
     } else {
       adminBtn.classList.remove('has-pending');
-      adminBtn.innerHTML = `<span>👥</span> <span>Kullanıcı Yönetimi</span>`;
+      adminBtn.innerHTML = `<span>Kullanıcı Yönetimi</span>`;
     }
   }
 

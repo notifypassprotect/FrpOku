@@ -82,11 +82,15 @@ window.FrpListRenderers = window.FrpListRenderers || {};
       key: 'fileSize',
       title: 'Boyut',
       sortField: 'sizeBytes',
-      renderTd: (file, { size }) => `
-        <td class="col-fileSize" style="white-space:nowrap;font-size:.76rem;color:var(--text-muted);font-family:var(--mono);">
-          ${size}
-        </td>
-      `
+      renderTd: (file, { size }) => {
+        const numBytes = Number(file.sizeBytes || file.size) || 0;
+        const displaySize = size || (numBytes > 1024 ? (numBytes > 1048576 ? (numBytes / 1048576).toFixed(1) + ' MB' : Math.round(numBytes / 1024) + ' KB') : (numBytes > 0 ? numBytes + ' B' : '—'));
+        return `
+          <td class="col-fileSize" style="white-space:nowrap;font-size:.76rem;color:var(--text-muted);font-family:var(--mono);">
+            ${displaySize}
+          </td>
+        `;
+      }
     },
     category: {
       key: 'category',
@@ -134,8 +138,10 @@ window.FrpListRenderers = window.FrpListRenderers || {};
       title: 'Son Değişiklik',
       sortField: 'lastModified',
       renderTd: (file) => {
-        const dObj = file.lastModified ? new Date(file.lastModified) : (file.loadedAt ? new Date(file.loadedAt) : null);
-        const str = dObj ? dObj.toLocaleDateString('tr-TR') + ' ' + dObj.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '—';
+        const rawDate = file.updatedAt || file.lastModified || file.loadedAt;
+        const dObj = rawDate ? new Date(rawDate) : null;
+        const isValid = dObj && !isNaN(dObj.getTime());
+        const str = isValid ? dObj.toLocaleDateString('tr-TR') + ' ' + dObj.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '—';
         return `
           <td class="col-lastModified" style="white-space:nowrap;font-size:.76rem;color:var(--text-muted);font-family:var(--mono);">
             ${str}

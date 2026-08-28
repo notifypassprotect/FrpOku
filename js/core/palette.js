@@ -9,16 +9,16 @@
   // ── Komut Tanımları ─────────────────────────────────────────
   const COMMANDS = [
     // Navigasyon
-    { id: 'nav_index',     label: '🏠 Ana Sayfaya Git',           desc: 'Rapor listesi',             action: () => { window.location.href = 'index.html'; } },
-    { id: 'nav_dashboard', label: '📊 Dashboard Aç',              desc: 'İstatistik & grafikler (Admin)', adminOnly: true, action: () => { window.location.href = 'dashboard.html'; } },
-    { id: 'nav_compare',   label: '🔀 Karşılaştırma Ekranı',      desc: 'İki raporu yan yana diff',  action: () => { window.location.href = 'compare.html'; } },
+    { id: 'nav_index',     label: 'Ana Sayfaya Git',              desc: 'Rapor listesi',             action: () => { window.location.href = 'index.html'; } },
+    { id: 'nav_dashboard', label: 'Dashboard Aç',                 desc: 'İstatistik & grafikler (Admin)', adminOnly: true, action: () => { window.location.href = 'dashboard.html'; } },
+    { id: 'nav_compare',   label: 'Karşılaştırma Ekranı',         desc: 'İki raporu yan yana diff',  action: () => { window.location.href = 'compare.html'; } },
 
     // Dosya İşlemleri
-    { id: 'file_add',      label: '➕ Rapor Ekle (.frp)',          desc: 'Tek dosya yükle',           action: () => { document.getElementById('fileInputSingle')?.click() || document.getElementById('fileInputMulti')?.click(); } },
-    { id: 'file_export_backup', label: '💾 Yedek Al (JSON)',       desc: 'Tüm verileri yedekle',      action: () => { document.getElementById('btnExportBackup')?.click(); } },
-    { id: 'file_import_backup', label: '📥 Yedek Yükle (JSON)',    desc: 'Yedeği geri yükle',         action: () => { document.getElementById('btnImportBackup')?.click() || document.getElementById('fileInputBackup')?.click(); } },
-    { id: 'file_export_sqls',   label: '📦 Tüm SQL\'leri İndir',  desc: 'Toplu SQL export',          action: () => { document.getElementById('btnExportAllSqls')?.click(); } },
-    { id: 'file_export_csv',    label: '📊 CSV Dışa Aktar',        desc: 'Sorguları CSV olarak indir', action: () => {
+    { id: 'file_add',      label: 'Rapor Ekle (.frp)',             desc: 'Tek dosya yükle',           action: () => { document.getElementById('fileInputSingle')?.click() || document.getElementById('fileInputMulti')?.click(); } },
+    { id: 'file_export_backup', label: 'Yedek Al (JSON)',          desc: 'Tüm verileri yedekle',      action: () => { document.getElementById('btnExportBackup')?.click(); } },
+    { id: 'file_import_backup', label: 'Yedek Yükle (JSON)',       desc: 'Yedeği geri yükle',         action: () => { document.getElementById('btnImportBackup')?.click() || document.getElementById('fileInputBackup')?.click(); } },
+    { id: 'file_export_sqls',   label: 'Tüm SQL\'leri İndir',     desc: 'Toplu SQL export',          action: () => { document.getElementById('btnExportAllSqls')?.click(); } },
+    { id: 'file_export_csv',    label: 'CSV Dışa Aktar',           desc: 'Sorguları CSV olarak indir', action: () => {
       if (!window.FrpStore) return;
       const csv = FrpStore.exportAllSqlsCsv();
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
@@ -30,23 +30,23 @@
     }},
 
     // Görünüm
-    { id: 'view_table',    label: '📋 Tablo Görünümü',            desc: 'Liste görünüme geç',         action: () => { window.setViewMode?.('table'); } },
-    { id: 'view_cards',    label: '🃏 Kart Görünümü',             desc: 'Kart/grid görünüme geç',    action: () => { window.setViewMode?.('cards'); } },
-    { id: 'view_timeline', label: '🕐 Zaman Çizelgesi',           desc: 'Timeline görünüme geç',     action: () => { window.setViewMode?.('timeline'); } },
-    { id: 'view_theme',    label: '🌙 Tema Değiştir',             desc: 'Koyu/Aydınlık tema',        action: () => { document.getElementById('btnThemeToggle')?.click(); } },
+    { id: 'view_table',    label: 'Tablo Görünümü',               desc: 'Liste görünüme geç',         action: () => { window.setViewMode?.('table'); } },
+    { id: 'view_cards',    label: 'Kart Görünümü',                desc: 'Kart/grid görünüme geç',    action: () => { window.setViewMode?.('cards'); } },
+    { id: 'view_timeline', label: 'Zaman Çizelgesi',              desc: 'Timeline görünüme geç',     action: () => { window.setViewMode?.('timeline'); } },
+    { id: 'view_theme',    label: 'Tema Değiştir',                desc: 'Koyu/Aydınlık tema',        action: () => { document.getElementById('btnThemeToggle')?.click(); } },
 
     // Araçlar
-    { id: 'tool_complexity', label: '🧠 SQL Karmaşıklık & DBA Analizi', desc: 'Tüm sorguların zeki statik analizi', action: () => { document.getElementById('btnComplexityCenter')?.click() || window.openComplexityModal?.(); } },
-    { id: 'tool_params',   label: '⚙️ SQL Parametre Paneli',      desc: 'Tüm parametreleri görüntüle', action: () => { document.getElementById('btnParams')?.click(); } },
-    { id: 'tool_deps',     label: '🕸️ Bağımlılık Haritası',      desc: 'Tablo bağımlılıkları',      action: () => { document.getElementById('btnDependencies')?.click(); } },
-    { id: 'tool_snippets', label: '📚 Sorgu Kütüphanesi',         desc: 'Kayıtlı SQL şablonları',    action: () => { if (window.renderSnippetsModal) { window.renderSnippetsModal(); } else { document.getElementById('btnSnippets')?.click(); } } },
-    { id: 'tool_dupes',    label: '🔎 Duplicate Sorgular',        desc: 'Tekrarlayan SQL tespiti',   action: () => { document.getElementById('btnFindDuplicates')?.click(); } },
-    { id: 'tool_shortcuts',label: '⌨️ Klavye Kısayolları',        desc: '? tuşu ile açılır',         action: () => { window.showShortcutsModal?.(); } },
+    { id: 'tool_complexity', label: 'SQL Karmaşıklık & DBA Analizi', desc: 'Tüm sorguların zeki statik analizi', action: () => { document.getElementById('btnComplexityCenter')?.click() || window.openComplexityCenter?.(); } },
+    { id: 'tool_params',   label: 'SQL Parametre Paneli',         desc: 'Tüm parametreleri görüntüle', action: () => { document.getElementById('btnParams')?.click() || window.openParamsModal?.(); } },
+    { id: 'tool_deps',     label: 'Bağımlılık Haritası',          desc: 'Tablo bağımlılıkları',      action: () => { document.getElementById('btnDependencies')?.click() || window.openDependenciesModal?.(); } },
+    { id: 'tool_snippets', label: 'Sorgu Kütüphanesi',            desc: 'Kayıtlı SQL şablonları',    action: () => { if (window.renderSnippetsModal) { window.renderSnippetsModal(); } else { document.getElementById('btnSnippets')?.click(); } } },
+    { id: 'tool_dupes',    label: 'Duplicate Sorgular',           desc: 'Tekrarlayan SQL tespiti',   action: () => { document.getElementById('btnFindDuplicates')?.click(); } },
+    { id: 'tool_shortcuts',label: 'Klavye Kısayolları',           desc: 'Kısayol tablosunu aç',      action: () => { window.openSettingsModal?.('shortcuts'); } },
 
     // Filtreler
-    { id: 'filter_favs',   label: '⭐ Sadece Favoriler',           desc: 'Favori filtresi aç/kapat', action: () => { document.getElementById('btnFavOnly')?.click(); } },
-    { id: 'filter_pinned', label: '📌 Sadece Sabitlenmiş',         desc: 'Pin filtresi aç/kapat',    action: () => { document.getElementById('btnPinnedOnly')?.click(); } },
-    { id: 'filter_clear',  label: '✖️ Filtreyi Temizle',           desc: 'Aramayı sıfırla',           action: () => {
+    { id: 'filter_favs',   label: 'Sadece Favoriler',              desc: 'Favori filtresi aç/kapat', action: () => { document.getElementById('btnFavOnly')?.click(); } },
+    { id: 'filter_pinned', label: 'Sadece Sabitlenmiş',            desc: 'Pin filtresi aç/kapat',    action: () => { document.getElementById('btnPinnedOnly')?.click(); } },
+    { id: 'filter_clear',  label: 'Filtreyi Temizle',              desc: 'Aramayı sıfırla',           action: () => {
       const si = document.getElementById('searchInput');
       if (si) { si.value = ''; si.dispatchEvent(new Event('input')); si.focus(); }
     }},

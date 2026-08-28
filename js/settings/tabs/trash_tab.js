@@ -141,7 +141,7 @@ window.FrpSettingsTabs.trash = {
           });
         }
         this.selectedTrashIds.delete(id);
-        safeToast('Rapor başarıyla geri yüklendi! ♻️', 'success');
+        safeToast('Rapor başarıyla geri yüklendi.', 'success');
         if (typeof window.refreshAll === 'function') window.refreshAll();
         renderModal();
       });
@@ -166,7 +166,7 @@ window.FrpSettingsTabs.trash = {
               });
             }
             this.selectedTrashIds.delete(id);
-            safeToast('Rapor kalıcı olarak silindi. 🗑️', 'info');
+            safeToast('Rapor kalıcı olarak silindi.', 'info');
             if (typeof window.refreshAll === 'function') window.refreshAll();
             renderModal();
           }
@@ -189,7 +189,7 @@ window.FrpSettingsTabs.trash = {
         });
       }
       this.selectedTrashIds.clear();
-      safeToast(`${ids.length} rapor başarıyla geri yüklendi! ♻️`, 'success');
+      safeToast(`${ids.length} rapor başarıyla geri yüklendi.`, 'success');
       if (typeof window.refreshAll === 'function') window.refreshAll();
       renderModal();
     });
@@ -215,7 +215,7 @@ window.FrpSettingsTabs.trash = {
             });
           }
           this.selectedTrashIds.clear();
-          safeToast(`${ids.length} rapor kalıcı olarak silindi. 🗑️`, 'info');
+          safeToast(`${ids.length} rapor kalıcı olarak silindi.`, 'info');
           if (typeof window.refreshAll === 'function') window.refreshAll();
           renderModal();
         }
@@ -239,7 +239,7 @@ window.FrpSettingsTabs.trash = {
             });
           }
           this.selectedTrashIds.clear();
-          safeToast('Çöp kutusu tamamen boşaltıldı. 🗑️', 'info');
+          safeToast('Çöp kutusu tamamen boşaltıldı.', 'info');
           if (typeof window.refreshAll === 'function') window.refreshAll();
           renderModal();
         }

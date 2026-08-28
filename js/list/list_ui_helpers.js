@@ -12,7 +12,7 @@ function openCategoryManagerModal(targetFileIds = null) {
 
     overlay.innerHTML = `
       <div class="modal" style="max-width:500px;border-radius:16px;">
-        <div class="modal-title">🏷️ Rapor Kategori Atama</div>
+        <div class="modal-title">Rapor Kategori Atama</div>
         <div style="font-size:.82rem;color:var(--text-muted);margin-bottom:1.2rem;">
           ${isTargeting ? `Seçili <strong>${targetCount}</strong> adet rapor için kategori belirleyin.` : 'Raporunuza kategori atayarak listeyi organize edin.'}
         </div>
@@ -32,18 +32,18 @@ function openCategoryManagerModal(targetFileIds = null) {
             <label style="font-size:.78rem;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:.3rem;">Atanacak Kategori:</label>
             <select id="catSelectCategory" class="master-search-input" style="width:100%;font-weight:700;">
               <option value="">(Kategorisiz Yap / Temizle)</option>
-              ${catObjects.map(c => `<option value="${escHtml(c.name)}">${c.icon || '🏷️'} ${escHtml(c.name)}</option>`).join('')}
+              ${catObjects.map(c => `<option value="${escHtml(c.name)}">${escHtml(c.name)}</option>`).join('')}
             </select>
           </div>
         </div>
 
         <div style="font-size:.74rem;color:var(--text-muted);background:var(--bg-raised);padding:.55rem .75rem;border-radius:8px;border:1px solid var(--border-light);margin-bottom:1.2rem;">
-          ℹ️ Yeni kategori oluşturmak veya kategorileri düzenlemek için üst menüdeki <strong>⚙️ Ayarlar > Kategoriler & Etiketler</strong> sekmesini kullanabilirsiniz.
+          Yeni kategori oluşturmak veya düzenlemek için üst menüdeki <strong>Ayarlar > Kategoriler & Etiketler</strong> sekmesini kullanabilirsiniz.
         </div>
 
         <div class="modal-actions" style="display:flex;align-items:center;justify-content:flex-end;gap:.6rem;">
           <button class="btn btn-sm btn-ghost" id="btnCloseCatModal">İptal</button>
-          <button class="btn btn-sm btn-primary" id="btnAssignCatSubmit" style="font-weight:800;padding:.45rem 1.25rem;">✓ Kategoriye Ata</button>
+          <button class="btn btn-sm btn-primary" id="btnAssignCatSubmit" style="font-weight:800;padding:.45rem 1.25rem;">Kategoriye Ata</button>
         </div>
       </div>
     `;
@@ -55,7 +55,7 @@ function openCategoryManagerModal(targetFileIds = null) {
         targetFileIds.forEach(id => {
           if (FrpStore.setCategory(id, selectedCat)) count++;
         });
-        toast(`${count} rapora kategori atandı 🏷️`, 'success');
+        toast(`${count} rapora kategori atandı`, 'success');
       } else {
         const fileId = overlay.querySelector('#catSelectReport')?.value;
         if (!fileId) {
@@ -63,7 +63,7 @@ function openCategoryManagerModal(targetFileIds = null) {
           return;
         }
         FrpStore.setCategory(fileId, selectedCat);
-        toast('Kategori başarıyla atandı 🏷️', 'success');
+        toast('Kategori başarıyla atandı', 'success');
       }
       if (typeof window.refreshAll === 'function') window.refreshAll();
       overlay.remove();
@@ -93,9 +93,6 @@ document.getElementById('btnBulkCategory')?.addEventListener('click', () => {
   }
   openCategoryManagerModal(ids);
 });
-
-// updateBulkBar is defined in list.js with full workspace/admin logic
-// window.updateBulkBar is set there; this file just uses it via window reference
 
 function bindInlineNameEdit() {
   // Inline name editing replaced by Right-Click -> "Adını Düzenle" modal per user request

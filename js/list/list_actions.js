@@ -89,12 +89,12 @@ async function downloadSingleReport(id) {
       <!-- Rapor Kartı -->
       <div style="background:var(--bg-raised);padding:.9rem 1.15rem;border-radius:12px;border:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
         <div style="min-width:0;flex:1;">
-          <div style="font-weight:800;font-size:1rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📋 ${escHtml(reportName)}</div>
+          <div style="font-weight:800;font-size:1rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(reportName)}</div>
           <div style="font-size:.78rem;color:var(--text-muted);font-family:var(--font);margin-top:.25rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Mevcut dosya: <strong>${escHtml(currentFilename)}</strong></div>
         </div>
         <div style="display:flex;align-items:center;gap:.4rem;">
-          <span class="badge badge-blue">🗄️ ${(file.queries || []).length} SQL</span>
-          ${file.category ? `<span class="badge badge-purple">🏷️ ${escHtml(file.category)}</span>` : ''}
+          <span class="badge badge-blue">${(file.queries || []).length} SQL</span>
+          ${file.category ? `<span class="badge badge-purple">${escHtml(file.category)}</span>` : ''}
         </div>
       </div>
 
@@ -125,10 +125,10 @@ async function downloadSingleReport(id) {
   `;
 
   const confirmed = await showModal({
-    title: '📥 FRP Raporu İndir',
+    title: 'FRP Raporu İndir',
     body: bodyHtml,
-    confirmText: '💾 Hemen İndir',
-    cancelText: '✕ İptal',
+    confirmText: 'Hemen İndir',
+    cancelText: 'İptal',
     maxWidth: '540px',
     onOpen: (modalEl) => {
       const nameInp = modalEl.querySelector('#targetFileNameInp');
@@ -182,7 +182,7 @@ async function downloadSingleReport(id) {
 
   if (!confirmed) return;
 
-  showProgressModal('FRP Hazırlanıyor...', finalChosenName, '📥');
+  showProgressModal('FRP Hazırlanıyor...', finalChosenName, '');
   updateProgressModal(1, 1, finalChosenName);
   await new Promise(r => setTimeout(r, 120));
 
@@ -219,7 +219,7 @@ async function downloadSingleReport(id) {
     }
 
     hideProgressModal();
-    toast(`'${finalChosenName}' başarıyla indirildi. 📥`, 'success');
+    toast(`'${finalChosenName}' başarıyla indirildi.`, 'success');
   } catch (err) {
     hideProgressModal();
     toast('İndirme hatası: ' + err.message, 'error');
@@ -232,7 +232,6 @@ async function showDownloadHistoryModal() {
   
   const bodyHtml = history.length === 0 ? `
     <div style="padding:2.5rem 1rem;text-align:center;color:var(--text-muted);">
-      <div style="font-size:2.5rem;margin-bottom:.5rem;">📥</div>
       <div style="font-weight:700;font-size:1rem;color:var(--text-secondary);">Henüz İndirilen Dosya Yok</div>
       <div style="font-size:.8rem;margin-top:.25rem;">İndirdiğiniz tekli veya toplu raporlar burada listelenecektir.</div>
     </div>
@@ -240,7 +239,7 @@ async function showDownloadHistoryModal() {
     <div style="display:flex;flex-direction:column;gap:.6rem;max-height:420px;overflow-y:auto;padding-right:.25rem;">
       ${history.map(item => {
         const timeStr = new Date(item.timestamp).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-        const formatBadge = item.format === 'zip' ? '📦 ZIP' : (item.format === 'sql' ? '🗄️ SQL' : (item.format === 'html' ? '🌐 HTML' : '📄 FRP'));
+        const formatBadge = item.format === 'zip' ? 'ZIP' : (item.format === 'sql' ? 'SQL' : (item.format === 'html' ? 'HTML' : 'FRP'));
         return `
           <div style="background:var(--bg-raised);padding:.75rem .95rem;border-radius:10px;border:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between;gap:.8rem;">
             <div style="min-width:0;flex:1;">
@@ -249,13 +248,13 @@ async function showDownloadHistoryModal() {
                 <span style="font-weight:800;font-size:.85rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(item.fileName)}</span>
               </div>
               <div style="font-size:.72rem;color:var(--text-muted);display:flex;align-items:center;gap:.6rem;">
-                <span>🕒 ${timeStr}</span>
-                ${item.reportName && item.reportName !== item.fileName ? `<span>• 📋 ${escHtml(item.reportName)}</span>` : ''}
+                <span>${timeStr}</span>
+                ${item.reportName && item.reportName !== item.fileName ? `<span>• ${escHtml(item.reportName)}</span>` : ''}
               </div>
             </div>
             ${item.reportId && item.reportId !== 'bulk' ? `
               <button type="button" class="btn btn-sm btn-ghost" onclick="window.downloadSingleReport && window.downloadSingleReport('${item.reportId}')" title="Tekrar İndir" style="font-size:.72rem;padding:.25rem .55rem;">
-                📥 İndir
+                İndir
               </button>
             ` : ''}
           </div>
@@ -265,15 +264,15 @@ async function showDownloadHistoryModal() {
   `;
 
   await showModal({
-    title: '📥 Son İndirilenler & İndirme Geçmişi',
+    title: 'Son İndirilenler & İndirme Geçmişi',
     body: bodyHtml,
     confirmText: 'Tamam',
-    cancelText: history.length > 0 ? '🗑️ Geçmişi Temizle' : null,
+    cancelText: history.length > 0 ? 'Geçmişi Temizle' : null,
     maxWidth: '560px'
   }).then(res => {
     if (res === false && history.length > 0) {
       localStorage.removeItem('frpoku_download_history');
-      toast('İndirme geçmişi temizlendi. 🗑️', 'info');
+      toast('İndirme geçmişi temizlendi.', 'info');
     }
   });
 }

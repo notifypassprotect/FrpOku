@@ -1,5 +1,6 @@
 // ============================================================
-//  list_modals.js — Liste Sayfası Diyalog & Master-Detail Modalları
+//  list_modals.js — Liste Sayfası Diyalog & Analiz Modalları
+//  Parametreler, Bağımlılıklar, Karmaşıklık, Tablo Kullanımı, Son Açılanlar & Son İndirilenler
 // ============================================================
 
 window.FrpListModals = window.FrpListModals || {};
@@ -37,7 +38,7 @@ window.FrpListModals = window.FrpListModals || {};
       <div class="modal-master-detail">
         <div class="master-pane">
           <div class="master-search-wrap">
-            <input type="text" id="paramMasterSearch" class="master-search-input" placeholder="🔍 Parametre ara... (:TARIH, :KOD)" autocomplete="off" />
+            <input type="text" id="paramMasterSearch" class="master-search-input" placeholder="Parametre ara... (:TARIH, :KOD)" autocomplete="off" />
             <div style="font-size:.72rem;color:var(--text-muted);display:flex;justify-content:space-between;">
               <span>Toplam: <strong>${usage.length}</strong> parametre</span>
               <span id="paramFilterCount"></span>
@@ -48,7 +49,7 @@ window.FrpListModals = window.FrpListModals || {};
               <div class="master-item ${i === 0 ? 'active' : ''}" data-idx="${i}">
                 <div style="min-width:0;flex:1;">
                   <div class="param-name" style="color:var(--accent);font-weight:700;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;">
-                    🏷️ ${escHtml(u.param)}
+                    ${escHtml(u.param)}
                   </div>
                   <div style="font-size:.72rem;color:var(--text-muted);margin-top:.15rem;">
                     ${u.count} kullanım
@@ -63,7 +64,7 @@ window.FrpListModals = window.FrpListModals || {};
         <div class="detail-pane">
           <div class="detail-header" id="paramDetailHeader"></div>
           <div style="margin-bottom:.65rem;">
-            <input type="text" id="paramDetailReportSearch" class="master-search-input" placeholder="🔍 Bu parametreyi kullanan raporlarda ara..." autocomplete="off" />
+            <input type="text" id="paramDetailReportSearch" class="master-search-input" placeholder="Bu parametreyi kullanan raporlarda ara..." autocomplete="off" />
           </div>
           <div class="detail-body" id="paramDetailBody"></div>
         </div>
@@ -72,7 +73,7 @@ window.FrpListModals = window.FrpListModals || {};
 
     if (typeof window.showModal === 'function') {
       await window.showModal({
-        title: `⚡ Global SQL Parametre Yönetim Paneli (${usage.length} Parametre)`,
+        title: `SQL Parametre Yönetim Paneli (${usage.length} Parametre)`,
         body: bodyHtml,
         confirmText: 'Kapat',
         cancelText: '',
@@ -99,7 +100,7 @@ window.FrpListModals = window.FrpListModals || {};
             headerEl.innerHTML = `
               <div>
                 <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">
-                  <span style="font-size:1.15rem;font-weight:800;color:var(--accent);">🏷️ ${escHtml(item.param)}</span>
+                  <span style="font-size:1.15rem;font-weight:800;color:var(--accent);">${escHtml(item.param)}</span>
                   <span class="badge badge-blue">${item.reportCount} farklı rapor</span>
                   <span class="badge badge-purple">${item.count} toplam kullanım</span>
                 </div>
@@ -108,7 +109,7 @@ window.FrpListModals = window.FrpListModals || {};
                 </div>
               </div>
               <div style="display:flex;align-items:center;gap:.4rem;">
-                <button class="btn btn-sm" id="btnCopyParamReports" title="Rapor isimlerini panoya kopyala">📋 Raporları Kopyala</button>
+                <button class="btn btn-sm" id="btnCopyParamReports" title="Rapor isimlerini panoya kopyala">Raporları Kopyala</button>
               </div>
             `;
 
@@ -130,7 +131,7 @@ window.FrpListModals = window.FrpListModals || {};
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:.35rem;">
                   <div style="min-width:0;flex:1;">
                     <div style="font-weight:700;font-size:.88rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                      📋 ${escHtml(r.reportName)}
+                      ${escHtml(r.reportName)}
                     </div>
                     <div style="font-size:.72rem;color:var(--text-muted);font-family:var(--mono);">
                       ${escHtml(r.fileName)}
@@ -141,7 +142,7 @@ window.FrpListModals = window.FrpListModals || {};
                 <div style="margin-top:.4rem;padding-top:.35rem;border-top:1px dashed var(--border-light);">
                   <span style="font-size:.72rem;color:var(--text-muted);font-weight:600;">Kullanan Sorgular:</span>
                   <div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.2rem;">
-                    ${r.queries.map(qn => `<span class="query-chip">⚡ ${escHtml(qn)}</span>`).join('')}
+                    ${r.queries.map(qn => `<span class="query-chip">${escHtml(qn)}</span>`).join('')}
                   </div>
                 </div>
               </div>
@@ -150,7 +151,7 @@ window.FrpListModals = window.FrpListModals || {};
             overlay.querySelector('#btnCopyParamReports')?.addEventListener('click', () => {
               const text = item.groupedReports.map(r => `${r.reportName} (${r.fileName}) [${r.queries.join(', ')}]`).join('\n');
               navigator.clipboard.writeText(text).then(() => {
-                if (typeof window.toast === 'function') window.toast('Rapor listesi panoya kopyalandı! 📋', 'success');
+                if (typeof window.toast === 'function') window.toast('Rapor listesi panoya kopyalandı.', 'success');
               });
             });
           }
@@ -217,7 +218,7 @@ window.FrpListModals = window.FrpListModals || {};
       <div class="modal-master-detail">
         <div class="master-pane">
           <div class="master-search-wrap">
-            <input type="text" id="tableMasterSearch" class="master-search-input" placeholder="🔍 Tablo ara... (BIRIM, HASTA)" autocomplete="off" />
+            <input type="text" id="tableMasterSearch" class="master-search-input" placeholder="Tablo ara... (BIRIM, HASTA)" autocomplete="off" />
             <div style="font-size:.72rem;color:var(--text-muted);display:flex;justify-content:space-between;">
               <span>Toplam: <strong>${deps.length}</strong> veritabanı tablosu</span>
               <span id="tableFilterCount"></span>
@@ -228,7 +229,7 @@ window.FrpListModals = window.FrpListModals || {};
               <div class="master-item ${i === 0 ? 'active' : ''}" data-idx="${i}">
                 <div style="min-width:0;flex:1;">
                   <div class="table-name" style="color:var(--accent);font-weight:700;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;">
-                    🗄️ ${escHtml(d.table)}
+                    ${escHtml(d.table)}
                   </div>
                   <div style="font-size:.72rem;color:var(--text-muted);margin-top:.15rem;">
                     ${d.count} sorgu
@@ -243,7 +244,7 @@ window.FrpListModals = window.FrpListModals || {};
         <div class="detail-pane">
           <div class="detail-header" id="tableDetailHeader"></div>
           <div style="margin-bottom:.65rem;">
-            <input type="text" id="tableDetailReportSearch" class="master-search-input" placeholder="🔍 Bu tabloya bağımlı raporlarda ara..." autocomplete="off" />
+            <input type="text" id="tableDetailReportSearch" class="master-search-input" placeholder="Bu tabloya bağımlı raporlarda ara..." autocomplete="off" />
           </div>
           <div class="detail-body" id="tableDetailBody"></div>
         </div>
@@ -252,7 +253,7 @@ window.FrpListModals = window.FrpListModals || {};
 
     if (typeof window.showModal === 'function') {
       await window.showModal({
-        title: `🕸️ Veritabanı Tablo Bağımlılık Haritası (${deps.length} Tablo)`,
+        title: `Veritabanı Tablo Bağımlılık Haritası (${deps.length} Tablo)`,
         body: bodyHtml,
         confirmText: 'Kapat',
         cancelText: '',
@@ -276,23 +277,20 @@ window.FrpListModals = window.FrpListModals || {};
               return;
             }
 
-            const impactLevel = item.reportCount > 50 ? '🚨 Yüksek Etki Riski' : (item.reportCount > 10 ? '⚠️ Orta Etki' : 'ℹ️ Düşük Etki');
+            const impactLevel = item.reportCount > 50 ? 'Yüksek Etki Riski' : (item.reportCount > 10 ? 'Orta Etki' : 'Düşük Etki');
             const impactColor = item.reportCount > 50 ? 'var(--red)' : (item.reportCount > 10 ? 'var(--orange)' : 'var(--green)');
 
             headerEl.innerHTML = `
               <div>
                 <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">
-                  <span style="font-size:1.15rem;font-weight:800;color:var(--accent);">🗄️ ${escHtml(item.table)}</span>
+                  <span style="font-size:1.15rem;font-weight:800;color:var(--accent);">${escHtml(item.table)}</span>
                   <span class="badge badge-purple">${item.reportCount} bağımlı rapor</span>
                   <span class="badge badge-blue">${item.count} sorgu</span>
                   <span style="font-size:.74rem;font-weight:700;color:${impactColor};background:var(--bg-raised);padding:.2rem .5rem;border-radius:6px;border:1px solid var(--border);">${impactLevel}</span>
                 </div>
                 <div style="font-size:.74rem;color:var(--text-muted);margin-top:.2rem;">
-                  Bu tabloda yapılacak kolon/şema değişikliklerinden etkilenecek raporlar aşağıda listelenmiştir.
+                  Bu tabloda yapılacak şema değişikliklerinden etkilenecek raporlar aşağıda listelenmiştir.
                 </div>
-              </div>
-              <div style="display:flex;align-items:center;gap:.4rem;">
-                <button class="btn btn-sm" id="btnFilterInList" title="Ana listede bu tabloyu filtrele">🔍 Listede Filtrele</button>
               </div>
             `;
 
@@ -314,7 +312,7 @@ window.FrpListModals = window.FrpListModals || {};
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:.35rem;">
                   <div style="min-width:0;flex:1;">
                     <div style="font-weight:700;font-size:.88rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                      📋 ${escHtml(r.reportName)}
+                      ${escHtml(r.reportName)}
                     </div>
                     <div style="font-size:.72rem;color:var(--text-muted);font-family:var(--mono);">
                       ${escHtml(r.fileName)}
@@ -325,16 +323,11 @@ window.FrpListModals = window.FrpListModals || {};
                 <div style="margin-top:.4rem;padding-top:.35rem;border-top:1px dashed var(--border-light);">
                   <span style="font-size:.72rem;color:var(--text-muted);font-weight:600;">Bağlı SQL Sorguları:</span>
                   <div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.2rem;">
-                    ${r.queries.map(qn => `<span class="query-chip">⚡ ${escHtml(qn)}</span>`).join('')}
+                    ${r.queries.map(qn => `<span class="query-chip">${escHtml(qn)}</span>`).join('')}
                   </div>
                 </div>
               </div>
             `).join('');
-
-            overlay.querySelector('#btnFilterInList')?.addEventListener('click', () => {
-              overlay.remove();
-              if (typeof window.filterByTable === 'function') window.filterByTable(item.table);
-            });
           }
 
           function filterMaster() {
@@ -370,4 +363,187 @@ window.FrpListModals = window.FrpListModals || {};
       });
     }
   };
+
+  // 3. SQL Karmaşıklık Analiz Merkezi Modalı
+  window.FrpListModals.openComplexityCenter = async function() {
+    const files = FrpStore.getAll();
+    if (!files || files.length === 0) {
+      if (typeof window.toast === 'function') window.toast('Analiz edilecek rapor bulunamadı.', 'warning');
+      return;
+    }
+
+    const analyzed = [];
+    files.forEach(f => {
+      (f.queries || []).forEach(q => {
+        const c = window.FrpComplexity ? window.FrpComplexity.getSqlComplexity(q.sql) : { score: 10, healthScore: 100, level: 'Normal', color: '#10b981', grade: 'A', warnings: [] };
+        analyzed.push({
+          fileId: f.id,
+          reportName: f.meta?.reportName || f.name,
+          fileName: f.name,
+          queryName: q.name || 'Sorgu',
+          sql: q.sql,
+          complexity: c
+        });
+      });
+    });
+
+    analyzed.sort((a, b) => b.complexity.score - a.complexity.score);
+
+    const bodyHtml = `
+      <div style="display:flex;flex-direction:column;gap:1rem;max-height:70vh;overflow-y:auto;padding-right:.3rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg-raised);padding:.8rem 1rem;border-radius:10px;border:1px solid var(--border-light);">
+          <div>
+            <div style="font-weight:800;font-size:.92rem;color:var(--text-primary);">Toplam ${analyzed.length} SQL Sorgusu İncelendi</div>
+            <div style="font-size:.74rem;color:var(--text-muted);margin-top:.15rem;">Sorgular mimari yük ve karmaşıklık puanına göre sıralanmıştır.</div>
+          </div>
+          <span class="badge badge-blue" style="font-size:.78rem;padding:.3rem .6rem;">${files.length} Rapor</span>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:.5rem;">
+          ${analyzed.map(item => `
+            <div style="background:var(--bg-surface);border:1px solid var(--border-light);border-radius:10px;padding:.8rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;">
+              <div style="min-width:0;flex:1;">
+                <div style="display:flex;align-items:center;gap:.5rem;">
+                  <strong style="font-size:.88rem;color:var(--text-primary);">${escHtml(item.reportName)}</strong>
+                  <span class="badge" style="background:${item.complexity.color}15;color:${item.complexity.color};border:1px solid ${item.complexity.color}40;font-weight:700;font-size:.72rem;">
+                    Puan: ${item.complexity.score}/100 (${item.complexity.grade})
+                  </span>
+                </div>
+                <div style="font-size:.75rem;color:var(--text-muted);margin-top:.2rem;font-family:var(--mono);">
+                  ${escHtml(item.queryName)} · ${item.complexity.details?.totalJoins || 0} JOIN · ${item.complexity.details?.subqCount || 0} Subquery · ${item.complexity.details?.lines || 0} Satır
+                </div>
+              </div>
+              <button class="btn btn-sm btn-primary" onclick="window.openDetail('${item.fileId}')" style="font-size:.75rem;padding:.3rem .7rem;">İncele →</button>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+
+    if (typeof window.showModal === 'function') {
+      await window.showModal({
+        title: 'SQL Karmaşıklık & Anti-Pattern Analiz Merkezi',
+        body: bodyHtml,
+        confirmText: 'Kapat',
+        cancelText: '',
+        maxWidth: '1000px'
+      });
+    }
+  };
+
+  // 4. Veritabanı Tablo Kullanım Analizi Modalı
+  window.FrpListModals.openTableUsageModal = async function() {
+    const usage = FrpStore.getTableUsage ? FrpStore.getTableUsage() : [];
+    if (usage.length === 0) {
+      if (typeof window.toast === 'function') window.toast('Tablo kullanım verisi bulunamadı.', 'warning');
+      return;
+    }
+
+    const bodyHtml = `
+      <div style="display:flex;flex-direction:column;gap:1rem;max-height:70vh;overflow-y:auto;padding-right:.3rem;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));gap:.65rem;">
+          ${usage.map(t => `
+            <div style="background:var(--bg-surface);border:1px solid var(--border-light);border-radius:10px;padding:.8rem 1rem;display:flex;align-items:center;justify-content:space-between;">
+              <div>
+                <div style="font-weight:700;font-size:.85rem;color:var(--accent);font-family:var(--mono);">${escHtml(t.tableName)}</div>
+                <div style="font-size:.72rem;color:var(--text-muted);margin-top:.15rem;">${t.count} farklı raporda kullanılıyor</div>
+              </div>
+              <span class="badge badge-purple" style="font-size:.74rem;">${t.count} Rapor</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+
+    if (typeof window.showModal === 'function') {
+      await window.showModal({
+        title: `Veritabanı Tablo Kullanım İstatistikleri (${usage.length} Tablo)`,
+        body: bodyHtml,
+        confirmText: 'Kapat',
+        cancelText: '',
+        maxWidth: '1000px'
+      });
+    }
+  };
+
+  // 5. Son İncelenen Raporlar Modalı
+  window.FrpListModals.openRecentModal = async function() {
+    const recent = FrpStore.getRecent ? FrpStore.getRecent() : [];
+    if (!recent || recent.length === 0) {
+      if (typeof window.toast === 'function') window.toast('Henüz incelenen bir rapor geçmişi bulunmuyor.', 'info');
+      return;
+    }
+
+    const bodyHtml = `
+      <div style="display:flex;flex-direction:column;gap:.6rem;max-height:60vh;overflow-y:auto;">
+        ${recent.map(f => {
+          const repName = f.meta?.reportName || f.name;
+          const timeStr = f.recentTs ? new Date(f.recentTs).toLocaleString('tr-TR') : 'Bilinmiyor';
+          return `
+            <div style="background:var(--bg-surface);border:1px solid var(--border-light);border-radius:10px;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:background .15s;" onclick="window.openDetail('${f.id}')">
+              <div style="min-width:0;flex:1;">
+                <div style="font-weight:700;font-size:.88rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(repName)}</div>
+                <div style="font-size:.72rem;color:var(--text-muted);margin-top:.15rem;">Dosya: ${escHtml(f.name)} · Son İnceleme: ${timeStr}</div>
+              </div>
+              <button class="btn btn-sm btn-primary" style="font-size:.74rem;padding:.25rem .65rem;">Aç →</button>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+
+    if (typeof window.showModal === 'function') {
+      await window.showModal({
+        title: `Son İncelenen Raporlar (${recent.length})`,
+        body: bodyHtml,
+        confirmText: 'Kapat',
+        cancelText: '',
+        maxWidth: '700px'
+      });
+    }
+  };
+
+  // 6. Son İndirilen Dosyalar Modalı
+  window.FrpListModals.openDownloadHistoryModal = async function() {
+    const history = FrpStore.getDownloadHistory ? FrpStore.getDownloadHistory() : [];
+    if (!history || history.length === 0) {
+      if (typeof window.toast === 'function') window.toast('Henüz indirme geçmişi kaydı bulunmuyor.', 'info');
+      return;
+    }
+
+    const bodyHtml = `
+      <div style="display:flex;flex-direction:column;gap:.6rem;max-height:60vh;overflow-y:auto;">
+        ${history.map(item => {
+          const timeStr = item.downloadedAt ? new Date(item.downloadedAt).toLocaleString('tr-TR') : '';
+          return `
+            <div style="background:var(--bg-surface);border:1px solid var(--border-light);border-radius:10px;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;">
+              <div style="min-width:0;flex:1;">
+                <div style="font-weight:700;font-size:.88rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(item.fileName)}</div>
+                <div style="font-size:.72rem;color:var(--text-muted);margin-top:.15rem;">Format: ${escHtml(item.format || 'frp')} · Zaman: ${timeStr}</div>
+              </div>
+              <span class="badge badge-blue" style="font-size:.74rem;font-family:var(--mono);">${escHtml(item.format?.toUpperCase() || 'FRP')}</span>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+
+    if (typeof window.showModal === 'function') {
+      await window.showModal({
+        title: `Son İndirilen Dosyalar (${history.length})`,
+        body: bodyHtml,
+        confirmText: 'Kapat',
+        cancelText: '',
+        maxWidth: '700px'
+      });
+    }
+  };
+
+  // Kısayol aliasları
+  window.openParamsModal = window.FrpListModals.openParamsModal;
+  window.openDependenciesModal = window.FrpListModals.openDependenciesModal;
+  window.openComplexityCenter = window.FrpListModals.openComplexityCenter;
+  window.openTableUsageModal = window.FrpListModals.openTableUsageModal;
+  window.openRecentModal = window.FrpListModals.openRecentModal;
+  window.openDownloadHistoryModal = window.FrpListModals.openDownloadHistoryModal;
 })();

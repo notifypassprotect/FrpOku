@@ -91,7 +91,7 @@ window.FrpSettingsTabs.storage = {
       a.download = `frpoku_yedek_${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(a.href);
-      safeToast('Tüm veriler JSON olarak yedeklendi! 💾', 'success');
+      safeToast('Tüm veriler JSON olarak yedeklendi.', 'success');
     });
 
     overlay.querySelector('#stagedAutoBackup')?.addEventListener('change', (e) => {
@@ -100,7 +100,7 @@ window.FrpSettingsTabs.storage = {
       if (typeof FrpStore.setAutoBackupInterval === 'function') {
         FrpStore.setAutoBackupInterval(val);
       }
-      safeToast(val > 0 ? `Otomatik yedekleme her ${val} dakikada bir ayarlandı ⏱️` : 'Otomatik yedekleme kapatıldı.', 'info');
+      safeToast(val > 0 ? `Otomatik yedekleme her ${val} dakikada bir ayarlandı.` : 'Otomatik yedekleme kapatıldı.', 'info');
     });
 
     const backupInput = overlay.querySelector('#settingsBackupFileInput');
@@ -115,7 +115,7 @@ window.FrpSettingsTabs.storage = {
       reader.onload = ev => {
         const count = FrpStore.importBackup(ev.target.result);
         if (count > 0) {
-          safeToast(`${count} rapor başarıyla içe aktarıldı! 🎉`, 'success');
+          safeToast(`${count} rapor başarıyla içe aktarıldı.`, 'success');
           if (typeof window.refreshAll === 'function') window.refreshAll();
           renderModal();
         } else {
@@ -127,7 +127,7 @@ window.FrpSettingsTabs.storage = {
 
     overlay.querySelector('#btnActionResetAll')?.addEventListener('click', () => {
       const authUser = window.FrpAuth?.getUser();
-      const promptPass = prompt('🚨 DİKKAT: Tüm yüklenen raporları ve veritabanını temizlemek üzeresiniz!\n\nİşlemi onaylamak için lütfen hesap şifrenizi giriniz:');
+      const promptPass = prompt('DİKKAT: Tüm yüklenen raporları ve veritabanını temizlemek üzeresiniz!\n\nİşlemi onaylamak için lütfen hesap şifrenizi giriniz:');
       if (!promptPass) return;
 
       fetch('/api/auth/verify-password', {
@@ -136,7 +136,7 @@ window.FrpSettingsTabs.storage = {
         body: JSON.stringify({ userId: authUser?.id || 'admin', password: promptPass })
       }).then(r => r.json()).then(res => {
         if (!res.success || !res.verified) {
-          alert('❌ Hata: Girdiğiniz şifre hatalı! İşlem iptal edildi.');
+          alert('Hata: Girdiğiniz şifre hatalı! İşlem iptal edildi.');
           return;
         }
 
@@ -154,7 +154,7 @@ window.FrpSettingsTabs.storage = {
                 details: 'Kullanıcı onayı ile tüm raporlar ve veritabanı sıfırlandı.'
               });
             }
-            safeToast('Tüm veriler sıfırlandı 🗑️', 'info');
+            safeToast('Tüm veriler sıfırlandı.', 'info');
             if (typeof window.refreshAll === 'function') window.refreshAll();
             renderModal();
           }

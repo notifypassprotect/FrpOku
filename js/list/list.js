@@ -1,6 +1,6 @@
 // ============================================================
-//  list.js — Ana Sayfa (index.html) Orkestratörü v6
-//  Sağ Tık Menüsü, Toplu İşlemler, Çalışma Alanı, Sürükle-Bırak & Filtreler
+//  list.js — Ana Sayfa (index.html) Orkestratörü v7
+//  Sağ Tık Menüsü, Toplu İşlemler Barı, Analiz Modalları, Çalışma Alanı & Filtreler
 // ============================================================
 
 let allFiles        = [];
@@ -208,8 +208,8 @@ function sortFiles(files) {
         vb = (b.name || '').toLowerCase();
         break;
       case 'sizeBytes':
-        va = Number(a.sizeBytes) || 0;
-        vb = Number(b.sizeBytes) || 0;
+        va = Number(a.sizeBytes || a.size) || 0;
+        vb = Number(b.sizeBytes || b.size) || 0;
         break;
       case 'guid':
         va = (a.meta?.guid || '').toLowerCase();
@@ -224,8 +224,8 @@ function sortFiles(files) {
         vb = (b.queries || []).length;
         break;
       case 'lastModified':
-        va = new Date(a.updatedAt || a.loadedAt).getTime() || 0;
-        vb = new Date(b.updatedAt || b.loadedAt).getTime() || 0;
+        va = new Date(a.updatedAt || a.lastModified || a.loadedAt).getTime() || 0;
+        vb = new Date(b.updatedAt || b.lastModified || b.loadedAt).getTime() || 0;
         break;
       case 'loadedAt':
       default:
@@ -397,7 +397,8 @@ function renderTable() {
   tableBody.innerHTML = pagedFiles.map(file => {
     const isSelected = selectedIds.has(file.id);
     const date = new Date(file.loadedAt).toLocaleDateString('tr-TR');
-    const size = typeof formatBytes === 'function' ? formatBytes(file.sizeBytes || file.size) : (file.size || '');
+    const numBytes = Number(file.sizeBytes || file.size) || 0;
+    const size = numBytes > 1024 ? (numBytes > 1048576 ? (numBytes / 1048576).toFixed(1) + ' MB' : Math.round(numBytes / 1024) + ' KB') : (numBytes > 0 ? numBytes + ' B' : '—');
     const reportName = file.meta?.reportName || file.name;
     const hasNote = !!(file.userNote && file.userNote.trim());
     
@@ -581,10 +582,18 @@ function updateBulkBar() {
   if (!bulkBar) return;
   const count = selectedIds.size;
   if (count > 0) {
+    bulkBar.classList.add('show');
     bulkBar.classList.add('visible');
     const info = document.getElementById('bulkInfo');
     if (info) info.textContent = `${count} rapor seçildi`;
+
+    const btnCompare = document.getElementById('btnCompareSelected');
+    if (btnCompare) {
+      btnCompare.style.display = count >= 2 ? 'inline-flex' : 'none';
+      btnCompare.textContent = count === 2 ? 'Karşılaştır (Diff)' : `Seçilen ${count} Raporu Karşılaştır`;
+    }
   } else {
+    bulkBar.classList.remove('show');
     bulkBar.classList.remove('visible');
   }
 }
@@ -658,7 +667,7 @@ function setupContextMenu() {
           openRenameModal(id);
           break;
         case 'download':
-          if (typeof downloadSingleFRP === 'function') downloadSingleFRP(id);
+          if (typeof downloadSingleReport === 'function') downloadSingleReport(id);
           break;
         case 'fav':
           toggleFav(null, id);
@@ -716,6 +725,11 @@ window.openRenameModal = openRenameModal;
 
 // ── Kategori Ata Modalı ─────────────────────────────────────
 async function openCategoryModalFor(fileId) {
+  if (typeof window.openCategoryManagerModal === 'function') {
+    window.openCategoryManagerModal([fileId]);
+    return;
+  }
+
   const file = FrpStore.getById(fileId);
   if (!file) return;
   const currentCat = file.category || '';
@@ -811,6 +825,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     selectedIds.forEach(id => FrpStore.toggleFavorite(id));
     toast(`${selectedIds.size} rapor favorilere eklendi.`, 'success');
     refreshAll();
+  });
+
+  document.getElementById('btnBulkTag')?.addEventListener('click', () => {
+    if (selectedIds.size === 0) return;
+    const tag = prompt('Seçili raporlara eklenecek etiketi girin:');
+    if (tag && tag.trim()) {
+      const cleanTag = tag.trim();
+      selectedIds.forEach(id => {
+        if (FrpStore.addTag) FrpStore.addTag(id, cleanTag);
+      });
+      toast(`${selectedIds.size} rapora "${cleanTag}" etiketi eklendi.`, 'success');
+      refreshAll();
+    }
+  });
+
+  document.getElementById('btnBulkCategory')?.addEventListener('click', () => {
+    if (selectedIds.size === 0) return;
+    if (typeof window.openCategoryManagerModal === 'function') {
+      window.openCategoryManagerModal([...selectedIds]);
+    }
+  });
+
+  document.getElementById('btnCompareSelected')?.addEventListener('click', () => {
+    if (selectedIds.size < 2) return;
+    const ids = [...selectedIds].slice(0, 2).join(',');
+    window.location.href = `compare.html?ids=${encodeURIComponent(ids)}`;
   });
 
   document.getElementById('btnDeleteBulk')?.addEventListener('click', () => {
@@ -919,12 +959,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btnViewCards')?.addEventListener('click', () => { currentViewMode = 'cards'; renderCurrentView(); });
   document.getElementById('btnViewTimeline')?.addEventListener('click', () => { currentViewMode = 'timeline'; renderCurrentView(); });
 
-  // Parametre ve Bağımlılık Butonları
-  document.getElementById('btnParams')?.addEventListener('click', () => window.FrpListModals?.openParamsModal());
-  document.getElementById('btnDependencies')?.addEventListener('click', () => window.FrpListModals?.openDependenciesModal());
+  // Topbar Analiz & Modallar
+  document.getElementById('btnOpenRecentModal')?.addEventListener('click', () => window.openRecentModal?.());
+  document.getElementById('btnRecentDownloadsModal')?.addEventListener('click', () => window.openDownloadHistoryModal?.());
+  document.getElementById('btnComplexityCenter')?.addEventListener('click', () => window.openComplexityCenter?.());
+  document.getElementById('btnDependencies')?.addEventListener('click', () => window.openDependenciesModal?.());
+  document.getElementById('btnParams')?.addEventListener('click', () => window.openParamsModal?.());
+  document.getElementById('btnSnippets')?.addEventListener('click', () => window.renderSnippetsModal?.());
+  document.getElementById('btnTableAnalysis')?.addEventListener('click', () => window.openTableUsageModal?.());
 
   // Ayarlar Modalı Tetikleyici (Ctrl+,)
   document.getElementById('btnOpenSettingsModal')?.addEventListener('click', () => window.openSettingsModal?.('appearance'));
+  document.getElementById('btnMenuToggle')?.addEventListener('click', () => window.openSettingsModal?.('appearance'));
+  
   document.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && e.key === ',') {
       e.preventDefault();

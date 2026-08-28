@@ -485,23 +485,23 @@
     dropdown.innerHTML = `
       <div style="padding:.6rem .75rem;border-bottom:1px solid var(--border-light,#f1f5f9);margin-bottom:.4rem;">
         <div style="font-weight:800;font-size:.9rem;color:var(--text-primary);">${escHtml(user.full_name || user.username)}</div>
-        <div style="font-size:.74rem;color:var(--text-muted);margin-top:2px;">@${escHtml(user.username)} · ${user.role === 'admin' ? '👑 Admin' : '👤 Kullanıcı'}</div>
+        <div style="font-size:.74rem;color:var(--text-muted);margin-top:2px;">@${escHtml(user.username)} · ${user.role === 'admin' ? 'Admin' : 'Kullanıcı'}</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:.25rem;">
         ${user.role === 'admin' ? `
           <button type="button" class="btn btn-sm btn-ghost" id="ddBtnAdminApproval" style="text-align:left;justify-content:flex-start;padding:.5rem .75rem;font-weight:700;">
-            👑 Kayıt Onay & Yönetim
+            Kayıt Onay & Yönetim
           </button>
         ` : ''}
         <button type="button" class="btn btn-sm btn-ghost" id="ddBtnSettings" style="text-align:left;justify-content:flex-start;padding:.5rem .75rem;font-weight:700;">
-          ⚙️ Profil & Ayarlar
+          Profil & Ayarlar
         </button>
         <button type="button" class="btn btn-sm btn-ghost" id="ddBtnAuditLogs" style="text-align:left;justify-content:flex-start;padding:.5rem .75rem;font-weight:700;">
-          📋 Denetim Günlüğü (Audit)
+          Denetim Günlüğü (Audit)
         </button>
         <div style="border-top:1px solid var(--border-light,#f1f5f9);margin:.3rem 0;"></div>
         <button type="button" class="btn btn-sm btn-ghost" id="ddBtnLogout" style="text-align:left;justify-content:flex-start;padding:.5rem .75rem;font-weight:800;color:#ef4444;">
-          🚪 Oturumu Kapat
+          Oturumu Kapat
         </button>
       </div>
     `;

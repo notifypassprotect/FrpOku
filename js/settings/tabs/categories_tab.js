@@ -57,11 +57,11 @@ window.FrpSettingsTabs.categories = {
 
         <!-- Özel Kullanıcı Etiketleri (Custom Tags) -->
         <div class="settings-card" style="display:flex;flex-direction:column;gap:.75rem;">
-          <div style="font-weight:700;font-size:.85rem;">🏷️ Özel Kullanıcı Etiketleri (Manuel Tag Havuzu)</div>
+          <div style="font-weight:700;font-size:.85rem;">Özel Kullanıcı Etiketleri (Manuel Tag Havuzu)</div>
           <div style="font-size:.74rem;color:var(--text-muted);">Otomatik etiketlerin yanı sıra kendi özel etiketlerinizi oluşturabilirsiniz.</div>
           <div style="display:flex;gap:.5rem;align-items:center;">
-            <input type="text" id="newCustomTagName" class="master-search-input" style="flex:1;" placeholder="Yeni etiket adı (Örn: Acil, Revizyon2026)..." />
-            <button type="button" class="btn btn-sm btn-primary" id="btnAddCustomTag" style="font-weight:700;padding:.5rem 1rem;">➕ Etiket Ekle</button>
+            <input type="text" id="newCustomTagName" class="master-search-input" style="flex:1;" placeholder="Yeni etiket adı (Örn: Acil, Revizyon, Onay)..." />
+            <button type="button" class="btn btn-sm btn-primary" id="btnAddCustomTag" style="font-weight:700;padding:.5rem 1rem;">Etiket Ekle</button>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.4rem;min-height:30px;">
             ${customTagsHtml || '<div style="color:var(--text-muted);font-size:.76rem;">Henüz özel etiket eklenmemiş.</div>'}
@@ -81,7 +81,7 @@ window.FrpSettingsTabs.categories = {
         return;
       }
       FrpStore.addCategory(name, color);
-      safeToast(`'${name}' kategorisi eklendi! 🏷️`, 'success');
+      safeToast(`'${name}' kategorisi eklendi.`, 'success');
       renderModal();
     });
 
@@ -103,7 +103,7 @@ window.FrpSettingsTabs.categories = {
         return;
       }
       FrpStore.addCustomTag(tag);
-      safeToast(`'${tag}' etiketi eklendi! 🏷️`, 'success');
+      safeToast(`'${tag}' etiketi eklendi.`, 'success');
       renderModal();
     });
 

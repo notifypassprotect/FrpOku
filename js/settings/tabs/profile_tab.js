@@ -100,44 +100,44 @@ window.FrpSettingsTabs.profile = {
           <!-- Sağ Kart: Tarayıcı ve Sistem Çalışma Ortamı -->
           <div class="settings-card" style="display:flex;flex-direction:column;gap:.75rem;">
             <div style="font-weight:800;font-size:.88rem;color:var(--text-primary);border-bottom:1px solid var(--border-light);padding-bottom:.4rem;display:flex;align-items:center;justify-content:space-between;">
-              <span>🖥️ İstemci & Sistem Ortamı</span>
-              <span class="badge badge-green" style="font-size:.68rem;">🟢 Aktif & Hazır</span>
+              <span>İstemci & Sistem Ortamı</span>
+              <span class="badge badge-green" style="font-size:.68rem;">Aktif & Hazır</span>
             </div>
 
             <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));gap:.55rem;font-size:.78rem;">
               
               <div style="background:var(--bg-surface);padding:.55rem .75rem;border-radius:9px;border:1px solid var(--border-light);">
-                <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">🌐 Tarayıcı & Motor</div>
+                <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">Tarayıcı & Motor</div>
                 <div style="font-size:.8rem;font-weight:700;color:var(--text-primary);margin-top:.15rem;">${escHtml(browser)}</div>
               </div>
 
               <div style="background:var(--bg-surface);padding:.55rem .75rem;border-radius:9px;border:1px solid var(--border-light);">
-                <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">💻 İşletim Sistemi</div>
+                <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">İşletim Sistemi</div>
                 <div style="font-size:.8rem;font-weight:700;color:var(--text-primary);margin-top:.15rem;">${escHtml(os)}</div>
               </div>
 
               <div style="background:var(--bg-surface);padding:.55rem .75rem;border-radius:9px;border:1px solid var(--border-light);">
-                <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">📡 İstemci IP Adresi</div>
+                <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">İstemci IP Adresi</div>
                 <div style="font-size:.8rem;font-weight:700;color:var(--accent);margin-top:.15rem;font-family:var(--mono);">${escHtml(clientIp)}</div>
               </div>
 
               <div style="background:var(--bg-surface);padding:.55rem .75rem;border-radius:9px;border:1px solid var(--border-light);">
-                <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">🖥️ Ekran & Çözünürlük</div>
+                <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">Ekran & Çözünürlük</div>
                 <div style="font-size:.8rem;font-weight:700;color:var(--accent);margin-top:.15rem;">${escHtml(resolution)}</div>
               </div>
 
               <div style="background:var(--bg-surface);padding:.55rem .75rem;border-radius:9px;border:1px solid var(--border-light);">
-                <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">⚡ CPU / Donanım</div>
+                <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">CPU / Donanım</div>
                 <div style="font-size:.8rem;font-weight:700;color:var(--text-primary);margin-top:.15rem;">${escHtml(cores)}</div>
               </div>
 
               <div style="background:var(--bg-surface);padding:.55rem .75rem;border-radius:9px;border:1px solid var(--border-light);">
-                <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">💾 Depolama (Store)</div>
+                <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">Depolama (Store)</div>
                 <div style="font-size:.8rem;font-weight:700;color:var(--text-primary);margin-top:.15rem;">${escHtml(storageFormatted)}</div>
               </div>
 
               <div style="background:var(--bg-surface);padding:.55rem .75rem;border-radius:9px;border:1px solid var(--border-light);">
-                <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">🚀 Sunucu Modu & Port</div>
+                <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">Sunucu Modu & Port</div>
                 <div style="font-size:.8rem;font-weight:700;color:var(--text-primary);margin-top:.15rem;font-family:var(--mono);">${escHtml(protocol)} · ${escHtml(host)}</div>
               </div>
 
@@ -145,17 +145,14 @@ window.FrpSettingsTabs.profile = {
 
           </div>
 
-          <!-- Alt Kart: 🔒 Şifre ve Hesap Güvenliği -->
+          <!-- Alt Kart: Şifre ve Hesap Güvenliği -->
           <div class="settings-card" style="grid-column: 1 / -1; display:flex; flex-direction:column; gap:.85rem; border: 1.5px solid var(--accent); background: var(--bg-surface); padding: 1.25rem; border-radius: 14px;">
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-light); padding-bottom:.5rem;">
-              <div style="display:flex; align-items:center; gap:.5rem;">
-                <span style="font-size:1.2rem;">🔒</span>
-                <div>
-                  <div style="font-weight:800; font-size:.92rem; color:var(--text-primary);">Şifre ve Hesap Güvenliği</div>
-                  <div style="font-size:.74rem; color:var(--text-muted);">Giriş şifrenizi güvenli bir şekilde güncelleyin</div>
-                </div>
+              <div>
+                <div style="font-weight:800; font-size:.92rem; color:var(--text-primary);">Şifre ve Hesap Güvenliği</div>
+                <div style="font-size:.74rem; color:var(--text-muted);">Giriş şifrenizi güvenli bir şekilde güncelleyin</div>
               </div>
-              <span class="badge" style="background:var(--accent-light); color:var(--accent); font-weight:700; font-size:.7rem;">🛡️ Uçtan Uca Şifreli</span>
+              <span class="badge" style="background:var(--accent-light); color:var(--accent); font-weight:700; font-size:.7rem;">Uçtan Uca Şifreli</span>
             </div>
 
             <!-- Canlı Uyarı / Bilgi Kutusu -->
@@ -163,22 +160,22 @@ window.FrpSettingsTabs.profile = {
 
             <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:.85rem;">
               <div>
-                <label style="font-size:.75rem; font-weight:700; color:var(--text-secondary); margin-bottom:.3rem; display:block;">🔑 Mevcut Şifre</label>
+                <label style="font-size:.75rem; font-weight:700; color:var(--text-secondary); margin-bottom:.3rem; display:block;">Mevcut Şifre</label>
                 <input type="password" id="profOldPass" class="master-search-input" style="width:100%;" placeholder="Mevcut şifrenizi girin" />
               </div>
               <div>
-                <label style="font-size:.75rem; font-weight:700; color:var(--text-secondary); margin-bottom:.3rem; display:block;">🔒 Yeni Şifre</label>
+                <label style="font-size:.75rem; font-weight:700; color:var(--text-secondary); margin-bottom:.3rem; display:block;">Yeni Şifre</label>
                 <input type="password" id="profNewPass" class="master-search-input" style="width:100%;" placeholder="En az 4 karakter" />
               </div>
               <div>
-                <label style="font-size:.75rem; font-weight:700; color:var(--text-secondary); margin-bottom:.3rem; display:block;">🔒 Yeni Şifre Tekrar</label>
+                <label style="font-size:.75rem; font-weight:700; color:var(--text-secondary); margin-bottom:.3rem; display:block;">Yeni Şifre Tekrar</label>
                 <input type="password" id="profNewPassConfirm" class="master-search-input" style="width:100%;" placeholder="Yeni şifreyi onaylayın" />
               </div>
             </div>
 
             <div style="display:flex; justify-content:flex-end; margin-top:.3rem;">
               <button type="button" id="btnUpdatePasswordProfile" class="btn btn-primary" style="padding:.6rem 1.4rem; font-weight:800; font-size:.85rem; border-radius:10px;">
-                🔐 Şifremi Güncelle
+                Şifremi Güncelle
               </button>
             </div>
           </div>
@@ -201,93 +198,94 @@ window.FrpSettingsTabs.profile = {
     bindInput('#profUsername', 'username');
     bindInput('#profEmail', 'email');
 
-    // E-Posta Değiştir Butonu
+    // E-Posta anında güncelle butonu
     overlay.querySelector('#btnUpdateEmailDirectly')?.addEventListener('click', async () => {
       const emailInput = overlay.querySelector('#profEmail');
       const newEmail = (emailInput?.value || '').trim();
-      const authUser = window.FrpAuth?.getUser();
-      const oldEmail = authUser?.email || stagedProfile.email || '';
 
-      if (!newEmail) {
-        safeToast('Lütfen geçerli bir e-posta adresi girin.', 'error');
+      if (!newEmail || !newEmail.includes('@')) {
+        safeToast('Geçerli bir e-posta adresi giriniz.', 'warning');
         return;
       }
 
-      if (newEmail === oldEmail) {
-        safeToast('Girdiğiniz e-posta adresi mevcut adresinizle aynı.', 'info');
-        return;
-      }
-
-      if (window.FrpAuth && typeof window.FrpAuth.updateEmailDirectly === 'function') {
-        const res = await window.FrpAuth.updateEmailDirectly(newEmail);
+      if (window.FrpAuth?.updateEmail) {
+        const res = await window.FrpAuth.updateEmail(newEmail);
         if (res.success) {
           stagedProfile.email = newEmail;
-          safeToast('E-posta adresi başarıyla güncellendi! ✉️', 'success');
+          safeToast('E-posta adresi başarıyla güncellendi.', 'success');
         } else {
-          safeToast(res.reason || 'E-posta adresi güncellenemedi.', 'error');
+          safeToast(res.reason || 'E-posta güncellenemedi.', 'error');
         }
       } else {
         stagedProfile.email = newEmail;
-        safeToast('E-posta adresi taslağa kaydedildi.', 'info');
         markDirty();
+        safeToast('E-posta kaydedilmek üzere hazırlandı.', 'info');
       }
     });
 
-    // Şifre Güncelleme Butonu
+    // Şifre Değiştirme Butonu
     overlay.querySelector('#btnUpdatePasswordProfile')?.addEventListener('click', async () => {
-      const oldPass = (overlay.querySelector('#profOldPass')?.value || '').trim();
-      const newPass = (overlay.querySelector('#profNewPass')?.value || '').trim();
-      const newPassConf = (overlay.querySelector('#profNewPassConfirm')?.value || '').trim();
-      const alertBox = overlay.querySelector('#profilePassAlert');
+      const oldPassEl = overlay.querySelector('#profOldPass');
+      const newPassEl = overlay.querySelector('#profNewPass');
+      const confirmPassEl = overlay.querySelector('#profNewPassConfirm');
+      const alertEl = overlay.querySelector('#profilePassAlert');
 
-      const showAlert = (msg, isErr = true) => {
-        if (!alertBox) return;
-        alertBox.style.display = 'block';
-        alertBox.style.background = isErr ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)';
-        alertBox.style.color = isErr ? 'var(--red)' : 'var(--green)';
-        alertBox.style.border = `1px solid ${isErr ? 'var(--red)' : 'var(--green)'}`;
-        alertBox.textContent = msg;
+      const oldPass = oldPassEl?.value || '';
+      const newPass = newPassEl?.value || '';
+      const confirmPass = confirmPassEl?.value || '';
+
+      const showAlert = (msg, type) => {
+        if (!alertEl) return;
+        alertEl.style.display = 'block';
+        alertEl.textContent = msg;
+        if (type === 'error') {
+          alertEl.style.background = 'rgba(239, 68, 68, 0.12)';
+          alertEl.style.color = '#ef4444';
+          alertEl.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+        } else if (type === 'success') {
+          alertEl.style.background = 'rgba(16, 185, 129, 0.12)';
+          alertEl.style.color = '#10b981';
+          alertEl.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+        } else {
+          alertEl.style.background = 'rgba(245, 158, 11, 0.12)';
+          alertEl.style.color = '#f59e0b';
+          alertEl.style.border = '1px solid rgba(245, 158, 11, 0.3)';
+        }
       };
 
-      if (!oldPass || !newPass || !newPassConf) {
-        showAlert('Lütfen tüm şifre alanlarını eksiksiz doldurun.');
+      if (!oldPass || !newPass || !confirmPass) {
+        showAlert('Lütfen tüm şifre alanlarını eksiksiz doldurunuz.', 'warning');
         return;
       }
 
       if (newPass.length < 4) {
-        showAlert('Yeni şifreniz en az 4 karakter uzunluğunda olmalıdır.');
+        showAlert('Yeni şifreniz en az 4 karakter uzunluğunda olmalıdır.', 'warning');
         return;
       }
 
-      if (newPass !== newPassConf) {
-        showAlert('Yeni şifreler birbiriyle eşleşmiyor.');
+      if (newPass !== confirmPass) {
+        showAlert('Yeni şifre ile şifre tekrarı birbiriyle uyuşmuyor.', 'error');
         return;
       }
 
-      const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
-      if (!curUser) {
-        showAlert('Oturum açık değil, lütfen giriş yapın.');
-        return;
-      }
+      if (window.FrpAuth?.updatePassword) {
+        const btn = overlay.querySelector('#btnUpdatePasswordProfile');
+        if (btn) { btn.disabled = true; btn.textContent = 'Güncelleniyor...'; }
 
-      try {
-        const res = await fetch('/api/auth/reset-password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: curUser.id, oldPassword: oldPass, newPassword: newPass })
-        });
-        const data = await res.json();
-        if (data.success) {
-          showAlert('✅ Şifreniz başarıyla güncellendi!', false);
-          overlay.querySelector('#profOldPass').value = '';
-          overlay.querySelector('#profNewPass').value = '';
-          overlay.querySelector('#profNewPassConfirm').value = '';
-          safeToast('Şifreniz başarıyla değiştirildi! 🔐', 'success');
+        const res = await window.FrpAuth.updatePassword({ oldPassword: oldPass, newPassword: newPass });
+        if (btn) { btn.disabled = false; btn.textContent = 'Şifremi Güncelle'; }
+
+        if (res.success) {
+          showAlert('Şifreniz başarıyla değiştirildi.', 'success');
+          safeToast('Şifreniz başarıyla güncellendi.', 'success');
+          if (oldPassEl) oldPassEl.value = '';
+          if (newPassEl) newPassEl.value = '';
+          if (confirmPassEl) confirmPassEl.value = '';
         } else {
-          showAlert(data.reason || 'Mevcut şifreniz hatalı.');
+          showAlert(res.reason || 'Şifre güncellenirken hata oluştu.', 'error');
         }
-      } catch (err) {
-        showAlert('Şifre güncellenirken bir hata oluştu.');
+      } else {
+        safeToast('Şifre güncelleme servisine erişilemedi.', 'error');
       }
     });
   }
