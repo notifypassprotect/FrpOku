@@ -1,59 +1,115 @@
 /**
- * FrpOku — Oracle Database Entegrasyonu ve Canlı Sorgu Çalıştırıcı
- * Thin mode destekli, parametre enjeksiyonlu ve Excel aktarımlı interaktif veri tablosu.
+ * FrpOku — Oracle Database Entegrasyonu ve Canlı Çoklu Bağlantı Yöneticisi (TOAD Stili)
+ * Çoklu bağlantı profilleri (Alias, Host, Port, Service Name/SID, User, Password),
+ * Sorgu esnasında hedef veritabanı seçimi, parametre bağlama ve Excel/CSV dışa aktarma.
  */
 
 (function() {
   'use strict';
 
-  const STORAGE_KEY = 'frpoku_oracle_config';
+  const STORAGE_KEY = 'frpoku_oracle_connections';
+  const ACTIVE_KEY = 'frpoku_oracle_active_conn_id';
+
+  // Varsayılan / Başlangıç Bağlantı Listesi
+  const DEFAULT_CONNECTIONS = [
+    {
+      id: 'conn_default',
+      alias: 'Yerel Oracle XE / Test DB',
+      host: 'localhost',
+      port: 1521,
+      connType: 'serviceName',
+      serviceName: 'XEPDB1',
+      sid: 'XE',
+      user: 'SYSTEM',
+      password: '',
+      color: '#3b82f6',
+      isDefault: true
+    }
+  ];
 
   const FrpOracle = {
-    getConfig() {
+    getConnections() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) return JSON.parse(raw);
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list) && list.length > 0) return list;
+        }
       } catch (e) {
-        console.warn('Oracle config parse hatası:', e);
+        console.warn('Oracle bağlantı listesi parse hatası:', e);
       }
-      return {
-        host: 'localhost',
-        port: 1521,
-        connType: 'serviceName', // 'serviceName' | 'sid'
-        serviceName: 'ORCL',
-        sid: 'ORCL',
-        user: '',
-        password: '',
-        maxRows: 250
-      };
+      return DEFAULT_CONNECTIONS;
     },
 
-    saveConfig(cfg) {
+    saveConnections(list) {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
         return true;
       } catch (e) {
-        console.error('Oracle config kaydedilemedi:', e);
+        console.error('Oracle bağlantıları kaydedilemedi:', e);
         return false;
       }
     },
 
-    async testConnection(cfg) {
-      const config = cfg || this.getConfig();
+    getActiveConnId() {
+      return localStorage.getItem(ACTIVE_KEY) || (this.getConnections()[0]?.id) || 'conn_default';
+    },
+
+    setActiveConnId(id) {
+      localStorage.setItem(ACTIVE_KEY, id);
+    },
+
+    getActiveConnection() {
+      const conns = this.getConnections();
+      const activeId = this.getActiveConnId();
+      return conns.find(c => c.id === activeId) || conns[0] || DEFAULT_CONNECTIONS[0];
+    },
+
+    saveConnection(conn) {
+      const conns = this.getConnections();
+      const idx = conns.findIndex(c => c.id === conn.id);
+      if (idx !== -1) {
+        conns[idx] = { ...conns[idx], ...conn };
+      } else {
+        conn.id = conn.id || 'conn_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+        conns.push(conn);
+      }
+      this.saveConnections(conns);
+      return conn;
+    },
+
+    deleteConnection(id) {
+      let conns = this.getConnections();
+      conns = conns.filter(c => c.id !== id);
+      if (conns.length === 0) conns = DEFAULT_CONNECTIONS;
+      this.saveConnections(conns);
+      if (this.getActiveConnId() === id) {
+        this.setActiveConnId(conns[0].id);
+      }
+      return conns;
+    },
+
+    async testConnection(connConfig) {
+      const cfg = connConfig || this.getActiveConnection();
       const res = await fetch('/api/oracle/test-connection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config)
+        body: JSON.stringify(cfg)
       });
       return await res.json();
     },
 
-    async executeQuery({ sql, params = {}, maxRows = 250 }) {
-      const config = this.getConfig();
-      if (!config.host || !config.user || !config.password) {
+    async executeQuery({ connId, connConfig, sql, params = {}, maxRows = 250 }) {
+      let config = connConfig;
+      if (!config) {
+        const conns = this.getConnections();
+        config = conns.find(c => c.id === connId) || this.getActiveConnection();
+      }
+
+      if (!config || !config.host || !config.user || !config.password) {
         return {
           success: false,
-          reason: 'Oracle veritabanı bağlantı ayarları eksik. Lütfen Ayarlar -> Oracle sekmesinden bağlantı bilgilerinizi kaydediniz.'
+          reason: 'Seçili Oracle veritabanı bağlantı bilgileri (Host, Kullanıcı veya Şifre) eksik.'
         };
       }
 
@@ -73,10 +129,10 @@
     },
 
     openRunnerModal(sql, rawParams = []) {
-      const config = this.getConfig();
-      const isConfigured = Boolean(config.host && config.user && config.password);
+      const conns = this.getConnections();
+      let activeConn = this.getActiveConnection();
 
-      // SQL içerisindeki tüm :PARAMETRE değişkenlerini regex ile yakala
+      // SQL içerisindeki :PARAMETRE değişkenlerini regex ile yakala
       const paramMatches = (sql.match(/(:[a-zA-Z0-9_]+)/g) || []);
       const paramSet = new Set(paramMatches.map(p => p.toUpperCase()));
 
@@ -96,44 +152,78 @@
       const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
       overlay.innerHTML = `
-        <div class="modal" style="max-width:960px;width:95vw;max-height:90vh;display:flex;flex-direction:column;padding:0;border-radius:16px;box-shadow:0 25px 60px rgba(0,0,0,.45);border:1px solid var(--border);background:var(--bg-surface);overflow:hidden;animation:fadeIn .2s ease-out;">
+        <div class="modal" style="max-width:1050px;width:95vw;max-height:92vh;display:flex;flex-direction:column;padding:0;border-radius:16px;box-shadow:0 25px 60px rgba(0,0,0,.45);border:1px solid var(--border);background:var(--bg-surface);overflow:hidden;animation:fadeIn .18s ease-out;">
           
-          <!-- Başlık Çubuğu -->
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:1.1rem 1.4rem;border-bottom:1px solid var(--border-light);background:var(--bg-raised);">
-            <div style="display:flex;align-items:center;gap:.75rem;">
-              <span style="font-size:1.6rem;">⚡</span>
-              <div>
-                <div style="font-size:1.05rem;font-weight:800;color:var(--text-primary);">Oracle Canlı Sorgu Çalıştırıcı</div>
-                <div style="font-size:.76rem;color:var(--text-muted);display:flex;align-items:center;gap:.4rem;">
-                  <span>Sunucu: <strong>${esc(config.host || 'Tanımsız')}:${esc(config.port || 1521)}</strong></span>
-                  <span>•</span>
-                  <span>Şema / Kullanıcı: <strong>${esc(config.user || 'Tanımsız')}</strong></span>
-                  ${!isConfigured ? '<span style="color:#ef4444;font-weight:700;">(Ayarlar Eksik)</span>' : '<span style="color:#10b981;font-weight:700;">(Hazır)</span>'}
+          <!-- Başlık Çubuğu & Hedef Oracle Bağlantı Seçimi (TOAD Modeli) -->
+          <div style="padding:1rem 1.4rem;border-bottom:1px solid var(--border-light);background:var(--bg-raised);display:flex;flex-direction:column;gap:.75rem;">
+            
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;">
+              <div style="display:flex;align-items:center;gap:.75rem;">
+                <span style="font-size:1.6rem;">⚡</span>
+                <div>
+                  <div style="font-size:1.08rem;font-weight:800;color:var(--text-primary);display:flex;align-items:center;gap:.5rem;">
+                    <span>Oracle Canlı Sorgu Çalıştırıcı</span>
+                    <span style="font-size:.7rem;background:rgba(217,119,6,0.15);color:var(--orange,#d97706);padding:.15rem .5rem;border-radius:6px;font-weight:800;">TOAD Login Modeli</span>
+                  </div>
+                  <div style="font-size:.76rem;color:var(--text-muted);">Çalıştırmak istediğiniz hedef veritabanını listeden seçin ve parametreleri girin.</div>
                 </div>
               </div>
+              <div style="display:flex;align-items:center;gap:.5rem;">
+                <button class="btn btn-sm btn-ghost" id="btnOracleModalSettings" title="TOAD Bağlantı Listesini Yönet" style="padding:.35rem .8rem;font-size:.8rem;font-weight:700;">⚙️ Bağlantı Yönetimi</button>
+                <button class="btn btn-sm btn-ghost" id="btnOracleModalClose" style="font-size:1.2rem;padding:.2rem .6rem;line-height:1;">✕</button>
+              </div>
             </div>
-            <div style="display:flex;align-items:center;gap:.5rem;">
-              <button class="btn btn-sm btn-ghost" id="btnOracleModalSettings" title="Oracle Bağlantı Ayarlarını Düzenle" style="padding:.35rem .75rem;font-size:.8rem;">⚙️ Ayarlar</button>
-              <button class="btn btn-sm btn-ghost" id="btnOracleModalClose" style="font-size:1.2rem;padding:.2rem .6rem;line-height:1;">✕</button>
+
+            <!-- HEDEF VERİTABANI SEÇİM ALANI (DROPDOWN + ANLIK ŞİFRE VE DETAY) -->
+            <div style="background:var(--bg-surface);border:1.5px solid var(--border);border-radius:12px;padding:.75rem 1rem;display:grid;grid-template-columns:1.8fr 1.2fr 1fr auto;gap:.75rem;align-items:center;">
+              
+              <!-- 1. Bağlantı Profili Seçimi -->
+              <div>
+                <label style="font-size:.74rem;font-weight:800;color:var(--text-secondary);display:block;margin-bottom:.25rem;">🎯 Hedef Veritabanı (Alias / Kurum)</label>
+                <select id="oracleTargetConnSelect" style="width:100%;padding:.4rem .6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text-primary);font-size:.84rem;font-weight:700;">
+                  ${conns.map(c => `
+                    <option value="${esc(c.id)}" ${c.id === activeConn.id ? 'selected' : ''}>
+                      ${esc(c.alias || c.host)} — (${esc(c.user)} @ ${esc(c.host)}:${esc(c.port)}/${esc(c.connType === 'sid' ? c.sid : c.serviceName)})
+                    </option>
+                  `).join('')}
+                </select>
+              </div>
+
+              <!-- 2. Kullanıcı Adı (Görüntüleme & Değiştirme) -->
+              <div>
+                <label style="font-size:.74rem;font-weight:800;color:var(--text-secondary);display:block;margin-bottom:.25rem;">👤 Kullanıcı (Schema)</label>
+                <input type="text" id="oracleTargetUserInp" class="master-search-input" style="width:100%;font-size:.82rem;padding:.38rem .6rem;" value="${esc(activeConn.user || '')}" placeholder="Kullanıcı..." />
+              </div>
+
+              <!-- 3. Şifre (Gerekirse Anlık Giriş) -->
+              <div>
+                <label style="font-size:.74rem;font-weight:800;color:var(--text-secondary);display:block;margin-bottom:.25rem;">🔒 Şifre</label>
+                <input type="password" id="oracleTargetPassInp" class="master-search-input" style="width:100%;font-size:.82rem;padding:.38rem .6rem;" value="${esc(activeConn.password || '')}" placeholder="••••••••" />
+              </div>
+
+              <!-- 4. Hızlı Test Butonu -->
+              <div style="padding-top:1.1rem;">
+                <button class="btn btn-sm btn-ghost" id="btnQuickTestTargetConn" title="Seçili bağlantıyı anında sına" style="padding:.4rem .8rem;font-size:.78rem;font-weight:800;border:1px solid var(--border);">
+                  🔄 Test Et
+                </button>
+              </div>
+
             </div>
+
           </div>
 
           <!-- Gövde -->
           <div style="flex:1;overflow-y:auto;padding:1.25rem 1.4rem;display:flex;flex-direction:column;gap:1.1rem;">
             
-            ${!isConfigured ? `
-              <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:.85rem 1rem;color:#ef4444;font-size:.85rem;display:flex;align-items:center;justify-content:space-between;">
-                <div>⚠️ Oracle bağlantı bilgileriniz henüz ayarlanmamış. Sorguyu çalıştırmadan önce lütfen ayarlarınızı kaydedin.</div>
-                <button class="btn btn-sm" id="btnGoToOracleConfig" style="background:#ef4444;color:#fff;border:none;font-weight:700;padding:.35rem .8rem;border-radius:6px;cursor:pointer;">Ayarları Aç</button>
-              </div>
-            ` : ''}
+            <!-- Durum Bildirim Kutusu -->
+            <div id="oracleModalAlertBox" style="display:none;padding:.65rem .9rem;border-radius:10px;font-size:.8rem;font-weight:700;"></div>
 
             <!-- Parametreler Alanı (Varsa) -->
             ${paramList.length > 0 ? `
               <div style="background:var(--bg-raised);border:1px solid var(--border-light);border-radius:12px;padding:1rem;">
                 <div style="font-size:.85rem;font-weight:800;color:var(--text-primary);margin-bottom:.65rem;display:flex;align-items:center;gap:.4rem;">
                   <span>🏷️ SQL Parametreleri (${paramList.length})</span>
-                  <span style="font-size:.72rem;color:var(--text-muted);font-weight:400;">(Oracle bind değişkenleri olarak gönderilir)</span>
+                  <span style="font-size:.72rem;color:var(--text-muted);font-weight:400;">(Oracle bind parametreleri olarak gönderilir)</span>
                 </div>
                 <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));gap:.65rem;">
                   ${paramList.map(p => `
@@ -149,7 +239,7 @@
             <!-- Kontrol ve Çalıştırma Butonları -->
             <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
               <div style="display:flex;align-items:center;gap:.75rem;">
-                <label style="font-size:.8rem;font-weight:600;color:var(--text-secondary);">Maksimum Satır:</label>
+                <label style="font-size:.8rem;font-weight:700;color:var(--text-secondary);">Maksimum Satır Limiti:</label>
                 <select id="oracleMaxRowsSelect" style="padding:.35rem .6rem;border-radius:8px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text-primary);font-size:.82rem;font-weight:600;">
                   <option value="50">50 Satır</option>
                   <option value="100">100 Satır</option>
@@ -160,18 +250,18 @@
               </div>
 
               <div style="display:flex;align-items:center;gap:.6rem;">
-                <button class="btn btn-primary" id="btnExecuteOracleQuery" style="padding:.5rem 1.4rem;font-weight:800;display:flex;align-items:center;gap:.4rem;">
-                  <span>⚡</span><span>Sorguyu Çalıştır (F5)</span>
+                <button class="btn btn-primary" id="btnExecuteOracleQuery" style="padding:.5rem 1.5rem;font-weight:800;display:flex;align-items:center;gap:.4rem;box-shadow:0 4px 14px rgba(37,99,235,.35);">
+                  <span>⚡</span><span>Seçili Veritabanında Çalıştır (F5)</span>
                 </button>
               </div>
             </div>
 
             <!-- Sonuç Alanı -->
-            <div id="oracleResultsContainer" style="flex:1;min-height:220px;display:flex;flex-direction:column;background:var(--bg-raised);border:1px solid var(--border-light);border-radius:12px;overflow:hidden;position:relative;">
-              <div id="oracleInitialEmptyState" style="padding:3rem;text-align:center;color:var(--text-muted);">
-                <div style="font-size:2.4rem;margin-bottom:.6rem;">🎯</div>
-                <div style="font-size:.92rem;font-weight:700;color:var(--text-secondary);">Sorgu Çalıştırılmaya Hazır</div>
-                <div style="font-size:.78rem;margin-top:.25rem;">Parametreleri doldurup "Sorguyu Çalıştır" butonuna tıklayınız.</div>
+            <div id="oracleResultsContainer" style="flex:1;min-height:240px;display:flex;flex-direction:column;background:var(--bg-raised);border:1px solid var(--border-light);border-radius:12px;overflow:hidden;position:relative;">
+              <div id="oracleInitialEmptyState" style="padding:3.5rem;text-align:center;color:var(--text-muted);">
+                <div style="font-size:2.6rem;margin-bottom:.6rem;">🎯</div>
+                <div style="font-size:.95rem;font-weight:800;color:var(--text-secondary);">Sorgu Çalıştırılmaya Hazır</div>
+                <div style="font-size:.78rem;margin-top:.3rem;">Yukarıdan hedef Oracle veritabanını seçip <strong>"Çalıştır"</strong> butonuna tıklayınız.</div>
               </div>
             </div>
 
@@ -183,7 +273,11 @@
 
       const closeBtn = overlay.querySelector('#btnOracleModalClose');
       const settingsBtn = overlay.querySelector('#btnOracleModalSettings');
-      const goToConfigBtn = overlay.querySelector('#btnGoToOracleConfig');
+      const targetSelect = overlay.querySelector('#oracleTargetConnSelect');
+      const userInp = overlay.querySelector('#oracleTargetUserInp');
+      const passInp = overlay.querySelector('#oracleTargetPassInp');
+      const quickTestBtn = overlay.querySelector('#btnQuickTestTargetConn');
+      const alertBox = overlay.querySelector('#oracleModalAlertBox');
       const execBtn = overlay.querySelector('#btnExecuteOracleQuery');
       const resultsContainer = overlay.querySelector('#oracleResultsContainer');
       const maxRowsSelect = overlay.querySelector('#oracleMaxRowsSelect');
@@ -192,25 +286,75 @@
       closeBtn.addEventListener('click', doClose);
       overlay.addEventListener('click', (e) => { if (e.target === overlay) doClose(); });
 
-      const openSettings = () => {
+      // Veritabanı seçimi değiştiğinde
+      targetSelect.addEventListener('change', () => {
+        const selectedId = targetSelect.value;
+        FrpOracle.setActiveConnId(selectedId);
+        const conn = FrpOracle.getActiveConnection();
+        if (conn) {
+          userInp.value = conn.user || '';
+          passInp.value = conn.password || '';
+        }
+      });
+
+      // Hızlı Test Butonu
+      quickTestBtn.addEventListener('click', async () => {
+        const conn = { ...FrpOracle.getActiveConnection(), user: userInp.value.trim(), password: passInp.value };
+        quickTestBtn.disabled = true;
+        quickTestBtn.textContent = 'Sınanıyor... ⏳';
+        alertBox.style.display = 'none';
+
+        try {
+          const res = await FrpOracle.testConnection(conn);
+          alertBox.style.display = 'block';
+          if (res.success) {
+            alertBox.style.background = '#f0fdf4'; alertBox.style.border = '1px solid #bbf7d0'; alertBox.style.color = '#15803d';
+            alertBox.innerHTML = `✅ <strong>${esc(conn.alias)}</strong> bağlantısı başarılı! (${res.dbVersion || ''})`;
+          } else {
+            alertBox.style.background = '#fef2f2'; alertBox.style.border = '1px solid #fecaca'; alertBox.style.color = '#b91c1c';
+            alertBox.innerHTML = `❌ <strong>Bağlantı Hatası:</strong> ${esc(res.reason || 'Bilinmeyen hata.')}`;
+          }
+        } catch (e) {
+          alertBox.style.display = 'block';
+          alertBox.style.background = '#fef2f2'; alertBox.style.border = '1px solid #fecaca'; alertBox.style.color = '#b91c1c';
+          alertBox.textContent = 'Bağlantı isteği başarısız: ' + e.message;
+        } finally {
+          quickTestBtn.disabled = false;
+          quickTestBtn.textContent = '🔄 Test Et';
+        }
+      });
+
+      // Ayarları Aç
+      settingsBtn.addEventListener('click', () => {
         doClose();
         if (typeof window.openSettingsModal === 'function') {
           window.openSettingsModal('oracle');
         }
-      };
-      if (settingsBtn) settingsBtn.addEventListener('click', openSettings);
-      if (goToConfigBtn) goToConfigBtn.addEventListener('click', openSettings);
+      });
 
       // Çalıştırma fonksiyonu
       const runQuery = async () => {
+        const targetConn = {
+          ...FrpOracle.getActiveConnection(),
+          user: userInp.value.trim(),
+          password: passInp.value
+        };
+
+        if (!targetConn.host || !targetConn.user || !targetConn.password) {
+          alertBox.style.display = 'block';
+          alertBox.style.background = '#fef2f2'; alertBox.style.border = '1px solid #fecaca'; alertBox.style.color = '#b91c1c';
+          alertBox.textContent = '⚠️ Lütfen seçili bağlantı için Kullanıcı Adı ve Şifre bilgilerini doldurunuz.';
+          return;
+        }
+
         execBtn.disabled = true;
-        execBtn.innerHTML = `<span>⏳</span><span>Çalıştırılıyor...</span>`;
+        execBtn.innerHTML = `<span>⏳</span><span>${esc(targetConn.alias)} üzerinde sorgulanıyor...</span>`;
         
         resultsContainer.innerHTML = `
           <div style="padding:3.5rem;text-align:center;color:var(--text-muted);display:flex;flex-direction:column;align-items:center;gap:.75rem;">
             <div style="font-size:2.8rem;animation:pulse 1.2s infinite ease-in-out;">⚡</div>
-            <div style="font-size:1rem;font-weight:700;color:var(--text-primary);">Oracle veritabanında sorgulanıyor...</div>
-            <div style="font-size:.78rem;">Lütfen bekleyiniz, kayıt seti aktarılıyor</div>
+            <div style="font-size:1rem;font-weight:800;color:var(--text-primary);">${esc(targetConn.alias)} veritabanına bağlanılıyor...</div>
+            <div style="font-size:.78rem;color:var(--text-muted);">Sorgu çalıştırılıyor ve kayıt seti alınıyor</div>
           </div>
         `;
 
@@ -227,6 +371,7 @@
 
         try {
           const res = await FrpOracle.executeQuery({
+            connConfig: targetConn,
             sql,
             params: paramValues,
             maxRows
@@ -236,7 +381,7 @@
             resultsContainer.innerHTML = `
               <div style="padding:2rem;color:#ef4444;">
                 <div style="font-size:1.05rem;font-weight:800;margin-bottom:.5rem;display:flex;align-items:center;gap:.4rem;">
-                  <span>❌</span><span>Oracle Sorgu Hatası</span>
+                  <span>❌</span><span>Oracle Sorgu Hatası (${esc(targetConn.alias)})</span>
                 </div>
                 <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px;padding:1rem;font-family:var(--mono);font-size:.82rem;white-space:pre-wrap;line-height:1.5;">${esc(res.reason || 'Bilinmeyen hata oluştu.')}</div>
               </div>
@@ -254,11 +399,12 @@
                 <div style="display:flex;align-items:center;gap:.6rem;font-size:.82rem;">
                   <span style="background:rgba(16,185,129,0.15);color:#10b981;font-weight:800;padding:.2rem .6rem;border-radius:6px;">⚡ ${duration} ms</span>
                   <span style="color:var(--text-muted);font-weight:600;">0 Satır Döndü</span>
+                  <span style="font-size:.75rem;color:var(--text-muted);">(${esc(targetConn.alias)})</span>
                 </div>
               </div>
-              <div style="padding:3rem;text-align:center;color:var(--text-muted);">
+              <div style="padding:3.5rem;text-align:center;color:var(--text-muted);">
                 <div style="font-size:2.4rem;margin-bottom:.5rem;">📭</div>
-                <div style="font-size:.9rem;font-weight:700;">Bu filtreye uygun kayıt bulunamadı.</div>
+                <div style="font-size:.9rem;font-weight:700;">Bu sorgu veya parametreler için kayıt dönmedi.</div>
               </div>
             `;
             return;
@@ -269,8 +415,9 @@
             <div style="padding:.75rem 1.25rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border-light);background:var(--bg-surface);flex-wrap:wrap;gap:.5rem;">
               <div style="display:flex;align-items:center;gap:.6rem;font-size:.82rem;">
                 <span style="background:rgba(16,185,129,0.15);color:#10b981;font-weight:800;padding:.25rem .65rem;border-radius:6px;">⚡ ${duration} ms</span>
-                <span style="font-weight:700;color:var(--text-primary);">${rows.length} Satır</span>
-                ${res.truncated ? '<span style="color:#f59e0b;font-weight:700;font-size:.75rem;">(Maksimum sınıra ulaşıldı)</span>' : ''}
+                <span style="font-weight:800;color:var(--text-primary);">${rows.length} Satır</span>
+                <span style="font-size:.76rem;color:var(--accent-bright);font-weight:700;background:rgba(37,99,235,0.08);padding:.15rem .45rem;border-radius:4px;">${esc(targetConn.alias)}</span>
+                ${res.truncated ? '<span style="color:#f59e0b;font-weight:700;font-size:.75rem;">(Maksimum satır sınırına ulaşıldı)</span>' : ''}
               </div>
               <div style="display:flex;gap:.4rem;">
                 <button class="btn btn-sm" id="btnExportOracleExcel" style="background:#059669;color:#fff;border:none;font-weight:700;padding:.32rem .75rem;border-radius:6px;cursor:pointer;">📊 Excel (XLSX) İndir</button>
@@ -278,7 +425,7 @@
               </div>
             </div>
 
-            <div style="flex:1;overflow:auto;max-height:420px;">
+            <div style="flex:1;overflow:auto;max-height:450px;">
               <table id="oracleDataTable" style="width:100%;border-collapse:collapse;font-size:.78rem;font-family:var(--mono);text-align:left;">
                 <thead style="position:sticky;top:0;background:var(--bg-surface);box-shadow:0 1px 2px rgba(0,0,0,.1);z-index:2;">
                   <tr>
@@ -306,7 +453,7 @@
 
           resultsContainer.innerHTML = tableHtml;
 
-          // Excel & CSV Export İşleyicileri
+          // Excel & CSV Export
           const exportExcelBtn = resultsContainer.querySelector('#btnExportOracleExcel');
           const exportCsvBtn = resultsContainer.querySelector('#btnExportOracleCsv');
 
@@ -319,7 +466,7 @@
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
-              a.download = `oracle_sorgu_sonucu_${Date.now()}.xls`;
+              a.download = `oracle_${targetConn.alias.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.xls`;
               a.click();
               URL.revokeObjectURL(url);
             });
@@ -341,7 +488,7 @@
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
-              a.download = `oracle_sorgu_sonucu_${Date.now()}.csv`;
+              a.download = `oracle_${targetConn.alias.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.csv`;
               a.click();
               URL.revokeObjectURL(url);
             });
@@ -356,13 +503,13 @@
           `;
         } finally {
           execBtn.disabled = false;
-          execBtn.innerHTML = `<span>⚡</span><span>Sorguyu Çalıştır (F5)</span>`;
+          execBtn.innerHTML = `<span>⚡</span><span>Seçili Veritabanında Çalıştır (F5)</span>`;
         }
       };
 
       execBtn.addEventListener('click', runQuery);
 
-      // F5 Kısayolu ile çalıştırma
+      // F5 Kısayolu
       const handleKeyDown = (e) => {
         if (e.key === 'F5') {
           e.preventDefault();
@@ -370,7 +517,6 @@
         }
       };
       document.addEventListener('keydown', handleKeyDown);
-      const origClose = doClose;
       overlay.querySelector('#btnOracleModalClose').addEventListener('click', () => {
         document.removeEventListener('keydown', handleKeyDown);
       });
