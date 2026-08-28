@@ -70,13 +70,9 @@
     s = s.replace(/\r\n/g, '\n').replace(/\t/g, '  ');
     s = s.replace(/\s+/g, ' ').trim();
 
-    // 4. Ana SQL Cümlelerini yeni satıra al
-    MAIN_CLAUSES.forEach(clause => {
-      const safeClause = typeof escapeRegex === 'function' ? escapeRegex(clause) : clause.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const escaped = safeClause.replace(/ /g, '\\s+');
-      const rx = new RegExp('(?<=[\\s,)]|^)(' + escaped + ')(?=[\\s(,]|$)', 'gi');
-      s = s.replace(rx, '\n' + clause.toUpperCase() + ' ');
-    });
+    // 4. Ana SQL Cümlelerini tek seferde (Atomic) yeni satıra al (LEFT OUTER JOIN vb. bölünmesini engeller)
+    const CLAUSE_RX = /\b(WITH|SELECT\s+DISTINCT|SELECT|FROM|LEFT\s+OUTER\s+JOIN|RIGHT\s+OUTER\s+JOIN|FULL\s+OUTER\s+JOIN|LEFT\s+JOIN|RIGHT\s+JOIN|INNER\s+JOIN|OUTER\s+JOIN|CROSS\s+JOIN|NATURAL\s+JOIN|JOIN|WHERE|GROUP\s+BY|HAVING|ORDER\s+BY|UNION\s+ALL|UNION|INTERSECT|MINUS|EXCEPT|INSERT\s+INTO|DELETE\s+FROM|UPDATE|SET|VALUES|FETCH\s+NEXT|ROWS\s+ONLY)\b/gi;
+    s = s.replace(CLAUSE_RX, (m) => '\n' + m.toUpperCase().replace(/\s+/g, ' ') + ' ');
 
     if (mode === 'expanded') {
       // ── GENİŞLETİLMİŞ FORMAT (Her Sütun ve Koşul Ayrı Satırda) ──

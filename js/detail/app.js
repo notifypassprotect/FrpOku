@@ -1347,6 +1347,19 @@ function renderViewer(file) {
     });
   });
 
+  // ➕ Yeni SQL Sorgusu Ekle Sekme Butonu (Doğrudan Sekme Çubuğunda)
+  const addQueryBtn = document.createElement('button');
+  addQueryBtn.className = 'tab add-query-tab-btn';
+  addQueryBtn.id = 'btnAddQueryTab';
+  addQueryBtn.style.cssText = 'background:rgba(59,130,246,0.1);color:var(--accent-bright);border:1px dashed var(--accent);font-weight:700;display:inline-flex;align-items:center;gap:.35rem;cursor:pointer;padding:.35rem .75rem;border-radius:6px;';
+  addQueryBtn.innerHTML = '➕ Yeni Sorgu Ekle';
+  addQueryBtn.title = 'Rapora yeni bir SQL sorgusu (Dataset) ekleyin';
+  addQueryBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    promptAndAddNewQuery();
+  });
+  tabBar.appendChild(addQueryBtn);
+
   if (activeTabs.length > 0) {
     activateTab(activeTabs[0].id);
     activeTabs.forEach(t => updateLastEditBtnState(t.id));
@@ -2862,7 +2875,51 @@ function insertSnippetToActiveEditor(sqlText) {
   }
 }
 
+function promptAndAddNewQuery() {
+  if (!currentFile) return;
+  showModal({
+    title: '➕ Rapora Yeni SQL Sorgusu Ekle',
+    body: `
+      <div style="display:flex;flex-direction:column;gap:.85rem;">
+        <div>
+          <label style="display:block;font-size:.78rem;font-weight:700;margin-bottom:.35rem;color:var(--text-secondary);">Sorgu / Dataset Adı (SQL Query Name):</label>
+          <input type="text" id="inpNewQueryName" class="form-input" value="q_yeni" style="width:100%;font-family:var(--mono);font-size:.85rem;padding:.45rem .65rem;border-radius:6px;background:var(--bg-base);border:1px solid var(--border-light);color:var(--text-primary);" placeholder="Örn: qdepo, qfatura, qozet" />
+        </div>
+        <div>
+          <label style="display:block;font-size:.78rem;font-weight:700;margin-bottom:.35rem;color:var(--text-secondary);">Başlangıç SQL Kodu:</label>
+          <textarea id="inpNewQuerySql" class="form-input" style="width:100%;height:140px;font-family:var(--mono);font-size:.82rem;line-height:1.45;padding:.5rem .65rem;border-radius:6px;background:var(--bg-base);border:1px solid var(--border-light);color:var(--text-primary);" placeholder="SELECT * FROM tablo WHERE 1=1"></textarea>
+        </div>
+      </div>
+    `,
+    confirmText: '➕ Sorguyu Ekle',
+    cancelText: 'Vazgeç',
+    onConfirm: () => {
+      const nameInput = document.getElementById('inpNewQueryName');
+      const sqlInput = document.getElementById('inpNewQuerySql');
+      const qName = (nameInput?.value || 'q_yeni').trim();
+      const qSql = (sqlInput?.value || 'SELECT * FROM dual').trim();
+
+      const createdName = addSnippetAsNewQueryToReport(qName, qSql);
+      if (createdName) {
+        showToast(`'${createdName}' sorgusu başarıyla rapora eklendi! ➕`, 'success');
+        // Yeni eklenen sorgu sekmesinde düzenleme modunu aç
+        const newIndex = currentFile.queries.length - 1;
+        const newTabId = 'tab_sql_' + newIndex;
+        setTimeout(() => {
+          if (typeof toggleEditMode === 'function') {
+            const editWrap = document.getElementById(newTabId + '_editorwrap');
+            if (!editWrap || editWrap.style.display === 'none') {
+              toggleEditMode(newTabId);
+            }
+          }
+        }, 150);
+      }
+    }
+  });
+}
+
 // ── GLOBAL EXPORTS ───────────────────────────────────────────
+window.promptAndAddNewQuery = promptAndAddNewQuery;
 window.addSnippetAsNewQueryToReport = addSnippetAsNewQueryToReport;
 window.insertSnippetToActiveEditor = insertSnippetToActiveEditor;
 window.addToSnippetLibrary = addToSnippetLibrary;

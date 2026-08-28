@@ -258,6 +258,42 @@
         'TSTRINGLIST', 'TLIST', 'TOBJECT', 'COMPONENT', 'OWNER', 'MATH', 'SYSUTILS', 'CLASSES', 'FORMS'
       ]);
 
+      const FR_BUILTIN_MAP = {
+        REPORT: {
+          label: 'Report',
+          props: {
+            PRINTOPTIONS: {
+              label: 'PrintOptions',
+              props: ['PRINTER', 'COPIES', 'DUPLEX', 'SHOWDIALOG', 'PRINTMODE', 'REVERSE', 'PAGENUMBERS', 'COLLATE']
+            },
+            REPORTOPTIONS: {
+              label: 'ReportOptions',
+              props: ['NAME', 'AUTHOR', 'DESCRIPTION', 'VERSIONBUILD', 'VERSIONMAJOR', 'VERSIONMINOR', 'GUID']
+            },
+            VARIABLES: { label: 'Variables', props: [] },
+            PARAMS: { label: 'Params', props: [] },
+            FILENAME: { label: 'FileName', props: [] },
+            SCRIPTTEXT: { label: 'ScriptText', props: [] },
+            PREPAREREPORT: { label: 'PrepareReport', props: [] },
+            SHOWREPORT: { label: 'ShowReport', props: [] },
+            DESIGNREPORT: { label: 'DesignReport', props: [] }
+          }
+        },
+        ENGINE: {
+          label: 'Engine',
+          props: {
+            STOPREPORT: { label: 'StopReport', props: [] },
+            NEWPAGE: { label: 'NewPage', props: [] },
+            NEWCOLUMN: { label: 'NewColumn', props: [] },
+            SHOWBAND: { label: 'ShowBand', props: [] },
+            CURX: { label: 'CurX', props: [] },
+            CURY: { label: 'CurY', props: [] },
+            PAGEWIDTH: { label: 'PageWidth', props: [] },
+            PAGEHEIGHT: { label: 'PageHeight', props: [] }
+          }
+        }
+      };
+
       function getLevenshteinDist(s1, s2) {
         const m = s1.length, n = s2.length;
         const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
@@ -275,45 +311,119 @@
       const seenUnknowns = new Set();
       strippedLines.forEach((sLine, lIdx) => {
         const lnum = lIdx + 1;
-        // Obje çağrısı kalıpları: ObjeAdi.Property veya ObjeAdi.Method(...)
-        const memberAccessRx = /\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\.\s*([a-zA-Z_][a-zA-Z0-9_]*)\b/g;
-        let mm;
-        while ((mm = memberAccessRx.exec(sLine)) !== null) {
-          const objName = mm[1];
-          const upperObj = objName.toUpperCase();
+        // Zincirleme Obje/Property kalıpları: ObjeAdi.Prop1 veya ObjeAdi.Prop1.Prop2
+        const fullChainRx = /\b([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)+)\b/g;
+        let cm;
+        while ((cm = fullChainRx.exec(sLine)) !== null) {
+          const rawChain = cm[1];
+          const parts = rawChain.split('.');
+          const rootObj = parts[0];
+          const upperRoot = rootObj.toUpperCase();
 
-          if (PASCAL_BUILTINS.has(upperObj) || declaredVars.has(upperObj)) continue;
-
-          // Rapor tasarımındaki bileşenler arasında var mı?
-          if (!reportComponentNames.has(upperObj) && !seenUnknowns.has(upperObj)) {
-            seenUnknowns.add(upperObj);
-
-            // En yakın eşleşen nesneyi bul (Örn: DBCheckListBox -> DBCheckListBox1, Page -> Page1, DialogPage -> DialogPage1, Typo)
-            let closest = '';
-            let minDistance = 999;
-            for (const realComp of reportComponentNames) {
-              if (realComp.startsWith(upperObj) || upperObj.startsWith(realComp)) {
-                closest = realComp;
-                break;
+          // 1. Report / Engine gibi yerleşik nesnelerin alt özellik denetimi
+          if (FR_BUILTIN_MAP[upperRoot]) {
+            const schema = FR_BUILTIN_MAP[upperRoot];
+            if (parts.length >= 2) {
+              const p1 = parts[1];
+              const upperP1 = p1.toUpperCase();
+              if (!schema.props[upperP1] && !seenUnknowns.has(`${upperRoot}.${upperP1}`)) {
+                seenUnknowns.add(`${upperRoot}.${upperP1}`);
+                let closestP1 = '';
+                let minDist = 999;
+                for (const validProp of Object.keys(schema.props)) {
+                  const d = getLevenshteinDist(upperP1, validProp);
+                  if (d < minDist && d <= 3) {
+                    minDist = d;
+                    closestP1 = schema.props[validProp].label;
+                  }
+                }
+                errors.push({
+                  text: `Satır ${lnum}: Geçersiz '${schema.label}' Özelliği '${p1}'${closestP1 ? ` ➔ (Doğrusu: '${closestP1}')` : ''}`,
+                  line: lnum,
+                  token: p1,
+                  suggestion: closestP1 ? `'${p1}' yerine '${closestP1}' kullanın.` : `'${p1}' özelliğinin geçerli olduğundan emin olun.`
+                });
+              } else if (schema.props[upperP1] && parts.length >= 3) {
+                // 3. Seviye alt özellik (Örn: Report.PrintOptions.Printer)
+                const subSchema = schema.props[upperP1];
+                const p2 = parts[2];
+                const upperP2 = p2.toUpperCase();
+                if (Array.isArray(subSchema.props) && subSchema.props.length > 0 && !subSchema.props.includes(upperP2) && !seenUnknowns.has(`${upperP1}.${upperP2}`)) {
+                  seenUnknowns.add(`${upperP1}.${upperP2}`);
+                  let closestP2 = '';
+                  let minDist = 999;
+                  for (const validSub of subSchema.props) {
+                    const d = getLevenshteinDist(upperP2, validSub);
+                    if (d < minDist && d <= 3) {
+                      minDist = d;
+                      closestP2 = validSub;
+                    }
+                  }
+                  errors.push({
+                    text: `Satır ${lnum}: Geçersiz '${subSchema.label}' Özelliği '${p2}'${closestP2 ? ` ➔ (Doğrusu: '${closestP2}')` : ''}`,
+                    line: lnum,
+                    token: p2,
+                    suggestion: closestP2 ? `'${p2}' yerine '${closestP2}' kullanın.` : `'${p2}' özelliğinin geçerli olduğundan emin olun.`
+                  });
+                }
               }
-              const dist = getLevenshteinDist(upperObj, realComp);
-              if (dist < minDistance && dist <= 3) {
-                minDistance = dist;
-                closest = realComp;
+            }
+            continue;
+          }
+
+          if (PASCAL_BUILTINS.has(upperRoot) || declaredVars.has(upperRoot)) continue;
+
+          // 2. Rapor tasarımındaki bileşenler arasında var mı?
+          if (!reportComponentNames.has(upperRoot) && !seenUnknowns.has(upperRoot)) {
+            seenUnknowns.add(upperRoot);
+
+            // Report / Engine için yazım hatası mı?
+            let closest = '';
+            if (getLevenshteinDist(upperRoot, 'REPORT') <= 2 || upperRoot === 'REPOR') {
+              closest = 'Report';
+            } else if (getLevenshteinDist(upperRoot, 'ENGINE') <= 2) {
+              closest = 'Engine';
+            } else {
+              let minDistance = 999;
+              for (const realComp of reportComponentNames) {
+                if (realComp.startsWith(upperRoot) || upperRoot.startsWith(realComp)) {
+                  closest = realComp;
+                  break;
+                }
+                const dist = getLevenshteinDist(upperRoot, realComp);
+                if (dist < minDistance && dist <= 3) {
+                  minDistance = dist;
+                  closest = realComp;
+                }
               }
             }
 
             errors.push({
-              text: `Satır ${lnum}: Tanımsız Rapor Nesnesi '${objName}' ➔ Rapor tasarımında '${objName}' adında bir nesne bulunamadı${closest ? ` (Tasarımda bulunan nesne: '${closest}')` : ''}`,
+              text: `Satır ${lnum}: Tanımsız Rapor Nesnesi '${rootObj}' ➔ Rapor tasarımında '${rootObj}' adında bir nesne bulunamadı${closest ? ` (Önerilen: '${closest}')` : ''}`,
               line: lnum,
-              token: objName,
+              token: rootObj,
               suggestion: closest 
-                ? `'${objName}' yerine rapordaki gerçek nesne olan '${closest}' kullanın.` 
-                : `'${objName}' nesnesinin rapor tasarımında var olduğundan emin olun.`
+                ? `'${rootObj}' yerine '${closest}' kullanın.` 
+                : `'${rootObj}' nesnesinin rapor tasarımında var olduğundan emin olun.`
             });
           }
         }
       });
+    }
+
+    // ── PASCAL SCRIPT SONLANDIRMA (end. Nokta Kontrolü) ──
+    const nonCommentLines = rawLines.map(l => l.replace(/\/\/.*$/, '').replace(/\{[^}]*\}/g, '').trim()).filter(Boolean);
+    if (nonCommentLines.length > 0) {
+      const lastLine = nonCommentLines[nonCommentLines.length - 1];
+      const lastClean = lastLine.replace(/\s+/g, '').toUpperCase();
+      if (lastClean === 'END' || lastClean === 'END;') {
+        errors.push({
+          text: `Satır ${rawLines.length}: PascalScript ana kod bloğu 'end.' (nokta) ile sonlandırılmalıdır. (Mevcut: '${lastLine}')`,
+          line: rawLines.length,
+          token: 'end.',
+          suggestion: "Programın en sonundaki 'end' ifadesini 'end.' olarak tamamlayın."
+        });
+      }
     }
 
     return { errors, warnings };
