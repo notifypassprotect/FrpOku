@@ -1,27 +1,30 @@
 // ============================================================
-//  list.js — Ana Sayfa (index.html) Orkestratörü v7
-//  Sağ Tık Menüsü, Toplu İşlemler Barı, Analiz Modalları, Çalışma Alanı & Filtreler
+//  list.js — Ana Sayfa (index.html) Orkestratörü v7.2
+//  Sağ Tık Menüsü, Toplu İşlemler Barı, Analiz Modalları, Çalışma Alanı, Filtreler & Mobil Çekmece
 // ============================================================
 
-let allFiles        = [];
-let selectedIds     = new Set();
-window.selectedIds  = selectedIds;
-let sortField       = 'loadedAt';
-let sortDir         = 'desc';
-let searchQuery     = '';
-let searchField     = 'all';
-let selectedTag     = '';
+let allFiles         = [];
+let selectedIds      = new Set();
+window.selectedIds   = selectedIds;
+let sortField        = 'loadedAt';
+let sortDir          = 'desc';
+let searchQuery      = '';
+let searchField      = 'all';
+let selectedTag      = '';
 let selectedCategory = '';
-let onlyFavorites   = false;
-let onlyPinned      = false;
-let onlyNotes       = false;
-let isStoreLoaded   = false;
-let currentPage     = 1;
-let currentViewMode = 'table';
+let onlyFavorites    = false;
+let onlyPinned       = false;
+let onlyNotes        = false;
+let isRegexMode      = false;
+let isStoreLoaded    = false;
+let currentPage      = 1;
+let currentViewMode  = 'table';
 let _lastSelectedRowId = null;
 
 const tableBody          = document.getElementById('tableBody');
 const searchInput        = document.getElementById('searchInput');
+const regexBtn           = document.getElementById('regexBtn');
+const regexErrMsg        = document.getElementById('regexErrMsg');
 const fieldSelect        = document.getElementById('fieldSelect') || document.getElementById('searchFieldSelect');
 const tagSelect          = document.getElementById('tagSelect');
 const catSelect          = document.getElementById('catSelect');
@@ -45,7 +48,12 @@ function toast(msg, type = 'info', duration = 3500) {
   el.className = 'toast-item ' + type;
   el.innerHTML = `<span>${escHtml(msg)}</span>`;
   stack.appendChild(el);
-  setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateX(40px)'; el.style.transition = '.3s'; setTimeout(() => el.remove(), 350); }, duration);
+  setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateX(40px)';
+    el.style.transition = '.3s';
+    setTimeout(() => el.remove(), 350);
+  }, duration);
 }
 window.toast = toast;
 
@@ -249,6 +257,21 @@ function applySearch() {
     btnReset.style.display = hasFilter ? 'inline-flex' : 'none';
   }
 
+  let regex = null;
+  if (regexErrMsg) regexErrMsg.style.display = 'none';
+
+  if (isRegexMode && searchQuery) {
+    try {
+      regex = new RegExp(searchQuery, 'i');
+    } catch (err) {
+      if (regexErrMsg) {
+        regexErrMsg.textContent = 'Geçersiz Regex: ' + err.message;
+        regexErrMsg.style.display = 'block';
+      }
+      return;
+    }
+  }
+
   const curWs = FrpStore.getActiveWorkspace ? FrpStore.getActiveWorkspace() : 'personal';
   let baseList = curWs === 'pool'
     ? (FrpStore.getPoolReports ? FrpStore.getPoolReports() : [])
@@ -262,18 +285,41 @@ function applySearch() {
     if (selectedCategory && file.category !== selectedCategory) return false;
 
     if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    const name = (file.meta?.reportName || file.name || '').toLowerCase();
-    const fileName = (file.name || '').toLowerCase();
-    const guid = (file.meta?.guid || '').toLowerCase();
-    const owner = (file.ownerName || file.owner_name || '').toLowerCase();
-    const sql = (file.queries || []).map(x => x.sql || '').join(' ').toLowerCase();
 
-    if (searchField === 'name') return name.includes(q);
-    if (searchField === 'guid') return guid.includes(q);
-    if (searchField === 'sql') return sql.includes(q);
-    if (searchField === 'author' || searchField === 'owner') return owner.includes(q);
-    return name.includes(q) || fileName.includes(q) || guid.includes(q) || owner.includes(q) || sql.includes(q);
+    const name = file.meta?.reportName || file.name || '';
+    const fileName = file.name || '';
+    const guid = file.meta?.guid || '';
+    const owner = file.ownerName || file.owner_name || '';
+    const sql = (file.queries || []).map(x => x.sql || '').join(' ');
+    const pascal = file.pascalScript || '';
+    const notes = file.userNote || '';
+
+    if (regex) {
+      if (searchField === 'name') return regex.test(name);
+      if (searchField === 'guid') return regex.test(guid);
+      if (searchField === 'sql') return regex.test(sql);
+      if (searchField === 'pascal') return regex.test(pascal);
+      if (searchField === 'notes') return regex.test(notes);
+      if (searchField === 'author' || searchField === 'owner') return regex.test(owner);
+      return regex.test(name) || regex.test(fileName) || regex.test(guid) || regex.test(owner) || regex.test(sql) || regex.test(pascal) || regex.test(notes);
+    }
+
+    const q = searchQuery.toLowerCase();
+    const lName = name.toLowerCase();
+    const lFileName = fileName.toLowerCase();
+    const lGuid = guid.toLowerCase();
+    const lOwner = owner.toLowerCase();
+    const lSql = sql.toLowerCase();
+    const lPascal = pascal.toLowerCase();
+    const lNotes = notes.toLowerCase();
+
+    if (searchField === 'name') return lName.includes(q);
+    if (searchField === 'guid') return lGuid.includes(q);
+    if (searchField === 'sql') return lSql.includes(q);
+    if (searchField === 'pascal') return lPascal.includes(q);
+    if (searchField === 'notes') return lNotes.includes(q);
+    if (searchField === 'author' || searchField === 'owner') return lOwner.includes(q);
+    return lName.includes(q) || lFileName.includes(q) || lGuid.includes(q) || lOwner.includes(q) || lSql.includes(q) || lPascal.includes(q) || lNotes.includes(q);
   });
 
   renderCurrentView();
@@ -290,11 +336,41 @@ function updateWorkspaceCounts() {
   if (poolBadge) poolBadge.textContent = poolCount;
 }
 
+function updateTagList() {
+  if (!tagSelect) return;
+  const tags = FrpStore.getAllTags ? FrpStore.getAllTags() : [];
+  const curVal = tagSelect.value;
+  tagSelect.innerHTML = '<option value="">Tüm Etiketler</option>' +
+    tags.map(t => `<option value="${escHtml(t)}" ${t === curVal ? 'selected' : ''}>${escHtml(t)}</option>`).join('');
+}
+window.updateTagList = updateTagList;
+
+function updateCatList() {
+  if (!catSelect) return;
+  const cats = FrpStore.getCategories ? FrpStore.getCategories() : [];
+  const curVal = catSelect.value;
+  catSelect.innerHTML = '<option value="">Tüm Kategoriler</option>' +
+    cats.map(c => `<option value="${escHtml(c)}" ${c === curVal ? 'selected' : ''}>${escHtml(c)}</option>`).join('');
+}
+window.updateCatList = updateCatList;
+
+function updateStats() {
+  updateWorkspaceCounts();
+  updateTagList();
+  updateCatList();
+}
+window.updateStats = updateStats;
+
 // ── Görünüm Değiştirici ─────────────────────────────────────
 function renderCurrentView() {
   const tableEl = document.getElementById('reportTable');
   let cardsEl   = document.getElementById('cardsView');
   let timelineEl= document.getElementById('timelineView');
+
+  // Buton aktiflik durumları
+  document.getElementById('btnViewTable')?.classList.toggle('active', currentViewMode === 'table');
+  document.getElementById('btnViewCards')?.classList.toggle('active', currentViewMode === 'cards');
+  document.getElementById('btnViewTimeline')?.classList.toggle('active', currentViewMode === 'timeline');
 
   if (currentViewMode === 'cards') {
     if (tableEl) tableEl.style.display = 'none';
@@ -663,6 +739,13 @@ function setupContextMenu() {
             refreshAll();
           }
           break;
+        case 'clone-to-personal':
+          if (FrpStore.cloneToPersonal) {
+            FrpStore.cloneToPersonal(id);
+            toast('Rapor kişisel alanınıza kopyalandı.', 'success');
+            refreshAll();
+          }
+          break;
         case 'rename':
           openRenameModal(id);
           break;
@@ -767,11 +850,90 @@ async function openCategoryModalFor(fileId) {
 }
 window.openCategoryModalFor = openCategoryModalFor;
 
+// ── Excel / CSV Dışa Aktarma (Ctrl+E) ───────────────────────
+function exportReportListExcel() {
+  const sorted = sortFiles(allFiles);
+  if (sorted.length === 0) {
+    toast('Dışa aktarılacak rapor bulunamadı.', 'warning');
+    return;
+  }
+
+  let csvContent = '\uFEFF"Rapor Adı";"Dosya Adı";"Boyut (Bayt)";"Kategori";"GUID";"Etiketler";"SQL Sayısı";"Yüklenme Tarihi"\n';
+  sorted.forEach(f => {
+    const rName = (f.meta?.reportName || f.name || '').replace(/"/g, '""');
+    const fName = (f.name || '').replace(/"/g, '""');
+    const size = Number(f.sizeBytes || f.size) || 0;
+    const cat = (f.category || '').replace(/"/g, '""');
+    const guid = (f.meta?.guid || '').replace(/"/g, '""');
+    const tags = (f.tags || []).join(', ').replace(/"/g, '""');
+    const qCount = (f.queries || []).length;
+    const date = new Date(f.loadedAt).toLocaleString('tr-TR');
+
+    csvContent += `"${rName}";"${fName}";"${size}";"${cat}";"${guid}";"${tags}";"${qCount}";"${date}"\n`;
+  });
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `frpoku_rapor_listesi_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast(`${sorted.length} adet rapor CSV olarak dışa aktarıldı.`, 'success');
+}
+window.exportReportListExcel = exportReportListExcel;
+
+// ── Mobil Çekmece (Drawer) Mantığı ──────────────────────────
+function setupMobileDrawer() {
+  const drawer = document.getElementById('mobileDrawer');
+  const overlay = document.getElementById('mobileDrawerOverlay');
+  const btnToggle = document.getElementById('btnMobileMenuToggle');
+  const btnClose = document.getElementById('btnMobileDrawerClose');
+
+  function openDrawer() {
+    drawer?.classList.add('open');
+    overlay?.classList.add('open');
+  }
+
+  function closeDrawer() {
+    drawer?.classList.remove('open');
+    overlay?.classList.remove('open');
+  }
+
+  btnToggle?.addEventListener('click', openDrawer);
+  btnClose?.addEventListener('click', closeDrawer);
+  overlay?.addEventListener('click', closeDrawer);
+
+  const bindDrawerItem = (id, fn) => {
+    document.getElementById(id)?.addEventListener('click', () => {
+      closeDrawer();
+      fn();
+    });
+  };
+
+  bindDrawerItem('btnMobAddSingle', () => document.getElementById('fileInputSingle')?.click());
+  bindDrawerItem('btnMobAddMulti', () => document.getElementById('fileInputMulti')?.click());
+  bindDrawerItem('btnMobAddFolder', () => document.getElementById('fileInputFolder')?.click());
+  bindDrawerItem('btnMobComplexity', () => window.openComplexityCenter?.());
+  bindDrawerItem('btnMobDependencies', () => window.openDependenciesModal?.());
+  bindDrawerItem('btnMobParams', () => window.openParamsModal?.());
+  bindDrawerItem('btnMobSnippets', () => window.renderSnippetsModal?.());
+  bindDrawerItem('btnMobTableAnalysis', () => window.openTableUsageModal?.());
+  bindDrawerItem('btnMobRecent', () => window.openRecentModal?.());
+  bindDrawerItem('btnMobDashboard', () => { window.location.href = 'dashboard.html'; });
+  bindDrawerItem('btnMobSettings', () => window.openSettingsModal?.('appearance'));
+
+  document.getElementById('btnMobileFab')?.addEventListener('click', () => {
+    document.getElementById('fileInputMulti')?.click();
+  });
+}
+
 // ── Tümünü Yenile ───────────────────────────────────────────
 function refreshAll() {
+  updateStats();
   applySearch();
-  if (typeof updateStats === 'function') updateStats();
-  if (typeof updateTagList === 'function') updateTagList();
 }
 window.refreshAll = refreshAll;
 
@@ -780,6 +942,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (window.FrpStoreReady) await window.FrpStoreReady;
   refreshAll();
   setupContextMenu();
+  setupMobileDrawer();
 
   // Çalışma Alanı Değiştirici
   document.getElementById('tabWsPersonal')?.addEventListener('click', () => {
@@ -899,9 +1062,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Arama ve Filtreler
+  // Arama ve Regex
   searchInput?.addEventListener('input', (e) => {
     searchQuery = e.target.value;
+    applySearch();
+  });
+
+  regexBtn?.addEventListener('click', () => {
+    isRegexMode = !isRegexMode;
+    regexBtn.classList.toggle('active', isRegexMode);
     applySearch();
   });
 
@@ -951,6 +1120,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btnPinnedOnly')?.classList.remove('active');
     onlyNotes = false;
     document.getElementById('btnNotesOnly')?.classList.remove('active');
+    isRegexMode = false;
+    regexBtn?.classList.remove('active');
+    if (regexErrMsg) regexErrMsg.style.display = 'none';
     applySearch();
   });
 
@@ -972,10 +1144,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btnOpenSettingsModal')?.addEventListener('click', () => window.openSettingsModal?.('appearance'));
   document.getElementById('btnMenuToggle')?.addEventListener('click', () => window.openSettingsModal?.('appearance'));
   
+  // Klavye Kısayolları (F6 Görünüm Değişimi, vs)
   document.addEventListener('keydown', e => {
-    if ((e.ctrlKey || e.metaKey) && e.key === ',') {
+    if (e.key === 'F6') {
       e.preventDefault();
-      window.openSettingsModal?.('appearance');
+      const modes = ['table', 'cards', 'timeline'];
+      const nextIdx = (modes.indexOf(currentViewMode) + 1) % modes.length;
+      currentViewMode = modes[nextIdx];
+      renderCurrentView();
     }
   });
 });

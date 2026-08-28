@@ -17,7 +17,7 @@ const btnThemeToggle = document.getElementById('btnThemeToggle');
 function updateThemeBtn() {
   const cur = FrpStore.getTheme();
   if (btnThemeToggle) {
-    btnThemeToggle.textContent = cur === 'dark' ? '☀️ Aydınlık Mod' : '🌙 Koyu Mod';
+    btnThemeToggle.textContent = cur === 'dark' ? 'Aydınlık Mod' : 'Koyu Mod';
   }
   if (Array.isArray(activeTabs)) {
     activeTabs.forEach(t => syncEditorBackdrop(t.id));
@@ -193,7 +193,7 @@ function renderSidebar(file) {
 
   const tagsList = tags.map(t => `
     <span class="tag-pill">
-      🏷️ ${esc(t)}
+      ${esc(t)}
       <span class="tag-pill-remove" onclick="removeTagFromDetail('${esc(t)}')">×</span>
     </span>
   `).join('');
@@ -207,14 +207,14 @@ function renderSidebar(file) {
         <div class="meta-label">GUID</div>
         <div class="meta-value" style="font-family:var(--mono);font-size:.68rem;display:flex;align-items:center;justify-content:space-between;gap:.3rem;">
           <span style="overflow:hidden;text-overflow:ellipsis;" title="${esc(meta.guid || '—')}">${esc(meta.guid || '—')}</span>
-          ${meta.guid ? `<button class="btn btn-sm" style="padding:.1rem .35rem;font-size:.65rem;" onclick="copyGuidText('${esc(meta.guid)}')">📋</button>` : ''}
+          ${meta.guid ? `<button class="btn btn-sm" style="padding:.1rem .35rem;font-size:.65rem;" onclick="copyGuidText('${esc(meta.guid)}')">Kopyala</button>` : ''}
         </div>
       </div>
       ${metaRow('Dosya Boyutu', file.sizeBytes > 1024 ? Math.round(file.sizeBytes / 1024) + ' KB' : file.sizeBytes + ' B')}
     </div>
 
     <div class="meta-card">
-      <div class="meta-label">🏷️ Etiketler</div>
+      <div class="meta-label">Etiketler</div>
       <div class="tag-list" style="margin-top:.3rem;">${tagsList || '<span style="color:var(--text-muted);font-size:.75rem;">Etiket yok</span>'}</div>
       <div class="tag-add-wrap">
         <input type="text" class="tag-add-input" id="inputNewTag" placeholder="Yeni etiket..." />
@@ -223,12 +223,12 @@ function renderSidebar(file) {
     </div>
 
     <div class="meta-card meta-editable-area">
-      <div class="meta-label">📝 Açıklama</div>
+      <div class="meta-label">Açıklama</div>
       <div class="meta-value-wrap" data-field="description" data-file-id="${file.id}" style="margin-top:.3rem;">
         <div class="meta-desc-display" style="font-size:.78rem;line-height:1.5;color:var(--text-secondary);cursor:pointer;min-height:1.5em;word-break:break-all;overflow-wrap:anywhere;white-space:pre-wrap;" title="Düzenlemek için tıklayın">${esc(meta.description || '') || '<span style="color:var(--text-muted);font-style:italic;">Açıklama yok — tıklayarak ekle</span>'}</div>
         <textarea class="note-textarea" id="descEditArea" style="display:none;min-height:60px;" placeholder="Açıklama girin...">${esc(meta.description || '')}</textarea>
         <div class="desc-edit-actions" style="display:none;gap:.35rem;margin-top:.3rem;">
-          <button class="btn-save-note" id="btnSaveDesc">💾 Kaydet</button>
+          <button class="btn-save-note" id="btnSaveDesc">Kaydet</button>
           <button class="btn btn-sm" id="btnCancelDesc">İptal</button>
         </div>
       </div>
@@ -260,9 +260,9 @@ function renderSidebar(file) {
     </div>
 
     <div class="note-area">
-      <div class="meta-label">📝 Kullanıcı Notu</div>
+      <div class="meta-label">Kullanıcı Notu</div>
       <textarea class="note-textarea" id="noteTextarea" placeholder="Bu rapora not ekleyin...">${esc(file.userNote || '')}</textarea>
-      <button class="btn-save-note" id="btnSaveNote">💾 Kaydet</button>
+      <button class="btn-save-note" id="btnSaveNote">Kaydet</button>
     </div>
 
     <div class="meta-card">
@@ -270,16 +270,16 @@ function renderSidebar(file) {
       <div class="export-btns">
         ${queries.map((q, i) => `
           <button class="btn-export" onclick="exportSqlQueryModal(${i})">
-            📤 ${esc(q.name)} Sorgusunu İndir (.sql / .txt)
+            ${esc(q.name)} Sorgusunu İndir (.sql / .txt)
           </button>`).join('')}
-        <button class="btn-export" onclick="exportReportJson()">📥 Rapor JSON İndir</button>
-        <button class="btn-export" onclick="exportHtmlDoc()">🌐 HTML Dokümantasyon</button>
+        <button class="btn-export" onclick="exportReportJson()">Rapor JSON İndir</button>
+        <button class="btn-export" onclick="exportHtmlDoc()">HTML Dokümantasyon</button>
       </div>
     </div>
 
     ${file.pascalScript ? `
     <div class="meta-card">
-      <div class="meta-label">🌲 PascalScript Fonksiyon Ağacı</div>
+      <div class="meta-label">PascalScript Fonksiyon Ağacı</div>
       <div id="pascalOutlineContainer" style="margin-top:.4rem;"></div>
     </div>` : ''}
 
@@ -291,7 +291,7 @@ function renderSidebar(file) {
 
     ${Array.isArray(file.editHistory) && file.editHistory.length > 0 ? `
     <div class="meta-card">
-      <div class="meta-label">📋 Düzenleme Geçmişi</div>
+      <div class="meta-label">Düzenleme Geçmişi</div>
       <div class="audit-log">
         ${[...file.editHistory].reverse().slice(0, 10).map(h => `
           <div class="audit-row">
@@ -3177,7 +3177,6 @@ function setupDownloadHistoryDetail() {
         const history = FrpStore.getDownloadHistory();
         const bodyHtml = history.length === 0 ? `
           <div style="padding:2.5rem 1rem;text-align:center;color:var(--text-muted);">
-            <div style="font-size:2.5rem;margin-bottom:.5rem;">📥</div>
             <div style="font-weight:700;font-size:1rem;color:var(--text-secondary);">Henüz İndirilen Dosya Yok</div>
             <div style="font-size:.8rem;margin-top:.25rem;">İndirdiğiniz tekli veya toplu raporlar burada listelenecektir.</div>
           </div>
@@ -3185,7 +3184,7 @@ function setupDownloadHistoryDetail() {
           <div style="display:flex;flex-direction:column;gap:.6rem;max-height:420px;overflow-y:auto;padding-right:.25rem;">
             ${history.map(item => {
               const timeStr = new Date(item.timestamp).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-              const formatBadge = item.format === 'zip' ? '📦 ZIP' : (item.format === 'sql' ? '🗄️ SQL' : (item.format === 'html' ? '🌐 HTML' : '📄 FRP'));
+              const formatBadge = item.format === 'zip' ? 'ZIP' : (item.format === 'sql' ? 'SQL' : (item.format === 'html' ? 'HTML' : 'FRP'));
               return `
                 <div style="background:var(--bg-raised);padding:.75rem .95rem;border-radius:10px;border:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between;gap:.8rem;">
                   <div style="min-width:0;flex:1;">
@@ -3194,8 +3193,8 @@ function setupDownloadHistoryDetail() {
                       <span style="font-weight:800;font-size:.85rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(item.fileName)}</span>
                     </div>
                     <div style="font-size:.72rem;color:var(--text-muted);display:flex;align-items:center;gap:.6rem;">
-                      <span>🕒 ${timeStr}</span>
-                      ${item.reportName && item.reportName !== item.fileName ? `<span>• 📋 ${esc(item.reportName)}</span>` : ''}
+                      <span>${timeStr}</span>
+                      ${item.reportName && item.reportName !== item.fileName ? `<span>• ${esc(item.reportName)}</span>` : ''}
                     </div>
                   </div>
                 </div>
@@ -3205,15 +3204,15 @@ function setupDownloadHistoryDetail() {
         `;
 
         showModal({
-          title: '📥 Son İndirilenler & İndirme Geçmişi',
+          title: 'Son İndirilenler & İndirme Geçmişi',
           body: bodyHtml,
           confirmText: 'Tamam',
-          cancelText: history.length > 0 ? '🗑️ Geçmişi Temizle' : null,
+          cancelText: history.length > 0 ? 'Geçmişi Temizle' : null,
           maxWidth: '560px'
         }).then(res => {
           if (res === false && history.length > 0) {
             localStorage.removeItem('frpoku_download_history');
-            showToast('İndirme geçmişi temizlendi. 🗑️', 'info');
+            showToast('İndirme geçmişi temizlendi.', 'info');
           }
         });
       }
