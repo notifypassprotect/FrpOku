@@ -224,7 +224,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
       : `<div style="padding:2rem;text-align:center;color:var(--text-muted);">Sekme yükleniyor...</div>`;
 
     overlay.innerHTML = `
-      <div class="modal settings-modal-box" style="max-width:1080px;width:94vw;padding:0;overflow:hidden;display:grid;grid-template-columns:250px 1fr;height:82vh;min-height:600px;max-height:860px;border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,.35);">
+      <div class="modal settings-modal-box" style="max-width:1160px;width:95vw;padding:0;overflow:hidden;display:grid;grid-template-columns:250px 1fr;height:86vh;min-height:640px;max-height:900px;border-radius:20px;box-shadow:0 28px 70px rgba(0,0,0,.45);border:1.5px solid var(--border);">
         
         <!-- Sol Sekme Çubuğu (Sidebar) -->
         <div style="background:var(--bg-raised);border-right:1px solid var(--border-light);padding:1.25rem 1rem;display:flex;flex-direction:column;gap:.4rem;">

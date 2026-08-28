@@ -9,6 +9,29 @@ window.FrpListRenderers = window.FrpListRenderers || {};
 
   const escHtml = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+  const TAG_PALETTE = [
+    { bg: 'rgba(59,130,246,.12)',  color: '#3b82f6',  border: 'rgba(59,130,246,.3)'  },  // blue
+    { bg: 'rgba(16,185,129,.12)', color: '#10b981',  border: 'rgba(16,185,129,.3)'  },  // green
+    { bg: 'rgba(139,92,246,.12)', color: '#8b5cf6',  border: 'rgba(139,92,246,.3)'  },  // purple
+    { bg: 'rgba(245,158,11,.12)', color: '#f59e0b',  border: 'rgba(245,158,11,.3)'  },  // amber
+    { bg: 'rgba(236,72,153,.12)', color: '#ec4899',  border: 'rgba(236,72,153,.3)'  },  // pink
+    { bg: 'rgba(6,182,212,.12)',  color: '#06b6d4',  border: 'rgba(6,182,212,.3)'   },  // cyan
+    { bg: 'rgba(249,115,22,.12)', color: '#f97316',  border: 'rgba(249,115,22,.3)'  },  // orange
+    { bg: 'rgba(132,204,22,.12)', color: '#84cc16',  border: 'rgba(132,204,22,.3)'  },  // lime
+  ];
+
+  function tagColor(tag) {
+    let hash = 0;
+    for (let i = 0; i < tag.length; i++) hash = (hash * 31 + tag.charCodeAt(i)) & 0xffffffff;
+    return TAG_PALETTE[Math.abs(hash) % TAG_PALETTE.length];
+  }
+
+  function renderTag(tag) {
+    const c = tagColor(tag);
+    return `<span class="tag-pill" style="background:${c.bg};color:${c.color};border:1px solid ${c.border};padding:.15rem .45rem;border-radius:6px;font-size:.72rem;font-weight:600;display:inline-flex;align-items:center;gap:.25rem;white-space:nowrap;">🏷️ ${escHtml(tag)}</span>`;
+  }
+  window.renderTag = renderTag;
+
   const DEFAULT_COLUMN_ORDER = [
     'reportName',
     'fileName',
@@ -28,15 +51,16 @@ window.FrpListRenderers = window.FrpListRenderers || {};
       sortField: 'name',
       renderTd: (file, { reportName, hasNote }) => {
         const isPublic = !!(file.isPublic || file.is_public);
-        const poolBadge = isPublic ? `<span class="badge badge-pool" style="font-size:.68rem;padding:1px 5px;" title="Ortak Havuzda Paylaşıldı">🌐 Havuzda</span>` : '';
+        const poolBadge = isPublic ? `<span class="badge badge-pool" style="font-size:.68rem;padding:1px 6px;border-radius:10px;margin-left:.25rem;" title="Ortak Havuzda Paylaşıldı">🌐 Havuzda</span>` : '';
         const oName = file.ownerName || file.owner_name || (file.userId === 'usr_admin_root' ? 'Admin' : 'Sistem');
         const oDept = file.ownerDepartment || file.owner_department || '';
-        const ownerChip = `<span class="owner-chip" style="font-size:.7rem;padding:.1rem .45rem;" title="Yükleyen: ${escHtml(oName)}${oDept ? ' · ' + escHtml(oDept) : ''}">👤 ${escHtml(oName)}</span>`;
+        const ownerChip = `<span class="owner-chip" style="font-size:.72rem;padding:.12rem .5rem;border-radius:6px;margin-left:.35rem;" title="Yükleyen: ${escHtml(oName)}${oDept ? ' · ' + escHtml(oDept) : ''}">👤 ${escHtml(oName)}</span>`;
 
         return `
-          <td class="col-report-name" style="cursor:pointer;max-width:320px;">
-            <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;">
-              <span class="report-title-text" style="font-weight:700;color:var(--text-primary);font-size:.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(reportName)}">${escHtml(reportName)}</span>
+          <td class="col-reportName" style="cursor:pointer;max-width:320px;">
+            <div class="file-name" style="display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;">
+              <span>📋</span>
+              <span class="report-name-title" style="font-weight:700;font-size:.88rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(reportName)}">${escHtml(reportName)}</span>
               ${poolBadge}
               ${ownerChip}
               ${hasNote ? `<span title="Not mevcut" style="font-size:.75rem;cursor:help;">📝</span>` : ''}
@@ -50,8 +74,8 @@ window.FrpListRenderers = window.FrpListRenderers || {};
       title: 'Dosya Adı (.frp)',
       sortField: 'fileName',
       renderTd: (file) => `
-        <td class="col-file-name" style="color:var(--text-secondary);font-size:.8rem;font-family:var(--font);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(file.name)}">
-          ${escHtml(file.name)}
+        <td class="col-fileName" style="color:var(--text-secondary);font-size:.8rem;font-family:var(--font);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(file.name)}">
+          📄 ${escHtml(file.name)}
         </td>
       `
     },
@@ -60,7 +84,7 @@ window.FrpListRenderers = window.FrpListRenderers || {};
       title: 'Boyut',
       sortField: 'sizeBytes',
       renderTd: (file, { size }) => `
-        <td class="col-file-size" style="white-space:nowrap;font-size:.76rem;color:var(--text-muted);font-family:var(--mono);">
+        <td class="col-fileSize" style="white-space:nowrap;font-size:.76rem;color:var(--text-muted);font-family:var(--mono);">
           ${size}
         </td>
       `
@@ -81,7 +105,7 @@ window.FrpListRenderers = window.FrpListRenderers || {};
       key: 'tags',
       title: 'Etiketler',
       sortField: null,
-      renderTd: (file, { tagsHtml }) => `<td class="col-tags" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${tagsHtml || '<span style="color:var(--text-muted);font-size:.75rem;">—</span>'}</td>`
+      renderTd: (file, { tagsHtml }) => `<td class="col-tags" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${tagsHtml || '<span style="color:var(--text-muted);font-size:.75rem;">—</span>'}</td>`
     },
     queries: {
       key: 'queries',
@@ -90,8 +114,8 @@ window.FrpListRenderers = window.FrpListRenderers || {};
       renderTd: (file) => {
         const qCount = (file.queries || []).length;
         return `
-          <td class="col-queries" style="white-space:nowrap;">
-            <span class="badge ${qCount > 0 ? 'badge-blue' : 'badge-gray'}" style="font-size:.72rem;">${qCount} SQL</span>
+          <td class="col-queries" style="white-space:nowrap;text-align:center;">
+            <span class="badge ${qCount > 0 ? 'badge-blue' : 'badge-gray'}" style="font-size:.72rem;padding:.18rem .45rem;">${qCount} SQL</span>
           </td>
         `;
       }
@@ -114,7 +138,7 @@ window.FrpListRenderers = window.FrpListRenderers || {};
         const dObj = file.lastModified ? new Date(file.lastModified) : (file.loadedAt ? new Date(file.loadedAt) : null);
         const str = dObj ? dObj.toLocaleDateString('tr-TR') + ' ' + dObj.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '—';
         return `
-          <td class="col-last-modified" style="white-space:nowrap;font-size:.76rem;color:var(--text-muted);font-family:var(--mono);">
+          <td class="col-lastModified" style="white-space:nowrap;font-size:.76rem;color:var(--text-muted);font-family:var(--mono);">
             ${str}
           </td>
         `;
@@ -147,7 +171,7 @@ window.FrpListRenderers = window.FrpListRenderers || {};
       <th style="width:36px;text-align:center;padding:0 .5rem;">
         <input type="checkbox" id="selectAll" style="cursor:pointer;" title="Tümünü Seç / Kaldır" />
       </th>
-      <th style="width:58px;text-align:center;padding:0 .3rem;">★</th>
+      <th style="width:58px;text-align:center;padding:0 .3rem;">★ 📌</th>
     `;
 
     currentOrder.forEach(colKey => {

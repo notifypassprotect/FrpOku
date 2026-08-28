@@ -1,12 +1,6 @@
 // ============================================================
-//  list.js — Ana Sayfa (index.html) Orkestratörü (Modüler v5)
-//  Delegasyon Modülleri:
-//  - js/list/renderers/table_renderer.js
-//  - js/list/renderers/cards_renderer.js
-//  - js/list/renderers/timeline_renderer.js
-//  - js/list/list_modals.js
-//  - js/list/list_actions.js
-//  - js/list/list_ui_helpers.js
+//  list.js — Ana Sayfa (index.html) Orkestratörü v5
+//  Modüler Mimaride Tüm Etkileşimler, Sürükle-Bırak, Toplu Eylemler ve Gezinme
 // ============================================================
 
 let allFiles        = [];
@@ -34,7 +28,6 @@ const btnFavOnly         = document.getElementById('btnFavOnly');
 const bulkBar            = document.getElementById('bulkBar');
 const resultCount        = document.getElementById('resultCount');
 const btnThemeToggle     = document.getElementById('btnThemeToggle');
-const selectAllCb        = document.getElementById('selectAll');
 
 function escHtml(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -111,7 +104,90 @@ function setupTopbarDropdowns() {
 }
 setupTopbarDropdowns();
 
-// ── Sıralama Mantığı (Pin önce, sonra Favori, sonra Alan) ────
+// ── Dosya Yükleme & Parse Motoru ────────────────────────────
+async function readFileAsText(file) {
+  try {
+    const buffer = await file.arrayBuffer();
+    try {
+      const utf8Decoder = new TextDecoder('utf-8', { fatal: true });
+      let decoded = utf8Decoder.decode(buffer);
+      if (typeof fixTurkishMojibake === 'function') decoded = fixTurkishMojibake(decoded);
+      return decoded;
+    } catch {
+      const win1254Decoder = new TextDecoder('windows-1254');
+      let decoded = win1254Decoder.decode(buffer);
+      if (typeof fixTurkishMojibake === 'function') decoded = fixTurkishMojibake(decoded);
+      return decoded;
+    }
+  } catch (err) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = e => {
+        let res = e.target.result;
+        if (typeof fixTurkishMojibake === 'function') res = fixTurkishMojibake(res);
+        resolve(res);
+      };
+      reader.onerror = () => reject(new Error('Dosya okunamadı'));
+      reader.readAsText(file, 'utf-8');
+    });
+  }
+}
+
+async function handleFiles(fileList) {
+  const allIncoming = Array.from(fileList || []);
+  if (allIncoming.length === 0) return;
+
+  const validFiles = [];
+  const rejectedFiles = [];
+
+  allIncoming.forEach(f => {
+    const isFrp = f.name.toLowerCase().endsWith('.frp') || f.name.toLowerCase().endsWith('.fr3');
+    if (!isFrp) {
+      rejectedFiles.push({ name: f.name, reason: 'Yalnızca .frp veya .fr3 dosyaları yüklenebilir.' });
+    } else {
+      validFiles.push(f);
+    }
+  });
+
+  if (rejectedFiles.length > 0) {
+    toast(`${rejectedFiles.length} dosya geçersiz format nedeniyle atlandı.`, 'warning');
+  }
+
+  if (validFiles.length === 0) return;
+
+  const resultsToSave = [];
+  const isBulk = validFiles.length > 1;
+
+  for (let i = 0; i < validFiles.length; i++) {
+    const file = validFiles[i];
+    try {
+      const text = await readFileAsText(file);
+      if (!text || text.trim().length === 0) continue;
+      const parsed = typeof parseFrp === 'function' ? parseFrp(text) : { reportName: file.name, queries: [] };
+      resultsToSave.push({ parsedData: parsed, fileName: file.name, fileSize: file.size });
+    } catch (err) {
+      console.warn('Dosya okuma hatası:', file.name, err);
+    }
+  }
+
+  if (resultsToSave.length > 0) {
+    const res = FrpStore.addMany(resultsToSave);
+    const added = res.added || resultsToSave.length;
+    const updated = res.updated || 0;
+    toast(`🎉 ${added} rapor başarıyla yüklendi!${updated > 0 ? ` (${updated} güncellendi)` : ''}`, 'success');
+    if (window.FrpAudit) {
+      window.FrpAudit.logAction({
+        action: 'REPORT_UPLOAD',
+        target: `${added} Rapor`,
+        details: `${added} adet rapor sisteme başarıyla yüklendi.`
+      });
+    }
+    refreshAll();
+  }
+}
+window.handleFiles = handleFiles;
+
+// ── Sıralama Mantığı ────────────────────────────────────────
 function sortFiles(files) {
   return [...files].sort((a, b) => {
     if (a.isPinned && !b.isPinned) return -1;
@@ -140,10 +216,6 @@ function sortFiles(files) {
       case 'category':
         va = (a.category || '').toLowerCase();
         vb = (b.category || '').toLowerCase();
-        break;
-      case 'ownerName':
-        va = (a.ownerName || a.owner_name || '').toLowerCase();
-        vb = (b.ownerName || b.owner_name || '').toLowerCase();
         break;
       case 'queries':
         va = (a.queries || []).length;
@@ -206,7 +278,7 @@ function applySearch() {
 }
 window.applySearch = applySearch;
 
-// ── Görünüm Değiştirici & Render ────────────────────────────
+// ── Görünüm Değiştirici (Tablo, Kartlar, Zaman Tüneli) ─────
 function renderCurrentView() {
   const tableEl = document.getElementById('reportTable');
   let cardsEl   = document.getElementById('cardsView');
@@ -283,7 +355,15 @@ function renderTable() {
   }
 
   const curSelectAll = document.getElementById('selectAll');
-  if (curSelectAll) curSelectAll.checked = pagedFiles.length > 0 && pagedFiles.every(f => selectedIds.has(f.id));
+  if (curSelectAll) {
+    curSelectAll.checked = pagedFiles.length > 0 && pagedFiles.every(f => selectedIds.has(f.id));
+    curSelectAll.onchange = () => {
+      if (curSelectAll.checked) pagedFiles.forEach(f => selectedIds.add(f.id));
+      else pagedFiles.forEach(f => selectedIds.delete(f.id));
+      renderCurrentView();
+      if (typeof updateBulkBar === 'function') updateBulkBar();
+    };
+  }
 
   if (!tableBody) return;
 
@@ -309,11 +389,15 @@ function renderTable() {
     const size = typeof formatBytes === 'function' ? formatBytes(file.sizeBytes || file.size) : (file.size || '');
     const reportName = file.meta?.reportName || file.name;
     const hasNote = !!(file.userNote && file.userNote.trim());
-    const tagsHtml = (file.tags || []).map(t => `<span class="tag-pill">🏷️ ${escHtml(t)}</span>`).join(' ');
+    
+    // Tag renklendirme (TAG_PALETTE)
+    const tagsHtml = (file.tags || []).map(t => window.renderTag ? window.renderTag(t) : `<span class="tag-pill">🏷️ ${escHtml(t)}</span>`).join(' ');
+    
     const guidVal = (file.meta && file.meta.guid) ? file.meta.guid : '';
     const guidColHtml = guidVal
       ? `<span class="badge badge-gray" onclick="event.stopPropagation();copyGuidText('${escHtml(guidVal)}')" title="Tıklayınca GUID kopyalar" style="cursor:pointer;font-family:var(--mono);font-size:.72rem;">🔑 ${escHtml(guidVal)}</span>`
       : `<span style="color:var(--text-muted);font-size:.75rem;">—</span>`;
+      
     const catHtml = file.category
       ? `<span class="badge badge-purple" onclick="event.stopPropagation();openCategoryModalFor('${file.id}')" style="cursor:pointer;">🏷️ ${escHtml(file.category)}</span>`
       : `<button class="btn btn-sm" onclick="event.stopPropagation();openCategoryModalFor('${file.id}')" style="padding:1px 6px;font-size:.72rem;">+ Kategori</button>`;
@@ -327,9 +411,9 @@ function renderTable() {
     });
 
     return `
-      <tr class="${isSelected ? 'selected' : ''} ${file.isPinned ? 'pinned-row' : ''}" data-id="${file.id}">
-        <td><input type="checkbox" class="row-checkbox" data-id="${file.id}" ${isSelected ? 'checked' : ''} onchange="toggleSelect(event, '${file.id}')" onclick="event.stopPropagation();" /></td>
-        <td style="white-space:nowrap;text-align:center;">
+      <tr class="${isSelected ? 'selected' : ''} ${file.isPinned ? 'pinned-row' : ''}" data-id="${file.id}" onclick="handleItemClick(event, '${file.id}')" style="cursor:pointer;">
+        <td onclick="event.stopPropagation();"><input type="checkbox" class="row-checkbox" data-id="${file.id}" ${isSelected ? 'checked' : ''} onchange="toggleSelect(event, '${file.id}')" /></td>
+        <td style="white-space:nowrap;text-align:center;" onclick="event.stopPropagation();">
           <button class="star-btn ${file.isFavorite ? 'active' : ''}" onclick="toggleFav(event, '${file.id}')" title="Favori">★</button>
           <button class="pin-btn ${file.isPinned ? 'active' : ''}" onclick="togglePin(event, '${file.id}')" title="Üste Sabitle" style="background:none;border:none;cursor:pointer;font-size:.95rem;padding:0 .15rem;opacity:${file.isPinned ? '1' : '0.35'};">📌</button>
         </td>
@@ -343,7 +427,7 @@ function renderTable() {
 }
 window.renderTable = renderTable;
 
-// ── Kartlar ve Zaman Tüneli Render Delegasyonları ───────────
+// ── Kartlar ve Zaman Tüneli Delegasyonları ───────────────────
 function renderCards(container) {
   const sorted = sortFiles(allFiles);
   if (resultCount) resultCount.textContent = sorted.length + ' sonuç';
@@ -414,7 +498,39 @@ function bindTableSortHeaders() {
   });
 }
 
-// ── Satır Etkileşimleri & Detaya Gitme ───────────────────────
+// ── Satır Tıklama (Ctrl / Shift / Normal Detay Açma) ────────
+function handleItemClick(e, id) {
+  if (e && e.target.closest('button, input, a, .badge, .owner-chip, .tag-pill')) return;
+
+  const sorted = sortFiles(allFiles);
+
+  if (e.ctrlKey || e.metaKey) {
+    if (selectedIds.has(id)) selectedIds.delete(id);
+    else selectedIds.add(id);
+    _lastSelectedRowId = id;
+    renderCurrentView();
+    if (typeof updateBulkBar === 'function') updateBulkBar();
+    return;
+  }
+
+  if (e.shiftKey && _lastSelectedRowId) {
+    const idx1 = sorted.findIndex(f => f.id === _lastSelectedRowId);
+    const idx2 = sorted.findIndex(f => f.id === id);
+    if (idx1 !== -1 && idx2 !== -1) {
+      const start = Math.min(idx1, idx2);
+      const end = Math.max(idx1, idx2);
+      for (let i = start; i <= end; i++) selectedIds.add(sorted[i].id);
+      renderCurrentView();
+      if (typeof updateBulkBar === 'function') updateBulkBar();
+      return;
+    }
+  }
+
+  _lastSelectedRowId = id;
+  openDetail(id);
+}
+window.handleItemClick = handleItemClick;
+
 function openDetail(id) {
   window.location.href = 'detail.html?id=' + encodeURIComponent(id);
 }
@@ -425,6 +541,7 @@ function toggleSelect(e, id) {
   if (selectedIds.has(id)) selectedIds.delete(id);
   else selectedIds.add(id);
   renderCurrentView();
+  if (typeof updateBulkBar === 'function') updateBulkBar();
 }
 window.toggleSelect = toggleSelect;
 
@@ -449,6 +566,45 @@ function copyGuidText(guid) {
 }
 window.copyGuidText = copyGuidText;
 
+// ── Kategori & Etiket Modal Tetikleyicileri ─────────────────
+async function openCategoryModalFor(fileId) {
+  const file = FrpStore.getById(fileId);
+  if (!file) return;
+  const currentCat = file.category || '';
+  const cats = FrpStore.getCategories ? FrpStore.getCategories() : [];
+  const catOptions = cats.map(c => `<option value="${escHtml(c)}" ${c === currentCat ? 'selected' : ''}>📁 ${escHtml(c)}</option>`).join('');
+
+  if (typeof window.showModal === 'function') {
+    await window.showModal({
+      title: '🏷️ Kategori Ata',
+      body: `
+        <div style="font-size:.85rem;color:var(--text-secondary);margin-bottom:.8rem;">
+          <strong>${escHtml(file.meta?.reportName || file.name)}</strong> için kategori seçin:
+        </div>
+        <select id="singleCatSelect" class="select-field" style="width:100%;font-size:.88rem;padding:.5rem .75rem;margin-bottom:.6rem;">
+          <option value="">-- Kategori Seçin --</option>
+          ${catOptions}
+        </select>
+        <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.3rem;">Veya Yeni Kategori Yazın:</div>
+        <input type="text" id="singleNewCatInput" class="master-search-input" placeholder="Yeni kategori adı..." style="width:100%;font-size:.88rem;" />
+      `,
+      confirmText: 'Kaydet',
+      cancelText: 'İptal',
+      onOpen: (modalEl) => {
+        modalEl.querySelector('.modal-confirm-btn')?.addEventListener('click', () => {
+          const sel = modalEl.querySelector('#singleCatSelect');
+          const inp = modalEl.querySelector('#singleNewCatInput');
+          const finalCat = (inp && inp.value.trim()) ? inp.value.trim() : (sel ? sel.value : '');
+          FrpStore.setCategory(fileId, finalCat);
+          toast(`Kategori güncellendi: ${finalCat || 'Kaldırıldı'} 📁`, 'success');
+          refreshAll();
+        });
+      }
+    });
+  }
+}
+window.openCategoryModalFor = openCategoryModalFor;
+
 // ── Tümünü Yenile ───────────────────────────────────────────
 function refreshAll() {
   applySearch();
@@ -457,18 +613,39 @@ function refreshAll() {
 }
 window.refreshAll = refreshAll;
 
-// ── Başlatma ────────────────────────────────────────────────
+// ── Başlatma ve Event Listener Bağlantıları ──────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   if (window.FrpStoreReady) await window.FrpStoreReady;
   refreshAll();
 
-  // Arama inputu
+  // Dosya Ekleme Butonları
+  const fileInputSingle  = document.getElementById('fileInputSingle');
+  const fileInputMulti   = document.getElementById('fileInputMulti');
+  const fileInputFolder  = document.getElementById('fileInputFolder');
+
+  document.getElementById('btnAddSingle')?.addEventListener('click', () => fileInputSingle?.click());
+  document.getElementById('btnAddMulti')?.addEventListener('click', () => fileInputMulti?.click());
+  document.getElementById('btnAddFolder')?.addEventListener('click', () => fileInputFolder?.click());
+
+  fileInputSingle?.addEventListener('change', e => { handleFiles(e.target.files); e.target.value = ''; });
+  fileInputMulti?.addEventListener('change', e => { handleFiles(e.target.files); e.target.value = ''; });
+  fileInputFolder?.addEventListener('change', e => { handleFiles(e.target.files); e.target.value = ''; });
+
+  // Sürükle-Bırak Olayları
+  window.addEventListener('dragover', e => e.preventDefault());
+  window.addEventListener('drop', e => {
+    e.preventDefault();
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFiles(e.dataTransfer.files);
+    }
+  });
+
+  // Arama ve Filtreler
   searchInput?.addEventListener('input', (e) => {
     searchQuery = e.target.value;
     applySearch();
   });
 
-  // Filtre seçimleri
   fieldSelect?.addEventListener('change', (e) => {
     searchField = e.target.value;
     applySearch();
@@ -485,6 +662,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     applySearch();
   });
 
+  document.getElementById('btnPinnedOnly')?.addEventListener('click', () => {
+    onlyPinned = !onlyPinned;
+    document.getElementById('btnPinnedOnly')?.classList.toggle('active', onlyPinned);
+    applySearch();
+  });
+
+  document.getElementById('btnNotesOnly')?.addEventListener('click', () => {
+    onlyNotes = !onlyNotes;
+    document.getElementById('btnNotesOnly')?.classList.toggle('active', onlyNotes);
+    applySearch();
+  });
+
+  document.getElementById('btnResetFilters')?.addEventListener('click', () => {
+    searchQuery = '';
+    if (searchInput) searchInput.value = '';
+    selectedTag = '';
+    if (tagSelect) tagSelect.value = '';
+    selectedCategory = '';
+    onlyFavorites = false;
+    btnFavOnly?.classList.remove('active');
+    onlyPinned = false;
+    document.getElementById('btnPinnedOnly')?.classList.remove('active');
+    onlyNotes = false;
+    document.getElementById('btnNotesOnly')?.classList.remove('active');
+    applySearch();
+  });
+
   // Görünüm butonları (Table / Cards / Timeline)
   document.getElementById('btnViewTable')?.addEventListener('click', () => { currentViewMode = 'table'; renderCurrentView(); });
   document.getElementById('btnViewCards')?.addEventListener('click', () => { currentViewMode = 'cards'; renderCurrentView(); });
@@ -496,4 +700,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Ayarlar Modalı Tetikleyici (Ctrl+,)
   document.getElementById('btnOpenSettingsModal')?.addEventListener('click', () => window.openSettingsModal?.('appearance'));
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === ',') {
+      e.preventDefault();
+      window.openSettingsModal?.('appearance');
+    }
+  });
 });
