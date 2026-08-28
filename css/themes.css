@@ -254,3 +254,195 @@
 .code-theme-tokyo-night .sql-operator,
 .code-theme-tokyo-night .pas-special { color: #89ddff; }
 
+/* ══════════════════════════════════════════════════════════
+   TEMA 8 — Cyberpunk Neon (🟣)
+   ══════════════════════════════════════════════════════════ */
+.code-theme-cyberpunk .code-scroll,
+.code-theme-cyberpunk .code-editor-backdrop,
+.code-theme-cyberpunk .code-editor-wrap {
+  background: #0d0221 !important;
+  color: #00f0ff !important;
+}
+.code-theme-cyberpunk .line-src  { color: #00f0ff !important; }
+.code-theme-cyberpunk .code-line { color: #00f0ff; }
+.code-theme-cyberpunk .line-num  { background: #080014 !important; color: #ff007f !important; border-right: 1px solid #2d004d; }
+
+.code-theme-cyberpunk .sql-keyword,
+.code-theme-cyberpunk .pas-keyword { color: #ff007f; font-weight: 800; text-shadow: 0 0 4px rgba(255, 0, 127, 0.4); }
+
+.code-theme-cyberpunk .sql-fn,
+.code-theme-cyberpunk .pas-type    { color: #00f0ff; font-weight: 700; text-shadow: 0 0 4px rgba(0, 240, 255, 0.4); }
+
+.code-theme-cyberpunk .sql-string,
+.code-theme-cyberpunk .pas-string  { color: #ffe600; }
+
+.code-theme-cyberpunk .sql-comment,
+.code-theme-cyberpunk .pas-comment { color: #795290; font-style: italic; }
+
+.code-theme-cyberpunk .sql-number,
+.code-theme-cyberpunk .pas-number  { color: #ff5e00; }
+
+.code-theme-cyberpunk .sql-param   { color: #05ffa1; font-weight: 800; }
+.code-theme-cyberpunk .sql-operator,
+.code-theme-cyberpunk .pas-special { color: #ff007f; }
+
+/* ══════════════════════════════════════════════════════════
+   TEMA 9 — Matrix Emerald (🟢)
+   ══════════════════════════════════════════════════════════ */
+.code-theme-matrix .code-scroll,
+.code-theme-matrix .code-editor-backdrop,
+.code-theme-matrix .code-editor-wrap {
+  background: #040d06 !important;
+  color: #00ff66 !important;
+}
+.code-theme-matrix .line-src  { color: #00ff66 !important; }
+.code-theme-matrix .code-line { color: #00ff66; }
+.code-theme-matrix .line-num  { background: #020803 !important; color: #008833 !important; border-right: 1px solid #0d3816; }
+
+.code-theme-matrix .sql-keyword,
+.code-theme-matrix .pas-keyword { color: #55ff99; font-weight: 800; }
+
+.code-theme-matrix .sql-fn,
+.code-theme-matrix .pas-type    { color: #00e5ff; font-weight: 700; }
+
+.code-theme-matrix .sql-string,
+.code-theme-matrix .pas-string  { color: #a3e635; }
+
+.code-theme-matrix .sql-comment,
+.code-theme-matrix .pas-comment { color: #2d6a4f; font-style: italic; }
+
+.code-theme-matrix .sql-number,
+.code-theme-matrix .pas-number  { color: #facc15; }
+
+.code-theme-matrix .sql-param   { color: #38bdf8; font-weight: 800; }
+.code-theme-matrix .sql-operator,
+.code-theme-matrix .pas-special { color: #4ade80; }
+
+/* ══════════════════════════════════════════════════════════
+   TEMA 10 — Synthwave Sunset (🌅)
+   ══════════════════════════════════════════════════════════ */
+.code-theme-synthwave .code-scroll,
+.code-theme-synthwave .code-editor-backdrop,
+.code-theme-synthwave .code-editor-wrap {
+  background: #241734 !important;
+  color: #f92aad !important;
+}
+.code-theme-synthwave .line-src  { color: #fdfdfd !important; }
+.code-theme-synthwave .code-line { color: #fdfdfd; }
+.code-theme-synthwave .line-num  { background: #190f24 !important; color: #72568f !important; border-right: 1px solid #3d2459; }
+
+.code-theme-synthwave .sql-keyword,
+.code-theme-synthwave .pas-keyword { color: #fede5d; font-weight: 800; }
+
+.code-theme-synthwave .sql-fn,
+.code-theme-synthwave .pas-type    { color: #36f9f6; font-weight: 700; }
+
+.code-theme-synthwave .sql-string,
+.code-theme-synthwave .pas-string  { color: #ff7edb; }
+
+.code-theme-synthwave .sql-comment,
+.code-theme-synthwave .pas-comment { color: #6d558a; font-style: italic; }
+
+.code-theme-synthwave .sql-number,
+.code-theme-synthwave .pas-number  { color: #fe4450; }
+
+.code-theme-synthwave .sql-param   { color: #ff8b39; font-weight: 800; }
+.code-theme-synthwave .sql-operator,
+.code-theme-synthwave .pas-special { color: #fede5d; }
+
+/* ══════════════════════════════════════════════════════════
+   TEMA 11 — Deep Ocean Blue (🌌)
+   ══════════════════════════════════════════════════════════ */
+.code-theme-deep-ocean .code-scroll,
+.code-theme-deep-ocean .code-editor-backdrop,
+.code-theme-deep-ocean .code-editor-wrap {
+  background: #0a192f !important;
+  color: #ccd6f6 !important;
+}
+.code-theme-deep-ocean .line-src  { color: #ccd6f6 !important; }
+.code-theme-deep-ocean .code-line { color: #ccd6f6; }
+.code-theme-deep-ocean .line-num  { background: #071224 !important; color: #495670 !important; border-right: 1px solid #172a45; }
+
+.code-theme-deep-ocean .sql-keyword,
+.code-theme-deep-ocean .pas-keyword { color: #64ffda; font-weight: 800; }
+
+.code-theme-deep-ocean .sql-fn,
+.code-theme-deep-ocean .pas-type    { color: #57cbff; font-weight: 700; }
+
+.code-theme-deep-ocean .sql-string,
+.code-theme-deep-ocean .pas-string  { color: #ffb86c; }
+
+.code-theme-deep-ocean .sql-comment,
+.code-theme-deep-ocean .pas-comment { color: #5a6e85; font-style: italic; }
+
+.code-theme-deep-ocean .sql-number,
+.code-theme-deep-ocean .pas-number  { color: #f7768e; }
+
+.code-theme-deep-ocean .sql-param   { color: #ff9e64; font-weight: 800; }
+.code-theme-deep-ocean .sql-operator,
+.code-theme-deep-ocean .pas-special { color: #82aaff; }
+
+/* ══════════════════════════════════════════════════════════
+   TEMA 12 — Solarized Light (☀️)
+   ══════════════════════════════════════════════════════════ */
+.code-theme-solarized-light .code-scroll,
+.code-theme-solarized-light .code-editor-backdrop,
+.code-theme-solarized-light .code-editor-wrap {
+  background: #fdf6e3 !important;
+  color: #586e75 !important;
+}
+.code-theme-solarized-light .line-src  { color: #586e75 !important; }
+.code-theme-solarized-light .code-line { color: #586e75; }
+.code-theme-solarized-light .line-num  { background: #eee8d5 !important; color: #93a1a1 !important; border-right: 1px solid #e0d8c3; }
+
+.code-theme-solarized-light .sql-keyword,
+.code-theme-solarized-light .pas-keyword { color: #859900; font-weight: 700; }
+
+.code-theme-solarized-light .sql-fn,
+.code-theme-solarized-light .pas-type    { color: #268bd2; font-weight: 600; }
+
+.code-theme-solarized-light .sql-string,
+.code-theme-solarized-light .pas-string  { color: #2aa198; }
+
+.code-theme-solarized-light .sql-comment,
+.code-theme-solarized-light .pas-comment { color: #93a1a1; font-style: italic; }
+
+.code-theme-solarized-light .sql-number,
+.code-theme-solarized-light .pas-number  { color: #d33682; }
+
+.code-theme-solarized-light .sql-param   { color: #cb4b16; font-weight: 700; }
+.code-theme-solarized-light .sql-operator,
+.code-theme-solarized-light .pas-special { color: #657b83; }
+
+/* ══════════════════════════════════════════════════════════
+   TEMA 13 — Solarized Dark (🌑)
+   ══════════════════════════════════════════════════════════ */
+.code-theme-solarized-dark .code-scroll,
+.code-theme-solarized-dark .code-editor-backdrop,
+.code-theme-solarized-dark .code-editor-wrap {
+  background: #002b36 !important;
+  color: #839496 !important;
+}
+.code-theme-solarized-dark .line-src  { color: #839496 !important; }
+.code-theme-solarized-dark .code-line { color: #839496; }
+.code-theme-solarized-dark .line-num  { background: #073642 !important; color: #586e75 !important; border-right: 1px solid #0a4756; }
+
+.code-theme-solarized-dark .sql-keyword,
+.code-theme-solarized-dark .pas-keyword { color: #859900; font-weight: 700; }
+
+.code-theme-solarized-dark .sql-fn,
+.code-theme-solarized-dark .pas-type    { color: #268bd2; font-weight: 600; }
+
+.code-theme-solarized-dark .sql-string,
+.code-theme-solarized-dark .pas-string  { color: #2aa198; }
+
+.code-theme-solarized-dark .sql-comment,
+.code-theme-solarized-dark .pas-comment { color: #586e75; font-style: italic; }
+
+.code-theme-solarized-dark .sql-number,
+.code-theme-solarized-dark .pas-number  { color: #d33682; }
+
+.code-theme-solarized-dark .sql-param   { color: #cb4b16; font-weight: 700; }
+.code-theme-solarized-dark .sql-operator,
+.code-theme-solarized-dark .pas-special { color: #93a1a1; }
+

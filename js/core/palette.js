@@ -10,7 +10,7 @@
   const COMMANDS = [
     // Navigasyon
     { id: 'nav_index',     label: '🏠 Ana Sayfaya Git',           desc: 'Rapor listesi',             action: () => { window.location.href = 'index.html'; } },
-    { id: 'nav_dashboard', label: '📊 Dashboard Aç',              desc: 'İstatistik & grafikler',    action: () => { window.location.href = 'dashboard.html'; } },
+    { id: 'nav_dashboard', label: '📊 Dashboard Aç',              desc: 'İstatistik & grafikler (Admin)', adminOnly: true, action: () => { window.location.href = 'dashboard.html'; } },
     { id: 'nav_compare',   label: '🔀 Karşılaştırma Ekranı',      desc: 'İki raporu yan yana diff',  action: () => { window.location.href = 'compare.html'; } },
 
     // Dosya İşlemleri
@@ -136,12 +136,18 @@
     setTimeout(() => _input.focus(), 50);
   }
 
+  function getAvailableCommands() {
+    const isAdmin = window.FrpAuth ? window.FrpAuth.isAdmin() : false;
+    return COMMANDS.filter(cmd => !cmd.adminOnly || isAdmin);
+  }
+
   function renderList() {
     const q = (_input?.value || '').trim();
+    const available = getAvailableCommands();
     if (!q) {
-      _filtered = COMMANDS.slice(0, 12);
+      _filtered = available.slice(0, 12);
     } else {
-      _filtered = COMMANDS
+      _filtered = available
         .filter(cmd => fuzzyMatch(q, cmd.label) || fuzzyMatch(q, cmd.desc || ''))
         .sort((a, b) => fuzzyScore(q, b.label) - fuzzyScore(q, a.label))
         .slice(0, 12);

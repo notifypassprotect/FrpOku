@@ -154,6 +154,7 @@ async function exportFrpOrSqlWithVersion(tabId, queryIndex) {
 
   const suggestedVerNum = currentVerNum + 1;
   const initialFrpName = `${prefix}${sep}${suggestedVerNum}.frp`;
+  let userVersionVal = String(suggestedVerNum);
 
   const bodyHtml = `
     <div style="font-size:.85rem;line-height:1.6;margin-bottom:1rem;color:var(--text-secondary);">
@@ -169,53 +170,59 @@ async function exportFrpOrSqlWithVersion(tabId, queryIndex) {
     </div>
   `;
 
-  const modalPromise = showModal({
+  const confirmed = await showModal({
     title: '📥 Rapor Versiyonu Güncelle & İndir',
     body: bodyHtml,
     confirmText: '💾 FRP Olarak İndir',
-    cancelText: 'Vazgeç'
+    cancelText: 'Vazgeç',
+    onOpen: (modalEl) => {
+      const inp = modalEl.querySelector('#inputVersionNum');
+      const preview = modalEl.querySelector('#previewVersionedFilename');
+      if (inp && preview) {
+        inp.addEventListener('input', () => {
+          const val = inp.value.trim();
+          userVersionVal = val ? val : String(suggestedVerNum);
+          preview.textContent = `${prefix}${sep}${userVersionVal}.frp`;
+        });
+        inp.select();
+      }
+    },
+    onConfirm: (modalEl) => {
+      const inp = modalEl.querySelector('#inputVersionNum');
+      const val = inp ? inp.value.trim() : '';
+      userVersionVal = val ? val : String(suggestedVerNum);
+      return true;
+    }
   });
 
-  let userVersionVal = String(suggestedVerNum);
-
-  setTimeout(() => {
-    const modalEl = document.querySelector('.modal');
-    if (!modalEl) return;
-    const inp = modalEl.querySelector('#inputVersionNum');
-    const preview = modalEl.querySelector('#previewVersionedFilename');
-
-    if (inp && preview) {
-      const updatePreview = () => {
-        const val = inp.value.trim();
-        userVersionVal = val ? val : String(suggestedVerNum);
-        preview.textContent = `${prefix}${sep}${userVersionVal}.frp`;
-      };
-      inp.addEventListener('input', updatePreview);
-      inp.select();
-    }
-  }, 80);
-
-  const confirmed = await modalPromise;
   if (!confirmed) return;
 
   const inpVal = userVersionVal || String(suggestedVerNum);
   const finalFrpName = `${prefix}${sep}${inpVal}.frp`;
 
-  const frpXml = window.buildUpdatedFrpXml ? window.buildUpdatedFrpXml(currentFile, inpVal) : (currentFile.rawXml || '');
+  try {
+    const frpXml = window.buildUpdatedFrpXml ? window.buildUpdatedFrpXml(currentFile, inpVal) : (currentFile.rawXml || '');
+    const blob = new Blob([frpXml], { type: 'application/octet-stream;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = finalFrpName;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 150);
 
-  const blob = new Blob([frpXml], { type: 'application/octet-stream;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = finalFrpName;
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
+    FrpStore.updateFileName(currentFile.id, finalFrpName);
+    currentFile.name = finalFrpName;
+    const pSub = document.getElementById('pageSubTitle');
+    if (pSub) pSub.textContent = finalFrpName;
 
-  FrpStore.updateFileName(currentFile.id, finalFrpName);
-  currentFile.name = finalFrpName;
-  const pSub = document.getElementById('pageSubTitle');
-  if (pSub) pSub.textContent = finalFrpName;
-
-  showToast(`'${finalFrpName}' indirildi ve güncellendi. 📦`, 'success');
+    showToast(`'${finalFrpName}' indirildi ve güncellendi. 📦`, 'success');
+  } catch (err) {
+    showToast('İndirme hatası: ' + err.message, 'error');
+  }
 }
 
 async function exportSqlWithVersion(queryIndex) {
@@ -369,24 +376,35 @@ async function exportSqlQueryModal(queryIndex) {
         title: `📤 ${esc(q.name)} Sorgusunu İndir`,
         body: body,
         confirmText: 'İndir',
-        cancelText: 'İptal'
+        cancelText: 'İptal',
+        onConfirm: (modalEl) => {
+          const selectedEl = modalEl.querySelector('input[name="queryFormatChoice"]:checked');
+          if (selectedEl) chosenFormat = selectedEl.value;
+          return true;
+        }
       })
     : true;
 
   if (!ok) return;
 
-  const selectedEl = document.querySelector('input[name="queryFormatChoice"]:checked');
-  if (selectedEl) chosenFormat = selectedEl.value;
+  try {
+    const fileName = `${q.name}.${chosenFormat}`;
+    const blob = new Blob([q.sql || ''], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 150);
 
-  const fileName = `${q.name}.${chosenFormat}`;
-  const blob = new Blob([q.sql || ''], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = fileName;
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
-
-  showToast(`'${fileName}' başarıyla indirildi. 📥`, 'success');
+    showToast(`'${fileName}' başarıyla indirildi. 📥`, 'success');
+  } catch (err) {
+    showToast('İndirme hatası: ' + err.message, 'error');
+  }
 }
 
 window.exportHtmlDoc = exportHtmlDoc;

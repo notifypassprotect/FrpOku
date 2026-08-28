@@ -91,8 +91,142 @@ async function ensureAdminUser() {
 }
 ensureAdminUser();
 
-app.use(express.json({ limit: '100mb' }));
-app.use(express.urlencoded({ extended: true, limit: '100mb' }));
+app.disable('x-powered-by');
+
+// ── GÜVENLİ OTURUM & HMAC TOKEN YÖNETİMİ ────────────────────
+const SESSION_SECRET = process.env.SESSION_SECRET || 'frpoku_sec_token_' + (process.env.SUPABASE_KEY ? crypto.createHash('sha256').update(process.env.SUPABASE_KEY).digest('hex') : 'default_local_secret_salt_2026');
+
+function signToken(payload) {
+  const dataStr = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const signature = crypto.createHmac('sha256', SESSION_SECRET).update(dataStr).digest('base64url');
+  return `${dataStr}.${signature}`;
+}
+
+function verifyToken(token) {
+  if (!token || typeof token !== 'string') return null;
+  const parts = token.split('.');
+  if (parts.length !== 2) return null;
+  const [dataStr, signature] = parts;
+  const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(dataStr).digest('base64url');
+  try {
+    const sigBuf = Buffer.from(signature, 'utf8');
+    const expBuf = Buffer.from(expectedSig, 'utf8');
+    if (sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf)) {
+      const json = JSON.parse(Buffer.from(dataStr, 'base64url').toString('utf8'));
+      if (json.exp && Date.now() > json.exp) return null;
+      return json;
+    }
+  } catch (e) {
+    return null;
+  }
+  return null;
+}
+
+// ── PENTESTING & GÜVENLİK HEADERLARI (Security Hardening) ─────
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://fonts.googleapis.com https://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co data: blob:; img-src 'self' data: blob:; frame-ancestors 'self';"
+  );
+  next();
+});
+
+// ── HASSAS DOSYA VE DİZİN KORUMASI (Information Disclosure Protection) ─
+app.use((req, res, next) => {
+  try {
+    const normalizedPath = decodeURIComponent(req.path).replace(/\\/g, '/').toLowerCase();
+    const blockedPatterns = [
+      /^\/\.env/i,
+      /^\/data(\/|$)/i,
+      /^\/\.git(\/|$)/i,
+      /^\/\.vscode(\/|$)/i,
+      /^\/package(-lock)?\.json$/i,
+      /^\/server\.js$/i,
+      /\.bak$/i,
+      /\.tmp$/i,
+      /\.log$/i
+    ];
+
+    if (blockedPatterns.some(pattern => pattern.test(normalizedPath))) {
+      return res.status(403).json({
+        success: false,
+        reason: '⛔ 403 Forbidden: Bu dosya veya dizine doğrudan erişim güvenlik politikası gereği engellenmiştir.'
+      });
+    }
+  } catch (err) {
+    return res.status(400).json({ success: false, reason: 'Geçersiz istek URL yolu.' });
+  }
+  next();
+});
+
+// ── RATE LIMITER (Brute-Force & DoS Koruması) ─────────────────
+const rateLimitMap = new Map();
+function createRateLimiter({ windowMs = 60000, max = 30, message = 'Çok fazla istek gönderildi. Lütfen bir süre sonra tekrar deneyiniz.' } = {}) {
+  return (req, res, next) => {
+    const ip = req.ip || req.connection?.remoteAddress || '127.0.0.1';
+    const now = Date.now();
+    const record = rateLimitMap.get(ip) || { count: 0, resetTime: now + windowMs };
+    if (now > record.resetTime) {
+      record.count = 1;
+      record.resetTime = now + windowMs;
+    } else {
+      record.count++;
+    }
+    rateLimitMap.set(ip, record);
+    if (record.count > max) {
+      return res.status(429).json({
+        success: false,
+        reason: `⚠️ ${message}`,
+        retryAfterSec: Math.ceil((record.resetTime - now) / 1000)
+      });
+    }
+    next();
+  };
+}
+
+const authRateLimiter = createRateLimiter({ windowMs: 60000, max: 25, message: 'Giriş/Kayıt deneme sınırı aşıldı. Lütfen 1 dakika bekleyiniz.' });
+const adminRateLimiter = createRateLimiter({ windowMs: 60000, max: 60, message: 'Yönetim istek sınırı aşıldı.' });
+
+// ── ADMİN YETKİ DENETİMİ (RBAC Middleware) ────────────────────
+function requireAdmin(req, res, next) {
+  const authHeader = req.headers['authorization'] || req.headers['x-admin-auth'];
+  const adminKey = req.headers['x-admin-key'] || req.body?.adminKey;
+
+  let requestingUser = null;
+
+  if (authHeader) {
+    const raw = String(authHeader).replace(/^Bearer\s+/i, '').trim();
+    // 1. Kriptografik İmzalı Token Doğrulaması (HMAC-SHA256)
+    const tokenPayload = verifyToken(raw);
+    if (tokenPayload && (tokenPayload.role === 'admin' || tokenPayload.username === 'admin')) {
+      requestingUser = tokenPayload;
+    }
+  }
+
+  // 2. Özel Sistem Admin Secret Anahtarı Doğrulaması
+  if (!requestingUser && process.env.ADMIN_SECRET && adminKey === process.env.ADMIN_SECRET) {
+    requestingUser = { role: 'admin', username: 'admin' };
+  }
+
+  // Pentesting: Yetkisiz çağrıları 403 Forbidden ile engelle
+  if (!requestingUser) {
+    return res.status(403).json({
+      success: false,
+      reason: '⛔ Yetkisiz Erişim (403 Forbidden): Bu yönetim işlemini gerçekleştirmek için geçerli Sistem Yöneticisi (Admin) oturumu gereklidir.'
+    });
+  }
+
+  req.adminUser = requestingUser;
+  next();
+}
+
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.static(path.join(__dirname)));
 
 // Config endpoint for client-side Supabase connection
@@ -104,7 +238,7 @@ app.get('/api/config', (req, res) => {
 });
 
 // ── 1. YENİ KULLANICI KAYDI (Admin Onayına Gönderme) ─────────
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', authRateLimiter, async (req, res) => {
   const { fullName, username, email, phone, department, password } = req.body;
   const cleanEmail = (email || '').trim().toLowerCase();
   const cleanUser = (username || '').trim().toLowerCase();
@@ -198,7 +332,7 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 // ── 2. KULLANICI GİRİŞİ (Login) ──────────────────────────────
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authRateLimiter, async (req, res) => {
   const { identifier, password } = req.body;
   const ident = (identifier || '').trim();
   if (!ident || !password) {
@@ -277,8 +411,17 @@ app.post('/api/auth/login', async (req, res) => {
     const safeUser = { ...user };
     delete safeUser.password_hash;
 
+    const token = signToken({
+      id: safeUser.id,
+      username: safeUser.username,
+      role: safeUser.role,
+      department: safeUser.department,
+      exp: Date.now() + 7 * 24 * 3600 * 1000 // 7 gün geçerli
+    });
+
     res.json({
       success: true,
+      token,
       user: safeUser
     });
   } catch (err) {
@@ -288,7 +431,7 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // ── 3. ADMİN: ONAY BEKLEYEN KULLANICILARI LİSTELE ──────────────
-app.get('/api/admin/pending-users', async (req, res) => {
+app.get('/api/admin/pending-users', adminRateLimiter, requireAdmin, async (req, res) => {
   try {
     let pendingList = [];
 
@@ -326,7 +469,7 @@ app.get('/api/admin/pending-users', async (req, res) => {
 });
 
 // ── 4. ADMİN: TÜM KULLANICILARI LİSTELE ───────────────────────
-app.get('/api/admin/all-users', async (req, res) => {
+app.get('/api/admin/all-users', adminRateLimiter, requireAdmin, async (req, res) => {
   try {
     let allUsers = [];
 
@@ -361,7 +504,7 @@ app.get('/api/admin/all-users', async (req, res) => {
 });
 
 // ── 5. ADMİN: KULLANICIYI ONAYLA (Approve & Activate) ─────────
-app.post('/api/admin/approve-user', async (req, res) => {
+app.post('/api/admin/approve-user', adminRateLimiter, requireAdmin, async (req, res) => {
   const { userId } = req.body;
   if (!userId) {
     return res.status(400).json({ success: false, reason: 'Kullanıcı kimliği (userId) belirtilmedi.' });
@@ -400,7 +543,7 @@ app.post('/api/admin/approve-user', async (req, res) => {
 });
 
 // ── 6. ADMİN: KULLANICIYI REDDET VEYA SİL ────────────────────
-app.post('/api/admin/reject-user', async (req, res) => {
+app.post('/api/admin/reject-user', adminRateLimiter, requireAdmin, async (req, res) => {
   const { userId, deletePermanently = true } = req.body;
   if (!userId) {
     return res.status(400).json({ success: false, reason: 'Kullanıcı kimliği (userId) belirtilmedi.' });
@@ -437,7 +580,7 @@ app.post('/api/admin/reject-user', async (req, res) => {
 });
 
 // ── 7. ADMİN: AKTİFLİK DURUMUNU DEĞİŞTİR (Dondur / Aç) ────────
-app.post('/api/admin/toggle-status', async (req, res) => {
+app.post('/api/admin/toggle-status', adminRateLimiter, requireAdmin, async (req, res) => {
   const { userId, isActive } = req.body;
   if (!userId) return res.status(400).json({ success: false, reason: 'Kullanıcı ID gerekli.' });
 
@@ -460,7 +603,7 @@ app.post('/api/admin/toggle-status', async (req, res) => {
 });
 
 // ── 8. ADMİN: ADMIN ROLÜ VER / GERİ AL ────────────────────────
-app.post('/api/admin/toggle-admin', async (req, res) => {
+app.post('/api/admin/toggle-admin', adminRateLimiter, requireAdmin, async (req, res) => {
   const { userId, makeAdmin } = req.body;
   if (!userId) return res.status(400).json({ success: false, reason: 'Kullanıcı ID gerekli.' });
 
@@ -485,7 +628,7 @@ app.post('/api/admin/toggle-admin', async (req, res) => {
 });
 
 // ── 9. ADMİN: DOĞRUDAN ŞİFRE SIFIRLAMA ────────────────────────
-app.post('/api/admin/reset-password', async (req, res) => {
+app.post('/api/admin/reset-password', adminRateLimiter, requireAdmin, async (req, res) => {
   const { userId, newPassword } = req.body;
   if (!userId || !newPassword || newPassword.length < 3) {
     return res.status(400).json({ success: false, reason: 'Lütfen en az 3 karakterden oluşan geçerli bir yeni şifre giriniz.' });

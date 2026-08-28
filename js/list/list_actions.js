@@ -81,7 +81,8 @@ async function downloadSingleReport(id) {
   const currentFilename = file.name;
   let versionBump = 1;
 
-  const initialTargetName = FrpStore.bumpVersionFilename(currentFilename, 1);
+  const initialTargetName = FrpStore.bumpVersionFilename ? FrpStore.bumpVersionFilename(currentFilename, 1) : currentFilename;
+  let finalChosenName = initialTargetName;
 
   const bodyHtml = `
     <div style="display:flex;flex-direction:column;gap:1.15rem;">
@@ -89,7 +90,7 @@ async function downloadSingleReport(id) {
       <div style="background:var(--bg-raised);padding:.9rem 1.15rem;border-radius:12px;border:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
         <div style="min-width:0;flex:1;">
           <div style="font-weight:800;font-size:1rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📋 ${escHtml(reportName)}</div>
-          <div style="font-size:.78rem;color:var(--text-muted);font-family:var(--mono);margin-top:.25rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Mevcut dosya: <strong>${escHtml(currentFilename)}</strong></div>
+          <div style="font-size:.78rem;color:var(--text-muted);font-family:var(--font);margin-top:.25rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Mevcut dosya: <strong>${escHtml(currentFilename)}</strong></div>
         </div>
         <div style="display:flex;align-items:center;gap:.4rem;">
           <span class="badge badge-blue">🗄️ ${(file.queries || []).length} SQL</span>
@@ -112,17 +113,14 @@ async function downloadSingleReport(id) {
         <div>
           <label style="font-size:.76rem;font-weight:700;color:var(--text-muted);display:block;margin-bottom:.35rem;">İndirilecek Dosya Adı (İsteğe bağlı düzenleyebilirsiniz):</label>
           <div style="display:flex;align-items:center;gap:.5rem;">
-            <input type="text" id="targetFileNameInp" class="master-search-input" style="flex:1;font-family:var(--mono);font-weight:700;color:var(--accent-bright);font-size:.9rem;" value="${escHtml(initialTargetName)}" />
+            <input type="text" id="targetFileNameInp" class="master-search-input" style="flex:1;font-family:var(--font);font-weight:700;color:var(--accent-bright);font-size:.9rem;" value="${escHtml(initialTargetName)}" />
           </div>
         </div>
       </div>
     </div>
   `;
 
-  let userConfirmed = false;
-  let finalChosenName = initialTargetName;
-
-  await showModal({
+  const confirmed = await showModal({
     title: '📥 FRP Raporu İndir',
     body: bodyHtml,
     confirmText: '💾 Hemen İndir',
@@ -134,7 +132,7 @@ async function downloadSingleReport(id) {
 
       function updateTargetName() {
         let baseName = currentFilename;
-        if (versionBump > 0) {
+        if (versionBump > 0 && typeof FrpStore.bumpVersionFilename === 'function') {
           baseName = FrpStore.bumpVersionFilename(baseName, versionBump);
         }
         if (!baseName.toLowerCase().endsWith('.frp')) {
@@ -155,36 +153,43 @@ async function downloadSingleReport(id) {
           updateTargetName();
         });
       });
-
-      modalEl.querySelector('.modal-confirm-btn')?.addEventListener('click', () => {
-        userConfirmed = true;
-        let val = (nameInp?.value || '').trim();
-        if (!val) val = initialTargetName;
-        if (!val.toLowerCase().endsWith('.frp')) val += '.frp';
-        finalChosenName = val;
-      });
+    },
+    onConfirm: (modalEl) => {
+      const nameInp = modalEl.querySelector('#targetFileNameInp');
+      let val = (nameInp?.value || '').trim();
+      if (!val) val = initialTargetName;
+      if (!val.toLowerCase().endsWith('.frp')) val += '.frp';
+      finalChosenName = val;
+      return true;
     }
   });
 
-  if (!userConfirmed) return;
+  if (!confirmed) return;
 
   showProgressModal('FRP Hazırlanıyor...', finalChosenName, '📥');
   updateProgressModal(1, 1, finalChosenName);
   await new Promise(r => setTimeout(r, 120));
 
-  const xmlData = window.buildUpdatedFrpXml ? window.buildUpdatedFrpXml(file, null) : (file.rawXml || '');
-  const blob = new Blob([xmlData], { type: 'application/octet-stream;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = finalChosenName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  try {
+    const xmlData = window.buildUpdatedFrpXml ? window.buildUpdatedFrpXml(file, null) : (file.rawXml || '');
+    const blob = new Blob([xmlData], { type: 'application/octet-stream;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = finalChosenName;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 150);
 
-  hideProgressModal();
-  toast(`'${finalChosenName}' başarıyla indirildi. 📥`, 'success');
+    hideProgressModal();
+    toast(`'${finalChosenName}' başarıyla indirildi. 📥`, 'success');
+  } catch (err) {
+    hideProgressModal();
+    toast('İndirme hatası: ' + err.message, 'error');
+  }
 }
 
 window.downloadSingleReport = downloadSingleReport;
@@ -210,6 +215,7 @@ async function downloadBulkReports() {
   const pad = n => String(n).padStart(2, '0');
   const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
   const defaultZipName = `FrpOku_Raporlar_${dateStr}.zip`;
+  let customZipName = defaultZipName;
 
   const bodyHtml = `
     <div style="display:flex;flex-direction:column;gap:1.15rem;">
@@ -224,7 +230,7 @@ async function downloadBulkReports() {
         </div>
       </div>
 
-      <!-- Seçilen Tüm Raporların Canlı Önizleme Listesi (Kullanıcı İsteği) -->
+      <!-- Seçilen Tüm Raporların Canlı Önizleme Listesi -->
       <div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.35rem;">
           <label style="font-size:.78rem;font-weight:700;color:var(--text-secondary);">Seçilen Raporların Canlı Önizleme Listesi (${count}):</label>
@@ -261,7 +267,7 @@ async function downloadBulkReports() {
           <label style="font-size:.78rem;font-weight:700;color:var(--text-primary);display:block;margin-bottom:.3rem;">
             ZIP Arşiv Adı:
           </label>
-          <input type="text" id="bulkZipNameInp" class="master-search-input" style="width:100%;font-family:var(--mono);font-weight:700;" placeholder="${escHtml(defaultZipName)}" value="${escHtml(defaultZipName)}" />
+          <input type="text" id="bulkZipNameInp" class="master-search-input" style="width:100%;font-family:var(--font);font-weight:700;" placeholder="${escHtml(defaultZipName)}" value="${escHtml(defaultZipName)}" />
           <div style="font-size:.71rem;color:var(--text-muted);margin-top:.25rem;">Boş bırakırsanız otomatik güncel tarih ve saat atanır.</div>
         </div>
 
@@ -287,10 +293,7 @@ async function downloadBulkReports() {
     </div>
   `;
 
-  let userConfirmed = false;
-  let customZipName = defaultZipName;
-
-  await showModal({
+  const confirmed = await showModal({
     title: `📦 Toplu Rapor İndirme (${count} Rapor)`,
     body: bodyHtml,
     confirmText: `💾 ${count} Raporu İndir`,
@@ -308,7 +311,7 @@ async function downloadBulkReports() {
         if (!previewList) return;
         previewList.innerHTML = selectedList.map((file, idx) => {
           let targetName = file.name;
-          if (versionBump > 0) {
+          if (versionBump > 0 && typeof FrpStore.bumpVersionFilename === 'function') {
             targetName = FrpStore.bumpVersionFilename(targetName, versionBump);
           }
           const catStr = (useFolders && file.category) ? `📁 ${escHtml(file.category)}/` : '';
@@ -317,7 +320,7 @@ async function downloadBulkReports() {
               <span style="font-weight:700;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px;">
                 ${idx + 1}. ${escHtml(file.meta?.reportName || file.name)}
               </span>
-              <span style="font-family:var(--mono);color:var(--accent-bright);font-weight:600;white-space:nowrap;">
+              <span style="font-family:var(--font);color:var(--accent-bright);font-weight:600;white-space:nowrap;">
                 ${catStr}${escHtml(targetName)}
               </span>
             </div>
@@ -360,22 +363,22 @@ async function downloadBulkReports() {
         });
       });
 
-      modalEl.querySelector('.modal-confirm-btn')?.addEventListener('click', () => {
-        userConfirmed = true;
-        let entered = (zipNameInp?.value || '').trim();
-        if (entered) {
-          if (!entered.toLowerCase().endsWith('.zip')) entered += '.zip';
-          customZipName = entered;
-        } else {
-          customZipName = defaultZipName;
-        }
-      });
-
       renderPreview();
+    },
+    onConfirm: (modalEl) => {
+      const zipNameInp = modalEl.querySelector('#bulkZipNameInp');
+      let entered = (zipNameInp?.value || '').trim();
+      if (entered) {
+        if (!entered.toLowerCase().endsWith('.zip')) entered += '.zip';
+        customZipName = entered;
+      } else {
+        customZipName = defaultZipName;
+      }
+      return true;
     }
   });
 
-  if (!userConfirmed) return;
+  if (!confirmed) return;
 
   showProgressModal('Toplu Raporlar Hazırlanıyor...', `${count} dosya işleniyor`, '📦');
   const errors = [];
@@ -387,7 +390,9 @@ async function downloadBulkReports() {
       const file = selectedList[i];
       try {
         let fName = file.name;
-        if (versionBump > 0) fName = FrpStore.bumpVersionFilename(fName, versionBump);
+        if (versionBump > 0 && typeof FrpStore.bumpVersionFilename === 'function') {
+          fName = FrpStore.bumpVersionFilename(fName, versionBump);
+        }
         if (useFolders && file.category) {
           fName = `${file.category.replace(/[/\\?%*:|"<>]/g, '_')}/${fName}`;
         }
@@ -411,8 +416,10 @@ async function downloadBulkReports() {
       a.download = customZipName;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 150);
       hideProgressModal();
       toast(`📦 ${successCount} rapor '${customZipName}' olarak indirildi!`, 'success');
     } else {
@@ -424,7 +431,9 @@ async function downloadBulkReports() {
       const file = selectedList[i];
       try {
         let fName = file.name;
-        if (versionBump > 0) fName = FrpStore.bumpVersionFilename(fName, versionBump);
+        if (versionBump > 0 && typeof FrpStore.bumpVersionFilename === 'function') {
+          fName = FrpStore.bumpVersionFilename(fName, versionBump);
+        }
         const xml = window.buildUpdatedFrpXml ? window.buildUpdatedFrpXml(file, null) : (file.rawXml || '');
         const blob = new Blob([xml], { type: 'application/octet-stream;charset=utf-8' });
         const url = URL.createObjectURL(blob);
@@ -433,8 +442,10 @@ async function downloadBulkReports() {
         a.download = fName;
         document.body.appendChild(a);
         a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 150);
         successCount++;
       } catch (err) {
         errors.push(`${file.name}: ${err.message}`);

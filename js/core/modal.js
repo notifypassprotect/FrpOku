@@ -32,8 +32,8 @@ function showModal({
       }).join(' ');
     } else {
       actionsHtml = `
-        ${cancelText ? `<button type="button" class="btn btn-sm" id="modalCancel">${escModalHtml(cancelText)}</button>` : ''}
-        ${confirmText ? `<button type="button" class="btn btn-sm ${danger ? 'btn-danger' : 'btn-primary'}" id="modalConfirm">${escModalHtml(confirmText)}</button>` : ''}
+        ${cancelText ? `<button type="button" class="btn btn-sm modal-cancel-btn" id="modalCancel">${escModalHtml(cancelText)}</button>` : ''}
+        ${confirmText ? `<button type="button" class="btn btn-sm ${danger ? 'btn-danger' : 'btn-primary'} modal-confirm-btn" id="modalConfirm">${escModalHtml(confirmText)}</button>` : ''}
       `;
     }
 

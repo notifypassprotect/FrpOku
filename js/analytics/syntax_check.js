@@ -230,8 +230,8 @@
   }
 
   function checkSqlStaticSyntax(sql) {
-    const errors = [], warnings = [];
-    if (!sql || !sql.trim()) return { errors, warnings };
+    const errors = [], warnings = [], securityRisks = [];
+    if (!sql || !sql.trim()) return { errors, warnings, securityRisks };
 
     const upper = sql.toUpperCase()
       .replace(/--[^\n]*/g, '')
@@ -241,7 +241,73 @@
     const hasAggregates = /\b(AVG|SUM|COUNT|MIN|MAX)\s*\(/i.test(upper);
     const hasGroupBy = /\bGROUP\s+BY\b/i.test(upper);
     const hasSelect = /\bSELECT\b/i.test(upper);
+    const hasWhere = /\bWHERE\b/i.test(upper);
+    const hasDelete = /\bDELETE\s+FROM\b/i.test(upper) || /\bDELETE\b\s+[a-zA-Z0-9_#]+/i.test(upper);
+    const hasUpdate = /\bUPDATE\b\s+[a-zA-Z0-9_#]+\s+SET\b/i.test(upper);
 
+    // ── GÜVENLİK VE RİSK DENETİMİ (Security Auditing) ──────────────
+    // 1. DROP / TRUNCATE / ALTER / DDL Denetimi
+    if (/\bDROP\s+(TABLE|DATABASE|VIEW|PROCEDURE|INDEX|SCHEMA)\b/i.test(upper)) {
+      securityRisks.push({
+        level: 'CRITICAL',
+        badge: '🚨 KRİTİK',
+        title: 'DROP Komutu Tespit Edildi',
+        text: "Sorgu içerisinde tablo veya nesne silmeye yönelik 'DROP' komutu bulundu. Raporlama sorgularında şema silme komutları son derece tehlikelidir!"
+      });
+    }
+
+    if (/\bTRUNCATE\s+TABLE\b/i.test(upper)) {
+      securityRisks.push({
+        level: 'CRITICAL',
+        badge: '🚨 KRİTİK',
+        title: 'TRUNCATE Komutu Tespit Edildi',
+        text: "Tabloyu tamamen boşaltan 'TRUNCATE' komutu tespit edildi. Rapor sorguları salt-okunur (read-only) olmalıdır!"
+      });
+    }
+
+    if (/\bALTER\s+TABLE\b/i.test(upper)) {
+      securityRisks.push({
+        level: 'HIGH',
+        badge: '⚠️ YÜKSEK',
+        title: 'ALTER TABLE Komutu Tespit Edildi',
+        text: "Veritabanı tablosunun yapısını değiştiren 'ALTER TABLE' komutu bulundu."
+      });
+    }
+
+    if (/\b(GRANT|REVOKE)\b/i.test(upper)) {
+      securityRisks.push({
+        level: 'HIGH',
+        badge: '⚠️ YÜKSEK',
+        title: 'Yetki Değiştirme Komutu Tespit Edildi',
+        text: "Kullanıcı yetkisi tanımlayan/kaldıran GRANT/REVOKE komutu tespit edildi."
+      });
+    }
+
+    // 2. WHERE'siz DELETE veya UPDATE (Veri Kaybı Riski)
+    if (hasDelete && !hasWhere) {
+      securityRisks.push({
+        level: 'CRITICAL',
+        badge: '🚨 KRİTİK',
+        title: "WHERE Koşulsuz DELETE!",
+        text: "DELETE sorgusu herhangi bir WHERE koşulu içermiyor! Tablodaki tüm kayıtların silinmesine neden olabilir."
+      });
+    }
+
+    if (hasUpdate && !hasWhere) {
+      securityRisks.push({
+        level: 'HIGH',
+        badge: '⚠️ YÜKSEK',
+        title: "WHERE Koşulsuz UPDATE!",
+        text: "UPDATE sorgusu WHERE koşulu içermiyor! Tablodaki tüm satırların güncellenmesine neden olabilir."
+      });
+    }
+
+    // 3. Kartezyen Çarpım (Cartesian Product) Uyarısı
+    if (hasSelect && upper.includes(' FROM ') && !upper.includes(' JOIN ') && upper.split(' FROM ')[1]?.split(/\b(WHERE|GROUP|ORDER|HAVING)\b/)[0]?.includes(',')) {
+      warnings.push("Birden fazla tablo virgülle birleştirilmiş fakat JOIN sözcüğü kullanılmamış. Kartezyen çarpım (Cross Join) ve performans sorunlarına yol açabilir.");
+    }
+
+    // 4. Standart Sözdizimi Kontrolleri
     if (hasAggregates && !hasGroupBy && hasSelect) {
       warnings.push("Aggregate fonksiyonu (SUM, COUNT vb.) ile normal kolonlar birlikte kullanılıyor olabilir ancak GROUP BY bulunamadı.");
     }
@@ -250,11 +316,63 @@
       errors.push("SELECT ifadesi bulundu fakat FROM anahtar sözcüğü eksik.");
     }
 
-    return { errors, warnings };
+    // 5. Parantez Bütünlüğü Kontrolü
+    let openCount = 0;
+    for (let i = 0; i < upper.length; i++) {
+      if (upper[i] === '(') openCount++;
+      else if (upper[i] === ')') {
+        openCount--;
+        if (openCount < 0) {
+          errors.push("SQL sorgusunda fazladan kapatma parantezi ')' bulundu.");
+          break;
+        }
+      }
+    }
+    if (openCount > 0) {
+      errors.push(`SQL sorgusunda ${openCount} adet açılan parantez '(' kapatılmamış.`);
+    }
+
+    return { errors, warnings, securityRisks };
+  }
+
+  /**
+   * FRP Dosya Bütünlüğü ve Güvenlik Denetimi
+   */
+  function validateFrpFileContent(file, rawBytesOrText) {
+    const results = {
+      isValid: true,
+      errors: [],
+      warnings: [],
+      fileSizeMb: (file.size / (1024 * 1024)).toFixed(2)
+    };
+
+    if (!file) {
+      results.isValid = false;
+      results.errors.push('Dosya nesnesi bulunamadı.');
+      return results;
+    }
+
+    if (file.size === 0) {
+      results.isValid = false;
+      results.errors.push('Dosya boş (0 bayt). Lütfen geçerli bir .frp rapor dosyası seçin.');
+      return results;
+    }
+
+    if (file.size > 50 * 1024 * 1024) {
+      results.warnings.push(`Dosya boyutu (${results.fileSizeMb} MB) oldukça büyük. Ayrıştırma süresi uzayabilir.`);
+    }
+
+    const fileName = (file.name || '').toLowerCase();
+    if (!fileName.endsWith('.frp') && !fileName.endsWith('.fr3') && !fileName.endsWith('.xml')) {
+      results.warnings.push(`Dosya uzantısı '.frp' yerine '${file.name.split('.').pop()}' görünüyor. FastReport standardı olmayabilir.`);
+    }
+
+    return results;
   }
 
   window.FrpSyntaxCheck = {
     checkPascalSyntax,
-    checkSqlStaticSyntax
+    checkSqlStaticSyntax,
+    validateFrpFileContent
   };
 })();

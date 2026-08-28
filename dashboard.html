@@ -187,26 +187,49 @@
 <!-- Scripts (Modüler Mimari) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/core/supabase.js?v=3.0"></script>
-<script src="js/core/auth.js?v=3.0"></script>
-<script src="js/core/dom.js?v=3.0"></script>
-<script src="js/core/formatter.js?v=3.0"></script>
-<script src="js/core/themes.js?v=3.0"></script>
-<script src="js/core/modal.js?v=3.0"></script>
-<script src="js/core/palette.js?v=3.0"></script>
-<script src="js/core/parser.js?v=3.0"></script>
-<script src="js/analytics/complexity.js?v=3.0"></script>
-<script src="js/analytics/dependencies.js?v=3.0"></script>
-<script src="js/analytics/table_usage.js?v=3.0"></script>
-<script src="js/analytics/param_usage.js?v=3.0"></script>
-<script src="js/analytics/syntax_check.js?v=3.0"></script>
-<script src="js/store/store_tags.js?v=3.0"></script>
-<script src="js/store/store_main.js?v=3.0"></script>
-<script src="js/core/snippet_tools.js?v=3.0"></script>
-<script src="js/core/snippet_modal.js?v=3.0"></script>
-<script src="js/settings/settings_modal.js?v=3.0"></script>
+<script src="js/core/notify.js?v=4.0"></script>
+<script src="js/core/auth.js?v=4.0"></script>
+<script src="js/core/dom.js?v=4.0"></script>
+<script src="js/core/formatter.js?v=4.0"></script>
+<script src="js/core/themes.js?v=4.0"></script>
+<script src="js/core/modal.js?v=4.0"></script>
+<script src="js/core/palette.js?v=4.0"></script>
+<script src="js/core/parser.js?v=4.0"></script>
+<script src="js/analytics/complexity.js?v=4.0"></script>
+<script src="js/analytics/dependencies.js?v=4.0"></script>
+<script src="js/analytics/table_usage.js?v=4.0"></script>
+<script src="js/analytics/param_usage.js?v=4.0"></script>
+<script src="js/analytics/syntax_check.js?v=4.0"></script>
+<script src="js/store/store_tags.js?v=4.0"></script>
+<script src="js/store/store_main.js?v=4.0"></script>
+<script src="js/core/snippet_tools.js?v=4.0"></script>
+<script src="js/core/snippet_modal.js?v=4.0"></script>
+<script src="js/settings/settings_modal.js?v=4.0"></script>
 <script>
 (function() {
 'use strict';
+
+// ── ADMİN YETKİ KONTROLÜ (Pentest & Access Control Guard) ──────
+function verifyAdminAccess() {
+  const isAdmin = window.FrpAuth ? window.FrpAuth.isAdmin() : false;
+  if (!isAdmin) {
+    document.body.innerHTML = `
+      <div style="height:100vh;display:flex;align-items:center;justify-content:center;background:#0b1020;color:#fff;font-family:system-ui,sans-serif;text-align:center;padding:1.5rem;">
+        <div style="background:rgba(26,34,53,0.95);border:1px solid rgba(239,68,68,0.4);border-radius:20px;padding:2.5rem 2rem;max-width:440px;box-shadow:0 25px 50px rgba(0,0,0,0.5);">
+          <div style="font-size:3.5rem;margin-bottom:.8rem;">🛡️</div>
+          <h2 style="font-size:1.35rem;font-weight:800;color:#f87171;margin:0 0 .5rem;">Yetkisiz Erişim (403 Forbidden)</h2>
+          <p style="font-size:.88rem;color:#94a3b8;line-height:1.6;margin-bottom:1.5rem;">İstatistik ve Analiz Paneli yalnızca <strong>Sistem Yöneticisi (Admin)</strong> yetkisine sahip kullanıcılar tarafından görüntülenebilir.</p>
+          <a href="index.html" style="display:inline-block;background:#2563eb;color:#fff;padding:.65rem 1.3rem;border-radius:10px;font-weight:700;font-size:.88rem;text-decoration:none;transition:background .2s;">← Ana Sayfaya Dön</a>
+        </div>
+      </div>
+    `;
+    setTimeout(() => { window.location.href = 'index.html'; }, 2200);
+    return false;
+  }
+  return true;
+}
+
+if (!verifyAdminAccess()) return;
 
 function esc(s) {
   return String(s || '')

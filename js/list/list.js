@@ -158,41 +158,74 @@ document.addEventListener('DOMContentLoaded', setupTopbarDropdowns);
 setupTopbarDropdowns();
 // ── Dosya Yükleme (Sürükle-Bırak & Çoklu Dosya Yükleme) ──────
 async function handleFiles(fileList) {
-  const files = Array.from(fileList).filter(f => f.name.toLowerCase().endsWith('.frp'));
+  const allIncoming = Array.from(fileList || []);
+  if (allIncoming.length === 0) return;
 
-  if (files.length === 0) {
-    toast('Seçilen dosyalar arasında .frp uzantılı dosya bulunamadı.', 'warning');
-    return;
+  const validFiles = [];
+  const rejectedFiles = [];
+
+  // 1. Dosya Bütünlüğü ve Uzantı Ön Denetimi
+  allIncoming.forEach(f => {
+    const valRes = (window.FrpSyntaxCheck && typeof window.FrpSyntaxCheck.validateFrpFileContent === 'function')
+      ? window.FrpSyntaxCheck.validateFrpFileContent(f)
+      : { isValid: f.name.toLowerCase().endsWith('.frp') || f.name.toLowerCase().endsWith('.fr3'), errors: [] };
+
+    if (!valRes.isValid || (!f.name.toLowerCase().endsWith('.frp') && !f.name.toLowerCase().endsWith('.fr3'))) {
+      rejectedFiles.push({ name: f.name, reason: valRes.errors[0] || 'Geçersiz dosya formatı (.frp veya .fr3 olmalıdır)' });
+    } else {
+      validFiles.push(f);
+    }
+  });
+
+  if (rejectedFiles.length > 0) {
+    if (rejectedFiles.length === 1) {
+      if (window.FrpNotify) {
+        window.FrpNotify.warn(`${rejectedFiles[0].name}: ${rejectedFiles[0].reason}`, 'Geçersiz Dosya');
+      } else {
+        toast(`${rejectedFiles[0].name}: ${rejectedFiles[0].reason}`, 'warning');
+      }
+    } else {
+      if (window.FrpNotify) {
+        window.FrpNotify.warn(`${rejectedFiles.length} dosya uygun .frp formatında olmadığı için atlandı.`, 'Uyarı');
+      }
+    }
   }
+
+  if (validFiles.length === 0) return;
 
   const resultsToSave = [];
   const errorDetails = [];
-  const isBulk = files.length > 1;
+  const isBulk = validFiles.length > 1;
 
   if (isBulk) {
-    showProgressModal('Raporlar Yükleniyor...', `${files.length} dosya işleniyor`, '🔄');
+    showProgressModal('Raporlar Yükleniyor...', `${validFiles.length} dosya işleniyor`, '🔄');
   }
 
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
+  for (let i = 0; i < validFiles.length; i++) {
+    const file = validFiles[i];
     
     if (isBulk) {
-      updateProgressModal(i + 1, files.length, file.name);
+      updateProgressModal(i + 1, validFiles.length, file.name);
       if (i % 3 === 0) await new Promise(r => setTimeout(r, 0));
     }
 
     try {
       const text = await readFileAsText(file);
+      if (!text || text.trim().length === 0) {
+        errorDetails.push({ name: file.name, error: 'Dosya içeriği boş veya okunamadı.' });
+        continue;
+      }
+
       const parsed = parseFrp(text);
 
       if (!parsed.pascalScript && (!parsed.queries || parsed.queries.length === 0)) {
-        errorDetails.push({ name: file.name, error: 'Pascal veya SQL kodu bulunamadı.' });
+        errorDetails.push({ name: file.name, error: 'Dosyada geçerli FastReport PascalScript veya SQL sorgusu bulunamadı.' });
         continue;
       }
 
       resultsToSave.push({ parsedData: parsed, fileName: file.name, fileSize: file.size });
     } catch (err) {
-      errorDetails.push({ name: file.name, error: err.message });
+      errorDetails.push({ name: file.name, error: err.message || 'Ayrıştırma hatası' });
     }
   }
 
@@ -207,17 +240,21 @@ async function handleFiles(fileList) {
 
   if (added + updated > 0) {
     if (updated > 0 && added > 0) {
-      toast(`✅ ${added} yeni rapor eklendi, ${updated} mevcut rapor güncellendi.`, 'success');
+      if (window.FrpNotify) window.FrpNotify.success(`${added} yeni rapor eklendi, ${updated} mevcut rapor güncellendi.`, 'İşlem Başarılı');
+      else toast(`✅ ${added} yeni rapor eklendi, ${updated} mevcut rapor güncellendi.`, 'success');
     } else if (updated > 0) {
-      toast(`🔄 ${updated} rapor başarıyla güncellendi.`, 'success');
+      if (window.FrpNotify) window.FrpNotify.success(`${updated} rapor başarıyla güncellendi.`, 'Raporlar Güncellendi');
+      else toast(`🔄 ${updated} rapor başarıyla güncellendi.`, 'success');
     } else {
-      toast(`📋 ${added} rapor başarıyla yüklendi.`, 'success');
+      if (window.FrpNotify) window.FrpNotify.success(`${added} rapor başarıyla sisteme aktarıldı.`, 'Yükleme Tamamlandı');
+      else toast(`📋 ${added} rapor başarıyla yüklendi.`, 'success');
     }
   }
 
   if (errorDetails.length > 0) {
     if (!isBulk) {
-      toast(`${errorDetails[0].name}: ${errorDetails[0].error}`, 'error');
+      if (window.FrpNotify) window.FrpNotify.error(`${errorDetails[0].name}: ${errorDetails[0].error}`, 'Ayrıştırma Hatası');
+      else toast(`${errorDetails[0].name}: ${errorDetails[0].error}`, 'error');
     } else {
       showModal({
         title: '⚠️ Bazı Dosyalar Yüklenemedi',
@@ -406,9 +443,9 @@ const COLUMN_DEFS = {
     label: 'Dosya Adı',
     sortKey: 'fileName',
     thClass: 'col-fileName',
-    thStyle: 'max-width:240px;',
+    thStyle: 'max-width:260px;',
     renderTd: (file, h) => `
-      <td class="col-fileName" style="font-family:var(--mono);font-size:.78rem;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(file.name)}">
+      <td class="col-fileName" style="font-family:var(--font);font-size:.82rem;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(file.name)}">
         📄 ${escHtml(file.name)}
       </td>`
   },
@@ -1410,13 +1447,17 @@ function renderCards(container) {
       ? `<span class="badge badge-gray" onclick="event.stopPropagation();copyGuidText('${escHtml(guidVal)}')" title="Tıklayınca GUID kopyalar: ${escHtml(guidVal)}" style="cursor:pointer;font-family:var(--mono);font-size:.68rem;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle;">🔑 ${escHtml(guidVal)}</span>`
       : '';
 
+    const oName = file.ownerName || file.owner_name || (file.userId === 'usr_admin_root' ? 'Admin' : 'Sistem');
+    const oDept = file.ownerDepartment || file.owner_department || '';
+    const ownerChip = `<span class="owner-chip" style="font-size:.72rem;padding:.15rem .5rem;" title="Yükleyen: ${escHtml(oName)}${oDept ? ' · ' + escHtml(oDept) : ''}">👤 ${escHtml(oName)}</span>`;
+
     return `
       <div class="report-card ${file.isPinned ? 'pinned' : ''}" style="background:var(--bg-surface);border:1.5px solid var(--border-light);border-radius:14px;padding:1.1rem;display:flex;flex-direction:column;gap:.75rem;cursor:pointer;transition:transform .18s ease, box-shadow .18s ease;box-shadow:0 4px 14px rgba(0,0,0,.04);box-sizing:border-box;max-width:100%;overflow:hidden;" onclick="openDetail('${file.id}')">
         <div class="card-top" style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;">
           <div style="min-width:0;flex:1;overflow:hidden;">
             <div class="card-title" style="font-weight:800;font-size:.92rem;color:var(--text-primary);line-height:1.35;word-break:break-word;">📋 ${escHtml(reportName)}</div>
-            <div style="font-size:.73rem;color:var(--text-muted);font-family:var(--mono);margin-top:.25rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;" title="${escHtml(file.name)} · ${size}">
-              ${escHtml(file.name)} · <strong>${size}</strong>
+            <div style="font-size:.74rem;color:var(--text-muted);font-family:var(--font);margin-top:.25rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;" title="${escHtml(file.name)} · ${size}">
+              📄 ${escHtml(file.name)} · <strong>${size}</strong>
             </div>
           </div>
           <div class="card-actions" onclick="event.stopPropagation();" style="display:flex;align-items:center;gap:.25rem;flex-shrink:0;">
@@ -1426,6 +1467,7 @@ function renderCards(container) {
         </div>
 
         <div class="card-body" style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;overflow:hidden;">
+          ${ownerChip}
           <span class="badge badge-blue">🗄️ ${file.queries.length} SQL</span>
           ${file.pascalScript ? '<span class="badge badge-purple">✓ Pascal</span>' : ''}
           ${file.category ? `<span class="badge badge-purple" onclick="event.stopPropagation();openCategoryModalFor('${file.id}')" style="cursor:pointer;" title="Kategori: ${escHtml(file.category)}">🏷️ ${escHtml(file.category)}</span>` : `<button class="btn btn-sm" onclick="event.stopPropagation();openCategoryModalFor('${file.id}')" style="font-size:.7rem;padding:1px 6px;border-radius:5px;opacity:.7;">+ Kategori</button>`}
@@ -1467,14 +1509,19 @@ function renderTimeline(container) {
           const reportName = file.meta.reportName || file.name;
           const timeStr = new Date(file.loadedAt).toLocaleDateString('tr-TR');
           const guidVal = (file.meta && file.meta.guid) ? file.meta.guid : '—';
+          const oName = file.ownerName || file.owner_name || (file.userId === 'usr_admin_root' ? 'Admin' : 'Sistem');
+          const oDept = file.ownerDepartment || file.owner_department || '';
+          const ownerChip = `<span class="owner-chip" style="font-size:.7rem;padding:.1rem .45rem;" title="Yükleyen: ${escHtml(oName)}${oDept ? ' · ' + escHtml(oDept) : ''}">👤 ${escHtml(oName)}</span>`;
+
           return `
             <div class="timeline-item" onclick="openDetail('${file.id}')" style="cursor:pointer;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <strong style="font-size:.9rem;color:var(--text-primary);">📋 ${escHtml(reportName)}</strong>
                 <span style="font-size:.75rem;color:var(--text-muted);">${timeStr}</span>
               </div>
-              <div style="font-size:.76rem;color:var(--text-muted);margin-top:.25rem;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">
-                <span>Dosya: <code>${escHtml(file.name)}</code></span>
+              <div style="font-size:.76rem;color:var(--text-muted);margin-top:.35rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+                ${ownerChip}
+                <span>Dosya: <code style="font-family:var(--font);font-size:.76rem;">${escHtml(file.name)}</code></span>
                 <span class="badge badge-gray" style="font-family:var(--mono);font-size:.7rem;">🔑 GUID: ${escHtml(guidVal)}</span>
                 <span class="badge badge-blue" style="font-size:.7rem;">🗄️ ${file.queries.length} SQL</span>
               </div>
@@ -3067,10 +3114,74 @@ function refreshAll() {
   toggleUploadMini(FrpStore.getAll().length === 0 && !searchQuery);
 }
 
-window.togglePin      = togglePin;
-window.setViewMode    = setViewMode;
-window.refreshAll     = refreshAll;
-window.showShortcutsModal = showShortcutsModal;
+function exportReportListExcel() {
+  const listToExport = selectedIds.size > 0
+    ? allFiles.filter(f => selectedIds.has(f.id))
+    : sortFiles(allFiles);
+
+  if (listToExport.length === 0) {
+    toast('Dışa aktarılacak rapor bulunamadı.', 'warning');
+    return;
+  }
+
+  const headers = ['Sıra', 'Rapor Adı', 'Dosya Adı', 'Yükleyen / Birim', 'Boyut (KB)', 'Kategori', 'GUID', 'SQL Sayısı', 'Etiketler', 'Yüklenme Tarihi'];
+  
+  const escapeCsv = (val) => {
+    if (val === null || val === undefined) return '""';
+    const str = String(val).replace(/"/g, '""');
+    return `"${str}"`;
+  };
+
+  const rows = listToExport.map((f, idx) => {
+    const rName = f.meta?.reportName || f.name;
+    const fName = f.name;
+    const oName = f.ownerName || f.owner_name || (f.userId === 'usr_admin_root' ? 'Admin' : 'Sistem');
+    const oDept = f.ownerDepartment || f.owner_department || '';
+    const uploaderStr = oDept ? `${oName} (${oDept})` : oName;
+    const kb = f.sizeBytes ? (f.sizeBytes / 1024).toFixed(1) : '0';
+    const cat = f.category || '';
+    const guid = f.meta?.guid || '';
+    const sqlCount = (f.queries || []).length;
+    const tags = (f.tags || []).join(', ');
+    const dStr = f.loadedAt ? new Date(f.loadedAt).toLocaleString('tr-TR') : '';
+
+    return [
+      idx + 1,
+      escapeCsv(rName),
+      escapeCsv(fName),
+      escapeCsv(uploaderStr),
+      escapeCsv(kb),
+      escapeCsv(cat),
+      escapeCsv(guid),
+      sqlCount,
+      escapeCsv(tags),
+      escapeCsv(dStr)
+    ].join(';');
+  });
+
+  const csvContent = '\uFEFF' + headers.join(';') + '\r\n' + rows.join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `FrpOku_Rapor_Listesi_${dateStr}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 150);
+
+  toast(`📊 ${listToExport.length} rapor Excel/CSV olarak dışa aktarıldı!`, 'success');
+}
+
+window.togglePin             = togglePin;
+window.setViewMode           = setViewMode;
+window.refreshAll            = refreshAll;
+window.showShortcutsModal    = showShortcutsModal;
+window.exportReportListExcel = exportReportListExcel;
 
 bindSearchControls();
 refreshAll();

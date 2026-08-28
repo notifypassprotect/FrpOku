@@ -32,8 +32,8 @@
   --shadow-md:  0 4px 14px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.04);
   --shadow-lg:  0 12px 32px rgba(15, 23, 42, 0.12), 0 4px 12px rgba(15, 23, 42, 0.06);
 
-  --font: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+  --mono: 'Cascadia Code', 'Consolas', 'Segoe UI Mono', 'Liberation Mono', Menlo, Monaco, monospace;
 
   --code-size: 13px;
   --code-line-height: 1.7;
@@ -2002,6 +2002,167 @@ tr.pinned-row {
   font-size: .84rem;
   font-weight: 600;
 }
+
+/* ══════════════════════════════════════════════════════════
+   GELİŞMİŞ 5 KADEMELİ TOAST & BİLDİRİM SİSTEMİ (PRO TOAST)
+   ══════════════════════════════════════════════════════════ */
+.frp-toast-container {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.25rem;
+  z-index: 999999;
+  display: flex;
+  flex-direction: column;
+  gap: .65rem;
+  max-width: 420px;
+  width: calc(100% - 2.5rem);
+  pointer-events: none;
+}
+
+.frp-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: .85rem;
+  padding: .9rem 1.15rem;
+  border-radius: 12px;
+  font-size: .86rem;
+  line-height: 1.45;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.35), 0 8px 10px -6px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid transparent;
+  animation: frpToastSlideIn .25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: all .2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.frp-toast.toast-hiding {
+  animation: frpToastSlideOut .2s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+}
+
+@keyframes frpToastSlideIn {
+  from { opacity: 0; transform: translateY(-16px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes frpToastSlideOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-12px) scale(0.92); }
+}
+
+.frp-toast-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  line-height: 1;
+  margin-top: .1rem;
+}
+
+.frp-toast-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+}
+
+.frp-toast-title {
+  font-weight: 700;
+  font-size: .88rem;
+}
+
+.frp-toast-msg {
+  color: inherit;
+  opacity: .92;
+  word-break: break-word;
+}
+
+.frp-toast-close {
+  background: transparent;
+  border: none;
+  color: inherit;
+  opacity: .6;
+  cursor: pointer;
+  padding: .15rem;
+  font-size: 1rem;
+  line-height: 1;
+  border-radius: 6px;
+  transition: opacity .15s;
+}
+.frp-toast-close:hover { opacity: 1; }
+
+.frp-toast-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: currentColor;
+  opacity: .35;
+  width: 100%;
+  animation: frpToastProgress linear forwards;
+}
+
+@keyframes frpToastProgress {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
+/* Toast Seviyeleri */
+.frp-toast-info {
+  background: rgba(30, 41, 59, 0.94);
+  color: #93c5fd;
+  border-color: rgba(59, 130, 246, 0.4);
+}
+.frp-toast-success {
+  background: rgba(6, 78, 59, 0.94);
+  color: #6ee7b7;
+  border-color: rgba(16, 185, 129, 0.4);
+}
+.frp-toast-warning {
+  background: rgba(120, 53, 15, 0.94);
+  color: #fde047;
+  border-color: rgba(245, 158, 11, 0.4);
+}
+.frp-toast-error {
+  background: rgba(127, 29, 29, 0.94);
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+.frp-toast-security {
+  background: rgba(88, 28, 135, 0.95);
+  color: #f472b6;
+  border-color: #ec4899;
+  box-shadow: 0 0 20px rgba(236, 72, 153, 0.35);
+  animation: frpToastSlideIn .25s cubic-bezier(0.16, 1, 0.3, 1) forwards, pulseSecurityGlow 2s infinite;
+}
+
+@keyframes pulseSecurityGlow {
+  0%, 100% { box-shadow: 0 0 15px rgba(236, 72, 153, 0.3); }
+  50% { box-shadow: 0 0 28px rgba(236, 72, 153, 0.6); }
+}
+
+/* ── GÜVENLİK RİSK ROZETLERİ ──────────────────────────────── */
+.sql-risk-banner {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  padding: .65rem 1rem;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 8px;
+  color: #f87171;
+  font-size: .82rem;
+  margin-bottom: .65rem;
+}
+.sql-risk-badge {
+  font-weight: 800;
+  padding: .2rem .5rem;
+  border-radius: 6px;
+  background: #ef4444;
+  color: #fff;
+  font-size: .75rem;
+  letter-spacing: .02em;
+}
+
 
 
 

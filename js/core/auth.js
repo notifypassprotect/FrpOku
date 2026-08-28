@@ -18,7 +18,6 @@
   const SUPABASE_ANON_KEY = 'sb_publishable_ASaLwO7-3T7nRqneM0GW6g_8cgCNzQJ';
 
   let currentUser = null;
-  let currentCaptchaText = '';
   let adminPollingInterval = null;
   let cachedPendingCount = 0;
 
@@ -39,66 +38,6 @@
       }
       return 'fb_' + Math.abs(hash);
     }
-  }
-
-  // ── 2. Akıllı Görsel CAPTCHA Motoru ───────────────────────────
-  function generateCaptcha(canvasId) {
-    const canvas = document.getElementById(canvasId);
-    if (!canvas) return '';
-
-    const ctx = canvas.getContext('2d');
-    const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-    let code = '';
-    for (let i = 0; i < 5; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    currentCaptchaText = code;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Açık Gradyan Arka Plan
-    const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-    grad.addColorStop(0, '#f8fafc');
-    grad.addColorStop(1, '#e2e8f0');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Parazit Çizgileri
-    for (let i = 0; i < 4; i++) {
-      ctx.strokeStyle = `rgba(37, 99, 235, ${0.25 + Math.random() * 0.35})`;
-      ctx.lineWidth = 1.5 + Math.random() * 1.5;
-      ctx.beginPath();
-      ctx.moveTo(Math.random() * canvas.width, Math.random() * canvas.height);
-      ctx.lineTo(Math.random() * canvas.width, Math.random() * canvas.height);
-      ctx.stroke();
-    }
-
-    // Parazit Noktaları
-    for (let i = 0; i < 35; i++) {
-      ctx.fillStyle = `rgba(15, 23, 42, ${0.15 + Math.random() * 0.25})`;
-      ctx.beginPath();
-      ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, Math.random() * 1.5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Karakterleri Açılı ve Renkli Çiz
-    ctx.font = 'bold 22px "Consolas", "Courier New", monospace';
-    ctx.textBaseline = 'middle';
-
-    const colors = ['#1e40af', '#4338ca', '#047857', '#b91c1c', '#7c2d12'];
-    for (let i = 0; i < code.length; i++) {
-      ctx.save();
-      const x = 14 + i * 22;
-      const y = canvas.height / 2 + (Math.random() * 4 - 2);
-      const angle = (Math.random() * 24 - 12) * Math.PI / 180;
-      ctx.translate(x, y);
-      ctx.rotate(angle);
-      ctx.fillStyle = colors[i % colors.length];
-      ctx.fillText(code[i], 0, 0);
-      ctx.restore();
-    }
-
-    return code;
   }
 
   // ── 3. REST / Server API İstek Motoru ─────────────────────────
@@ -428,10 +367,33 @@
     }
   }
 
+  function getAuthHeaders(extra = {}) {
+    const user = getSession();
+    const headers = { 'Content-Type': 'application/json', ...extra };
+    if (user) {
+      try {
+        const token = btoa(unescape(encodeURIComponent(JSON.stringify(user))));
+        headers['Authorization'] = `Bearer ${token}`;
+        headers['X-Admin-Auth'] = token;
+      } catch (e) {}
+    }
+    return headers;
+  }
+
+  function updateAdminPanelVisibility() {
+    const isUsrAdmin = isAdmin();
+    const btnDashboard = document.getElementById('btnDashboardPanel');
+    if (btnDashboard) {
+      btnDashboard.style.display = isUsrAdmin ? 'inline-flex' : 'none';
+    }
+  }
+
   // ── 8. ADMİN: Onay Bekleyen Kayıtları Sorgulama & Bildirim ────
   async function fetchPendingUsers() {
     try {
-      const res = await fetch('/api/admin/pending-users');
+      const res = await fetch('/api/admin/pending-users', {
+        headers: getAuthHeaders()
+      });
       const data = await res.json();
       if (data && data.success && Array.isArray(data.users)) {
         return data.users;
@@ -451,7 +413,9 @@
 
   async function fetchAllUsers() {
     try {
-      const res = await fetch('/api/admin/all-users');
+      const res = await fetch('/api/admin/all-users', {
+        headers: getAuthHeaders()
+      });
       const data = await res.json();
       if (data && data.success && Array.isArray(data.users)) {
         return data.users;
@@ -468,6 +432,7 @@
 
   // Admin Topbar Bildirim Butonunu Güncelle (Yanıp Sönen Buton)
   async function refreshAdminPendingBadge() {
+    updateAdminPanelVisibility();
     if (!isAdmin()) {
       const btn = document.getElementById('btnAdminPendingRegistrations');
       if (btn) btn.remove();
@@ -695,7 +660,7 @@
             // Backend API isteği
             const res = await fetch('/api/admin/approve-user', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: getAuthHeaders(),
               body: JSON.stringify({ userId: uId })
             });
             const data = await res.json();
@@ -771,7 +736,7 @@
               try {
                 await fetch('/api/admin/reject-user', {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: getAuthHeaders(),
                   body: JSON.stringify({ userId: uId, deletePermanently: true })
                 });
                 if (card) {
@@ -957,7 +922,7 @@
             try {
               await fetch('/api/admin/toggle-admin', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify({ userId: uId, makeAdmin })
               });
               if (typeof window.toast === 'function') {
@@ -980,7 +945,7 @@
             try {
               await fetch('/api/admin/toggle-status', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify({ userId: uId, isActive: setActive })
               });
               if (typeof window.toast === 'function') {
@@ -1083,7 +1048,7 @@
       try {
         const res = await fetch('/api/admin/reset-password', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify({ userId, newPassword: pass })
         });
         const data = await res.json();
@@ -1150,6 +1115,7 @@
 
   // ── 11. Navbar Rozeti & Hızlı Çıkış Butonu ───────────────────
   function updateNavbarUserBadge() {
+    updateAdminPanelVisibility();
     const user = getSession();
     const btnProfile = document.getElementById('btnUserProfile') || document.querySelector('[data-auth-badge]');
     let quickLogoutBtn = document.getElementById('btnQuickLogout');
@@ -1240,7 +1206,7 @@
     }, 850);
   }
 
-  // ── 13. BAĞIMSIZ TAM EKRAN AUTH PORTAL ───────────────────────
+  // ── 13. SADE & MODERN TAM EKRAN GİRİŞ / KAYIT PORTALI ──────
   function showAuthFullScreenPortal(initialTab = 'login') {
     const existing = document.getElementById('authFullScreenPortal');
     if (existing) existing.remove();
@@ -1254,7 +1220,7 @@
     portal.id = 'authFullScreenPortal';
     portal.style.cssText = `
       position: fixed; inset: 0;
-      background: radial-gradient(circle at 50% 30%, #1e293b 0%, #0f172a 60%, #020617 100%);
+      background: radial-gradient(ellipse at 50% 30%, #1e293b 0%, #0f172a 75%, #020617 100%);
       z-index: 1000000;
       display: flex; align-items: center; justify-content: center;
       padding: 1.25rem; overflow-y: auto; font-family: inherit;
@@ -1262,255 +1228,217 @@
 
     portal.innerHTML = `
       <div class="auth-card" style="
-        max-width: 490px; width: 100%;
+        max-width: 440px; width: 100%;
         background: #ffffff;
         border: 1px solid #e2e8f0;
-        border-radius: 26px;
-        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
-        padding: 2.2rem 2.2rem 1.8rem;
+        border-radius: 22px;
+        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.45);
+        padding: 2rem 2rem 1.6rem;
         position: relative; overflow: hidden;
         color: #0f172a;
       ">
-        <!-- Dekoratif Üst Çizgi -->
-        <div style="position:absolute;top:0;left:0;right:0;height:6px;background:linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);"></div>
-
         <!-- Logo & Başlık -->
-        <div style="text-align:center;margin-bottom:1.35rem;">
-          <div style="width:62px;height:62px;margin:0 auto .75rem;background:linear-gradient(135deg, #3b82f6, #8b5cf6);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:2.2rem;box-shadow:0 8px 24px rgba(59,130,246,0.35);">⚡</div>
-          <h1 style="font-size:1.45rem;font-weight:900;letter-spacing:-.02em;margin:0 0 .25rem;color:#0f172a;">FrpOku Cloud Portal</h1>
-          <p id="authSubtitle" style="font-size:.82rem;color:#64748b;margin:0;">Kurumsal FastReport Rapor & Kod Havuzu</p>
+        <div style="text-align:center;margin-bottom:1.25rem;">
+          <div style="width:50px;height:50px;margin:0 auto .6rem;background:linear-gradient(135deg, #3b82f6, #6366f1);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;box-shadow:0 6px 18px rgba(59,130,246,0.28);">📋</div>
+          <h1 style="font-size:1.35rem;font-weight:800;letter-spacing:-.02em;margin:0 0 .2rem;color:#0f172a;">FrpOku</h1>
+          <p id="authSubtitle" style="font-size:.82rem;color:#64748b;margin:0;">FastReport Rapor & Kod Portalı</p>
         </div>
 
         <!-- Canlı Hata / Uyarı Bildirim Kutusu -->
         <div id="authAlertBox" style="
-          display: none; padding: .85rem 1rem; border-radius: 12px; margin-bottom: 1.2rem;
-          font-size: .84rem; font-weight: 600; line-height: 1.45; animation: shake .3s ease-in-out;
+          display: none; padding: .75rem .9rem; border-radius: 10px; margin-bottom: 1rem;
+          font-size: .82rem; font-weight: 600; line-height: 1.45; animation: shake .3s ease-in-out;
         "></div>
 
-        <!-- Sekmeler (Tab Switcher) -->
+        <!-- Sekmeler (Giriş / Kayıt) -->
         <div id="authTabSwitcher" style="
           display: flex; background: #f1f5f9;
-          border-radius: 12px; padding: 4px; margin-bottom: 1.35rem;
-          border: 1px solid #e2e8f0;
+          border-radius: 10px; padding: 3px; margin-bottom: 1.25rem;
         ">
           <button type="button" id="tabLoginBtn" style="
-            flex: 1; padding: .6rem; border: none; border-radius: 9px;
-            font-weight: 800; font-size: .88rem; cursor: pointer; transition: all .2s;
+            flex: 1; padding: .55rem; border: none; border-radius: 8px;
+            font-weight: 700; font-size: .86rem; cursor: pointer; transition: all .15s;
             background: ${initialTab === 'login' ? '#ffffff' : 'transparent'};
             color: ${initialTab === 'login' ? '#2563eb' : '#64748b'};
-            box-shadow: ${initialTab === 'login' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none'};
-          ">🔑 Giriş Yap</button>
+            box-shadow: ${initialTab === 'login' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none'};
+          ">Giriş Yap</button>
           <button type="button" id="tabRegisterBtn" style="
-            flex: 1; padding: .6rem; border: none; border-radius: 9px;
-            font-weight: 800; font-size: .88rem; cursor: pointer; transition: all .2s;
+            flex: 1; padding: .55rem; border: none; border-radius: 8px;
+            font-weight: 700; font-size: .86rem; cursor: pointer; transition: all .15s;
             background: ${initialTab === 'register' ? '#ffffff' : 'transparent'};
             color: ${initialTab === 'register' ? '#2563eb' : '#64748b'};
-            box-shadow: ${initialTab === 'register' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none'};
-          ">✨ Kayıt Ol</button>
+            box-shadow: ${initialTab === 'register' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none'};
+          ">Kayıt Ol</button>
         </div>
 
         <!-- ── 1. GİRİŞ FORMU ── -->
         <form id="authLoginForm" style="display: ${initialTab === 'login' ? 'block' : 'none'};">
-          <div style="margin-bottom: .95rem;">
-            <label style="display:block;font-size:.78rem;font-weight:700;color:#334155;margin-bottom:.35rem;">
-              👤 E-Posta / Kullanıcı Adı / Telefon No
+          <div style="margin-bottom: .9rem;">
+            <label style="display:block;font-size:.76rem;font-weight:700;color:#334155;margin-bottom:.3rem;">
+              Kullanıcı Adı veya E-Posta
             </label>
-            <input type="text" id="loginIdentifier" required value="${escHtml(savedIdentifier)}" placeholder="ör: admin, ilker veya 0534..." style="
-              width: 100%; padding: .72rem 1rem; border-radius: 12px;
+            <input type="text" id="loginIdentifier" required value="${escHtml(savedIdentifier)}" placeholder="ör: admin veya ilker" style="
+              width: 100%; padding: .65rem .85rem; border-radius: 10px;
               background: #f8fafc; border: 1.5px solid #cbd5e1;
-              color: #0f172a; font-size: .9rem; outline: none; transition: all .2s; box-sizing: border-box;
+              color: #0f172a; font-size: .88rem; outline: none; transition: all .15s; box-sizing: border-box;
             " />
           </div>
 
-          <div style="margin-bottom: .95rem;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem;">
-              <label style="font-size:.78rem;font-weight:700;color:#334155;">🔒 Şifre</label>
-              <a href="#" id="linkForgotPassword" style="font-size:.75rem;color:#2563eb;text-decoration:none;font-weight:700;">Şifremi Unuttum?</a>
+          <div style="margin-bottom: .9rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem;">
+              <label style="font-size:.76rem;font-weight:700;color:#334155;">Şifre</label>
+              <a href="#" id="linkForgotPassword" style="font-size:.74rem;color:#2563eb;text-decoration:none;font-weight:600;">Şifremi Unuttum?</a>
             </div>
             <div style="position:relative;">
               <input type="password" id="loginPassword" required placeholder="Şifrenizi girin" style="
-                width: 100%; padding: .72rem 2.5rem .72rem 1rem; border-radius: 12px;
+                width: 100%; padding: .65rem 2.4rem .65rem .85rem; border-radius: 10px;
                 background: #f8fafc; border: 1.5px solid #cbd5e1;
-                color: #0f172a; font-size: .9rem; outline: none; transition: all .2s; box-sizing: border-box;
+                color: #0f172a; font-size: .88rem; outline: none; transition: all .15s; box-sizing: border-box;
               " />
               <button type="button" id="toggleLoginPass" style="
-                position:absolute;right:.75rem;top:50%;transform:translateY(-50%);
-                background:none;border:none;color:#64748b;cursor:pointer;font-size:1rem;
+                position:absolute;right:.65rem;top:50%;transform:translateY(-50%);
+                background:none;border:none;color:#64748b;cursor:pointer;font-size:.95rem;
               ">👁️</button>
             </div>
           </div>
 
-          <!-- CAPTCHA -->
-          <div style="margin-bottom: 1rem; background: #f8fafc; padding:.7rem; border-radius: 12px; border: 1.5px solid #e2e8f0;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem;">
-              <span style="font-size:.75rem;font-weight:700;color:#334155;">🛡️ Güvenlik Doğrulaması</span>
-              <button type="button" id="btnRefreshCaptchaLogin" style="background:none;border:none;color:#2563eb;font-size:.75rem;font-weight:700;cursor:pointer;">🔄 Yeni Kod</button>
-            </div>
-            <div style="display:flex;gap:.75rem;align-items:center;">
-              <canvas id="captchaCanvasLogin" width="130" height="38" style="border-radius:8px;border:1px solid #cbd5e1;cursor:pointer;background:#fff;" title="Yenilemek için tıklayın"></canvas>
-              <input type="text" id="loginCaptchaInput" maxlength="5" required placeholder="Kodu yazın" style="
-                flex:1; padding:.55rem .75rem; border-radius:8px; text-transform:uppercase; font-family:monospace; font-weight:800;
-                background:#ffffff; border:1.5px solid #cbd5e1; color:#0f172a; font-size:.95rem; outline:none; text-align:center;
-              " />
-            </div>
-          </div>
-
           <!-- Beni Hatırla -->
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem;">
-            <label style="display:flex;align-items:center;gap:.5rem;font-size:.82rem;color:#475569;cursor:pointer;font-weight:600;">
-              <input type="checkbox" id="loginRememberMe" ${localStorage.getItem(REMEMBER_KEY) !== '0' ? 'checked' : ''} style="width:16px;height:16px;accent-color:#2563eb;cursor:pointer;" />
-              Beni Hatırla (Oturumu Açık Tut)
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.15rem;">
+            <label style="display:flex;align-items:center;gap:.45rem;font-size:.8rem;color:#475569;cursor:pointer;font-weight:500;">
+              <input type="checkbox" id="loginRememberMe" ${localStorage.getItem(REMEMBER_KEY) !== '0' ? 'checked' : ''} style="width:15px;height:15px;accent-color:#2563eb;cursor:pointer;" />
+              Beni Hatırla
             </label>
           </div>
 
           <button type="submit" id="btnLoginSubmit" style="
-            width: 100%; padding: .85rem; border: none; border-radius: 12px;
-            background: linear-gradient(135deg, #2563eb, #1d4ed8);
-            color: #ffffff; font-weight: 800; font-size: .95rem; cursor: pointer;
-            box-shadow: 0 4px 14px rgba(37,99,235,0.3); transition: all .2s;
-          ">🚀 Giriş Yap</button>
+            width: 100%; padding: .75rem; border: none; border-radius: 10px;
+            background: #2563eb; color: #ffffff; font-weight: 700; font-size: .9rem; cursor: pointer;
+            box-shadow: 0 4px 12px rgba(37,99,235,0.25); transition: background .15s;
+          ">Giriş Yap</button>
         </form>
 
         <!-- ── 2. KAYIT FORMU ── -->
         <form id="authRegisterForm" style="display: ${initialTab === 'register' ? 'block' : 'none'};">
           <div id="regFormBody">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:.65rem;">
               <div>
-                <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">👤 Ad Soyad *</label>
-                <input type="text" id="regFullName" required placeholder="İlker Diner" style="
-                  width: 100%; padding: .65rem .85rem; border-radius: 10px;
+                <label style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">Ad Soyad *</label>
+                <input type="text" id="regFullName" required placeholder="Ad Soyad" style="
+                  width: 100%; padding: .55rem .75rem; border-radius: 8px;
                   background: #f8fafc; border: 1.5px solid #cbd5e1;
-                  color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
+                  color: #0f172a; font-size: .84rem; outline: none; box-sizing: border-box;
                 " />
               </div>
               <div>
-                <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">🏷️ Kullanıcı Adı *</label>
-                <input type="text" id="regUsername" required placeholder="ilker" style="
-                  width: 100%; padding: .65rem .85rem; border-radius: 10px;
+                <label style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">Kullanıcı Adı *</label>
+                <input type="text" id="regUsername" required placeholder="kullanici_adi" style="
+                  width: 100%; padding: .55rem .75rem; border-radius: 8px;
                   background: #f8fafc; border: 1.5px solid #cbd5e1;
-                  color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
+                  color: #0f172a; font-size: .84rem; outline: none; box-sizing: border-box;
                 " />
               </div>
             </div>
 
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:.65rem;">
               <div>
-                <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">📧 E-Posta *</label>
+                <label style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">E-Posta *</label>
                 <input type="email" id="regEmail" required placeholder="ornek@kurum.com" style="
-                  width: 100%; padding: .65rem .85rem; border-radius: 10px;
+                  width: 100%; padding: .55rem .75rem; border-radius: 8px;
                   background: #f8fafc; border: 1.5px solid #cbd5e1;
-                  color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
+                  color: #0f172a; font-size: .84rem; outline: none; box-sizing: border-box;
                 " />
               </div>
               <div>
-                <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">📱 Telefon No</label>
-                <input type="tel" id="regPhone" placeholder="0534..." style="
-                  width: 100%; padding: .65rem .85rem; border-radius: 10px;
+                <label style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">Telefon No</label>
+                <input type="tel" id="regPhone" placeholder="05XX..." style="
+                  width: 100%; padding: .55rem .75rem; border-radius: 8px;
                   background: #f8fafc; border: 1.5px solid #cbd5e1;
-                  color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
+                  color: #0f172a; font-size: .84rem; outline: none; box-sizing: border-box;
                 " />
               </div>
             </div>
 
-            <div style="margin-bottom:.75rem;">
-              <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">🏢 Kurum / Birim</label>
-              <input type="text" id="regDepartment" placeholder="ör: Şehir Hastanesi Bilgi İşlem" style="
-                width: 100%; padding: .65rem .85rem; border-radius: 10px;
+            <div style="margin-bottom:.65rem;">
+              <label style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">Kurum / Birim</label>
+              <input type="text" id="regDepartment" placeholder="ör: Bilgi İşlem" style="
+                width: 100%; padding: .55rem .75rem; border-radius: 8px;
                 background: #f8fafc; border: 1.5px solid #cbd5e1;
-                color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
+                color: #0f172a; font-size: .84rem; outline: none; box-sizing: border-box;
               " />
             </div>
 
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:.85rem;">
               <div>
-                <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">🔒 Şifre *</label>
+                <label style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">Şifre *</label>
                 <input type="password" id="regPassword" required placeholder="Şifreniz" style="
-                  width: 100%; padding: .65rem .85rem; border-radius: 10px;
+                  width: 100%; padding: .55rem .75rem; border-radius: 8px;
                   background: #f8fafc; border: 1.5px solid #cbd5e1;
-                  color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
+                  color: #0f172a; font-size: .84rem; outline: none; box-sizing: border-box;
                 " />
               </div>
               <div>
-                <label style="display:block;font-size:.75rem;font-weight:700;color:#334155;margin-bottom:.25rem;">🔒 Şifre Tekrar *</label>
+                <label style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">Şifre Tekrar *</label>
                 <input type="password" id="regPasswordConfirm" required placeholder="Tekrar girin" style="
-                  width: 100%; padding: .65rem .85rem; border-radius: 10px;
+                  width: 100%; padding: .55rem .75rem; border-radius: 8px;
                   background: #f8fafc; border: 1.5px solid #cbd5e1;
-                  color: #0f172a; font-size: .85rem; outline: none; box-sizing: border-box;
+                  color: #0f172a; font-size: .84rem; outline: none; box-sizing: border-box;
                 " />
               </div>
             </div>
 
-            <!-- CAPTCHA (Kayıt) -->
-            <div style="margin-bottom: 1rem; background: #f8fafc; padding:.65rem; border-radius: 10px; border: 1.5px solid #e2e8f0;">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.35rem;">
-                <span style="font-size:.72rem;font-weight:700;color:#334155;">🛡️ Güvenlik Doğrulaması</span>
-                <button type="button" id="btnRefreshCaptchaReg" style="background:none;border:none;color:#2563eb;font-size:.72rem;font-weight:700;cursor:pointer;">🔄 Yeni Kod</button>
-              </div>
-              <div style="display:flex;gap:.65rem;align-items:center;">
-                <canvas id="captchaCanvasReg" width="120" height="34" style="border-radius:6px;border:1px solid #cbd5e1;cursor:pointer;background:#fff;"></canvas>
-                <input type="text" id="regCaptchaInput" maxlength="5" required placeholder="Kodu girin" style="
-                  flex:1; padding:.5rem .7rem; border-radius:6px; text-transform:uppercase; font-family:monospace; font-weight:800;
-                  background:#ffffff; border:1.5px solid #cbd5e1; color:#0f172a; font-size:.9rem; outline:none; text-align:center;
-                " />
-              </div>
-            </div>
-
-            <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:.65rem .85rem;margin-bottom:1rem;font-size:.76rem;color:#1e40af;line-height:1.4;">
-              ℹ️ Kaydınız tamamlandığında sistem yöneticisi (Admin) onayına iletilecektir. Yönetici onayının ardından giriş yapabilirsiniz.
+            <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:.55rem .75rem;margin-bottom:.85rem;font-size:.74rem;color:#1e40af;line-height:1.4;">
+              ℹ️ Kayıt başvurusu yapıldıktan sonra sistem yöneticisi onayı ile hesabınız aktifleştirilecektir.
             </div>
 
             <button type="submit" id="btnRegisterSubmit" style="
-              width: 100%; padding: .85rem; border: none; border-radius: 12px;
-              background: linear-gradient(135deg, #10b981, #059669);
-              color: #ffffff; font-weight: 800; font-size: .95rem; cursor: pointer;
-              box-shadow: 0 4px 14px rgba(16,185,129,0.3); transition: all .2s;
-            ">✨ Kayıt Başvurusunu Tamamla</button>
+              width: 100%; padding: .75rem; border: none; border-radius: 10px;
+              background: #10b981; color: #ffffff; font-weight: 700; font-size: .9rem; cursor: pointer;
+              box-shadow: 0 4px 12px rgba(16,185,129,0.25); transition: background .15s;
+            ">Kayıt Başvurusunu Gönder</button>
           </div>
 
           <!-- Kayıt Başarılı & Onay Bekleme Bilgilendirme Ekranı -->
-          <div id="regSuccessNotice" style="display:none;text-align:center;padding:1.5rem .5rem;">
-            <div style="font-size:3.2rem;margin-bottom:.8rem;animation:pulse 1.8s infinite;">🎉</div>
-            <div style="font-size:1.25rem;font-weight:900;color:#0f172a;margin-bottom:.4rem;">Kayıt Başvurunuz Alındı!</div>
-            <p style="font-size:.85rem;color:#475569;line-height:1.5;margin-bottom:1.5rem;">
-              Hesabınız başarıyla oluşturuldu. Sistem güvenliği gereği hesabınız <strong>yönetici (admin) onayına</strong> iletilmiştir. Yönetici onayının ardından hesabınızla giriş yapabilirsiniz.
+          <div id="regSuccessNotice" style="display:none;text-align:center;padding:1.2rem .5rem;">
+            <div style="font-size:2.8rem;margin-bottom:.6rem;">🎉</div>
+            <div style="font-size:1.15rem;font-weight:800;color:#0f172a;margin-bottom:.35rem;">Başvurunuz Alındı!</div>
+            <p style="font-size:.82rem;color:#475569;line-height:1.5;margin-bottom:1.2rem;">
+              Hesap başvurunuz yönetici onayına iletildi. Onaylandıktan sonra giriş yapabilirsiniz.
             </p>
             <button type="button" id="btnGoToLoginAfterReg" style="
-              width:100%;padding:.8rem;border:none;border-radius:12px;
-              background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;
-              font-weight:800;font-size:.92rem;cursor:pointer;
-              box-shadow:0 4px 14px rgba(37,99,235,0.3);
-            ">🔑 Giriş Ekranına Dön</button>
+              width:100%;padding:.7rem;border:none;border-radius:10px;
+              background:#2563eb;color:#fff;font-weight:700;font-size:.88rem;cursor:pointer;
+            ">Giriş Ekranına Dön</button>
           </div>
         </form>
 
         <!-- ── 3. ŞİFREMİ UNUTTUM REHBERİ ── -->
         <div id="authForgotPanel" style="display: none; text-align: left;">
-          <div style="text-align:center;margin-bottom:1.5rem;">
-            <div style="font-size:2.8rem;margin-bottom:.6rem;">🔑</div>
-            <div style="font-size: 1.15rem; font-weight: 800; color: #0f172a; margin-bottom: .4rem;">Şifrenizi mi Unuttunuz?</div>
-            <p style="font-size: .84rem; color: #475569; line-height: 1.5; margin: 0 auto; max-width: 360px;">
-              Sistem güvenliği nedeniyle şifre sıfırlama işlemleri <strong>Sistem Yöneticisi (Admin)</strong> kontrolünde yapılmaktadır.
+          <div style="text-align:center;margin-bottom:1.2rem;">
+            <div style="font-size:2.4rem;margin-bottom:.4rem;">🔑</div>
+            <div style="font-size: 1.1rem; font-weight: 800; color: #0f172a; margin-bottom: .3rem;">Şifre Sıfırlama</div>
+            <p style="font-size: .8rem; color: #475569; line-height: 1.45; margin: 0 auto;">
+              Şifre sıfırlama işlemleri güvenlik amacıyla <strong>Sistem Yöneticisi (Admin)</strong> tarafından yapılmaktadır.
             </p>
           </div>
 
-          <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:14px;padding:1.2rem;margin-bottom:1.5rem;">
-            <div style="font-weight:800;font-size:.85rem;color:#0f172a;margin-bottom:.4rem;">📌 Nasıl Şifre Sıfırlanır?</div>
-            <ul style="margin:0;padding-left:1.2rem;font-size:.8rem;color:#64748b;line-height:1.6;">
-              <li>Kurumunuzun <strong>Sistem Yöneticisi (Admin)</strong> ile iletişime geçiniz.</li>
-              <li>Yönetici, Yönetim Paneli üzerinden hesabınız için anında yeni bir geçici şifre tanımlayacaktır.</li>
-              <li>Tanımlanan şifreyle giriş yaptıktan sonra "Profil & Ayarlar" menüsünden şifrenizi dilediğiniz gibi güncelleyebilirsiniz.</li>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:1rem;margin-bottom:1.2rem;">
+            <div style="font-weight:700;font-size:.82rem;color:#0f172a;margin-bottom:.3rem;">📌 Nasıl Yapılır?</div>
+            <ul style="margin:0;padding-left:1.1rem;font-size:.78rem;color:#64748b;line-height:1.5;">
+              <li>Sistem Yöneticinizle iletişime geçiniz.</li>
+              <li>Yönetici paneli üzerinden yeni geçici şifreniz tanımlanacaktır.</li>
+              <li>Giriş yaptıktan sonra şifrenizi profilinizden güncelleyebilirsiniz.</li>
             </ul>
           </div>
 
           <button type="button" id="btnBackToLoginFromForgot" style="
-            width: 100%; padding: .75rem; border: 1px solid #cbd5e1; border-radius: 12px;
-            background: #f1f5f9; color: #475569; font-weight: 700; font-size: .85rem; cursor: pointer;
-          ">← Giriş Ekranına Geri Dön</button>
+            width: 100%; padding: .65rem; border: 1px solid #cbd5e1; border-radius: 10px;
+            background: #f1f5f9; color: #475569; font-weight: 700; font-size: .82rem; cursor: pointer;
+          ">← Giriş Ekranına Dön</button>
         </div>
 
-        <!-- Alt Bilgi / Geri Dönüş Linkleri -->
-        <div id="authFooterNote" style="margin-top: 1.25rem; text-align: center; font-size: .82rem; color: #64748b;">
-          ${initialTab === 'login' ? `Hesabınız yok mu? <a href="#" id="linkGoToRegister" style="color:#2563eb;font-weight:800;text-decoration:none;">Hemen Kayıt Olun</a>` : `Zaten hesabınız var mı? <a href="#" id="linkGoToLogin" style="color:#2563eb;font-weight:800;text-decoration:none;">Giriş Yapın</a>`}
+        <!-- Alt Bilgi / Sekme Geçiş Linki -->
+        <div id="authFooterNote" style="margin-top: 1.1rem; text-align: center; font-size: .8rem; color: #64748b;">
+          ${initialTab === 'login' ? `Hesabınız yok mu? <a href="#" id="linkGoToRegister" style="color:#2563eb;font-weight:700;text-decoration:none;">Kayıt Olun</a>` : `Zaten hesabınız var mı? <a href="#" id="linkGoToLogin" style="color:#2563eb;font-weight:700;text-decoration:none;">Giriş Yapın</a>`}
         </div>
       </div>
     `;
@@ -1518,7 +1446,7 @@
     document.body.appendChild(portal);
 
     portal.querySelectorAll('input').forEach(inp => {
-      inp.addEventListener('focus', () => { inp.style.borderColor = '#2563eb'; inp.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.15)'; });
+      inp.addEventListener('focus', () => { inp.style.borderColor = '#2563eb'; inp.style.boxShadow = '0 0 0 2px rgba(37,99,235,0.12)'; });
       inp.addEventListener('blur', () => { inp.style.borderColor = '#cbd5e1'; inp.style.boxShadow = 'none'; });
     });
 
@@ -1563,13 +1491,12 @@
         regForm.style.display = 'none';
         tabLogin.style.background = '#ffffff';
         tabLogin.style.color = '#2563eb';
-        tabLogin.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
+        tabLogin.style.boxShadow = '0 2px 6px rgba(0,0,0,0.06)';
         tabReg.style.background = 'transparent';
         tabReg.style.color = '#64748b';
         tabReg.style.boxShadow = 'none';
-        footerNote.innerHTML = `Hesabınız yok mu? <a href="#" id="linkGoToRegister" style="color:#2563eb;font-weight:800;text-decoration:none;">Hemen Kayıt Olun</a>`;
+        footerNote.innerHTML = `Hesabınız yok mu? <a href="#" id="linkGoToRegister" style="color:#2563eb;font-weight:700;text-decoration:none;">Kayıt Olun</a>`;
         bindFooterLinks();
-        generateCaptcha('captchaCanvasLogin');
       } else if (tab === 'register') {
         loginForm.style.display = 'none';
         regForm.style.display = 'block';
@@ -1577,13 +1504,12 @@
         if (regNotice) regNotice.style.display = 'none';
         tabReg.style.background = '#ffffff';
         tabReg.style.color = '#2563eb';
-        tabReg.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
+        tabReg.style.boxShadow = '0 2px 6px rgba(0,0,0,0.06)';
         tabLogin.style.background = 'transparent';
         tabLogin.style.color = '#64748b';
         tabLogin.style.boxShadow = 'none';
-        footerNote.innerHTML = `Zaten hesabınız var mı? <a href="#" id="linkGoToLogin" style="color:#2563eb;font-weight:800;text-decoration:none;">Giriş Yapın</a>`;
+        footerNote.innerHTML = `Zaten hesabınız var mı? <a href="#" id="linkGoToLogin" style="color:#2563eb;font-weight:700;text-decoration:none;">Giriş Yapın</a>`;
         bindFooterLinks();
-        generateCaptcha('captchaCanvasReg');
       } else if (tab === 'forgot') {
         loginForm.style.display = 'none';
         regForm.style.display = 'none';
@@ -1619,20 +1545,6 @@
       }
     };
 
-    // CAPTCHA Başlat
-    if (initialTab === 'login') generateCaptcha('captchaCanvasLogin');
-    else generateCaptcha('captchaCanvasReg');
-
-    const cCanvasLogin = portal.querySelector('#captchaCanvasLogin');
-    if (cCanvasLogin) cCanvasLogin.onclick = () => generateCaptcha('captchaCanvasLogin');
-    const btnRefLogin = portal.querySelector('#btnRefreshCaptchaLogin');
-    if (btnRefLogin) btnRefLogin.onclick = () => generateCaptcha('captchaCanvasLogin');
-
-    const cCanvasReg = portal.querySelector('#captchaCanvasReg');
-    if (cCanvasReg) cCanvasReg.onclick = () => generateCaptcha('captchaCanvasReg');
-    const btnRefReg = portal.querySelector('#btnRefreshCaptchaReg');
-    if (btnRefReg) btnRefReg.onclick = () => generateCaptcha('captchaCanvasReg');
-
     // ── GİRİŞ SUBMIT ──
     const loginForm = portal.querySelector('#authLoginForm');
     loginForm.onsubmit = async (e) => {
@@ -1654,24 +1566,15 @@
         return;
       }
 
-      const captchaInput = portal.querySelector('#loginCaptchaInput').value.trim().toUpperCase();
-      if (captchaInput !== currentCaptchaText.toUpperCase()) {
-        showAlert('🛡️ Güvenlik kodu (CAPTCHA) hatalı! Lütfen görseldeki kodu tekrar giriniz.', 'warning');
-        generateCaptcha('captchaCanvasLogin');
-        portal.querySelector('#loginCaptchaInput').value = '';
-        portal.querySelector('#loginCaptchaInput').focus();
-        return;
-      }
-
       const submitBtn = portal.querySelector('#btnLoginSubmit');
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Giriş Yapılıyor... ⏳';
+      submitBtn.textContent = 'Giriş Yapılıyor...';
 
       const remember = portal.querySelector('#loginRememberMe').checked;
 
       const res = await login({ identifier: ident, password: pass, rememberMe: remember });
       submitBtn.disabled = false;
-      submitBtn.textContent = '🚀 Giriş Yap';
+      submitBtn.textContent = 'Giriş Yap';
 
       if (res.success) {
         portal.remove();
@@ -1690,7 +1593,6 @@
         } else {
           showAlert(res.reason || 'Giriş başarısız oldu.', 'error');
         }
-        generateCaptcha('captchaCanvasLogin');
       }
     };
 
@@ -1713,7 +1615,7 @@
       }
 
       if (!/^[a-zA-Z0-9_]{3,25}$/.test(username)) {
-        showAlert('⚠️ Kullanıcı adı 3-25 karakter arasında olmalı, Türkçe karakter veya boşluk içermemelidir.', 'warning');
+        showAlert('⚠️ Kullanıcı adı 3-25 karakter arasında olmalı, boşluk içermemelidir.', 'warning');
         portal.querySelector('#regUsername').focus();
         return;
       }
@@ -1731,22 +1633,14 @@
       }
 
       if (pass !== passConf) {
-        showAlert('🔒 Girdiğiniz şifreler birbiriyle eşleşmiyor. İki kutuya da aynı şifreyi yazınız.', 'warning');
+        showAlert('🔒 Girdiğiniz şifreler birbiriyle eşleşmiyor.', 'warning');
         portal.querySelector('#regPasswordConfirm').focus();
-        return;
-      }
-
-      const captchaInput = portal.querySelector('#regCaptchaInput').value.trim().toUpperCase();
-      if (captchaInput !== currentCaptchaText.toUpperCase()) {
-        showAlert('🛡️ Güvenlik kodu (CAPTCHA) hatalı! Görseldeki kodu doğru giriniz.', 'warning');
-        generateCaptcha('captchaCanvasReg');
-        portal.querySelector('#regCaptchaInput').value = '';
         return;
       }
 
       const submitBtn = portal.querySelector('#btnRegisterSubmit');
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Başvuru İletiliyor... ⏳';
+      submitBtn.textContent = 'Gönderiliyor...';
 
       const payload = {
         fullName,
@@ -1759,7 +1653,7 @@
 
       const res = await register(payload);
       submitBtn.disabled = false;
-      submitBtn.textContent = '✨ Kayıt Başvurusunu Tamamla';
+      submitBtn.textContent = 'Kayıt Başvurusunu Gönder';
 
       if (res.success) {
         portal.querySelector('#regFormBody').style.display = 'none';
@@ -1775,7 +1669,6 @@
         }
       } else {
         showAlert(res.reason || 'Kayıt işlemi gerçekleştirilemedi.', 'error');
-        generateCaptcha('captchaCanvasReg');
       }
     };
   }
