@@ -1269,6 +1269,59 @@ if (uploadMini) {
 document.addEventListener('dragover', e => e.preventDefault());
 document.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files); });
 
+// ── MOBİL MENÜ & HIZLI İŞLEM ÇEKMECESİ (DRAWER) ───────────
+const btnMobileMenuToggle = document.getElementById('btnMobileMenuToggle');
+const mobileDrawer = document.getElementById('mobileDrawer');
+const mobileDrawerOverlay = document.getElementById('mobileDrawerOverlay');
+const btnMobileDrawerClose = document.getElementById('btnMobileDrawerClose');
+const btnMobileFab = document.getElementById('btnMobileFab');
+
+function openMobileDrawer() {
+  if (mobileDrawer) mobileDrawer.classList.add('open');
+  if (mobileDrawerOverlay) mobileDrawerOverlay.classList.add('open');
+}
+
+function closeMobileDrawer() {
+  if (mobileDrawer) mobileDrawer.classList.remove('open');
+  if (mobileDrawerOverlay) mobileDrawerOverlay.classList.remove('open');
+}
+
+if (btnMobileMenuToggle) btnMobileMenuToggle.addEventListener('click', openMobileDrawer);
+if (btnMobileDrawerClose) btnMobileDrawerClose.addEventListener('click', closeMobileDrawer);
+if (mobileDrawerOverlay) mobileDrawerOverlay.addEventListener('click', closeMobileDrawer);
+
+if (btnMobileFab) {
+  btnMobileFab.addEventListener('click', () => {
+    fileInputMulti?.click();
+  });
+}
+
+// Mobil Çekmece İçi İşlem Butonları
+const mobBind = (id, targetBtnId, action) => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('click', () => {
+    closeMobileDrawer();
+    if (typeof action === 'function') {
+      action();
+    } else if (targetBtnId) {
+      document.getElementById(targetBtnId)?.click();
+    }
+  });
+};
+
+mobBind('btnMobAddSingle', null, () => fileInputSingle?.click());
+mobBind('btnMobAddMulti', null, () => fileInputMulti?.click());
+mobBind('btnMobAddFolder', null, () => fileInputFolder?.click());
+mobBind('btnMobComplexity', 'btnComplexityCenter');
+mobBind('btnMobDependencies', 'btnDependencies');
+mobBind('btnMobParams', 'btnParams');
+mobBind('btnMobSnippets', 'btnSnippets');
+mobBind('btnMobTableAnalysis', 'btnTableAnalysis');
+mobBind('btnMobRecent', 'btnOpenRecentModal');
+mobBind('btnMobDashboard', 'btnDashboardPanel');
+mobBind('btnMobSettings', 'btnOpenSettingsModal');
+
 
 // ── SABİTLEME (PIN) TOGGLE ────────────────────────────────
 // ── SIRALAMA (Pin önce, sonra favori, sonra alan sıralaması) ──────────────

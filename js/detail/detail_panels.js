@@ -90,7 +90,8 @@ async function openParamInjector(queryIndex) {
               injectedVal = `'${val}'`;
             }
           }
-          const rx = new RegExp(p + '\\b', 'g');
+          const safeP = typeof escapeRegex === 'function' ? escapeRegex(p) : p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const rx = new RegExp(safeP + '(?=[^a-zA-Z0-9_]|$)', 'g');
           finalSql = finalSql.replace(rx, injectedVal);
         }
       });

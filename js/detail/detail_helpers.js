@@ -95,8 +95,7 @@ function showSelectionReplacePopover(tabId) {
     const replacement = input ? input.value : '';
     const currentText = editArea.value;
     const searchText = selectedText;
-    const escapedSearch = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const nextText = currentText.replace(new RegExp(escapedSearch, 'g'), replacement);
+    const nextText = currentText.replaceAll ? currentText.replaceAll(searchText, replacement) : currentText.split(searchText).join(replacement);
     editArea.value = nextText;
     const firstMatchIndex = currentText.indexOf(searchText);
     const caretPos = firstMatchIndex >= 0 ? firstMatchIndex + replacement.length : start + replacement.length;

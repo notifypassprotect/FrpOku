@@ -496,10 +496,17 @@
   }
 
   function updateMeta(id, metaPatch) {
+    if (!metaPatch || typeof metaPatch !== 'object') return false;
     const files = _read();
     const idx = files.findIndex(f => f.id === id);
     if (idx >= 0) {
-      files[idx].meta = Object.assign({}, files[idx].meta || {}, metaPatch);
+      const currentMeta = { ...(files[idx].meta || {}) };
+      for (const [k, v] of Object.entries(metaPatch)) {
+        if (k !== '__proto__' && k !== 'constructor' && k !== 'prototype') {
+          currentMeta[k] = v;
+        }
+      }
+      files[idx].meta = currentMeta;
       _write(files);
       return true;
     }

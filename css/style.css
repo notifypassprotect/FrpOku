@@ -76,7 +76,9 @@
 
 html, body {
   height: 100%;
+  height: 100dvh;
   overflow: hidden;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -371,6 +373,7 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -2161,6 +2164,254 @@ tr.pinned-row {
   color: #fff;
   font-size: .75rem;
   letter-spacing: .02em;
+}
+
+/* ════════════════════════════════════════════════════════════
+   📱 MOBİL DUYARLI ARAYÜZ SİSTEMİ (MOBILE RESPONSIVE OVERHAUL)
+   ════════════════════════════════════════════════════════════ */
+
+/* Mobil Hamburger Menü Butonu */
+.btn-mobile-menu {
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  background: var(--bg-raised);
+  border: 1.5px solid var(--border);
+  color: var(--text-primary);
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.btn-mobile-menu:hover {
+  background: var(--bg-surface);
+  border-color: var(--accent);
+}
+
+/* Mobil Menü Yan Çekmecesi (Drawer) */
+.mobile-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 99998;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.24s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.24s;
+}
+.mobile-drawer-overlay.open {
+  opacity: 1;
+  visibility: visible;
+}
+.mobile-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 320px;
+  max-width: 88vw;
+  background: var(--bg-surface);
+  border-left: 1.5px solid var(--border);
+  box-shadow: -10px 0 35px rgba(0, 0, 0, 0.35);
+  z-index: 99999;
+  transform: translateX(100%);
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem 1rem;
+  gap: 0.75rem;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.mobile-drawer.open {
+  transform: translateX(0);
+}
+.mobile-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 0.85rem;
+  border-bottom: 1.5px solid var(--border-light);
+}
+.mobile-drawer-header h3 {
+  font-size: 1.05rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-primary);
+}
+.mobile-drawer-close {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+.mobile-drawer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.mobile-drawer-section-title {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-top: 0.4rem;
+  padding: 0 0.4rem;
+}
+.mobile-drawer-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: var(--bg-raised);
+  border: 1.5px solid var(--border-light);
+  color: var(--text-primary);
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: all 0.15s ease;
+  min-height: 44px;
+}
+.mobile-drawer-item:active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  transform: scale(0.98);
+}
+
+/* Mobil Hızlı Ekleme Butonu (FAB) */
+.mobile-fab-btn {
+  display: none;
+  position: fixed;
+  bottom: 22px;
+  right: 20px;
+  z-index: 9000;
+  padding: 0.85rem 1.35rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  color: #ffffff;
+  font-size: 0.92rem;
+  font-weight: 800;
+  border: none;
+  box-shadow: 0 10px 28px rgba(37, 99, 235, 0.45), 0 2px 8px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  align-items: center;
+  gap: 0.5rem;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  user-select: none;
+}
+.mobile-fab-btn:active {
+  transform: scale(0.94);
+}
+
+/* Mobil Rapor Detay Sayfası Tab Çubuğu */
+.mobile-detail-nav {
+  display: none;
+  background: var(--bg-surface);
+  border-bottom: 1.5px solid var(--border);
+  padding: 0.4rem 0.6rem;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.mobile-detail-nav-btn {
+  flex: 1;
+  padding: 0.55rem 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border-radius: 9px;
+  border: 1.5px solid var(--border-light);
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  text-align: center;
+  transition: all 0.15s ease;
+  min-height: 40px;
+}
+.mobile-detail-nav-btn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+}
+
+/* Modal ve Dialoglar İçin Mobil Uyum */
+@media (max-width: 860px) {
+  .btn-mobile-menu { display: flex; }
+  .mobile-fab-btn { display: inline-flex; }
+  
+  .topbar {
+    padding: 0 0.85rem;
+    height: 54px;
+  }
+  .brand-sub { display: none; }
+  
+  /* Mobilde üst barda sadece Profil, Tema ve Menü gösterilir */
+  .topbar-right > *:not(#btnUserProfile):not(#btnThemeToggle):not(#btnMobileMenuToggle):not(.detail-topbar-left):not(.brand) {
+    display: none !important;
+  }
+  
+  /* Modalların mobilde tam ekrana yakın esnemesi */
+  .modal-box, .dialog-box, .custom-modal-content, .settings-modal-box {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    max-height: 90dvh !important;
+    margin: auto !important;
+    border-radius: 16px !important;
+    padding: 1rem !important;
+  }
+
+  /* Detay Sayfası Mobil Düzeni */
+  .mobile-detail-nav { display: flex; }
+  .app-body { flex-direction: column; overflow-y: auto; }
+  .sidebar {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border) !important;
+    display: none;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .sidebar.mobile-active { display: flex !important; }
+  .main {
+    width: 100% !important;
+    flex: 1;
+    min-height: 0;
+  }
+  .main.mobile-hidden { display: none !important; }
+  
+  .detail-topbar-left {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .code-search-box {
+    min-width: 100%;
+    margin-top: 0.3rem;
+  }
 }
 
 

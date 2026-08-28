@@ -10,7 +10,7 @@ function safeToast(msg, type = 'info') {
   } else if (typeof window.showToast === 'function') {
     window.showToast(msg, type);
   } else {
-    console.log(`[Toast ${type}]`, msg);
+    console.log('[Toast]', type, msg);
   }
 }
 // Use unique name to avoid collision with list.js's global toast function

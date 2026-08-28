@@ -617,7 +617,9 @@ function findSyntaxErrors(code, lang = 'sql') {
           if (SQL_FN.has(prefixUp) || SQL_KW.has(prefixUp)) continue;
 
           // Paket / Şema fonksiyon çağrıları: prefix.function(...) (örn. p_util.datediff)
-          if (new RegExp('\\b' + prefix + '\\.' + col + '\\s*\\(', 'i').test(cleanLine)) continue;
+          const safePref = typeof escapeRegex === 'function' ? escapeRegex(prefix) : prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const safeCol = typeof escapeRegex === 'function' ? escapeRegex(col) : col.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          if (new RegExp('\\b' + safePref + '\\.' + safeCol + '\\s*\\(', 'i').test(cleanLine)) continue;
 
           // Bu satırda zaten aynı hata var mı?
           if (!errors.some(e => e.line === lineNum && e.token === am[0])) {

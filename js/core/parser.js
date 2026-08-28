@@ -49,7 +49,7 @@ function decodeHtmlEntities(str) {
 }
 
 function getAttr(chunk, name) {
-  const escaped = name.replace(/\./g, '\\.');
+  const escaped = typeof escapeRegex === 'function' ? escapeRegex(name) : name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const rx = new RegExp(
     '(?:^|\\s)' + escaped + "\\s*=\\s*(?:\"((?:[^\"\\\\]|\\\\.)*?)\"|'((?:[^'\\\\]|\\\\.)*?)')",
     's'
@@ -60,7 +60,8 @@ function getAttr(chunk, name) {
 }
 
 function findTagAttributes(xmlText, tagName) {
-  const rx = new RegExp(`<${tagName}\\b`, 'g');
+  const safeTag = typeof escapeRegex === 'function' ? escapeRegex(tagName) : tagName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const rx = new RegExp(`<${safeTag}\\b`, 'g');
   const chunks = [];
   let match;
 
@@ -603,7 +604,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
 
   (file.queries || []).forEach(q => {
     const encodedSql = encodeFrpAttr(q.sql);
-    const escapedName = q.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escapedName = typeof escapeRegex === 'function' ? escapeRegex(q.name) : q.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const tagRx = new RegExp(`(<Tfrx(?:FOQuery|Query)\\b[^>]*?\\b(?:Name|UserName)=["']${escapedName}["'][^>]*?>)`, 'gi');
     xml = xml.replace(tagRx, match => {
       if (/\bSQL\.Text=["']/i.test(match)) {

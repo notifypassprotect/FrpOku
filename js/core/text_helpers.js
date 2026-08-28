@@ -115,9 +115,18 @@ async function copyTextToClipboard(text) {
   }
 }
 
+/**
+ * RegExp metinlerini güvenli escape eder (ReDoS & RegExp Injection Koruması)
+ */
+function escapeRegex(str) {
+  if (!str) return '';
+  return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 window.countLines           = countLines;
 window.trLower              = trLower;
 window.trUpper              = trUpper;
 window.trNormalize          = trNormalize;
 window.fixTurkishMojibake   = fixTurkishMojibake;
-window.copyTextToClipboard  = copyTextToClipboard;
+window.copyTextToClipboard  = copyTextToClipboard;
+window.escapeRegex          = escapeRegex;

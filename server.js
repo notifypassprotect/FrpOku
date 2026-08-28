@@ -122,16 +122,32 @@ function verifyToken(token) {
   return null;
 }
 
-// ── PENTESTING & GÜVENLİK HEADERLARI (Security Hardening) ─────
+function safeLogStr(str) {
+  if (typeof str !== 'string') return String(str || '');
+  return str.replace(/[\r\n\x00-\x1f\x7f]/g, '').slice(0, 150);
+}
+
+// ── PENTESTING & GÜVENLİK HEADERLARI (Security Hardening & Mozilla Observatory A+) ─────
 app.use((req, res, next) => {
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://fonts.googleapis.com https://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co data: blob:; img-src 'self' data: blob:; frame-ancestors 'self';"
+    "default-src 'self'; " +
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+    "font-src 'self' https://fonts.gstatic.com data:; " +
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co; " +
+    "img-src 'self' data: blob: https:; " +
+    "object-src 'none'; " +
+    "base-uri 'self'; " +
+    "form-action 'self'; " +
+    "frame-ancestors 'self';"
   );
   next();
 });
@@ -530,14 +546,14 @@ app.post('/api/admin/approve-user', adminRateLimiter, requireAdmin, async (req, 
       saveLocalUsers(localUsers);
     }
 
-    console.log(`✅ Kullanıcı Başarıyla Onaylandı: ${userId}`);
+    console.log('✅ Kullanıcı Başarıyla Onaylandı:', safeLogStr(userId));
 
     res.json({
       success: true,
       message: 'Kullanıcı hesabı başarıyla onaylandı ve aktifleştirildi.'
     });
   } catch (err) {
-    console.error('Onaylama hatası:', err.message);
+    console.error('Onaylama hatası:', safeLogStr(err.message));
     res.status(500).json({ success: false, reason: 'Kullanıcı onaylanamadı: ' + err.message });
   }
 });
@@ -556,7 +572,7 @@ app.post('/api/admin/reject-user', adminRateLimiter, requireAdmin, async (req, r
       }
       const localUsers = getLocalUsers().filter(u => u.id !== userId);
       saveLocalUsers(localUsers);
-      console.log(`🗑️ Kullanıcı Kaydı Silindi / Reddedildi: ${userId}`);
+      console.log('🗑️ Kullanıcı Kaydı Silindi / Reddedildi:', safeLogStr(userId));
     } else {
       const updates = { is_active: false };
       if (supabase) {

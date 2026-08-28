@@ -52,7 +52,7 @@ function detectParamType(sql, paramName) {
 
   // 4. SQL İçindeki Doğrudan Bağlam Analizi (Sadece bu parametreye sarılmış fonksiyonlar)
   if (sql) {
-    const escapedParam = rawName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const escapedParam = typeof escapeRegex === 'function' ? escapeRegex(rawName) : rawName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const rxDateWrap = new RegExp(`(?:TO_DATE|TRUNC)\\s*\\(\\s*:${escapedParam}\\b`, 'i');
     if (rxDateWrap.test(sql)) {
       return 'tarih';

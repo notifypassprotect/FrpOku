@@ -123,7 +123,13 @@ function deactivateMetaEdit(rowEl, newDisplay) {
   const input = rowEl.querySelector('.meta-inline-input');
   const actions = rowEl.querySelector('.meta-edit-actions');
   if (!display || !input || !actions) return;
-  if (newDisplay !== undefined) display.innerHTML = newDisplay || '<span style="color:var(--text-muted);font-style:italic;">—</span>';
+  if (newDisplay !== undefined) {
+    if (newDisplay) {
+      display.textContent = newDisplay;
+    } else {
+      display.innerHTML = '<span style="color:var(--text-muted);font-style:italic;">—</span>';
+    }
+  }
   display.style.display = '';
   input.style.display = 'none';
   actions.style.display = 'none';
@@ -323,7 +329,11 @@ function renderSidebar(file) {
       FrpStore.updateMeta(file.id, { description: newDesc });
       currentFile = FrpStore.getById(file.id);
       if (descDisplay) {
-        descDisplay.innerHTML = newDesc ? esc(newDesc) : '<span style="color:var(--text-muted);font-style:italic;">Açıklama yok — tıklayarak ekle</span>';
+        if (newDesc) {
+          descDisplay.textContent = newDesc;
+        } else {
+          descDisplay.innerHTML = '<span style="color:var(--text-muted);font-style:italic;">Açıklama yok — tıklayarak ekle</span>';
+        }
         descDisplay.style.display = '';
       }
       if (descArea) descArea.style.display = 'none';
@@ -877,8 +887,7 @@ function showSelectionReplacePopover(tabId) {
     let nextText = currentText;
 
     if (replaceAll) {
-      const escapedSearch = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      nextText = currentText.replace(new RegExp(escapedSearch, 'g'), replacement);
+      nextText = currentText.replaceAll ? currentText.replaceAll(searchText, replacement) : currentText.split(searchText).join(replacement);
     } else {
       nextText = currentText.slice(0, start) + replacement + currentText.slice(end);
     }
@@ -2476,7 +2485,8 @@ async function openParamInjector(queryIndex) {
               injectedVal = `'${val}'`;
             }
           }
-          const rx = new RegExp(p + '\\b', 'g');
+          const safeP = typeof escapeRegex === 'function' ? escapeRegex(p) : p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const rx = new RegExp(safeP + '(?=[^a-zA-Z0-9_]|$)', 'g');
           finalSql = finalSql.replace(rx, injectedVal);
         }
       });
@@ -2768,10 +2778,38 @@ window.removeTagFromDetail = removeTagFromDetail;
 window.openAllSyntaxErrorsModal = openAllSyntaxErrorsModal;
 window.jumpToEditorLine = jumpToEditorLine;
 
+// ── MOBİL DETAY SAYFASI SEKME YÖNETİMİ ─────────────────────────
+function setupMobileDetailTabs() {
+  const btnCode = document.getElementById('btnTabMobCode');
+  const btnInfo = document.getElementById('btnTabMobInfo');
+  const sidebar = document.querySelector('.sidebar');
+  const main = document.querySelector('.main');
+
+  if (!btnCode || !btnInfo || !sidebar || !main) return;
+
+  btnCode.addEventListener('click', () => {
+    btnCode.classList.add('active');
+    btnInfo.classList.remove('active');
+    sidebar.classList.remove('mobile-active');
+    main.classList.remove('mobile-hidden');
+  });
+
+  btnInfo.addEventListener('click', () => {
+    btnInfo.classList.add('active');
+    btnCode.classList.remove('active');
+    sidebar.classList.add('mobile-active');
+    main.classList.add('mobile-hidden');
+  });
+}
+
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
+  document.addEventListener('DOMContentLoaded', () => {
+    init();
+    setupMobileDetailTabs();
+  });
 } else {
   init();
+  setupMobileDetailTabs();
 }
 
 

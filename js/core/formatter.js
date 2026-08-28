@@ -67,7 +67,8 @@
 
     // 4. Ana cümlelerin önüne newline koy
     MAIN_CLAUSES.forEach(clause => {
-      const escaped = clause.replace(/ /g, '\\s+');
+      const safeClause = typeof escapeRegex === 'function' ? escapeRegex(clause) : clause.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const escaped = safeClause.replace(/ /g, '\\s+');
       const rx = new RegExp('(?<=[\\s,)]|^)(' + escaped + ')(?=[\\s(,]|$)', 'gi');
       s = s.replace(rx, '\n' + clause);
     });

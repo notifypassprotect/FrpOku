@@ -135,9 +135,72 @@
 
       <!-- Ayarlar Butonu -->
       <button class="btn btn-sm" id="btnOpenSettingsModal" style="font-weight:700;background:var(--bg-surface);border:1.5px solid var(--border);" title="Görünüm, Kategoriler, Sütunlar, Çöp Kutusu, Yedekleme">⚙️ Ayarlar</button>
+
+      <!-- Mobil Menü Butonu (Sadece mobilde görünür) -->
+      <button class="btn btn-sm btn-mobile-menu" id="btnMobileMenuToggle" title="Mobil Menüyü Aç" aria-label="Menü">
+        <span>☰</span> <span style="font-size:.78rem;">Menü</span>
+      </button>
     </div>
   </nav>
 
+  <!-- MOBİL MENÜ ÇEKMECESİ (DRAWER) -->
+  <div class="mobile-drawer-overlay" id="mobileDrawerOverlay"></div>
+  <div class="mobile-drawer" id="mobileDrawer">
+    <div class="mobile-drawer-header">
+      <h3>📋 FrpOku Menü</h3>
+      <button class="mobile-drawer-close" id="btnMobileDrawerClose" aria-label="Kapat">✕</button>
+    </div>
+    
+    <div class="mobile-drawer-section">
+      <div class="mobile-drawer-section-title">⚡ Hızlı İşlemler</div>
+      <button class="mobile-drawer-item" id="btnMobAddSingle">
+        <span>➕</span> <span>Tek Dosya Ekle (.frp)</span>
+      </button>
+      <button class="mobile-drawer-item" id="btnMobAddMulti">
+        <span>📋</span> <span>Çoklu Dosya Ekle</span>
+      </button>
+      <button class="mobile-drawer-item" id="btnMobAddFolder">
+        <span>📂</span> <span>Klasör Yükle</span>
+      </button>
+    </div>
+
+    <div class="mobile-drawer-section">
+      <div class="mobile-drawer-section-title">🧠 Analiz Araçları</div>
+      <button class="mobile-drawer-item" id="btnMobComplexity">
+        <span>🧠</span> <span>SQL Karmaşıklık Analizi</span>
+      </button>
+      <button class="mobile-drawer-item" id="btnMobDependencies">
+        <span>🕸️</span> <span>Tablo Bağımlılık Haritası</span>
+      </button>
+      <button class="mobile-drawer-item" id="btnMobParams">
+        <span>⚙️</span> <span>Tüm Parametreler</span>
+      </button>
+      <button class="mobile-drawer-item" id="btnMobSnippets">
+        <span>📌</span> <span>Kayıtlı SQL Kütüphanesi</span>
+      </button>
+      <button class="mobile-drawer-item" id="btnMobTableAnalysis">
+        <span>📊</span> <span>Tablo Kullanım Analizi</span>
+      </button>
+    </div>
+
+    <div class="mobile-drawer-section">
+      <div class="mobile-drawer-section-title">⚙️ Sistem & Ayarlar</div>
+      <button class="mobile-drawer-item" id="btnMobRecent">
+        <span>🕒</span> <span>Son Açılan Raporlar</span>
+      </button>
+      <button class="mobile-drawer-item" id="btnMobDashboard" style="display:none;">
+        <span>📊</span> <span>Yönetim Paneli (Admin)</span>
+      </button>
+      <button class="mobile-drawer-item" id="btnMobSettings">
+        <span>⚙️</span> <span>Sistem & Görünüm Ayarları</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- MOBİL HIZLI RAPOR EKLEME BUTONU (FAB) -->
+  <button class="mobile-fab-btn" id="btnMobileFab" title="Hızlı Rapor Ekle">
+    <span>➕</span> <span>Rapor Ekle</span>
+  </button>
 
   <!-- Gizli file input'lar -->
   <input type="file" id="fileInputSingle" accept=".frp" style="display:none" />
@@ -303,7 +366,7 @@
 <div class="toast-stack" id="toastStack"></div>
 
 <!-- SCRIPTS (MODÜLER MİMARİ) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/lib/supabase.js?v=4.3"></script>
 <!-- 1. Çekirdek & Ortak Araçlar -->
 <script src="js/core/notify.js?v=4.3"></script>
 <script src="js/core/supabase.js?v=4.3"></script>
