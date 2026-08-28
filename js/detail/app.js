@@ -531,7 +531,6 @@ function addTab(cfg) {
             <button class="btn-copy" onclick="openComplexityModal(${cfg.queryIndex})" title="SQL Karmaşıklık Puanı & Zeki Analiz">📊 Karmaşıklık</button>
             <button class="btn-copy" onclick="addToSnippetLibrary(${cfg.queryIndex})">📌 Kütüphaneye Ekle</button>
             <button class="btn-copy" onclick="openParamInjector(${cfg.queryIndex})">⚡ SQL Testi</button>
-            <button class="btn-copy" onclick="openOracleRunner(${cfg.queryIndex})" title="Sorguyu Canlı Oracle Veritabanında Çalıştır" style="background:rgba(217,119,6,0.1);color:var(--orange,#d97706);border-color:rgba(217,119,6,0.3);font-weight:700;">⚡ Oracle'da Çalıştır</button>
           ` : ''}
           ${cfg.type === 'pascal' ? `
             <button class="btn-copy" id="btnCheckPascalSyntax" onclick="checkPascalSyntaxInTab()" title="PascalScript Sözdizimi Kontrolü">🔍 Sözdizimi Kontrol</button>
