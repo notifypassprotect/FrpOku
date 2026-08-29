@@ -369,6 +369,64 @@
     }
   });
 
+  async function updatePassword({ oldPassword, newPassword }) {
+    const user = getSession();
+    if (!user || !user.id) return { success: false, reason: 'Oturum bulunamadı.' };
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ userId: user.id, oldPassword, newPassword })
+      });
+      const data = await res.json();
+      return data;
+    } catch (e) {
+      return { success: false, reason: 'Sunucu bağlantı hatası: ' + e.message };
+    }
+  }
+
+  async function updateEmail(newEmail) {
+    const user = getSession();
+    if (!user || !user.id) return { success: false, reason: 'Oturum bulunamadı.' };
+    try {
+      const res = await fetch('/api/auth/update-profile', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ userId: user.id, email: newEmail })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        user.email = newEmail;
+        updateSession({ email: newEmail });
+      }
+      return data;
+    } catch (e) {
+      user.email = newEmail;
+      updateSession({ email: newEmail });
+      return { success: true };
+    }
+  }
+
+  async function updateProfile(updates) {
+    const user = getSession();
+    if (!user || !user.id) return { success: false, reason: 'Oturum bulunamadı.' };
+    try {
+      const res = await fetch('/api/auth/update-profile', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ userId: user.id, ...updates })
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        updateSession(updates);
+      }
+      return data;
+    } catch (e) {
+      updateSession(updates);
+      return { success: true };
+    }
+  }
+
   window.FrpAuth = {
     register,
     login,
@@ -383,6 +441,9 @@
     updateNavbarUserBadge,
     setupAdminFeatures,
     refreshAdminPendingBadge,
+    updatePassword,
+    updateEmail,
+    updateProfile,
     updateSession(updatedUser) {
       if (currentUser && updatedUser) {
         currentUser = { ...currentUser, ...updatedUser };

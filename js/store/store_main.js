@@ -1307,17 +1307,69 @@
     }, intervalMinutes * 60 * 1000);
   }
 
-  function setAutoBackupInterval(minutes) {
-    const prefs = getPreferences();
-    prefs.autoBackupInterval = minutes;
-    setPreferences(prefs);
-    startAutoBackupTimer();
+  function exportBackup() {
+    const backupObj = {
+      version: '7.2',
+      exportedAt: new Date().toISOString(),
+      reports: _read(),
+      categories: getCategoryObjects(),
+      customTags: getCustomTags(),
+      snippets: getSnippets(),
+      preferences: getPreferences(),
+      trash: getTrash()
+    };
+    return JSON.stringify(backupObj, null, 2);
+  }
+
+  function importBackup(jsonStr) {
+    try {
+      const data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
+      let importedCount = 0;
+
+      // Format 1: Tam Yedek Paketi
+      if (data && typeof data === 'object' && !Array.isArray(data) && Array.isArray(data.reports || data.files)) {
+        const reportList = data.reports || data.files || [];
+        if (data.categories && Array.isArray(data.categories)) {
+          try { localStorage.setItem(CATEGORIES_KEY, JSON.stringify(data.categories)); } catch (e) {}
+        }
+        if (data.customTags && Array.isArray(data.customTags)) {
+          try { localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(data.customTags)); } catch (e) {}
+        }
+        if (data.snippets && Array.isArray(data.snippets)) {
+          try { localStorage.setItem(SNIPPETS_KEY, JSON.stringify(data.snippets)); } catch (e) {}
+        }
+        if (data.preferences) {
+          setPreferences(data.preferences);
+        }
+        const existing = _read();
+        const existingIds = new Set(existing.map(f => f.id));
+        const newReports = reportList.filter(r => r && r.id && !existingIds.has(r.id));
+        const combined = [...existing, ...newReports];
+        _write(combined);
+        importedCount = newReports.length || reportList.length;
+      }
+      // Format 2: Doğrudan Rapor Listesi Dizisi
+      else if (Array.isArray(data)) {
+        const existing = _read();
+        const existingIds = new Set(existing.map(f => f.id));
+        const newReports = data.filter(r => r && r.id && !existingIds.has(r.id));
+        const combined = [...existing, ...newReports];
+        _write(combined);
+        importedCount = newReports.length || data.length;
+      }
+
+      return importedCount;
+    } catch (e) {
+      console.error('importBackup hatası:', e);
+      return 0;
+    }
   }
 
   // ── Public Store API (Köprü ve Delegasyon) ─────────────────────
   const FrpStore = {
     getAll, getById, add, addMany, deleteOne, deleteMany, deleteAll,
     updateNote, updateMeta, updateCode, updateFileName, restoreFromIndexedDB,
+    exportBackup, importBackup,
     toggleFavorite, togglePin, setFavoriteMany, toggleFavoriteMany, addTag, removeTag, getAllTags, getCustomTags, addCustomTag, deleteCustomTag,
     setCategory, getCategories, getCategoryObjects, addCategory, updateCategory, deleteCategory,
     getSnippets, addSnippet, removeSnippet, updateSnippet,

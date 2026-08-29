@@ -73,7 +73,7 @@ window.FrpSettingsTabs.categories = {
 
   bind({ overlay, renderModal, safeToast }) {
     // Kategori Ekle
-    overlay.querySelector('#btnSaveNewCat')?.addEventListener('click', () => {
+    const doAddCategory = () => {
       const name = (overlay.querySelector('#newCategoryName')?.value || '').trim();
       const color = overlay.querySelector('#newCategoryColor')?.value || '#3b82f6';
       if (!name) {
@@ -83,6 +83,12 @@ window.FrpSettingsTabs.categories = {
       FrpStore.addCategory(name, color);
       safeToast(`'${name}' kategorisi eklendi.`, 'success');
       renderModal();
+    };
+
+    overlay.querySelector('#btnAddNewCategory')?.addEventListener('click', doAddCategory);
+    overlay.querySelector('#btnSaveNewCat')?.addEventListener('click', doAddCategory);
+    overlay.querySelector('#newCategoryName')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') doAddCategory();
     });
 
     // Kategori Sil
@@ -96,7 +102,7 @@ window.FrpSettingsTabs.categories = {
     });
 
     // Özel Etiket Ekle
-    overlay.querySelector('#btnAddCustomTag')?.addEventListener('click', () => {
+    const doAddTag = () => {
       const tag = (overlay.querySelector('#newCustomTagName')?.value || '').trim();
       if (!tag) {
         safeToast('Lütfen bir etiket adı girin.', 'error');
@@ -105,6 +111,11 @@ window.FrpSettingsTabs.categories = {
       FrpStore.addCustomTag(tag);
       safeToast(`'${tag}' etiketi eklendi.`, 'success');
       renderModal();
+    };
+
+    overlay.querySelector('#btnAddCustomTag')?.addEventListener('click', doAddTag);
+    overlay.querySelector('#newCustomTagName')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') doAddTag();
     });
 
     // Özel Etiket Sil
