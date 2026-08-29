@@ -661,24 +661,37 @@ app.post('/api/admin/approve-user', adminRateLimiter, requireAdmin, async (req, 
   try {
     const updates = { is_active: true };
 
-    if (supabase) {
-      const { error } = await supabase
-        .from('app_users')
-        .update(updates)
-        .eq('id', userId);
-
-      if (error) throw error;
-    }
-
-    // Yerel kaydı da güncelle
+    // 1. Yerel kaydı mutlaka güncelle
     const localUsers = getLocalUsers();
-    const idx = localUsers.findIndex(u => u.id === userId);
+    const idx = localUsers.findIndex(u => u.id === userId || u.username === userId);
+    let targetUsername = userId;
     if (idx !== -1) {
       localUsers[idx] = { ...localUsers[idx], ...updates };
+      targetUsername = localUsers[idx].username || userId;
       saveLocalUsers(localUsers);
     }
 
-    console.log('✅ Kullanıcı Başarıyla Onaylandı:', safeLogStr(userId));
+    // 2. Supabase varsa güvenle güncelle
+    if (supabase) {
+      try {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId);
+        if (isUuid) {
+          await supabase.from('app_users').update(updates).eq('id', userId);
+        } else {
+          await supabase.from('app_users').update(updates).eq('username', targetUsername);
+        }
+      } catch (sbErr) {
+        console.warn('Supabase approve-user warning:', sbErr.message);
+      }
+    }
+
+    recordAuditLog({
+      action: 'USER_APPROVE',
+      target: targetUsername,
+      details: `@${targetUsername} kullanıcısının kaydı onaylandı ve hesabı aktifleştirildi.`
+    });
+
+    console.log('✅ Kullanıcı Başarıyla Onaylandı:', safeLogStr(targetUsername));
 
     res.json({
       success: true,
@@ -698,25 +711,53 @@ app.post('/api/admin/reject-user', adminRateLimiter, requireAdmin, async (req, r
   }
 
   try {
+    const localUsers = getLocalUsers();
+    const userObj = localUsers.find(u => u.id === userId || u.username === userId);
+    const targetUsername = userObj ? userObj.username : userId;
+
     if (deletePermanently) {
+      const filtered = localUsers.filter(u => u.id !== userId && u.username !== userId);
+      saveLocalUsers(filtered);
+
       if (supabase) {
-        await supabase.from('app_users').delete().eq('id', userId);
+        try {
+          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId);
+          if (isUuid) {
+            await supabase.from('app_users').delete().eq('id', userId);
+          } else {
+            await supabase.from('app_users').delete().eq('username', targetUsername);
+          }
+        } catch (sbErr) {
+          console.warn('Supabase reject-user delete warning:', sbErr.message);
+        }
       }
-      const localUsers = getLocalUsers().filter(u => u.id !== userId);
-      saveLocalUsers(localUsers);
-      console.log('🗑️ Kullanıcı Kaydı Silindi / Reddedildi:', safeLogStr(userId));
+      console.log('🗑️ Kullanıcı Kaydı Silindi / Reddedildi:', safeLogStr(targetUsername));
     } else {
       const updates = { is_active: false };
-      if (supabase) {
-        await supabase.from('app_users').update(updates).eq('id', userId);
-      }
-      const localUsers = getLocalUsers();
-      const idx = localUsers.findIndex(u => u.id === userId);
+      const idx = localUsers.findIndex(u => u.id === userId || u.username === userId);
       if (idx !== -1) {
         localUsers[idx] = { ...localUsers[idx], ...updates };
         saveLocalUsers(localUsers);
       }
+      if (supabase) {
+        try {
+          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId);
+          if (isUuid) {
+            await supabase.from('app_users').update(updates).eq('id', userId);
+          } else {
+            await supabase.from('app_users').update(updates).eq('username', targetUsername);
+          }
+        } catch (sbErr) {
+          console.warn('Supabase reject-user update warning:', sbErr.message);
+        }
+      }
     }
+
+    recordAuditLog({
+      action: 'USER_REJECT',
+      target: targetUsername,
+      details: `@${targetUsername} kullanıcısının başvuru kaydı reddedildi.`
+    });
 
     res.json({
       success: true,
@@ -734,14 +775,26 @@ app.post('/api/admin/toggle-status', adminRateLimiter, requireAdmin, async (req,
 
   try {
     const updates = { is_active: !!isActive };
-    if (supabase) {
-      await supabase.from('app_users').update(updates).eq('id', userId);
-    }
     const localUsers = getLocalUsers();
-    const idx = localUsers.findIndex(u => u.id === userId);
+    const idx = localUsers.findIndex(u => u.id === userId || u.username === userId);
+    let targetUsername = userId;
     if (idx !== -1) {
       localUsers[idx] = { ...localUsers[idx], ...updates };
+      targetUsername = localUsers[idx].username || userId;
       saveLocalUsers(localUsers);
+    }
+
+    if (supabase) {
+      try {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId);
+        if (isUuid) {
+          await supabase.from('app_users').update(updates).eq('id', userId);
+        } else {
+          await supabase.from('app_users').update(updates).eq('username', targetUsername);
+        }
+      } catch (sbErr) {
+        console.warn('Supabase toggle-status warning:', sbErr.message);
+      }
     }
 
     res.json({ success: true, is_active: !!isActive });
@@ -758,15 +811,28 @@ app.post('/api/admin/toggle-admin', adminRateLimiter, requireAdmin, async (req, 
   try {
     const newRole = makeAdmin ? 'admin' : 'user';
     const newAvatar = makeAdmin ? '👑' : '👤';
-    if (supabase) {
-      await supabase.from('app_users').update({ role: newRole, avatar: newAvatar }).eq('id', userId);
-    }
+    const updates = { role: newRole, avatar: newAvatar };
+
     const localUsers = getLocalUsers();
-    const idx = localUsers.findIndex(u => u.id === userId);
+    const idx = localUsers.findIndex(u => u.id === userId || u.username === userId);
+    let targetUsername = userId;
     if (idx !== -1) {
-      localUsers[idx].role = newRole;
-      localUsers[idx].avatar = newAvatar;
+      localUsers[idx] = { ...localUsers[idx], ...updates };
+      targetUsername = localUsers[idx].username || userId;
       saveLocalUsers(localUsers);
+    }
+
+    if (supabase) {
+      try {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId);
+        if (isUuid) {
+          await supabase.from('app_users').update(updates).eq('id', userId);
+        } else {
+          await supabase.from('app_users').update(updates).eq('username', targetUsername);
+        }
+      } catch (sbErr) {
+        console.warn('Supabase toggle-admin warning:', sbErr.message);
+      }
     }
 
     res.json({ success: true, role: newRole });
