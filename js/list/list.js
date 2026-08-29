@@ -955,7 +955,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('tabWsPersonal')?.classList.add('active');
     document.getElementById('tabWsPool')?.classList.remove('active');
     if (FrpStore.setActiveWorkspace) FrpStore.setActiveWorkspace('personal');
-    document.getElementById('poolNotice').style.display = 'none';
+    const pn = document.getElementById('poolNotice');
+    if (pn) pn.style.display = 'none';
     applySearch();
   });
 
@@ -963,7 +964,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('tabWsPool')?.classList.add('active');
     document.getElementById('tabWsPersonal')?.classList.remove('active');
     if (FrpStore.setActiveWorkspace) FrpStore.setActiveWorkspace('pool');
-    document.getElementById('poolNotice').style.display = 'block';
+    const pn = document.getElementById('poolNotice');
+    if (pn) pn.style.display = 'block';
     applySearch();
   });
 

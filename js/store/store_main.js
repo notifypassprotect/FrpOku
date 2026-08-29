@@ -1365,6 +1365,13 @@
     }
   }
 
+  function setAutoBackupInterval(minutes) {
+    const prefs = getPreferences();
+    prefs.autoBackupInterval = minutes;
+    setPreferences(prefs);
+    startAutoBackupTimer();
+  }
+
   // ── Public Store API (Köprü ve Delegasyon) ─────────────────────
   const FrpStore = {
     getAll, getById, add, addMany, deleteOne, deleteMany, deleteAll,
