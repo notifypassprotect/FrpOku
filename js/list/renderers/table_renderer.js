@@ -102,7 +102,7 @@ window.FrpListRenderers = window.FrpListRenderers || {};
       key: 'guid',
       title: 'GUID',
       sortField: 'guid',
-      renderTd: (file, { guidColHtml }) => `<td class="col-guid" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${guidColHtml}</td>`
+      renderTd: (file, { guidColHtml }) => `<td class="col-guid" style="white-space:nowrap;">${guidColHtml}</td>`
     },
     tags: {
       key: 'tags',

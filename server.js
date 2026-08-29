@@ -965,6 +965,46 @@ app.post('/api/auth/verify-password', async (req, res) => {
   }
 });
 
+// ── 10.6. DENETİM GÜNLÜĞÜ VE İSTEMCİ BİLGİ SERVİSLERİ ────────
+app.get('/api/client-ip', (req, res) => {
+  const rawIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || '127.0.0.1';
+  const ip = rawIp === '::1' || rawIp === '::ffff:127.0.0.1' ? '127.0.0.1' : rawIp;
+  res.json({ success: true, ip });
+});
+
+app.post('/api/audit-log', (req, res) => {
+  const { action, target, details, userId, username, fullName, role, ip: clientIp } = req.body;
+  const rawIp = clientIp || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || '127.0.0.1';
+  const ip = rawIp === '::1' || rawIp === '::ffff:127.0.0.1' ? '127.0.0.1' : rawIp;
+  const entry = recordAuditLog({
+    userId,
+    username,
+    fullName,
+    role,
+    action,
+    target,
+    details,
+    ip
+  });
+  res.json({ success: true, log: entry });
+});
+
+app.get('/api/admin/audit-logs', requireAdmin, (req, res) => {
+  const q = (req.query.q || '').trim().toLowerCase();
+  const limit = parseInt(req.query.limit, 10) || 500;
+  let logs = getAuditLogs();
+  if (q) {
+    logs = logs.filter(l =>
+      (l.username || '').toLowerCase().includes(q) ||
+      (l.action || '').toLowerCase().includes(q) ||
+      (l.target || '').toLowerCase().includes(q) ||
+      (l.details || '').toLowerCase().includes(q) ||
+      (l.ip || '').includes(q)
+    );
+  }
+  res.json({ success: true, logs: logs.slice(0, limit) });
+});
+
 // ── 11. ADMİN: KULLANICI ADI DEĞİŞTİRME ───────────────────────
 app.post('/api/admin/change-username', adminRateLimiter, requireAdmin, async (req, res) => {
   const { userId, newUsername } = req.body;

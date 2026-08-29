@@ -1,5 +1,6 @@
 // ============================================================
-//  audit_tab.js — Kullanıcı İşlem Geçmişi & Denetim Günlüğü
+//  audit_tab.js — Kullanıcı İşlem Geçmişi & Denetim Günlüğü v6
+//  Kompakt, Yüksek Çözünürlüklü ve Hatasız Tasarım
 // ============================================================
 
 window.FrpSettingsTabs = window.FrpSettingsTabs || {};
@@ -9,81 +10,82 @@ window.FrpSettingsTabs.audit = {
 
   render() {
     return `
-      <div style="display:flex;flex-direction:column;gap:1.15rem;width:100%;box-sizing:border-box;">
+      <div style="display:flex;flex-direction:column;gap:.9rem;width:100%;box-sizing:border-box;max-width:100%;">
         
-        <!-- Üst Başlık ve Eylem Barı -->
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;padding-bottom:.65rem;border-bottom:1px solid var(--border-light);width:100%;box-sizing:border-box;">
+        <!-- Üst Başlık ve Kompakt Eylem Çubuğu -->
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.65rem;padding-bottom:.55rem;border-bottom:1px solid var(--border-light);width:100%;box-sizing:border-box;">
           <div>
-            <div style="font-size:1.18rem;font-weight:900;color:var(--text-primary);display:flex;align-items:center;gap:.5rem;">
-              <span>Kullanıcı İşlem Geçmişi & Denetim Günlüğü</span>
-              <span class="badge badge-purple" style="font-size:.7rem;padding:.2rem .55rem;border-radius:6px;">Canlı Kayıtlar</span>
+            <div style="font-size:1.08rem;font-weight:900;color:var(--text-primary);display:flex;align-items:center;gap:.5rem;">
+              <span>Kullanıcı İşlem & Denetim Günlüğü</span>
+              <span class="badge badge-purple" style="font-size:.68rem;padding:.15rem .5rem;border-radius:6px;">Canlı Kayıtlar</span>
             </div>
-            <div style="font-size:.8rem;color:var(--text-muted);margin-top:.25rem;">
-              Oturum açma, rapor yükleme, indirme, silme, havuz paylaşımı ve sistem denetim kayıtları.
+            <div style="font-size:.76rem;color:var(--text-muted);margin-top:.15rem;">
+              Sistem oturumları, indirme, silme, yükleme, havuz ve kod düzenleme hareketleri.
             </div>
           </div>
-          <div style="display:flex;gap:.55rem;align-items:center;flex-wrap:wrap;">
-            <button type="button" class="btn btn-sm btn-ghost" id="btnRefreshAuditLogs" style="font-weight:700;padding:.45rem .85rem;border:1px solid var(--border);">
-              Yenile
+          <div style="display:flex;gap:.45rem;align-items:center;flex-wrap:wrap;">
+            <button type="button" class="btn btn-sm btn-ghost" id="btnRefreshAuditLogs" style="font-weight:700;padding:.35rem .75rem;font-size:.78rem;border:1px solid var(--border);">
+              🔄 Yenile
             </button>
-            <button type="button" class="btn btn-sm btn-primary" id="btnExportAuditExcel" style="font-weight:800;background:linear-gradient(135deg,#059669,#10b981);border:none;box-shadow:0 3px 10px rgba(16,185,129,0.35);padding:.45rem 1.1rem;">
-              Excel (.xls) Olarak İndir
+            <button type="button" class="btn btn-sm btn-primary" id="btnExportAuditExcel" style="font-weight:800;font-size:.78rem;background:linear-gradient(135deg,#059669,#10b981);border:none;box-shadow:0 2px 8px rgba(16,185,129,0.3);padding:.35rem .95rem;">
+              📊 Excel (.xls) İndir
             </button>
           </div>
         </div>
 
-        <!-- KPI Özet Sayaç Kartları (4 Eşit Sütun) -->
-        <div style="display:grid;grid-template-columns:repeat(4, minmax(0, 1fr));gap:.75rem;width:100%;box-sizing:border-box;" id="auditKpiRow">
-          <div style="background:var(--bg-raised);border:1.5px solid var(--border-light);border-radius:12px;padding:.8rem 1rem;display:flex;flex-direction:column;gap:.2rem;box-shadow:0 2px 6px rgba(0,0,0,0.03);">
-            <div style="font-size:.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Toplam Kayıt</div>
-            <div id="kpiAuditTotal" style="font-size:1.5rem;font-weight:900;color:var(--accent);">0</div>
+        <!-- Kompakt Sayaç Rozetleri Şeridi -->
+        <div style="display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;background:var(--bg-raised);padding:.45rem .75rem;border-radius:10px;border:1px solid var(--border-light);font-size:.78rem;" id="auditKpiRow">
+          <div style="display:flex;align-items:center;gap:.35rem;color:var(--text-secondary);font-weight:600;">
+            <span>Toplam:</span>
+            <span id="kpiAuditTotal" style="font-weight:800;color:var(--accent);background:var(--bg-surface);padding:1px 6px;border-radius:6px;border:1px solid var(--border-light);">0</span>
           </div>
-          <div style="background:var(--bg-raised);border:1.5px solid var(--border-light);border-radius:12px;padding:.8rem 1rem;display:flex;flex-direction:column;gap:.2rem;box-shadow:0 2px 6px rgba(0,0,0,0.03);">
-            <div style="font-size:.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Yükleme / İndirme</div>
-            <div id="kpiAuditFiles" style="font-size:1.5rem;font-weight:900;color:var(--green);">0</div>
+          <div style="color:var(--border);">|</div>
+          <div style="display:flex;align-items:center;gap:.35rem;color:var(--text-secondary);font-weight:600;">
+            <span>Yükleme/İndirme:</span>
+            <span id="kpiAuditFiles" style="font-weight:800;color:var(--green);background:var(--bg-surface);padding:1px 6px;border-radius:6px;border:1px solid var(--border-light);">0</span>
           </div>
-          <div style="background:var(--bg-raised);border:1.5px solid var(--border-light);border-radius:12px;padding:.8rem 1rem;display:flex;flex-direction:column;gap:.2rem;box-shadow:0 2px 6px rgba(0,0,0,0.03);">
-            <div style="font-size:.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Kod / Tasarım</div>
-            <div id="kpiAuditEdits" style="font-size:1.5rem;font-weight:900;color:var(--purple);">0</div>
+          <div style="color:var(--border);">|</div>
+          <div style="display:flex;align-items:center;gap:.35rem;color:var(--text-secondary);font-weight:600;">
+            <span>Kod/Düzenleme:</span>
+            <span id="kpiAuditEdits" style="font-weight:800;color:var(--purple);background:var(--bg-surface);padding:1px 6px;border-radius:6px;border:1px solid var(--border-light);">0</span>
           </div>
-          <div style="background:var(--bg-raised);border:1.5px solid var(--border-light);border-radius:12px;padding:.8rem 1rem;display:flex;flex-direction:column;gap:.2rem;box-shadow:0 2px 6px rgba(0,0,0,0.03);">
-            <div style="font-size:.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Silme & Çöp</div>
-            <div id="kpiAuditDeletes" style="font-size:1.5rem;font-weight:900;color:var(--red);">0</div>
+          <div style="color:var(--border);">|</div>
+          <div style="display:flex;align-items:center;gap:.35rem;color:var(--text-secondary);font-weight:600;">
+            <span>Silme/Çöp:</span>
+            <span id="kpiAuditDeletes" style="font-weight:800;color:var(--red);background:var(--bg-surface);padding:1px 6px;border-radius:6px;border:1px solid var(--border-light);">0</span>
           </div>
         </div>
 
-        <!-- Arama ve Filtre Kontrolleri -->
-        <div style="display:flex;gap:.75rem;width:100%;box-sizing:border-box;">
-          <div style="flex:1;">
-            <input type="text" id="auditSearchInput" placeholder="Loglarda filtrele (Kullanıcı, işlem türü, hedef rapor, IP adresi, detay)..." class="master-search-input" style="width:100%;font-size:.85rem;padding:.55rem .85rem;box-sizing:border-box;border-radius:10px;" />
+        <!-- Kompakt Arama ve Filtre Kontrolleri -->
+        <div style="display:flex;gap:.55rem;width:100%;box-sizing:border-box;flex-wrap:wrap;">
+          <div style="flex:1;min-width:180px;">
+            <input type="text" id="auditSearchInput" placeholder="🔍 Loglarda ara (Kullanıcı, işlem, rapor adı, IP, detay)..." class="master-search-input" style="width:100%;font-size:.8rem;padding:.4rem .7rem;box-sizing:border-box;border-radius:8px;" />
           </div>
-          <select id="auditActionFilter" class="master-search-input" style="width:230px;font-size:.84rem;font-weight:700;border-radius:10px;padding:.5rem .75rem;">
+          <select id="auditActionFilter" class="master-search-input" style="width:200px;font-size:.8rem;font-weight:700;border-radius:8px;padding:.4rem .6rem;">
             <option value="">Tüm İşlem Türleri</option>
-            <option value="FRP_DOWNLOAD">İndirmeler (FRP_DOWNLOAD)</option>
-            <option value="REPORT_UPLOAD">Yüklemeler (REPORT_UPLOAD)</option>
-            <option value="REPORT_UPDATE">Güncellemeler (REPORT_UPDATE)</option>
-            <option value="POOL_ADD">Havuz Paylaşımı (POOL_ADD)</option>
-            <option value="POOL_REMOVE">Havuzdan Kaldırma (POOL_REMOVE)</option>
-            <option value="REPORT_DELETE">Çöp Kutusuna Taşıma</option>
-            <option value="TRASH_RESTORE">Çöpten Geri Yükleme</option>
-            <option value="TRASH_PURGE">Kalıcı Silme (TRASH_PURGE)</option>
-            <option value="TRASH_EMPTY">Çöp Kutusunu Boşaltma</option>
-            <option value="DESIGN_EDIT">Tasarım Düzenleme</option>
-            <option value="SQL_EDIT">SQL Sorgu Düzenleme</option>
-            <option value="PASCAL_EDIT">Pascal Script Düzenleme</option>
-            <option value="USERNAME_CHANGE">Kullanıcı Adı Değişikliği</option>
-            <option value="LOGIN">Giriş Yapma (LOGIN)</option>
-            <option value="USER_UPDATE">Profil Güncelleme</option>
-            <option value="EMAIL_CHANGE">E-Posta Değişikliği</option>
-            <option value="DATA_RESET">Tüm Verileri Sıfırlama</option>
+            <option value="FRP_DOWNLOAD">📥 İndirme (FRP_DOWNLOAD)</option>
+            <option value="REPORT_UPLOAD">📤 Yükleme (REPORT_UPLOAD)</option>
+            <option value="REPORT_UPDATE">✏️ Güncelleme (REPORT_UPDATE)</option>
+            <option value="POOL_ADD">🌐 Havuz Paylaşımı</option>
+            <option value="POOL_REMOVE">🔒 Havuzdan Kaldırma</option>
+            <option value="REPORT_DELETE">🗑️ Çöp Kutusuna Taşıma</option>
+            <option value="TRASH_RESTORE">♻️ Çöpten Geri Yükleme</option>
+            <option value="TRASH_PURGE">💥 Kalıcı Silme</option>
+            <option value="TRASH_EMPTY">🧹 Çöpü Boşaltma</option>
+            <option value="DESIGN_EDIT">🎨 Tasarım Düzenleme</option>
+            <option value="SQL_EDIT">💻 SQL Sorgu Düzenleme</option>
+            <option value="PASCAL_EDIT">📜 Pascal Script Düzenleme</option>
+            <option value="LOGIN">🔐 Giriş Yapma (LOGIN)</option>
+            <option value="USER_UPDATE">👤 Profil Güncelleme</option>
+            <option value="DATA_RESET">🚨 Veritabanı Sıfırlama</option>
           </select>
         </div>
 
-        <!-- Geniş Tablo Alanı -->
-        <div id="auditLogsContainer" style="background:var(--bg-surface);border:1.5px solid var(--border-light);border-radius:14px;overflow-x:auto;max-height:480px;overflow-y:auto;box-shadow:inset 0 1px 4px rgba(0,0,0,0.04);width:100%;box-sizing:border-box;">
-          <div style="text-align:center;padding:3.5rem;color:var(--text-muted);">
-            <div class="splash-spinner" style="margin-bottom:.8rem;"></div>
-            <div style="font-weight:700;">Denetim kayıtları yükleniyor...</div>
+        <!-- Kompakt ve Taşmayan Tablo Alanı -->
+        <div id="auditLogsContainer" style="background:var(--bg-surface);border:1px solid var(--border-light);border-radius:10px;overflow-x:auto;max-height:390px;overflow-y:auto;box-shadow:inset 0 1px 3px rgba(0,0,0,0.03);width:100%;box-sizing:border-box;">
+          <div style="text-align:center;padding:3rem 1rem;color:var(--text-muted);">
+            <div class="splash-spinner" style="margin-bottom:.6rem;width:24px;height:24px;"></div>
+            <div style="font-weight:700;font-size:.82rem;">Denetim kayıtları yükleniyor...</div>
           </div>
         </div>
       </div>
@@ -97,43 +99,43 @@ window.FrpSettingsTabs.audit = {
     overlay.style.zIndex = '999999';
 
     overlay.innerHTML = `
-      <div class="modal" style="max-width:580px;width:92vw;padding:1.75rem;border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,.45);border:1.5px solid var(--border);background:var(--bg-surface);animation:fadeIn .18s ease-out;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;border-bottom:1px solid var(--border-light);padding-bottom:.75rem;">
-          <div style="font-size:1.12rem;font-weight:800;color:var(--text-primary);display:flex;align-items:center;gap:.5rem;">
+      <div class="modal" style="max-width:540px;width:92vw;padding:1.4rem;border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.45);border:1.5px solid var(--border);background:var(--bg-surface);animation:fadeIn .18s ease-out;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;border-bottom:1px solid var(--border-light);padding-bottom:.6rem;">
+          <div style="font-size:1.05rem;font-weight:800;color:var(--text-primary);display:flex;align-items:center;gap:.5rem;">
             <span>Denetim Kayıt Detayı</span>
-            <span class="badge badge-blue" style="font-size:.76rem;padding:.2rem .55rem;">${esc(log.action)}</span>
+            <span class="badge badge-blue" style="font-size:.74rem;padding:.15rem .5rem;">${esc(log.action)}</span>
           </div>
           <button type="button" class="btn btn-sm btn-ghost btn-close-detail" style="font-size:1.1rem;padding:2px 10px;border-radius:50%;">✕</button>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.9rem;font-size:.84rem;margin-bottom:1.2rem;background:var(--bg-raised);padding:1rem;border-radius:12px;border:1px solid var(--border-light);">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;font-size:.82rem;margin-bottom:1rem;background:var(--bg-raised);padding:.85rem;border-radius:10px;border:1px solid var(--border-light);">
           <div>
-            <div style="font-size:.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">İşlem Zamanı</div>
-            <div style="font-weight:700;color:var(--text-primary);font-family:var(--mono);">${log.timestamp ? new Date(log.timestamp).toLocaleString('tr-TR') : '-'}</div>
+            <div style="font-size:.7rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">İşlem Zamanı</div>
+            <div style="font-weight:700;color:var(--text-primary);font-family:var(--mono);font-size:.78rem;">${log.timestamp ? new Date(log.timestamp).toLocaleString('tr-TR') : '-'}</div>
           </div>
           <div>
-            <div style="font-size:.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">Kullanıcı & Rol</div>
+            <div style="font-size:.7rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">Kullanıcı & Rol</div>
             <div style="font-weight:700;color:var(--text-primary);">@${esc(log.username || 'misafir')} (${esc(log.role || 'user')})</div>
           </div>
           <div>
-            <div style="font-size:.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">İstemci IP Adresi</div>
-            <div style="font-weight:800;font-family:var(--mono);color:var(--accent);">${esc(log.ip || '127.0.0.1')}</div>
+            <div style="font-size:.7rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">İstemci IP Adresi</div>
+            <div style="font-weight:800;font-family:var(--mono);color:var(--accent);font-size:.78rem;">${esc(log.ip || '127.0.0.1')}</div>
           </div>
           <div>
-            <div style="font-size:.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">Hedef Rapor / Dosya</div>
-            <div style="font-weight:700;color:var(--text-primary);word-break:break-all;">${esc(log.target || '-')}</div>
+            <div style="font-size:.7rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">Hedef Rapor / Dosya</div>
+            <div style="font-weight:700;color:var(--text-primary);word-break:break-all;">${esc(log.target || 'Genel Sistem')}</div>
           </div>
         </div>
 
-        <div style="margin-bottom:1.4rem;">
-          <div style="font-size:.74rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;margin-bottom:.4rem;">Açıklama & Detaylar</div>
-          <div style="background:var(--bg-surface);padding:.9rem;border-radius:10px;border:1.5px solid var(--border);font-size:.85rem;line-height:1.5;color:var(--text-secondary);word-break:break-word;max-height:180px;overflow-y:auto;">
-            ${esc(log.details || 'Detay bulunmuyor.')}
+        <div style="margin-bottom:1.2rem;">
+          <div style="font-size:.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;margin-bottom:.35rem;">Açıklama & Detaylar</div>
+          <div style="background:var(--bg-surface);padding:.75rem .85rem;border-radius:8px;border:1px solid var(--border);font-size:.82rem;line-height:1.5;color:var(--text-secondary);word-break:break-word;max-height:160px;overflow-y:auto;">
+            ${esc(log.details || 'Açıklama bulunmuyor.')}
           </div>
         </div>
 
         <div style="display:flex;justify-content:flex-end;">
-          <button type="button" class="btn btn-sm btn-primary btn-close-detail" style="padding:.5rem 1.4rem;font-weight:800;border-radius:8px;">Kapat</button>
+          <button type="button" class="btn btn-sm btn-primary btn-close-detail" style="padding:.45rem 1.2rem;font-weight:800;border-radius:8px;font-size:.82rem;">Kapat</button>
         </div>
       </div>
     `;
@@ -175,67 +177,73 @@ window.FrpSettingsTabs.audit = {
 
     const escHtml = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+    const getActionLabelAndBadge = (action) => {
+      const act = String(action || 'INFO').toUpperCase();
+      const map = {
+        LOGIN:               { label: '🔐 Giriş', badge: 'badge-blue' },
+        REGISTER:            { label: '✨ Kayıt', badge: 'badge-green' },
+        USER_UPDATE:         { label: '👤 Profil', badge: 'badge-purple' },
+        USERNAME_CHANGE:     { label: '🏷️ Kullanıcı Adı', badge: 'badge-purple' },
+        EMAIL_CHANGE:        { label: '📧 E-Posta', badge: 'badge-amber' },
+        REPORT_UPLOAD:       { label: '📤 Yükleme', badge: 'badge-green' },
+        REPORT_UPDATE:       { label: '✏️ Güncelleme', badge: 'badge-blue' },
+        REPORT_EDIT:         { label: '✏️ Düzenleme', badge: 'badge-blue' },
+        FRP_DOWNLOAD:        { label: '📥 İndirme', badge: 'badge-purple' },
+        BULK_DOWNLOAD:       { label: '📦 Toplu İndir', badge: 'badge-purple' },
+        POOL_ADD:            { label: '🌐 Havuz Ekle', badge: 'badge-green' },
+        POOL_ADD_BULK:       { label: '🌐 Toplu Havuz', badge: 'badge-green' },
+        POOL_REMOVE:         { label: '🔒 Havuz Çıkar', badge: 'badge-amber' },
+        POOL_REMOVE_BULK:    { label: '🔒 Toplu Çıkar', badge: 'badge-amber' },
+        POOL_CLONE:          { label: '📋 Klonlama', badge: 'badge-blue' },
+        DESIGN_EDIT:         { label: '🎨 Tasarım', badge: 'badge-blue' },
+        SQL_EDIT:            { label: '💻 SQL Düzenle', badge: 'badge-purple' },
+        PASCAL_EDIT:         { label: '📜 Pascal', badge: 'badge-amber' },
+        REPORT_DELETE:       { label: '🗑️ Çöp', badge: 'badge-red' },
+        REPORT_DELETE_BULK:  { label: '🗑️ Toplu Çöp', badge: 'badge-red' },
+        TRASH_RESTORE:       { label: '♻️ Kurtar', badge: 'badge-green' },
+        TRASH_PURGE:         { label: '💥 Kalıcı Sil', badge: 'badge-red' },
+        TRASH_EMPTY:         { label: '🧹 Çöpü Boşalt', badge: 'badge-red' },
+        DATA_RESET:          { label: '🚨 Sıfırla', badge: 'badge-red' },
+        AUTO_BACKUP:         { label: '⏱️ Oto Yedek', badge: 'badge-green' },
+        EXPORT:              { label: '📊 Dışa Aktar', badge: 'badge-blue' }
+      };
+      return map[act] || { label: act, badge: 'badge-blue' };
+    };
+
     const renderLogTable = (logs) => {
       if (!container) return;
       if (!logs || logs.length === 0) {
-        container.innerHTML = `<div style="text-align:center;padding:3.5rem;color:var(--text-muted);">Herhangi bir işlem kaydı bulunamadı.</div>`;
+        container.innerHTML = `<div style="text-align:center;padding:3rem 1rem;color:var(--text-muted);font-size:.82rem;">Herhangi bir işlem kaydı bulunamadı.</div>`;
         return;
       }
 
-      const actionBadges = {
-        LOGIN: 'badge-blue',
-        REGISTER: 'badge-green',
-        USER_UPDATE: 'badge-purple',
-        USERNAME_CHANGE: 'badge-purple',
-        EMAIL_CHANGE: 'badge-amber',
-        DELETE: 'badge-red',
-        REPORT_DELETE: 'badge-red',
-        REPORT_DELETE_BULK: 'badge-red',
-        TRASH_PURGE: 'badge-red',
-        TRASH_EMPTY: 'badge-red',
-        TRASH_RESTORE: 'badge-green',
-        REPORT_UPLOAD: 'badge-green',
-        REPORT_UPDATE: 'badge-blue',
-        FRP_DOWNLOAD: 'badge-purple',
-        BULK_DOWNLOAD: 'badge-purple',
-        POOL_ADD: 'badge-green',
-        POOL_ADD_BULK: 'badge-green',
-        POOL_REMOVE: 'badge-amber',
-        POOL_REMOVE_BULK: 'badge-amber',
-        POOL_CLONE: 'badge-blue',
-        DESIGN_EDIT: 'badge-blue',
-        SQL_EDIT: 'badge-purple',
-        PASCAL_EDIT: 'badge-amber',
-        DATA_RESET: 'badge-red',
-        REPORT_EDIT: 'badge-blue',
-        AUTO_BACKUP: 'badge-green',
-        EXPORT: 'badge-blue'
-      };
-
       const rows = logs.map((l, idx) => {
-        const dateStr = l.timestamp ? new Date(l.timestamp).toLocaleString('tr-TR') : '-';
-        const badgeClass = actionBadges[l.action] || 'badge-blue';
+        const dateStr = l.timestamp ? new Date(l.timestamp).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-';
+        const { label: actLabel, badge: badgeClass } = getActionLabelAndBadge(l.action);
         const ipDisplay = (l.ip && l.ip !== '-' && l.ip !== '') ? l.ip : '127.0.0.1';
+        const targetDisplay = l.target || l.reportName || l.fileName || 'Genel Sistem';
+        const detailsDisplay = l.details || `${actLabel} işlemi gerçekleştirildi.`;
+        const userDisplay = l.username || (l.role === 'admin' ? 'admin' : 'misafir');
 
         return `
-          <tr data-log-idx="${idx}" class="audit-row" style="border-bottom:1px solid var(--border-light);font-size:.82rem;cursor:pointer;transition:background .15s;">
-            <td style="padding:.75rem .95rem;white-space:nowrap;color:var(--text-muted);font-family:var(--mono);">${dateStr}</td>
-            <td style="padding:.75rem .95rem;font-weight:700;color:var(--text-primary);">
-              <div style="display:flex;align-items:center;gap:.35rem;">
-                <span>@${escHtml(l.username || 'misafir')}</span>
-                ${l.role === 'admin' ? '<span class="badge badge-purple" style="font-size:.65rem;padding:1px 5px;">Admin</span>' : ''}
+          <tr data-log-idx="${idx}" class="audit-row" style="border-bottom:1px solid var(--border-light);font-size:.78rem;cursor:pointer;transition:background .12s;">
+            <td style="padding:.55rem .75rem;white-space:nowrap;color:var(--text-muted);font-family:var(--mono);font-size:.74rem;">${dateStr}</td>
+            <td style="padding:.55rem .75rem;font-weight:700;color:var(--text-primary);white-space:nowrap;">
+              <div style="display:flex;align-items:center;gap:.3rem;">
+                <span>@${escHtml(userDisplay)}</span>
+                ${l.role === 'admin' ? '<span class="badge badge-purple" style="font-size:.62rem;padding:1px 4px;border-radius:4px;">Admin</span>' : ''}
               </div>
             </td>
-            <td style="padding:.75rem .95rem;">
-              <span class="badge ${badgeClass}" style="font-size:.72rem;padding:.22rem .55rem;">${escHtml(l.action || 'INFO')}</span>
+            <td style="padding:.55rem .75rem;white-space:nowrap;">
+              <span class="badge ${badgeClass}" style="font-size:.68rem;padding:.15rem .45rem;border-radius:6px;">${escHtml(actLabel)}</span>
             </td>
-            <td style="padding:.75rem .95rem;font-weight:700;color:var(--accent);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(l.target || '')}">
-              ${escHtml(l.target || '-')}
+            <td style="padding:.55rem .75rem;font-weight:700;color:var(--accent);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(targetDisplay)}">
+              ${escHtml(targetDisplay)}
             </td>
-            <td style="padding:.75rem .95rem;color:var(--text-secondary);max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(l.details || '')}">
-              ${escHtml(l.details || '-')}
+            <td style="padding:.55rem .75rem;color:var(--text-secondary);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(detailsDisplay)}">
+              ${escHtml(detailsDisplay)}
             </td>
-            <td style="padding:.75rem .95rem;color:var(--text-muted);font-family:var(--mono);font-weight:700;">
+            <td style="padding:.55rem .75rem;color:var(--text-muted);font-family:var(--mono);font-size:.72rem;white-space:nowrap;">
               ${escHtml(ipDisplay)}
             </td>
           </tr>
@@ -243,15 +251,15 @@ window.FrpSettingsTabs.audit = {
       }).join('');
 
       container.innerHTML = `
-        <table style="width:100%;border-collapse:collapse;text-align:left;">
+        <table style="width:100%;border-collapse:collapse;text-align:left;font-size:.78rem;">
           <thead>
-            <tr style="background:var(--bg-raised);border-bottom:2px solid var(--border);font-size:.78rem;font-weight:800;color:var(--text-secondary);position:sticky;top:0;z-index:2;">
-              <th style="padding:.8rem .95rem;width:155px;">Zaman</th>
-              <th style="padding:.8rem .95rem;width:130px;">Kullanıcı</th>
-              <th style="padding:.8rem .95rem;width:145px;">İşlem Türü</th>
-              <th style="padding:.8rem .95rem;width:180px;">Hedef</th>
-              <th style="padding:.8rem .95rem;">Açıklama / Detay</th>
-              <th style="padding:.8rem .95rem;width:115px;">IP Adresi</th>
+            <tr style="background:var(--bg-raised);border-bottom:1.5px solid var(--border);font-size:.74rem;font-weight:800;color:var(--text-secondary);position:sticky;top:0;z-index:2;">
+              <th style="padding:.6rem .75rem;width:125px;white-space:nowrap;">Zaman</th>
+              <th style="padding:.6rem .75rem;width:120px;white-space:nowrap;">Kullanıcı</th>
+              <th style="padding:.6rem .75rem;width:130px;white-space:nowrap;">İşlem</th>
+              <th style="padding:.6rem .75rem;width:160px;white-space:nowrap;">Hedef / Rapor</th>
+              <th style="padding:.6rem .75rem;">Açıklama / Detay</th>
+              <th style="padding:.6rem .75rem;width:105px;white-space:nowrap;">IP Adresi</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -290,7 +298,7 @@ window.FrpSettingsTabs.audit = {
 
     const fetchLogs = async () => {
       if (container) {
-        container.innerHTML = `<div style="text-align:center;padding:3.5rem;color:var(--text-muted);"><div class="splash-spinner" style="margin-bottom:.8rem;"></div><div style="font-weight:700;">Kayıtlar yükleniyor...</div></div>`;
+        container.innerHTML = `<div style="text-align:center;padding:3rem 1rem;color:var(--text-muted);"><div class="splash-spinner" style="margin-bottom:.6rem;width:24px;height:24px;"></div><div style="font-weight:700;font-size:.82rem;">Kayıtlar yükleniyor...</div></div>`;
       }
       try {
         if (window.FrpAudit && typeof window.FrpAudit.getLogs === 'function') {
@@ -326,41 +334,48 @@ window.FrpSettingsTabs.audit = {
         return;
       }
 
-      const tableRows = this.loadedLogs.map(l => `
-        <tr>
-          <td style="border:1px solid #cbd5e1;padding:6px;font-family:Consolas,monospace;">${l.timestamp ? new Date(l.timestamp).toLocaleString('tr-TR') : '-'}</td>
-          <td style="border:1px solid #cbd5e1;padding:6px;font-weight:bold;">@${escHtml(l.username || 'misafir')}</td>
-          <td style="border:1px solid #cbd5e1;padding:6px;">${escHtml(l.role || 'user')}</td>
-          <td style="border:1px solid #cbd5e1;padding:6px;color:#1e40af;font-weight:bold;">${escHtml(l.action || '-')}</td>
-          <td style="border:1px solid #cbd5e1;padding:6px;font-weight:bold;">${escHtml(l.target || '-')}</td>
-          <td style="border:1px solid #cbd5e1;padding:6px;">${escHtml(l.details || '-')}</td>
-          <td style="border:1px solid #cbd5e1;padding:6px;font-family:Consolas,monospace;">${escHtml(l.ip || '127.0.0.1')}</td>
-        </tr>
-      `).join('');
+      const tableRows = this.loadedLogs.map(l => {
+        const { label: actLabel } = getActionLabelAndBadge(l.action);
+        const targetDisplay = l.target || l.reportName || l.fileName || 'Genel Sistem';
+        const detailsDisplay = l.details || `${actLabel} işlemi gerçekleştirildi.`;
+        const userDisplay = l.username || (l.role === 'admin' ? 'admin' : 'misafir');
+
+        return `
+          <tr>
+            <td style="border:1px solid #cbd5e1;padding:6px;font-family:Consolas,monospace;">${l.timestamp ? new Date(l.timestamp).toLocaleString('tr-TR') : '-'}</td>
+            <td style="border:1px solid #cbd5e1;padding:6px;font-weight:bold;">@${escHtml(userDisplay)}</td>
+            <td style="border:1px solid #cbd5e1;padding:6px;">${escHtml(l.role || 'user')}</td>
+            <td style="border:1px solid #cbd5e1;padding:6px;color:#1e40af;font-weight:bold;">${escHtml(actLabel)}</td>
+            <td style="border:1px solid #cbd5e1;padding:6px;font-weight:bold;">${escHtml(targetDisplay)}</td>
+            <td style="border:1px solid #cbd5e1;padding:6px;">${escHtml(detailsDisplay)}</td>
+            <td style="border:1px solid #cbd5e1;padding:6px;font-family:Consolas,monospace;">${escHtml(l.ip || '127.0.0.1')}</td>
+          </tr>
+        `;
+      }).join('');
 
       const excelContent = `
         <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
         <head>
           <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
           <style>
-            th { background-color: #1e3a8a; color: #ffffff; font-weight: bold; font-family: Segoe UI, sans-serif; font-size: 11pt; padding: 8px; border: 1px solid #93c5fd; }
-            td { font-family: Segoe UI, sans-serif; font-size: 10pt; vertical-align: middle; }
+            th { background-color: #1e3a8a; color: #ffffff; font-weight: bold; font-family: Segoe UI, sans-serif; font-size: 10pt; padding: 8px; border: 1px solid #93c5fd; }
+            td { font-family: Segoe UI, sans-serif; font-size: 9pt; vertical-align: middle; }
             tr:nth-child(even) td { background-color: #f8fafc; }
           </style>
         </head>
         <body>
           <h2 style="font-family:Segoe UI,sans-serif;color:#1e3a8a;margin-bottom:4px;">FrpOku - Kullanıcı İşlem Geçmişi & Denetim Günlüğü</h2>
-          <p style="font-family:Segoe UI,sans-serif;font-size:10pt;color:#64748b;margin-top:0;">Dışa Aktarma Tarihi: ${new Date().toLocaleString('tr-TR')} | Toplam Kayıt: ${this.loadedLogs.length}</p>
+          <p style="font-family:Segoe UI,sans-serif;font-size:9pt;color:#64748b;margin-top:0;">Dışa Aktarma Tarihi: ${new Date().toLocaleString('tr-TR')} | Toplam Kayıt: ${this.loadedLogs.length}</p>
           <table style="border-collapse:collapse;width:100%;">
             <thead>
               <tr>
-                <th style="width:160px;">Zaman</th>
-                <th style="width:140px;">Kullanıcı</th>
-                <th style="width:100px;">Rol</th>
-                <th style="width:160px;">İşlem Türü</th>
-                <th style="width:200px;">Hedef</th>
-                <th style="width:380px;">Açıklama / Detay</th>
-                <th style="width:120px;">IP Adresi</th>
+                <th style="width:150px;">Zaman</th>
+                <th style="width:130px;">Kullanıcı</th>
+                <th style="width:90px;">Rol</th>
+                <th style="width:140px;">İşlem Türü</th>
+                <th style="width:190px;">Hedef</th>
+                <th style="width:340px;">Açıklama / Detay</th>
+                <th style="width:110px;">IP Adresi</th>
               </tr>
             </thead>
             <tbody>

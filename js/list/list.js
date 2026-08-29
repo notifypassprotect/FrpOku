@@ -483,8 +483,9 @@ function renderTable() {
     const tagsHtml = (file.tags || []).map(t => window.renderTag ? window.renderTag(t) : `<span class="tag-pill">${escHtml(t)}</span>`).join(' ');
     
     const guidVal = (file.meta && file.meta.guid) ? file.meta.guid : '';
+    const shortGuid = guidVal ? (guidVal.length > 16 ? guidVal.slice(0, 7) + '...' + guidVal.slice(-5) : guidVal) : '';
     const guidColHtml = guidVal
-      ? `<span class="badge badge-gray" onclick="event.stopPropagation();copyGuidText('${escHtml(guidVal)}')" title="Tıklayınca GUID kopyalar" style="cursor:pointer;font-family:var(--mono);font-size:.72rem;">${escHtml(guidVal)}</span>`
+      ? `<span class="guid-chip" onclick="event.stopPropagation();copyGuidText('${escHtml(guidVal)}')" title="GUID: ${escHtml(guidVal)} (Kopyalamak için tıklayın)"><span style="opacity:0.6;font-size:10px;">📋</span><span>${escHtml(shortGuid)}</span></span>`
       : `<span style="color:var(--text-muted);font-size:.75rem;">—</span>`;
       
     const catHtml = file.category
