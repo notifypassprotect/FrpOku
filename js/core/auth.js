@@ -129,6 +129,10 @@
         });
         const data = await res.json();
         if (data && data.success && data.user) {
+          if (data.token) {
+            data.user.token = data.token;
+            try { localStorage.setItem('frpoku_auth_token', data.token); } catch (e) {}
+          }
           if (rememberMe) localStorage.setItem(SAVED_IDENTIFIER_KEY, ident);
           else localStorage.removeItem(SAVED_IDENTIFIER_KEY);
           setSession(data.user, rememberMe);
@@ -180,11 +184,11 @@
       sessionStorage.removeItem(AUTH_STORAGE_KEY);
     } else {
       sessionStorage.setItem(AUTH_STORAGE_KEY, json);
-      localStorage.setItem(REMEMBER_KEY, '0');
       localStorage.removeItem(AUTH_STORAGE_KEY);
+      localStorage.removeItem(REMEMBER_KEY);
     }
     updateNavbarUserBadge();
-    setupAdminFeatures();
+    refreshAdminPendingBadge();
   }
 
   function getSession() {
@@ -208,14 +212,14 @@
     currentUser = null;
     localStorage.removeItem(AUTH_STORAGE_KEY);
     localStorage.removeItem(REMEMBER_KEY);
+    localStorage.removeItem('frpoku_auth_token');
     sessionStorage.removeItem(AUTH_STORAGE_KEY);
-    if (adminPollingInterval) {
-      clearInterval(adminPollingInterval);
-      adminPollingInterval = null;
-    }
     updateNavbarUserBadge();
+    document.getElementById('btnAdminPendingRegistrations')?.remove();
     if (typeof window.showAuthFullScreenPortal === 'function') {
       window.showAuthFullScreenPortal('login');
+    } else {
+      window.location.reload();
     }
   }
 
@@ -230,14 +234,11 @@
     if (typeof window.showConfirmDialog === 'function') {
       window.showConfirmDialog({
         title: 'Oturumu Kapat',
-        message: 'Mevcut kullanıcı oturumunuz sonlandırılacaktır. Devam etmek istiyor musunuz?',
-        confirmText: 'Evet, Çıkış Yap',
+        message: 'Mevcut kullanıcı oturumunuz kapatılacaktır. Devam etmek istiyor musunuz?',
+        confirmText: 'Çıkış Yap',
         cancelText: 'Vazgeç',
         isDanger: true,
-        onConfirm: () => {
-          logout();
-          if (typeof window.toast === 'function') window.toast('Oturum kapatıldı.', 'info');
-        }
+        onConfirm: () => logout()
       });
     } else {
       if (confirm('Oturumunuz kapatılacaktır. Devam etmek istiyor musunuz?')) logout();
@@ -249,7 +250,7 @@
     const headers = { 'Content-Type': 'application/json', ...extra };
     if (user) {
       try {
-        const token = btoa(unescape(encodeURIComponent(JSON.stringify(user))));
+        const token = user.token || localStorage.getItem('frpoku_auth_token') || btoa(unescape(encodeURIComponent(JSON.stringify(user))));
         headers['Authorization'] = `Bearer ${token}`;
         headers['X-Admin-Auth'] = token;
       } catch (e) {}

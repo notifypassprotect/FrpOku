@@ -589,6 +589,36 @@
     return false;
   }
 
+  function setFavoriteMany(ids, isFav = true) {
+    if (!Array.isArray(ids) || ids.length === 0) return 0;
+    const files = _read();
+    const idSet = new Set(ids);
+    let count = 0;
+    files.forEach(f => {
+      if (idSet.has(f.id)) {
+        f.isFavorite = !!isFav;
+        count++;
+      }
+    });
+    if (count > 0) _write(files);
+    return count;
+  }
+
+  function toggleFavoriteMany(ids) {
+    if (!Array.isArray(ids) || ids.length === 0) return 0;
+    const files = _read();
+    const idSet = new Set(ids);
+    let count = 0;
+    files.forEach(f => {
+      if (idSet.has(f.id)) {
+        f.isFavorite = !f.isFavorite;
+        count++;
+      }
+    });
+    if (count > 0) _write(files);
+    return count;
+  }
+
   function togglePin(id) {
     const files = _read();
     const idx = files.findIndex(f => f.id === id);
@@ -1288,7 +1318,7 @@
   const FrpStore = {
     getAll, getById, add, addMany, deleteOne, deleteMany, deleteAll,
     updateNote, updateMeta, updateCode, updateFileName, restoreFromIndexedDB,
-    toggleFavorite, togglePin, addTag, removeTag, getAllTags, getCustomTags, addCustomTag, deleteCustomTag,
+    toggleFavorite, togglePin, setFavoriteMany, toggleFavoriteMany, addTag, removeTag, getAllTags, getCustomTags, addCustomTag, deleteCustomTag,
     setCategory, getCategories, getCategoryObjects, addCategory, updateCategory, deleteCategory,
     getSnippets, addSnippet, removeSnippet, updateSnippet,
     getTrash, moveToTrash, moveManyToTrash, restoreFromTrash, restoreManyFromTrash, purgeFromTrash, purgeManyFromTrash, emptyTrash,
@@ -1301,6 +1331,11 @@
     // Ortak Havuz & Çalışma Alanı
     getActiveWorkspace, setActiveWorkspace, getMyReports, getPoolReports,
     toggleReportPool, bulkToggleReportPool, cloneReportToPersonal,
+    // Aliaslar (Geriye Dönük Uyumluluk ve UI Bağlantıları)
+    addManyToPool: (ids) => bulkToggleReportPool(ids, true),
+    removeManyFromPool: (ids) => bulkToggleReportPool(ids, false),
+    togglePublicPool: (id, makePub) => toggleReportPool(id, makePub),
+    cloneToPersonal: (id) => cloneReportToPersonal(id),
 
     // Analytics delegasyonları
     getSqlComplexity: (sql) => window.FrpComplexity ? window.FrpComplexity.getSqlComplexity(sql) : {},

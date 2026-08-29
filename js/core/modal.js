@@ -186,6 +186,107 @@ function showPromptModal({
   });
 }
 
+function showConfirmDialog({
+  title = 'İşlemi Onaylayın',
+  message = '',
+  confirmText = 'Evet, Onayla',
+  cancelText = 'İptal',
+  isDanger = false,
+  onConfirm = () => {},
+  onCancel = () => {}
+}) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.style.zIndex = '999999';
+
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:450px;width:92vw;padding:1.6rem;text-align:center;border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,.4);border:1px solid var(--border);background:var(--bg-surface);animation:fadeIn .18s ease-out;">
+      <div style="font-size:1.15rem;font-weight:800;color:var(--text-primary);margin-bottom:.4rem;">${escModalHtml(title)}</div>
+      <div style="font-size:.83rem;color:var(--text-secondary);line-height:1.5;margin-bottom:1.4rem;">${message}</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:.75rem;">
+        <button type="button" class="btn btn-sm btn-ghost btn-cancel-confirm" style="padding:.5rem 1.25rem;font-weight:700;">
+          ${escModalHtml(cancelText)}
+        </button>
+        <button type="button" class="btn btn-sm ${isDanger ? 'btn-danger' : 'btn-primary'} btn-ok-confirm" style="padding:.5rem 1.5rem;font-weight:800;box-shadow:${isDanger ? '0 4px 14px rgba(239,68,68,.35)' : '0 4px 14px rgba(37,99,235,.35)'};">
+          ${escModalHtml(confirmText)}
+        </button>
+      </div>
+    </div>
+  `;
+
+  overlay.querySelector('.btn-cancel-confirm').addEventListener('click', () => {
+    overlay.remove();
+    if (typeof onCancel === 'function') onCancel();
+  });
+
+  overlay.querySelector('.btn-ok-confirm').addEventListener('click', () => {
+    overlay.remove();
+    if (typeof onConfirm === 'function') onConfirm();
+  });
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      overlay.remove();
+      if (typeof onCancel === 'function') onCancel();
+    }
+  });
+
+  document.body.appendChild(overlay);
+}
+
+function showPromptDialog({
+  title = 'Bilgi Girin',
+  message = '',
+  defaultValue = '',
+  placeholder = '',
+  confirmText = 'Kaydet',
+  cancelText = 'İptal',
+  onConfirm = () => {}
+}) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.style.zIndex = '999999';
+
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:440px;width:90vw;padding:1.5rem;text-align:left;border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.4);border:1px solid var(--border);background:var(--bg-surface);animation:fadeIn .18s ease-out;">
+      <div style="font-size:1.08rem;font-weight:800;color:var(--text-primary);margin-bottom:.3rem;">${escModalHtml(title)}</div>
+      ${message ? `<div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.8rem;">${message}</div>` : ''}
+      <div style="margin-bottom:1.2rem;">
+        <input type="text" id="customPromptInput" class="master-search-input" style="width:100%;font-size:.88rem;" value="${escModalHtml(defaultValue)}" placeholder="${escModalHtml(placeholder)}" />
+      </div>
+      <div style="display:flex;align-items:center;justify-content:flex-end;gap:.65rem;">
+        <button type="button" class="btn btn-sm btn-ghost btn-cancel-prompt" style="padding:.45rem 1rem;font-weight:700;">
+          ${escModalHtml(cancelText)}
+        </button>
+        <button type="button" class="btn btn-sm btn-primary btn-ok-prompt" style="padding:.45rem 1.35rem;font-weight:800;">
+          ${escModalHtml(confirmText)}
+        </button>
+      </div>
+    </div>
+  `;
+
+  const input = overlay.querySelector('#customPromptInput');
+  const btnOk = overlay.querySelector('.btn-ok-prompt');
+  const btnCancel = overlay.querySelector('.btn-cancel-prompt');
+
+  const doSubmit = () => {
+    const val = input ? input.value.trim() : '';
+    overlay.remove();
+    if (typeof onConfirm === 'function') onConfirm(val);
+  };
+
+  btnOk.addEventListener('click', doSubmit);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSubmit(); });
+  btnCancel.addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+  document.body.appendChild(overlay);
+  setTimeout(() => input?.focus(), 80);
+}
+
 window.showModal = showModal;
 window.showChoiceModal = showChoiceModal;
-window.showPromptModal = showPromptModal;
+window.showPromptModal = showPromptModal;
+window.showConfirmDialog = showConfirmDialog;
+window.showPromptDialog = showPromptDialog;
+

@@ -279,15 +279,19 @@ async function showDownloadHistoryModal() {
 
 window.downloadSingleReport = downloadSingleReport;
 window.showDownloadHistoryModal = showDownloadHistoryModal;
+window.openDownloadHistoryModal = showDownloadHistoryModal;
 window.showProgressModal = showProgressModal;
 window.updateProgressModal = updateProgressModal;
 window.hideProgressModal = hideProgressModal;
 
 // ── TOPLU RAPOR İNDİRME PANELİ (YENİLENMİŞ TEK PANEL) ────────────
 async function downloadBulkReports() {
-  const selectedList = allFiles.filter(f => selectedIds.has(f.id));
+  const currentSelectedIds = window.selectedIds || (typeof selectedIds !== 'undefined' ? selectedIds : new Set());
+  const allList = window.allFiles || (window.FrpStore ? window.FrpStore.getAll() : []);
+  const selectedList = allList.filter(f => currentSelectedIds.has(f.id));
   if (selectedList.length === 0) {
-    toast('Lütfen indirilecek en az bir rapor seçin.', 'warning');
+    if (typeof toast === 'function') toast('Lütfen indirilecek en az bir rapor seçin.', 'warning');
+    else if (window.toast) window.toast('Lütfen indirilecek en az bir rapor seçin.', 'warning');
     return;
   }
 
@@ -646,9 +650,10 @@ document.getElementById('btnExportAllSqls')?.addEventListener('click', async () 
 document.getElementById('btnExportBackup')?.addEventListener('click', async () => {
   const lastFolder = localStorage.getItem('frp_last_save_path') || 'İndirilenler (Downloads)';
 
+  const allList = window.allFiles || (window.FrpStore ? window.FrpStore.getAll() : []);
   const optionsHtml = `
     <div style="font-size:.85rem;color:var(--text-secondary);line-height:1.6;margin-bottom:1rem;">
-      Sistemdeki tüm <strong>${allFiles.length} rapor</strong>, etiketler ve notlar tam yedek JSON olarak paketlenecektir.
+      Sistemdeki tüm <strong>${allList.length} rapor</strong>, etiketler ve notlar tam yedek JSON olarak paketlenecektir.
     </div>
     <div style="background:var(--bg-raised);padding:.8rem;border-radius:8px;border:1px solid var(--border-light);margin-bottom:.8rem;">
       <div style="font-weight:700;font-size:.82rem;color:var(--accent);margin-bottom:.3rem;">📁 Varsayılan İndirme Konumu:</div>

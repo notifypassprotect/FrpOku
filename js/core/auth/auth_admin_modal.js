@@ -347,6 +347,20 @@
       html += `</div>`;
       body.innerHTML = html;
 
+      // Arama filtresi
+      const searchInp = body.querySelector('#adminUserSearchInput');
+      if (searchInp) {
+        searchInp.addEventListener('input', (e) => {
+          const q = e.target.value.toLowerCase().trim();
+          body.querySelectorAll('.admin-user-card').forEach(card => {
+            const text = card.textContent.toLowerCase();
+            card.style.display = text.includes(q) ? 'flex' : 'none';
+          });
+        });
+      }
+
+      body.querySelector('#btnRefreshAllUsers')?.addEventListener('click', renderAllUsersTab);
+
       // Kullanıcı Adı Değiştirme
       body.querySelectorAll('.btn-edit-username').forEach(btn => {
         btn.onclick = () => {
@@ -401,6 +415,29 @@
         };
       });
     }
+
+    // Modal açıldığında her iki sekmenin sayaçlarını arka planda çek
+    async function updateTabBadges() {
+      const headers = (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') ? window.FrpAuth.getAuthHeaders() : {};
+      try {
+        const [pendingRes, allRes] = await Promise.all([
+          fetch('/api/admin/pending-users', { headers }),
+          fetch('/api/admin/all-users', { headers })
+        ]);
+        const pendingData = await pendingRes.json();
+        const allData = await allRes.json();
+        const badgePending = overlay.querySelector('#adminPendingTabBadge');
+        const badgeAll = overlay.querySelector('#adminAllTabBadge');
+        if (badgePending && pendingData.success && Array.isArray(pendingData.users)) {
+          badgePending.textContent = pendingData.users.length;
+        }
+        if (badgeAll && allData.success && Array.isArray(allData.users)) {
+          badgeAll.textContent = allData.users.length;
+        }
+      } catch (e) {}
+    }
+
+    updateTabBadges();
 
     if (initialTab === 'all') renderAllUsersTab();
     else renderPendingTab();

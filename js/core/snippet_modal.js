@@ -186,8 +186,8 @@
           const filtered = snippets.filter(s => {
             if (!filter) return true;
             return (s.title || '').toLowerCase().includes(filter) ||
-                   (s.reportName || '').toLowerCase().includes(filter) ||
-                   (s.sql || '').toLowerCase().includes(filter);
+              (s.reportName || '').toLowerCase().includes(filter) ||
+              (s.sql || '').toLowerCase().includes(filter);
           });
 
           if (snippets.length === 0) {

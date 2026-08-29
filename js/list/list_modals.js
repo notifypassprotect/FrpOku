@@ -13,14 +13,15 @@ window.FrpListModals = window.FrpListModals || {};
   // 1. Parametre Yönetim Paneli
   window.FrpListModals.openParamsModal = async function() {
     const usage = FrpStore.getParameterUsage ? FrpStore.getParameterUsage() : [];
-    if (usage.length === 0) {
+    if (!usage || usage.length === 0) {
       if (typeof window.toast === 'function') window.toast('Sistemde analiz edilmiş SQL parametresi bulunamadı.', 'warning');
       return;
     }
 
     usage.forEach(u => {
       const reportsMap = new Map();
-      u.reports.forEach(r => {
+      const reps = u.reports || u.usages || [];
+      reps.forEach(r => {
         if (!reportsMap.has(r.fileId)) {
           reportsMap.set(r.fileId, {
             fileId: r.fileId,
@@ -29,9 +30,10 @@ window.FrpListModals = window.FrpListModals || {};
             queries: []
           });
         }
-        reportsMap.get(r.fileId).queries.push(r.queryName);
+        reportsMap.get(r.fileId).queries.push(r.queryName || 'Sorgu');
       });
       u.groupedReports = Array.from(reportsMap.values());
+      u.reportCount = u.reportCount || u.groupedReports.length;
     });
 
     const bodyHtml = `

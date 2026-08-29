@@ -4,6 +4,7 @@
 // ============================================================
 
 let allFiles         = [];
+window.allFiles      = allFiles;
 let selectedIds      = new Set();
 window.selectedIds   = selectedIds;
 let sortField        = 'loadedAt';
@@ -322,6 +323,7 @@ function applySearch() {
     return lName.includes(q) || lFileName.includes(q) || lGuid.includes(q) || lOwner.includes(q) || lSql.includes(q) || lPascal.includes(q) || lNotes.includes(q);
   });
 
+  window.allFiles = allFiles;
   renderCurrentView();
   updateWorkspaceCounts();
 }
@@ -762,19 +764,22 @@ function setupContextMenu() {
           openCategoryModalFor(id);
           break;
         case 'delete':
+          const doSingleDelete = () => {
+            FrpStore.moveToTrash(id);
+            selectedIds.delete(id);
+            toast('Rapor çöp kutusuna taşındı.', 'info');
+            refreshAll();
+          };
           if (window.showConfirmDialog) {
             window.showConfirmDialog({
               title: 'Raporu Sil',
               message: `"${file.meta?.reportName || file.name}" adlı rapor çöp kutusuna taşınacaktır.`,
               confirmText: 'Çöp Kutusuna Taşı',
               isDanger: true,
-              onConfirm: () => {
-                FrpStore.moveToTrash(id);
-                selectedIds.delete(id);
-                toast('Rapor çöp kutusuna taşındı.', 'info');
-                refreshAll();
-              }
+              onConfirm: doSingleDelete
             });
+          } else if (confirm(`"${file.meta?.reportName || file.name}" adlı rapor çöp kutusuna taşınacaktır. Onaylıyor musunuz?`)) {
+            doSingleDelete();
           }
           break;
       }
@@ -985,21 +990,41 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btnBulkFav')?.addEventListener('click', () => {
     if (selectedIds.size === 0) return;
-    selectedIds.forEach(id => FrpStore.toggleFavorite(id));
+    if (FrpStore.setFavoriteMany) {
+      FrpStore.setFavoriteMany([...selectedIds], true);
+    } else if (FrpStore.toggleFavoriteMany) {
+      FrpStore.toggleFavoriteMany([...selectedIds]);
+    } else {
+      selectedIds.forEach(id => FrpStore.toggleFavorite(id));
+    }
     toast(`${selectedIds.size} rapor favorilere eklendi.`, 'success');
     refreshAll();
   });
 
   document.getElementById('btnBulkTag')?.addEventListener('click', () => {
     if (selectedIds.size === 0) return;
-    const tag = prompt('Seçili raporlara eklenecek etiketi girin:');
-    if (tag && tag.trim()) {
-      const cleanTag = tag.trim();
+    const applyTag = (cleanTag) => {
+      if (!cleanTag) return;
       selectedIds.forEach(id => {
         if (FrpStore.addTag) FrpStore.addTag(id, cleanTag);
       });
       toast(`${selectedIds.size} rapora "${cleanTag}" etiketi eklendi.`, 'success');
       refreshAll();
+    };
+
+    if (typeof window.showPromptDialog === 'function') {
+      window.showPromptDialog({
+        title: 'Toplu Etiket Ekle',
+        message: `Seçili <strong>${selectedIds.size}</strong> rapora eklenecek etiketi girin:`,
+        placeholder: 'Örn: Muhasebe, Önemli, Stok...',
+        confirmText: 'Etiket Ekle',
+        onConfirm: (tag) => {
+          if (tag && tag.trim()) applyTag(tag.trim());
+        }
+      });
+    } else {
+      const tag = prompt('Seçili raporlara eklenecek etiketi girin:');
+      if (tag && tag.trim()) applyTag(tag.trim());
     }
   });
 
@@ -1019,38 +1044,50 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btnDeleteBulk')?.addEventListener('click', () => {
     if (selectedIds.size === 0) return;
     const n = selectedIds.size;
+    const idsToDelete = [...selectedIds];
+    const performBulkDelete = () => {
+      if (FrpStore.moveManyToTrash) FrpStore.moveManyToTrash(idsToDelete);
+      else idsToDelete.forEach(id => FrpStore.moveToTrash(id));
+      selectedIds.clear();
+      toast(`${n} rapor çöp kutusuna taşındı.`, 'info');
+      refreshAll();
+    };
+
     if (window.showConfirmDialog) {
       window.showConfirmDialog({
         title: 'Toplu Silme',
         message: `${n} adet rapor çöp kutusuna taşınacaktır. İstediğiniz zaman kurtarabilirsiniz.`,
         confirmText: 'Çöp Kutusuna Taşı',
         isDanger: true,
-        onConfirm: () => {
-          FrpStore.moveManyToTrash([...selectedIds]);
-          selectedIds.clear();
-          toast(`${n} rapor çöp kutusuna taşındı.`, 'info');
-          refreshAll();
-        }
+        onConfirm: performBulkDelete
       });
+    } else if (confirm(`${n} adet rapor çöp kutusuna taşınacaktır. Onaylıyor musunuz?`)) {
+      performBulkDelete();
     }
   });
 
   document.getElementById('btnBulkSharePool')?.addEventListener('click', () => {
     if (selectedIds.size === 0) return;
-    if (FrpStore.addManyToPool) {
-      FrpStore.addManyToPool([...selectedIds]);
-      toast(`${selectedIds.size} rapor ortak havuzda paylaşıldı.`, 'success');
-      refreshAll();
+    const ids = [...selectedIds];
+    if (FrpStore.bulkToggleReportPool) {
+      FrpStore.bulkToggleReportPool(ids, true);
+    } else if (FrpStore.addManyToPool) {
+      FrpStore.addManyToPool(ids);
     }
+    toast(`${ids.length} rapor ortak havuzda paylaşıldı.`, 'success');
+    refreshAll();
   });
 
   document.getElementById('btnBulkRemovePool')?.addEventListener('click', () => {
     if (selectedIds.size === 0) return;
-    if (FrpStore.removeManyFromPool) {
-      FrpStore.removeManyFromPool([...selectedIds]);
-      toast(`${selectedIds.size} rapor ortak havuzdan kaldırıldı.`, 'info');
-      refreshAll();
+    const ids = [...selectedIds];
+    if (FrpStore.bulkToggleReportPool) {
+      FrpStore.bulkToggleReportPool(ids, false);
+    } else if (FrpStore.removeManyFromPool) {
+      FrpStore.removeManyFromPool(ids);
     }
+    toast(`${ids.length} rapor ortak havuzdan kaldırıldı.`, 'info');
+    refreshAll();
   });
 
   // Sürükle-Bırak Olayları
