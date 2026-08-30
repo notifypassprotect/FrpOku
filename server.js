@@ -107,7 +107,7 @@ async function ensureAdminUser() {
     department: 'Bilgi İşlem ve Yönetim',
     role: 'admin',
     is_active: true,
-    avatar: '👑',
+    avatar: 'A',
     created_at: new Date().toISOString(),
     last_login: null
   };
@@ -121,7 +121,7 @@ async function ensureAdminUser() {
         .limit(1);
 
       if (!admins || admins.length === 0) {
-        console.log('⚡ Admin kullanıcısı bulunamadı, varsayılan admin oluşturuluyor...');
+        console.log('Admin kullanıcısı bulunamadı, varsayılan admin oluşturuluyor...');
         await supabase.from('app_users').upsert([defaultAdmin], { onConflict: 'username' });
       }
     } catch (e) {
@@ -289,7 +289,7 @@ app.use((req, res, next) => {
     if (blockedPatterns.some(pattern => pattern.test(normalizedPath))) {
       return res.status(403).json({
         success: false,
-        reason: '⛔ 403 Forbidden: Bu dosya veya dizine doğrudan erişim güvenlik politikası gereği engellenmiştir.'
+        reason: '403 Forbidden: Bu dosya veya dizine doğrudan erişim güvenlik politikası gereği engellenmiştir.'
       });
     }
   } catch (err) {
@@ -315,7 +315,7 @@ function createRateLimiter({ windowMs = 60000, max = 30, message = 'Çok fazla i
     if (record.count > max) {
       return res.status(429).json({
         success: false,
-        reason: `⚠️ ${message}`,
+        reason: `${message}`,
         retryAfterSec: Math.ceil((record.resetTime - now) / 1000)
       });
     }
@@ -372,7 +372,7 @@ function requireAdmin(req, res, next) {
   if (!requestingUser) {
     return res.status(403).json({
       success: false,
-      reason: '⛔ Yetkisiz Erişim (403 Forbidden): Bu yönetim işlemini gerçekleştirmek için geçerli Sistem Yöneticisi (Admin) oturumu gereklidir.'
+      reason: 'Yetkisiz Erişim (403 Forbidden): Bu yönetim işlemini gerçekleştirmek için geçerli Sistem Yöneticisi (Admin) oturumu gereklidir.'
     });
   }
 
@@ -401,15 +401,15 @@ app.post('/api/auth/register', authRateLimiter, async (req, res) => {
   const cleanPhone = (phone || '').trim();
 
   if (!cleanName || !cleanUser || !cleanEmail || !password) {
-    return res.status(400).json({ success: false, reason: '⚠️ Lütfen zorunlu alanları (Ad Soyad, Kullanıcı Adı, E-Posta, Şifre) eksiksiz doldurunuz.' });
+    return res.status(400).json({ success: false, reason: 'Lütfen zorunlu alanları (Ad Soyad, Kullanıcı Adı, E-Posta, Şifre) eksiksiz doldurunuz.' });
   }
 
   if (!EMAIL_REGEX.test(cleanEmail)) {
-    return res.status(400).json({ success: false, reason: '⚠️ Lütfen geçerli bir e-posta formatı giriniz (Örn: ad.soyad@kurum.com).' });
+    return res.status(400).json({ success: false, reason: 'Lütfen geçerli bir e-posta formatı giriniz (Örn: ad.soyad@kurum.com).' });
   }
 
   if (password.length < 3) {
-    return res.status(400).json({ success: false, reason: '⚠️ Şifreniz en az 3 karakter olmalıdır.' });
+    return res.status(400).json({ success: false, reason: 'Şifreniz en az 3 karakter olmalıdır.' });
   }
 
   try {
@@ -424,17 +424,17 @@ app.post('/api/auth/register', authRateLimiter, async (req, res) => {
       if (existingUsers && existingUsers.length > 0) {
         const matchEmail = existingUsers.some(u => (u.email || '').toLowerCase() === cleanEmail);
         if (matchEmail) {
-          return res.status(400).json({ success: false, reason: `⚠️ '${cleanEmail}' e-posta adresi zaten kayıtlıdır.` });
+          return res.status(400).json({ success: false, reason: `'${cleanEmail}' e-posta adresi zaten kayıtlıdır.` });
         }
-        return res.status(400).json({ success: false, reason: `⚠️ '${cleanUser}' kullanıcı adı zaten kullanımda.` });
+        return res.status(400).json({ success: false, reason: `'${cleanUser}' kullanıcı adı zaten kullanımda.` });
       }
     } else {
       const localUsers = getLocalUsers();
       if (localUsers.some(u => (u.username || '').toLowerCase() === cleanUser)) {
-        return res.status(400).json({ success: false, reason: `⚠️ '${cleanUser}' kullanıcı adı zaten kullanımda.` });
+        return res.status(400).json({ success: false, reason: `'${cleanUser}' kullanıcı adı zaten kullanımda.` });
       }
       if (localUsers.some(u => (u.email || '').toLowerCase() === cleanEmail)) {
-        return res.status(400).json({ success: false, reason: `⚠️ '${cleanEmail}' e-posta adresi zaten kayıtlıdır.` });
+        return res.status(400).json({ success: false, reason: `'${cleanEmail}' e-posta adresi zaten kayıtlıdır.` });
       }
     }
 
@@ -449,7 +449,7 @@ app.post('/api/auth/register', authRateLimiter, async (req, res) => {
       department: (department || 'Bilgi İşlem').trim(),
       role: 'user',
       is_active: false, // Yönetici onayı bekliyor (false = pending)
-      avatar: '👤',
+      avatar: 'U',
       created_at: new Date().toISOString(),
       last_login: null
     };
@@ -466,7 +466,7 @@ app.post('/api/auth/register', authRateLimiter, async (req, res) => {
     localUsers.unshift(newRecord);
     saveLocalUsers(localUsers);
 
-    console.log(`📌 Yeni Kullanıcı Kaydı Alındı (Admin Onayı Bekliyor): ${cleanUser} (${cleanName})`);
+    console.log(`Yeni Kullanıcı Kaydı Alındı (Admin Onayı Bekliyor): ${cleanUser} (${cleanName})`);
 
     res.json({
       success: true,
@@ -528,12 +528,12 @@ app.post('/api/auth/login', authRateLimiter, async (req, res) => {
     }
 
     if (!user) {
-      return res.status(404).json({ success: false, reason: '❌ Girdiğiniz bilgilere ait bir kullanıcı hesabı bulunamadı.' });
+      return res.status(404).json({ success: false, reason: 'Girdiğiniz bilgilere ait bir kullanıcı hesabı bulunamadı.' });
     }
 
     // Şifre denetimi (Hash veya düz metin eski uyumluluğu)
     if (user.password_hash !== pHash && user.password_hash !== password) {
-      return res.status(400).json({ success: false, reason: '🔒 Şifreniz hatalı! Lütfen şifrenizi kontrol edip tekrar deneyin.' });
+      return res.status(400).json({ success: false, reason: 'Şifreniz hatalı! Lütfen şifrenizi kontrol edip tekrar deneyin.' });
     }
 
     // Onay ve Aktiflik Durumu Denetimi
@@ -710,7 +710,7 @@ app.post('/api/admin/approve-user', adminRateLimiter, requireAdmin, async (req, 
       details: `@${targetUsername} kullanıcısının kaydı onaylandı ve hesabı aktifleştirildi.`
     });
 
-    console.log('✅ Kullanıcı Başarıyla Onaylandı:', safeLogStr(targetUsername));
+    console.log('Kullanıcı Başarıyla Onaylandı:', safeLogStr(targetUsername));
 
     res.json({
       success: true,
@@ -750,7 +750,7 @@ app.post('/api/admin/reject-user', adminRateLimiter, requireAdmin, async (req, r
           console.warn('Supabase reject-user delete warning:', sbErr.message);
         }
       }
-      console.log('🗑️ Kullanıcı Kaydı Silindi / Reddedildi:', safeLogStr(targetUsername));
+      console.log('Kullanıcı Kaydı Silindi / Reddedildi:', safeLogStr(targetUsername));
     } else {
       const updates = { is_active: false };
       const idx = localUsers.findIndex(u => u.id === userId || u.username === userId);
@@ -829,7 +829,7 @@ app.post('/api/admin/toggle-admin', adminRateLimiter, requireAdmin, async (req, 
 
   try {
     const newRole = makeAdmin ? 'admin' : 'user';
-    const newAvatar = makeAdmin ? '👑' : '👤';
+    const newAvatar = makeAdmin ? 'A' : 'U';
     const updates = { role: newRole, avatar: newAvatar };
 
     const localUsers = getLocalUsers();
@@ -923,13 +923,13 @@ app.post('/api/admin/update-username', adminRateLimiter, requireAdmin, async (re
     // Mükerrer kontrolü
     const localUsers = getLocalUsers();
     if (localUsers.some(u => u.id !== userId && (u.username || '').toLowerCase() === cleanUser)) {
-      return res.status(400).json({ success: false, reason: `⚠️ '${cleanUser}' kullanıcı adı zaten kullanımda.` });
+      return res.status(400).json({ success: false, reason: `'${cleanUser}' kullanıcı adı zaten kullanımda.` });
     }
 
     if (supabase) {
       const { data: existing } = await supabase.from('app_users').select('id').ilike('username', cleanUser).neq('id', userId).limit(1);
       if (existing && existing.length > 0) {
-        return res.status(400).json({ success: false, reason: `⚠️ '${cleanUser}' kullanıcı adı zaten kullanımda.` });
+        return res.status(400).json({ success: false, reason: `'${cleanUser}' kullanıcı adı zaten kullanımda.` });
       }
       await supabase.from('app_users').update({ username: cleanUser }).eq('id', userId);
     }
@@ -950,11 +950,11 @@ app.post('/api/admin/update-username', adminRateLimiter, requireAdmin, async (re
 app.post('/api/auth/change-password', async (req, res) => {
   const { userId, oldPassword, newPassword } = req.body;
   if (!userId || !oldPassword || !newPassword) {
-    return res.status(400).json({ success: false, reason: '⚠️ Lütfen mevcut ve yeni şifrenizi giriniz.' });
+    return res.status(400).json({ success: false, reason: 'Lütfen mevcut ve yeni şifrenizi giriniz.' });
   }
 
   if (newPassword.length < 3) {
-    return res.status(400).json({ success: false, reason: '⚠️ Yeni şifre en az 3 karakter olmalıdır.' });
+    return res.status(400).json({ success: false, reason: 'Yeni şifre en az 3 karakter olmalıdır.' });
   }
 
   try {
@@ -971,7 +971,7 @@ app.post('/api/auth/change-password', async (req, res) => {
 
     const oldHash = hashPassword(oldPassword);
     if (user.password_hash !== oldHash && user.password_hash !== oldPassword) {
-      return res.status(400).json({ success: false, reason: '🔒 Mevcut şifrenizi hatalı girdiniz!' });
+      return res.status(400).json({ success: false, reason: 'Mevcut şifrenizi hatalı girdiniz!' });
     }
 
     const newHash = hashPassword(newPassword);
@@ -1102,13 +1102,13 @@ app.post('/api/admin/change-username', adminRateLimiter, requireAdmin, async (re
   try {
     const localUsers = getLocalUsers();
     if (localUsers.some(u => u.id !== userId && (u.username || '').toLowerCase() === cleanUser)) {
-      return res.status(400).json({ success: false, reason: `⚠️ '@${cleanUser}' kullanıcı adı zaten başka bir kullanıcı tarafından kullanılıyor.` });
+      return res.status(400).json({ success: false, reason: `'@${cleanUser}' kullanıcı adı zaten başka bir kullanıcı tarafından kullanılıyor.` });
     }
 
     if (supabase) {
       const { data: exist } = await supabase.from('app_users').select('id').eq('username', cleanUser).neq('id', userId).limit(1);
       if (exist && exist.length > 0) {
-        return res.status(400).json({ success: false, reason: `⚠️ '@${cleanUser}' kullanıcı adı zaten kullanımda.` });
+        return res.status(400).json({ success: false, reason: `'@${cleanUser}' kullanıcı adı zaten kullanımda.` });
       }
       await supabase.from('app_users').update({ username: cleanUser }).eq('id', userId);
     }
@@ -1149,13 +1149,13 @@ app.post('/api/auth/change-email', async (req, res) => {
   try {
     const localUsers = getLocalUsers();
     if (localUsers.some(u => u.id !== userId && (u.email || '').toLowerCase() === cleanEmail)) {
-      return res.status(400).json({ success: false, reason: `⚠️ '${cleanEmail}' e-posta adresi zaten kullanımda.` });
+      return res.status(400).json({ success: false, reason: `'${cleanEmail}' e-posta adresi zaten kullanımda.` });
     }
 
     if (supabase) {
       const { data: exist } = await supabase.from('app_users').select('id').eq('email', cleanEmail).neq('id', userId).limit(1);
       if (exist && exist.length > 0) {
-        return res.status(400).json({ success: false, reason: `⚠️ '${cleanEmail}' e-posta adresi zaten kullanımda.` });
+        return res.status(400).json({ success: false, reason: `'${cleanEmail}' e-posta adresi zaten kullanımda.` });
       }
       await supabase.from('app_users').update({ email: cleanEmail }).eq('id', userId);
     }

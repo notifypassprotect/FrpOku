@@ -31,7 +31,7 @@ async function readFileAsText(file) {
 }
 
 // ── YÜKLEME VE İLERLEME PENCERESİ (PROGRESS MODAL) ────────
-function showProgressModal(title, sub, icon = '⚡') {
+function showProgressModal(title, sub, icon = '') {
   const pm = document.getElementById('progressModal');
   if (!pm) return;
   const pTitle = document.getElementById('progressTitle');
@@ -43,7 +43,7 @@ function showProgressModal(title, sub, icon = '⚡') {
 
   if (pTitle) pTitle.textContent = title || 'İşlem Yapılıyor...';
   if (pSub)   pSub.textContent   = sub || 'Lütfen bekleyin';
-  if (pIcon)  pIcon.textContent  = icon || '⚡';
+  if (pIcon)  pIcon.textContent  = icon || '';
   if (pFill)  pFill.style.width  = '0%';
   if (pCount) pCount.textContent = '0 / 0 dosya';
   if (pPct)   pPct.textContent   = '0%';
@@ -571,7 +571,7 @@ async function downloadBulkReports() {
       }
 
       hideProgressModal();
-      toast(`📦 ${successCount} rapor '${customZipName}' olarak indirildi!`, 'success');
+      toast(`${successCount} rapor '${customZipName}' olarak indirildi!`, 'success');
     } else {
       hideProgressModal();
       toast('Hiçbir rapor paketlenemedi.', 'error');
@@ -623,12 +623,12 @@ async function downloadBulkReports() {
     }
 
     hideProgressModal();
-    toast(`📄 ${successCount} rapor ayrı ayrı indirildi!`, 'success');
+    toast(`${successCount} rapor ayrı ayrı indirildi!`, 'success');
   }
 
   if (errors.length > 0) {
     showModal({
-      title: '⚠️ Bazı Dosyalar İndirilemedi',
+      title: 'Bazı Dosyalar İndirilemedi',
       body: `<div style="font-size:.82rem;color:var(--red);margin-bottom:.5rem;"><strong>${successCount}/${count}</strong> dosya indirildi. Hata alan dosyalar:</div><div style="font-family:var(--mono);font-size:.78rem;background:var(--bg-raised);padding:.6rem;border-radius:6px;max-height:200px;overflow-y:auto;">${errors.map(e => escHtml(e)).join('<br>')}</div>`,
       confirmText: 'Anladım',
       cancelText: ''
@@ -644,7 +644,7 @@ document.getElementById('btnDownloadZipSelected')?.addEventListener('click', dow
 document.getElementById('btnExportAllSqls')?.addEventListener('click', async () => {
   const filename = 'tum_sorgular-1.sql';
   const ok = await showModal({
-    title: '📦 Tüm SQL Sorgularını Dışa Aktar',
+    title: 'Tüm SQL Sorgularını Dışa Aktar',
     body: 'Sistemdeki tüm raporlara ait SQL sorguları tek dosyada indirilecektir.',
     confirmText: 'İndir',
     cancelText: 'İptal'
@@ -661,7 +661,7 @@ document.getElementById('btnExportAllSqls')?.addEventListener('click', async () 
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  toast('Tüm SQL sorguları indirildi. 📦', 'success');
+  toast('Tüm SQL sorguları indirildi.', 'success');
 });
 
 document.getElementById('btnExportBackup')?.addEventListener('click', async () => {
@@ -673,15 +673,15 @@ document.getElementById('btnExportBackup')?.addEventListener('click', async () =
       Sistemdeki tüm <strong>${allList.length} rapor</strong>, etiketler ve notlar tam yedek JSON olarak paketlenecektir.
     </div>
     <div style="background:var(--bg-raised);padding:.8rem;border-radius:8px;border:1px solid var(--border-light);margin-bottom:.8rem;">
-      <div style="font-weight:700;font-size:.82rem;color:var(--accent);margin-bottom:.3rem;">📁 Varsayılan İndirme Konumu:</div>
+      <div style="font-weight:700;font-size:.82rem;color:var(--accent);margin-bottom:.3rem;">Varsayılan İndirme Konumu:</div>
       <div style="font-family:var(--mono);font-size:.78rem;color:var(--text-primary);">${escHtml(lastFolder)}</div>
     </div>
   `;
 
   const ok = await showModal({
-    title: '💾 Sistem Veri Yedeği Oluştur & İndir',
+    title: 'Sistem Veri Yedeği Oluştur & İndir',
     body: optionsHtml,
-    confirmText: '💾 Yedeği İndir',
+    confirmText: 'Yedeği İndir',
     cancelText: 'Vazgeç'
   });
 
@@ -698,14 +698,14 @@ document.getElementById('btnExportBackup')?.addEventListener('click', async () =
       await writable.write(jsonStr);
       await writable.close();
       localStorage.setItem('frp_last_save_path', handle.name || lastFolder);
-      toast('Veri yedeği seçilen konuma kaydedildi! 💾', 'success');
+      toast('Veri yedeği seçilen konuma kaydedildi!', 'success');
       return;
     } catch (err) {
       if (err.name === 'AbortError') return;
     }
   }
 
-  showProgressModal('JSON Yedeği Oluşturuluyor...', 'Veriler paketleniyor', '💾');
+  showProgressModal('JSON Yedeği Oluşturuluyor...', 'Veriler paketleniyor', '');
   updateProgressModal(1, 1, 'Yedek JSON dosyası');
   await new Promise(r => setTimeout(r, 200));
 
@@ -721,7 +721,7 @@ document.getElementById('btnExportBackup')?.addEventListener('click', async () =
   URL.revokeObjectURL(url);
 
   hideProgressModal();
-  toast('Veri yedeği JSON dosyası olarak indirildi. 💾', 'success');
+  toast('Veri yedeği JSON dosyası olarak indirildi.', 'success');
 });
 
 const fileInputBackup = document.getElementById('fileInputBackup');
@@ -733,7 +733,7 @@ fileInputBackup?.addEventListener('change', async e => {
   try {
     const text = await readFileAsText(file);
     const count = FrpStore.importBackup(text);
-    toast(`${count} adet rapor yedekten geri yüklendi! 🎉`, 'success');
+    toast(`${count} adet rapor yedekten geri yüklendi!`, 'success');
     refreshAll();
   } catch (err) {
     toast('Yedek yükleme hatası: ' + err.message, 'error');
@@ -743,22 +743,22 @@ fileInputBackup?.addEventListener('change', async e => {
 
 async function showTransferGuide() {
   await showModal({
-    title: '🖥️ Başka PC\'ye Taşıma Rehberi',
+    title: 'Başka PC\'ye Taşıma Rehberi',
     body: `
       <div style="font-size:.85rem;line-height:1.75;">
         <p style="margin:0 0 .75rem;">FrpOku verileriniz <strong>tarayıcı deposunda</strong> saklanır (LocalStorage + IndexedDB). Başka bir bilgisayara taşımak için:</p>
         <ol style="margin:0;padding-left:1.4rem;">
-          <li style="margin-bottom:.5rem;"><strong>Bu PC'de:</strong> Sağ üstteki <strong>💾 Yedekle</strong> butonuna tıklayın → JSON dosyası iner.</li>
+          <li style="margin-bottom:.5rem;"><strong>Bu PC'de:</strong> Sağ üstteki <strong>Yedekle</strong> butonuna tıklayın → JSON dosyası iner.</li>
           <li style="margin-bottom:.5rem;"><strong>Diğer PC'de:</strong> FrpOku klasörünü kopyalayın ve <code>index.html</code>'i açın.</li>
-          <li style="margin-bottom:.5rem;"><strong>Diğer PC'de:</strong> <strong>📥 Yedek Yükle</strong> butonuyla indirdiğiniz JSON'u seçin.</li>
-          <li>Tüm raporlarınız karşı tarafta görünecektir. ✅</li>
+          <li style="margin-bottom:.5rem;"><strong>Diğer PC'de:</strong> <strong>Yedek Yükle</strong> butonuyla indirdiğiniz JSON'u seçin.</li>
+          <li>Tüm raporlarınız karşı tarafta görünecektir.</li>
         </ol>
         <div style="margin-top:.85rem;padding:.6rem .8rem;background:var(--accent-light);border-radius:8px;border-left:3px solid var(--accent-bright);">
-          <strong>ℹ️ Localhost gerekmez:</strong> FrpOku <code>file://</code> protokolüyle doğrudan çalışır, herhangi bir sunucu kurmanıza gerek yoktur.
+          <strong>Localhost gerekmez:</strong> FrpOku <code>file://</code> protokolüyle doğrudan çalışır, herhangi bir sunucu kurmanıza gerek yoktur.
         </div>
       </div>
     `,
-    confirmText: '💾 Hemen Yedekle',
+    confirmText: 'Hemen Yedekle',
     cancelText: 'Kapat'
   }).then(ok => {
     if (ok) document.getElementById('btnExportBackup')?.click();

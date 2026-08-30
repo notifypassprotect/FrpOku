@@ -11,37 +11,112 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
   const escHtml = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
   const ACTION_MAP = {
-    LOGIN:               { label: 'Giriş', badge: 'badge-blue' },
-    REGISTER:            { label: 'Kayıt', badge: 'badge-green' },
-    USER_UPDATE:         { label: 'Profil Güncelleme', badge: 'badge-purple' },
-    USERNAME_CHANGE:     { label: 'Kullanıcı Adı', badge: 'badge-purple' },
-    EMAIL_CHANGE:        { label: 'E-Posta Değişimi', badge: 'badge-amber' },
-    REPORT_UPLOAD:       { label: 'Rapor Yükleme', badge: 'badge-green' },
-    REPORT_UPDATE:       { label: 'Rapor Güncelleme', badge: 'badge-blue' },
-    REPORT_EDIT:         { label: 'Rapor Düzenleme', badge: 'badge-blue' },
-    FRP_DOWNLOAD:        { label: 'Rapor İndirme', badge: 'badge-purple' },
-    BULK_DOWNLOAD:       { label: 'Toplu İndirme', badge: 'badge-purple' },
-    POOL_ADD:            { label: 'Havuza Ekleme', badge: 'badge-green' },
-    POOL_ADD_BULK:       { label: 'Toplu Havuz Ekleme', badge: 'badge-green' },
-    POOL_REMOVE:         { label: 'Havuzdan Kaldırma', badge: 'badge-amber' },
-    POOL_REMOVE_BULK:    { label: 'Toplu Havuz Çıkarma', badge: 'badge-amber' },
-    POOL_CLONE:          { label: 'Havuzdan Klonlama', badge: 'badge-blue' },
-    DESIGN_EDIT:         { label: 'Tasarım Düzenleme', badge: 'badge-blue' },
-    SQL_EDIT:            { label: 'SQL Sorgu Düzenleme', badge: 'badge-purple' },
-    PASCAL_EDIT:         { label: 'Pascal Script Düzenleme', badge: 'badge-amber' },
-    REPORT_DELETE:       { label: 'Çöp Kutusuna Taşıma', badge: 'badge-red' },
-    REPORT_DELETE_BULK:  { label: 'Toplu Çöp Taşıma', badge: 'badge-red' },
-    TRASH_RESTORE:       { label: 'Çöpten Kurtarma', badge: 'badge-green' },
-    TRASH_PURGE:         { label: 'Kalıcı Silme', badge: 'badge-red' },
-    TRASH_EMPTY:         { label: 'Çöpü Boşaltma', badge: 'badge-red' },
-    DATA_RESET:          { label: 'Veritabanı Sıfırlama', badge: 'badge-red' },
-    AUTO_BACKUP:         { label: 'Otomatik Yedekleme', badge: 'badge-green' },
-    EXPORT:              { label: 'Dışa Aktarma', badge: 'badge-blue' }
+    // Oturum & Güvenlik
+    LOGIN:               { label: 'Kullanıcı Girişi', badge: 'badge-blue', group: 'auth' },
+    LOGOUT:              { label: 'Kullanıcı Çıkışı', badge: 'badge-gray', group: 'auth' },
+    REGISTER:            { label: 'Kullanıcı Kaydı', badge: 'badge-green', group: 'auth' },
+    USER_UPDATE:         { label: 'Profil Güncelleme', badge: 'badge-purple', group: 'auth' },
+    USERNAME_CHANGE:     { label: 'Kullanıcı Adı Değişimi', badge: 'badge-purple', group: 'auth' },
+    PASSWORD_CHANGE:     { label: 'Şifre Güncelleme', badge: 'badge-purple', group: 'auth' },
+    EMAIL_CHANGE:        { label: 'E-Posta Değişimi', badge: 'badge-purple', group: 'auth' },
+    INIT:                { label: 'Sistem Başlatma', badge: 'badge-gray', group: 'system' },
+    SYSTEM_INIT:         { label: 'Sistem Başlatma', badge: 'badge-gray', group: 'system' },
+
+    // Rapor Dosya & İndirme
+    REPORT_UPLOAD:       { label: 'Rapor Yükleme', badge: 'badge-green', group: 'files' },
+    REPORT_BULK_UPLOAD:  { label: 'Toplu Rapor Yükleme', badge: 'badge-green', group: 'files' },
+    FRP_DOWNLOAD:        { label: 'Rapor İndirme', badge: 'badge-purple', group: 'files' },
+    REPORT_DOWNLOAD:     { label: 'Rapor İndirme', badge: 'badge-purple', group: 'files' },
+    BULK_DOWNLOAD:       { label: 'Toplu İndirme', badge: 'badge-purple', group: 'files' },
+    REPORT_BULK_DOWNLOAD:{ label: 'Toplu İndirme', badge: 'badge-purple', group: 'files' },
+    EXPORT:              { label: 'Dışa Aktarma', badge: 'badge-blue', group: 'files' },
+    EXPORT_ALL_SQL:      { label: 'Tüm SQL İndirme', badge: 'badge-purple', group: 'files' },
+    EXPORT_ALL_SQL_CSV:  { label: 'SQL CSV İndirme', badge: 'badge-purple', group: 'files' },
+
+    // Düzenleme & Kod
+    REPORT_UPDATE:       { label: 'Rapor Güncelleme', badge: 'badge-blue', group: 'edits' },
+    REPORT_EDIT:         { label: 'Rapor Düzenleme', badge: 'badge-blue', group: 'edits' },
+    REPORT_RENAME:       { label: 'Rapor Adı Güncelleme', badge: 'badge-blue', group: 'edits' },
+    NOTE_UPDATE:         { label: 'Not Güncelleme', badge: 'badge-blue', group: 'edits' },
+    DESIGN_EDIT:         { label: 'Tasarım Düzenleme', badge: 'badge-blue', group: 'edits' },
+    SQL_EDIT:            { label: 'SQL Sorgu Düzenleme', badge: 'badge-purple', group: 'edits' },
+    PASCAL_EDIT:         { label: 'Pascal Script Düzenleme', badge: 'badge-amber', group: 'edits' },
+    REPORT_FAVORITE:     { label: 'Favori İşlemi', badge: 'badge-amber', group: 'edits' },
+    REPORT_PIN:          { label: 'Sabitleme İşlemi', badge: 'badge-amber', group: 'edits' },
+    REPORT_BULK_FAVORITE:{ label: 'Toplu Favori İşlemi', badge: 'badge-amber', group: 'edits' },
+
+    // Ortak Havuz
+    POOL_ADD:            { label: 'Havuz Paylaşımı', badge: 'badge-green', group: 'pool' },
+    POOL_ADD_BULK:       { label: 'Toplu Havuz Paylaşımı', badge: 'badge-green', group: 'pool' },
+    POOL_REMOVE:         { label: 'Havuzdan Kaldırma', badge: 'badge-amber', group: 'pool' },
+    POOL_REMOVE_BULK:    { label: 'Toplu Havuz Çıkarma', badge: 'badge-amber', group: 'pool' },
+    POOL_CLONE:          { label: 'Havuzdan İçe Aktarma', badge: 'badge-blue', group: 'pool' },
+
+    // Çöp Kutusu & Silme
+    REPORT_DELETE:       { label: 'Çöp Kutusuna Taşıma', badge: 'badge-red', group: 'trash' },
+    REPORT_BULK_DELETE:  { label: 'Toplu Çöpe Taşıma', badge: 'badge-red', group: 'trash' },
+    REPORT_CLEAR_ALL:    { label: 'Tüm Raporları Çöpe Taşıma', badge: 'badge-red', group: 'trash' },
+    TRASH_MOVE:          { label: 'Çöp Kutusuna Taşıma', badge: 'badge-red', group: 'trash' },
+    TRASH_BULK_MOVE:     { label: 'Toplu Çöpe Taşıma', badge: 'badge-red', group: 'trash' },
+    TRASH_RESTORE:       { label: 'Çöpten Geri Yükleme', badge: 'badge-green', group: 'trash' },
+    TRASH_BULK_RESTORE:  { label: 'Toplu Çöpten Kurtarma', badge: 'badge-green', group: 'trash' },
+    TRASH_PURGE:         { label: 'Kalıcı Silme', badge: 'badge-red', group: 'trash' },
+    TRASH_BULK_PURGE:    { label: 'Toplu Kalıcı Silme', badge: 'badge-red', group: 'trash' },
+    TRASH_EMPTY:         { label: 'Çöpü Boşaltma', badge: 'badge-red', group: 'trash' },
+
+    // Kategori & Etiket
+    TAG_ADD:             { label: 'Etiket Ekleme', badge: 'badge-blue', group: 'tags' },
+    TAG_REMOVE:          { label: 'Etiket Kaldırma', badge: 'badge-amber', group: 'tags' },
+    TAG_CREATE:          { label: 'Özel Etiket Ekleme', badge: 'badge-blue', group: 'tags' },
+    TAG_DELETE:          { label: 'Özel Etiket Silme', badge: 'badge-red', group: 'tags' },
+    CATEGORY_CREATE:     { label: 'Kategori Oluşturma', badge: 'badge-green', group: 'tags' },
+    CATEGORY_UPDATE:     { label: 'Kategori Güncelleme', badge: 'badge-blue', group: 'tags' },
+    CATEGORY_DELETE:     { label: 'Kategori Silme', badge: 'badge-red', group: 'tags' },
+    CATEGORY_ASSIGN:     { label: 'Kategori Atama', badge: 'badge-blue', group: 'tags' },
+
+    // Sistem & Ayarlar
+    SETTINGS_UPDATE:     { label: 'Kullanıcı Ayarları', badge: 'badge-blue', group: 'system' },
+    SETTINGS_CHANGE:     { label: 'Arayüz Tercihleri', badge: 'badge-blue', group: 'system' },
+    THEME_CHANGE:        { label: 'Tema Değişimi', badge: 'badge-blue', group: 'system' },
+    DATA_RESET:          { label: 'Veritabanı Sıfırlama', badge: 'badge-red', group: 'system' },
+    AUTO_BACKUP:         { label: 'Otomatik Yedekleme', badge: 'badge-green', group: 'system' },
+    BACKUP_EXPORT:       { label: 'Sistem Yedeği Alma', badge: 'badge-green', group: 'system' },
+    BACKUP_IMPORT:       { label: 'Yedekten Geri Yükleme', badge: 'badge-green', group: 'system' }
+  };
+
+  const LEGACY_ACTION_TEXTS = {
+    'TOPLU İNDİRME':       'BULK_DOWNLOAD',
+    'TOPLU INDIRME':       'BULK_DOWNLOAD',
+    'RAPOR YÜKLEME':       'REPORT_UPLOAD',
+    'RAPOR YUKLEME':       'REPORT_UPLOAD',
+    'TOPLU HAVUZ EKLEME':  'POOL_ADD_BULK',
+    'HAVUZ PAYLAŞIMI':     'POOL_ADD',
+    'HAVUZDAN KALDIRMA':   'POOL_REMOVE',
+    'TOPLU HAVUZ ÇIKARMA': 'POOL_REMOVE_BULK',
+    'ÇÖP KUTUSUNA TAŞIMA': 'TRASH_MOVE',
+    'ÇÖPTEN GERİ YÜKLEME': 'TRASH_RESTORE',
+    'KALICI SİLME':        'TRASH_PURGE',
+    'ÇÖPÜ BOŞALTMA':       'TRASH_EMPTY',
+    'TASARIM DÜZENLEME':   'DESIGN_EDIT',
+    'SQL SORGU DÜZENLEME': 'SQL_EDIT',
+    'PASCAL SCRİPT DÜZENLEME': 'PASCAL_EDIT',
+    'GİRİŞ':               'LOGIN',
+    'GİRİŞ YAPMA':         'LOGIN',
+    'KULLANICI AYARLARI':  'SETTINGS_UPDATE',
+    'PROFİL GÜNCELLEME':   'USER_UPDATE'
   };
 
   function getActionInfo(action) {
-    const act = String(action || 'INFO').toUpperCase();
-    return ACTION_MAP[act] || { label: act, badge: 'badge-blue' };
+    let act = String(action || 'INFO').trim().toUpperCase();
+    if (LEGACY_ACTION_TEXTS[act]) {
+      act = LEGACY_ACTION_TEXTS[act];
+    }
+    if (ACTION_MAP[act]) {
+      return ACTION_MAP[act];
+    }
+    const cleanLabel = act.replace(/_/g, ' ').toLowerCase()
+      .replace(/\b\w/g, l => l.toUpperCase());
+    return { label: cleanLabel, badge: 'badge-blue', group: 'other' };
   }
 
   function formatTimestamp(isoStr) {
@@ -73,10 +148,10 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
       <div class="modal" style="max-width:580px;width:94vw;padding:1.6rem;border-radius:18px;box-shadow:0 28px 70px rgba(0,0,0,.5);border:1.5px solid var(--border);background:var(--bg-surface);animation:fadeIn .18s ease-out;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;border-bottom:1px solid var(--border-light);padding-bottom:.75rem;">
           <div style="font-size:1.1rem;font-weight:900;color:var(--text-primary);display:flex;align-items:center;gap:.6rem;">
-            <span>Denetim Kayıt Detayı</span>
-            <span class="badge ${actInfo.badge}" style="font-size:.74rem;padding:.2rem .6rem;">${escHtml(actInfo.label)}</span>
+            <span>İşlem Detay Kartı</span>
+            <span class="badge ${actInfo.badge}">${escHtml(actInfo.label)}</span>
           </div>
-          <button type="button" class="btn btn-sm btn-ghost btn-close-detail" style="font-size:1.2rem;padding:2px 10px;border-radius:50%;">✕</button>
+          <button type="button" class="btn btn-sm btn-ghost btn-close-detail" style="font-size:1rem;padding:4px 8px;border-radius:8px;" title="Kapat">Kapat</button>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.85rem;font-size:.84rem;margin-bottom:1.2rem;background:var(--bg-raised);padding:1rem;border-radius:12px;border:1px solid var(--border-light);">
@@ -212,7 +287,7 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
             <button type="button" class="btn btn-sm btn-primary" id="btnWideExportExcel" style="font-weight:800;font-size:.82rem;background:linear-gradient(135deg,#059669,#10b981);border:none;box-shadow:0 4px 12px rgba(16,185,129,0.35);padding:.45rem 1.1rem;">
               Excel (.xls) İndir
             </button>
-            <button type="button" class="btn btn-sm btn-ghost" id="btnCloseWideAuditModal" style="font-size:1.3rem;padding:.3rem .75rem;border-radius:10px;margin-left:.4rem;" title="Kapat">✕</button>
+            <button type="button" class="btn btn-sm btn-ghost" id="btnCloseWideAuditModal" style="font-size:.84rem;font-weight:700;padding:.45rem .85rem;border-radius:10px;margin-left:.4rem;" title="Kapat">Kapat</button>
           </div>
         </div>
 
@@ -245,25 +320,47 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
           <!-- Arama ve Filtre Çubuğu -->
           <div style="display:flex;gap:.75rem;width:100%;box-sizing:border-box;flex-wrap:wrap;">
             <div style="flex:1;min-width:240px;">
-              <input type="text" id="wideAuditSearchInput" placeholder="Loglarda ara (Kullanıcı, işlem, rapor adı, IP, detay)..." class="master-search-input" style="width:100%;font-size:.86rem;padding:.5rem .9rem;box-sizing:border-box;border-radius:10px;" />
+              <input type="text" id="wideAuditSearchInput" placeholder="Loglarda ara (Kullanıcı, işlem, rapor adı, IP, açıklama)..." class="master-search-input" style="width:100%;font-size:.86rem;padding:.5rem .9rem;box-sizing:border-box;border-radius:10px;" />
             </div>
-            <select id="wideAuditActionFilter" class="master-search-input" style="width:240px;font-size:.84rem;font-weight:700;border-radius:10px;padding:.5rem .8rem;">
+            <select id="wideAuditActionFilter" class="master-search-input" style="width:260px;font-size:.84rem;font-weight:700;border-radius:10px;padding:.5rem .8rem;">
               <option value="">Tüm İşlem Türleri</option>
-              <option value="FRP_DOWNLOAD">İndirme (FRP_DOWNLOAD)</option>
-              <option value="REPORT_UPLOAD">Yükleme (REPORT_UPLOAD)</option>
-              <option value="REPORT_UPDATE">Güncelleme (REPORT_UPDATE)</option>
-              <option value="POOL_ADD">Havuz Paylaşımı</option>
-              <option value="POOL_REMOVE">Havuzdan Kaldırma</option>
-              <option value="REPORT_DELETE">Çöp Kutusuna Taşıma</option>
-              <option value="TRASH_RESTORE">Çöpten Geri Yükleme</option>
-              <option value="TRASH_PURGE">Kalıcı Silme</option>
-              <option value="TRASH_EMPTY">Çöpü Boşaltma</option>
-              <option value="DESIGN_EDIT">Tasarım Düzenleme</option>
-              <option value="SQL_EDIT">SQL Sorgu Düzenleme</option>
-              <option value="PASCAL_EDIT">Pascal Script Düzenleme</option>
-              <option value="LOGIN">Giriş Yapma (LOGIN)</option>
-              <option value="USER_UPDATE">Profil Güncelleme</option>
-              <option value="DATA_RESET">Veritabanı Sıfırlama</option>
+              <optgroup label="Dosya & Aktarım">
+                <option value="REPORT_UPLOAD">Rapor Yükleme</option>
+                <option value="REPORT_BULK_UPLOAD">Toplu Rapor Yükleme</option>
+                <option value="FRP_DOWNLOAD">Rapor İndirme</option>
+                <option value="BULK_DOWNLOAD">Toplu İndirme</option>
+                <option value="EXPORT_ALL_SQL">SQL Dışa Aktarma</option>
+              </optgroup>
+              <optgroup label="Düzenleme & Kod">
+                <option value="REPORT_UPDATE">Rapor Güncelleme</option>
+                <option value="DESIGN_EDIT">Tasarım Düzenleme</option>
+                <option value="SQL_EDIT">SQL Düzenleme</option>
+                <option value="PASCAL_EDIT">Pascal Script Düzenleme</option>
+                <option value="NOTE_UPDATE">Not Güncelleme</option>
+                <option value="REPORT_FAVORITE">Favori / Sabitleme</option>
+              </optgroup>
+              <optgroup label="Ortak Havuz">
+                <option value="POOL_ADD">Havuz Paylaşımı</option>
+                <option value="POOL_REMOVE">Havuzdan Kaldırma</option>
+                <option value="POOL_CLONE">Havuzdan İçe Aktarma</option>
+              </optgroup>
+              <optgroup label="Çöp Kutusu & Silme">
+                <option value="REPORT_DELETE">Çöp Kutusuna Taşıma</option>
+                <option value="TRASH_RESTORE">Çöpten Geri Yükleme</option>
+                <option value="TRASH_PURGE">Kalıcı Silme</option>
+                <option value="TRASH_EMPTY">Çöpü Boşaltma</option>
+              </optgroup>
+              <optgroup label="Kategori & Etiket">
+                <option value="TAG_ADD">Etiket Ekleme / Kaldırma</option>
+                <option value="CATEGORY_CREATE">Kategori İşlemleri</option>
+              </optgroup>
+              <optgroup label="Oturum & Sistem">
+                <option value="LOGIN">Kullanıcı Girişi</option>
+                <option value="USER_UPDATE">Profil & Güvenlik</option>
+                <option value="SETTINGS_UPDATE">Kullanıcı Ayarları</option>
+                <option value="BACKUP_EXPORT">Sistem Yedeği</option>
+                <option value="DATA_RESET">Veritabanı Sıfırlama</option>
+              </optgroup>
             </select>
           </div>
 
@@ -384,20 +481,37 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
 
     const filterAndDisplay = () => {
       const q = (searchInp?.value || '').toLowerCase().trim();
-      const act = filterSelect?.value || '';
+      const act = (filterSelect?.value || '').toUpperCase();
 
       let filtered = loadedLogs;
       if (act) {
-        filtered = filtered.filter(l => (l.action || '').toUpperCase() === act.toUpperCase());
+        filtered = filtered.filter(l => {
+          let rawAct = String(l.action || '').trim().toUpperCase();
+          if (LEGACY_ACTION_TEXTS[rawAct]) rawAct = LEGACY_ACTION_TEXTS[rawAct];
+          if (rawAct === act) return true;
+          if (act === 'REPORT_UPLOAD' && ['REPORT_UPLOAD', 'REPORT_BULK_UPLOAD'].includes(rawAct)) return true;
+          if (act === 'FRP_DOWNLOAD' && ['FRP_DOWNLOAD', 'REPORT_DOWNLOAD', 'BULK_DOWNLOAD', 'REPORT_BULK_DOWNLOAD'].includes(rawAct)) return true;
+          if (act === 'POOL_ADD' && ['POOL_ADD', 'POOL_ADD_BULK'].includes(rawAct)) return true;
+          if (act === 'POOL_REMOVE' && ['POOL_REMOVE', 'POOL_REMOVE_BULK'].includes(rawAct)) return true;
+          if (act === 'REPORT_DELETE' && ['REPORT_DELETE', 'REPORT_BULK_DELETE', 'REPORT_CLEAR_ALL', 'TRASH_MOVE', 'TRASH_BULK_MOVE'].includes(rawAct)) return true;
+          if (act === 'TRASH_RESTORE' && ['TRASH_RESTORE', 'TRASH_BULK_RESTORE'].includes(rawAct)) return true;
+          if (act === 'TRASH_PURGE' && ['TRASH_PURGE', 'TRASH_BULK_PURGE'].includes(rawAct)) return true;
+          if (act === 'TAG_ADD' && ['TAG_ADD', 'TAG_REMOVE', 'TAG_CREATE', 'TAG_DELETE'].includes(rawAct)) return true;
+          if (act === 'CATEGORY_CREATE' && ['CATEGORY_CREATE', 'CATEGORY_UPDATE', 'CATEGORY_DELETE', 'CATEGORY_ASSIGN'].includes(rawAct)) return true;
+          if (act === 'REPORT_FAVORITE' && ['REPORT_FAVORITE', 'REPORT_PIN', 'REPORT_BULK_FAVORITE'].includes(rawAct)) return true;
+          return false;
+        });
       }
       if (q) {
-        filtered = filtered.filter(l =>
-          (l.username || '').toLowerCase().includes(q) ||
-          (l.details || '').toLowerCase().includes(q) ||
-          (l.target || '').toLowerCase().includes(q) ||
-          (l.action || '').toLowerCase().includes(q) ||
-          (l.ip || '').includes(q)
-        );
+        filtered = filtered.filter(l => {
+          const actInfo = getActionInfo(l.action);
+          return (l.username || '').toLowerCase().includes(q) ||
+            (l.details || '').toLowerCase().includes(q) ||
+            (l.target || '').toLowerCase().includes(q) ||
+            (l.action || '').toLowerCase().includes(q) ||
+            (actInfo.label || '').toLowerCase().includes(q) ||
+            (l.ip || '').includes(q);
+        });
       }
       renderTable(filtered);
     };

@@ -106,8 +106,8 @@ async function openParamInjector(queryIndex) {
       btnCopy.addEventListener('click', function () {
         if (resultArea) {
           navigator.clipboard.writeText(resultArea.value).then(() => {
-            this.textContent = '✅ Kopyalandı!';
-            setTimeout(() => this.textContent = '📋 Ham SQL\'i Kopyala', 2000);
+            this.textContent = 'Kopyalandı!';
+            setTimeout(() => this.textContent = 'Ham SQL\'i Kopyala', 2000);
             showToast('Ham SQL panoya kopyalandı.', 'success');
           });
         }
@@ -170,7 +170,7 @@ function bindMetaEditEvents(container, fileId) {
       FrpStore.updateMeta(fileId, { [field]: newVal });
       currentFile = FrpStore.getById(fileId);
       deactivateMetaEdit(rowEl, esc(newVal));
-      showToast(`${field === 'reportName' ? 'Rapor adı' : field === 'author' ? 'Yazar' : 'Açıklama'} güncellendi. ✏️`, 'success');
+      showToast(`${field === 'reportName' ? 'Rapor adı' : field === 'author' ? 'Yazar' : 'Açıklama'} güncellendi.`, 'success');
       if (field === 'reportName') {
         const pTitle = document.getElementById('pageTitle');
         if (pTitle) pTitle.textContent = newVal || currentFile.name;
@@ -421,9 +421,9 @@ function renderSidebar(file) {
       const noteInp = document.getElementById('noteTextarea');
       const note = noteInp ? noteInp.value : '';
       FrpStore.updateNote(file.id, note);
-      this.textContent = '✅ Kaydedildi';
+      this.textContent = 'Kaydedildi';
       this.classList.add('saved');
-      setTimeout(() => { this.textContent = '💾 Kaydet'; this.classList.remove('saved'); }, 2000);
+      setTimeout(() => { this.textContent = 'Kaydet'; this.classList.remove('saved'); }, 2000);
       showToast('Not kaydedildi.', 'success');
     });
   }

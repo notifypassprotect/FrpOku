@@ -66,7 +66,7 @@ window.FrpSettingsTabs.trash = {
         ${trashItems.length > 0 ? `
           <div style="display:flex;align-items:center;gap:.75rem;">
             <div style="position:relative;flex:1;">
-              <input type="text" id="trashSearchInput" placeholder="🔍 Çöp kutusunda ara (Rapor adı, dosya adı)..." class="master-search-input" style="width:100%;font-size:.82rem;padding:.45rem .8rem;" />
+              <input type="text" id="trashSearchInput" placeholder="Çöp kutusunda ara (Rapor adı, dosya adı)..." class="master-search-input" style="width:100%;font-size:.82rem;padding:.45rem .8rem;" />
             </div>
             <label style="display:flex;align-items:center;gap:.4rem;font-size:.78rem;font-weight:700;cursor:pointer;color:var(--text-secondary);">
               <input type="checkbox" id="trashSelectAll" style="width:16px;height:16px;cursor:pointer;" />
@@ -79,7 +79,9 @@ window.FrpSettingsTabs.trash = {
           </div>
         ` : `
           <div style="text-align:center;padding:3.5rem 1rem;background:var(--bg-surface);border-radius:12px;border:1px dashed var(--border);">
-            <div style="font-size:2.8rem;margin-bottom:.6rem;">🎉</div>
+            <div style="width:48px;height:48px;margin:0 auto .75rem;border-radius:12px;background:var(--bg-raised);color:var(--text-muted);display:flex;align-items:center;justify-content:center;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </div>
             <div style="font-weight:800;font-size:1rem;color:var(--text-primary);">Çöp Kutusu Boş</div>
             <div style="font-size:.78rem;color:var(--text-muted);margin-top:.2rem;">Silinmiş herhangi bir rapor bulunmuyor.</div>
           </div>

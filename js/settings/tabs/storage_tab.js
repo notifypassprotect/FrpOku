@@ -70,11 +70,11 @@ window.FrpSettingsTabs.storage = {
         <!-- Tümünü Sıfırlama -->
         <div class="settings-card" style="border:1px solid rgba(239,68,68,0.3);background:rgba(239,68,68,0.03);display:flex;align-items:center;justify-content:space-between;gap:1rem;">
           <div>
-            <div style="font-weight:800;font-size:.85rem;color:var(--red);">🚨 Fabrika Ayarlarına Sıfırla</div>
+            <div style="font-weight:800;font-size:.85rem;color:var(--red);">Fabrika Ayarlarına Sıfırla</div>
             <div style="font-size:.72rem;color:var(--text-muted);">Tüm rapor verilerini, kategorileri ve önbelleği kalıcı olarak temizler.</div>
           </div>
           <button type="button" class="btn btn-sm btn-danger" id="btnActionResetAll" style="font-weight:800;padding:.5rem 1.1rem;">
-            💥 Verileri Sıfırla
+            Verileri Sıfırla
           </button>
         </div>
       </div>

@@ -68,13 +68,13 @@ async function migrate() {
 
     const { error } = await supabase.from('reports').upsert(row, { onConflict: 'id' });
     if (error) {
-      console.error('❌ Aktarılamadı:', name, error.message);
+      console.error('Aktarılamadı:', name, error.message);
     } else {
-      console.log('✅ Başarıyla Supabase\'e aktarıldı:', name);
+      console.log('Başarıyla Supabase\'e aktarıldı:', name);
     }
   }
 
-  console.log('🎉 Migrasyon tamamlandı!');
+  console.log('Migrasyon tamamlandı!');
 }
 
 migrate();

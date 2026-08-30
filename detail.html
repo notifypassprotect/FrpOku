@@ -1,456 +1,456 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FrpOku — Rapor Detayı</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inconsolata:wght@400;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700;800&family=Nunito:wght@400;600;700;800&family=Open+Sans:wght@400;600;700&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&family=Raleway:wght@400;600;700;800&family=Roboto:wght@400;500;700&family=Source+Code+Pro:wght@400;600;700&family=Source+Sans+3:wght@400;600;700&family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=4.3" />
-  <link rel="stylesheet" href="css/list.css?v=4.3" />
-  <link rel="stylesheet" href="css/compare.css?v=4.3" />
-  <link rel="stylesheet" href="css/themes.css?v=4.3" />
-  <link rel="stylesheet" href="css/designer.css?v=4.3" />
-  <script>
-    (function() {
-      const t = localStorage.getItem('frpoku_theme') || 'light';
-      document.documentElement.setAttribute('data-theme', t);
-    })();
-  </script>
+ <meta charset="UTF-8" />
+ <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+ <title>FrpOku — Rapor Detayı</title>
+ <link rel="preconnect" href="https://fonts.googleapis.com">
+ <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+ <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inconsolata:wght@400;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700;800&family=Nunito:wght@400;600;700;800&family=Open+Sans:wght@400;600;700&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&family=Raleway:wght@400;600;700;800&family=Roboto:wght@400;500;700&family=Source+Code+Pro:wght@400;600;700&family=Source+Sans+3:wght@400;600;700&family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet">
+ <link rel="stylesheet" href="css/style.css?v=4.3" />
+ <link rel="stylesheet" href="css/list.css?v=4.3" />
+ <link rel="stylesheet" href="css/compare.css?v=4.3" />
+ <link rel="stylesheet" href="css/themes.css?v=4.3" />
+ <link rel="stylesheet" href="css/designer.css?v=4.3" />
+ <script>
+ (function() {
+ const t = localStorage.getItem('frpoku_theme') || 'light';
+ document.documentElement.setAttribute('data-theme', t);
+ })();
+ </script>
 
-  <style>
-    .detail-topbar-left { display:flex; align-items:center; gap:.75rem; }
+ <style>
+.detail-topbar-left { display:flex; align-items:center; gap:.75rem; }
 
-    .btn-back {
-      display:flex; align-items:center; gap:.4rem;
-      padding:.4rem .9rem; border-radius:8px;
-      border:1px solid var(--border); background:var(--bg-raised);
-      color:var(--text-secondary); font-size:.82rem; font-weight:600;
-      cursor:pointer; font-family:var(--font); transition:all .16s;
-    }
-    .btn-back:hover { background:var(--accent-light); color:var(--accent-bright); border-color:var(--accent-bright); }
+.btn-back {
+ display:flex; align-items:center; gap:.4rem;
+ padding:.4rem.9rem; border-radius:8px;
+ border:1px solid var(--border); background:var(--bg-raised);
+ color:var(--text-secondary); font-size:.82rem; font-weight:600;
+ cursor:pointer; font-family:var(--font); transition:all.16s;
+ }
+.btn-back:hover { background:var(--accent-light); color:var(--accent-bright); border-color:var(--accent-bright); }
 
-    .note-area {
-      background: var(--bg-surface);
-      border: 1.5px solid var(--border-light);
-      border-radius: 10px;
-      padding: .85rem 1rem;
-      margin-bottom: .65rem;
-      box-shadow: var(--shadow-sm);
-    }
-    .sql-accordion {
-      margin-top: .75rem;
-      border: 1px solid var(--border-light);
-      border-radius: 12px;
-      background: var(--bg-surface);
-      overflow: hidden;
-    }
-    .sql-accordion summary {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 1rem 1.1rem;
-      min-height: 48px;
-      cursor: pointer;
-      font-weight: 700;
-      color: var(--text-primary);
-      list-style: none;
-      gap: .75rem;
-      user-select: none;
-      font-size: .95rem;
-      border-bottom: 1px solid rgba(0,0,0,.06);
-      background: var(--bg-surface);
-    }
-    .sql-accordion summary:hover {
-      background: rgba(255,255,255,.55);
-    }
-    .sql-accordion summary::-webkit-details-marker {
-      display: none;
-    }
-    .sql-accordion summary::before {
-      content: '▶';
-      display: inline-block;
-      transform: rotate(0deg);
-      transition: transform .2s ease;
-      font-size: 1rem;
-      width: 1rem;
-      text-align: center;
-    }
-    .sql-accordion[open] summary::before {
-      transform: rotate(90deg);
-    }
-    .sql-accordion[open] summary {
-      background: rgba(247,250,255,.9);
-    }
-    .sql-accordion:not([open]) .sql-preview,
-    .sql-accordion:not([open]) .sql-accordion-actions {
-      display: none;
-    }
-    .sql-preview {
-      background: var(--bg-raised);
-      color: var(--text-primary);
-      font-family: var(--mono);
-      font-size: .75rem;
-      line-height: 1.45;
-      padding: .85rem 1rem;
-      border-top: 1px solid var(--border-light);
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-    .sql-accordion-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: .4rem;
-      padding: .75rem 1rem 1rem;
-    }
-    .sql-accordion-actions .btn-export {
-      padding:.35rem .65rem;
-      font-size:.72rem;
-      border-radius:7px;
-    }
-    .sql-accordion-actions .query-meta {
-      margin-left:auto;
-      font-size:.72rem;
-      color: var(--text-muted);
-      font-weight:600;
-    }
-    .note-textarea {
-      width: 100%; min-height: 80px; resize: vertical;
-      border: 1px solid var(--border-light); border-radius: 7px;
-      background: var(--bg-raised); color: var(--text-primary);
-      font-family: var(--font); font-size: .8rem; line-height: 1.5;
-      padding: .5rem .75rem; outline: none; margin-top: .4rem;
-      transition: border-color .18s;
-    }
-    .note-textarea:focus { border-color: var(--accent-bright); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+.note-area {
+ background: var(--bg-surface);
+ border: 1.5px solid var(--border-light);
+ border-radius: 10px;
+ padding:.85rem 1rem;
+ margin-bottom:.65rem;
+ box-shadow: var(--shadow-sm);
+ }
+.sql-accordion {
+ margin-top:.75rem;
+ border: 1px solid var(--border-light);
+ border-radius: 12px;
+ background: var(--bg-surface);
+ overflow: hidden;
+ }
+.sql-accordion summary {
+ display: flex;
+ align-items: center;
+ justify-content: space-between;
+ padding: 1rem 1.1rem;
+ min-height: 48px;
+ cursor: pointer;
+ font-weight: 700;
+ color: var(--text-primary);
+ list-style: none;
+ gap:.75rem;
+ user-select: none;
+ font-size:.95rem;
+ border-bottom: 1px solid rgba(0,0,0,.06);
+ background: var(--bg-surface);
+ }
+.sql-accordion summary:hover {
+ background: rgba(255,255,255,.55);
+ }
+.sql-accordion summary::-webkit-details-marker {
+ display: none;
+ }
+.sql-accordion summary::before {
+ content: '▶';
+ display: inline-block;
+ transform: rotate(0deg);
+ transition: transform.2s ease;
+ font-size: 1rem;
+ width: 1rem;
+ text-align: center;
+ }
+.sql-accordion[open] summary::before {
+ transform: rotate(90deg);
+ }
+.sql-accordion[open] summary {
+ background: rgba(247,250,255,.9);
+ }
+.sql-accordion:not([open]).sql-preview,
+.sql-accordion:not([open]).sql-accordion-actions {
+ display: none;
+ }
+.sql-preview {
+ background: var(--bg-raised);
+ color: var(--text-primary);
+ font-family: var(--mono);
+ font-size:.75rem;
+ line-height: 1.45;
+ padding:.85rem 1rem;
+ border-top: 1px solid var(--border-light);
+ white-space: pre-wrap;
+ word-break: break-word;
+ }
+.sql-accordion-actions {
+ display: flex;
+ flex-wrap: wrap;
+ gap:.4rem;
+ padding:.75rem 1rem 1rem;
+ }
+.sql-accordion-actions.btn-export {
+ padding:.35rem.65rem;
+ font-size:.72rem;
+ border-radius:7px;
+ }
+.sql-accordion-actions.query-meta {
+ margin-left:auto;
+ font-size:.72rem;
+ color: var(--text-muted);
+ font-weight:600;
+ }
+.note-textarea {
+ width: 100%; min-height: 80px; resize: vertical;
+ border: 1px solid var(--border-light); border-radius: 7px;
+ background: var(--bg-raised); color: var(--text-primary);
+ font-family: var(--font); font-size:.8rem; line-height: 1.5;
+ padding:.5rem.75rem; outline: none; margin-top:.4rem;
+ transition: border-color.18s;
+ }
+.note-textarea:focus { border-color: var(--accent-bright); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
 
-    .btn-save-note {
-      margin-top: .4rem; display:flex; align-items:center; gap:.3rem;
-      padding:.32rem .75rem; border-radius:6px; border:1px solid rgba(5,150,105,.3);
-      background:var(--green-light); color:var(--green);
-      font-size:.75rem; font-weight:600; cursor:pointer; font-family:var(--font);
-      transition:all .15s;
-    }
-    .btn-save-note:hover { background:rgba(5,150,105,.2); }
-    .btn-save-note.saved { background:var(--green); color:#fff; }
+.btn-save-note {
+ margin-top:.4rem; display:flex; align-items:center; gap:.3rem;
+ padding:.32rem.75rem; border-radius:6px; border:1px solid rgba(5,150,105,.3);
+ background:var(--green-light); color:var(--green);
+ font-size:.75rem; font-weight:600; cursor:pointer; font-family:var(--font);
+ transition:all.15s;
+ }
+.btn-save-note:hover { background:rgba(5,150,105,.2); }
+.btn-save-note.saved { background:var(--green); color:#fff; }
 
-    .param-list { display:flex; flex-wrap:wrap; gap:.3rem; margin-top:.4rem; }
-    .param-pill {
-      font-size:.7rem; padding:.18rem .55rem; border-radius:20px;
-      background:rgba(217,119,6,.1); color:var(--orange);
-      border:1px solid rgba(217,119,6,.25); font-weight:700;
-      font-family:var(--mono);
-    }
+.param-list { display:flex; flex-wrap:wrap; gap:.3rem; margin-top:.4rem; }
+.param-pill {
+ font-size:.7rem; padding:.18rem.55rem; border-radius:20px;
+ background:rgba(217,119,6,.1); color:var(--orange);
+ border:1px solid rgba(217,119,6,.25); font-weight:700;
+ font-family:var(--mono);
+ }
 
-    .export-btns { display:flex; flex-direction:column; gap:.4rem; margin-top:.5rem; }
-    .btn-export {
-      display:flex; align-items:center; gap:.4rem;
-      padding:.38rem .75rem; border-radius:7px; border:1px solid var(--border);
-      background:var(--bg-raised); color:var(--text-secondary);
-      font-size:.78rem; font-weight:500; cursor:pointer; font-family:var(--font);
-      transition:all .16s; text-align:left;
-    }
-    .btn-export:hover { background:var(--accent-light); color:var(--accent-bright); border-color:var(--accent-bright); }
+.export-btns { display:flex; flex-direction:column; gap:.4rem; margin-top:.5rem; }
+.btn-export {
+ display:flex; align-items:center; gap:.4rem;
+ padding:.38rem.75rem; border-radius:7px; border:1px solid var(--border);
+ background:var(--bg-raised); color:var(--text-secondary);
+ font-size:.78rem; font-weight:500; cursor:pointer; font-family:var(--font);
+ transition:all.16s; text-align:left;
+ }
+.btn-export:hover { background:var(--accent-light); color:var(--accent-bright); border-color:var(--accent-bright); }
 
-    #toastDetail {
-      position:fixed; bottom:1.5rem; right:1.5rem; z-index:9999;
-      padding:.75rem 1.1rem; border-radius:10px;
-      background:var(--bg-surface); border:1px solid var(--border);
-      font-size:.875rem; font-weight:500;
-      box-shadow:var(--shadow-lg); max-width:380px;
-      transform:translateX(120%); transition:transform .3s ease;
-      display:flex; align-items:center; gap:.6rem; color:var(--text-primary);
-    }
-    #toastDetail.show { transform:translateX(0); }
-    #toastDetail.success { border-left:3px solid var(--green); }
-    #toastDetail.error   { border-left:3px solid var(--red); }
-    #toastDetail.info    { border-left:3px solid var(--accent-bright); }
+ #toastDetail {
+ position:fixed; bottom:1.5rem; right:1.5rem; z-index:9999;
+ padding:.75rem 1.1rem; border-radius:10px;
+ background:var(--bg-surface); border:1px solid var(--border);
+ font-size:.875rem; font-weight:500;
+ box-shadow:var(--shadow-lg); max-width:380px;
+ transform:translateX(120%); transition:transform.3s ease;
+ display:flex; align-items:center; gap:.6rem; color:var(--text-primary);
+ }
+ #toastDetail.show { transform:translateX(0); }
+ #toastDetail.success { border-left:3px solid var(--green); }
+ #toastDetail.error { border-left:3px solid var(--red); }
+ #toastDetail.info { border-left:3px solid var(--accent-bright); }
 
-    .btn {
-      display:inline-flex; align-items:center; gap:.4rem;
-      padding:.45rem .9rem; border-radius:8px; border:1px solid var(--border);
-      background:var(--bg-raised); color:var(--text-secondary);
-      font-size:.82rem; font-weight:500; cursor:pointer; font-family:var(--font);
-      transition:all .16s; white-space:nowrap;
-    }
-    .btn:hover { background:var(--bg-surface); color:var(--text-primary); box-shadow:var(--shadow-sm); }
-    .btn-primary { background:var(--accent); color:#fff; border-color:var(--accent); }
-    .btn-primary:hover { background:#1d4ed8; }
-    .btn-sm { padding:.35rem .7rem; font-size:.78rem; border-radius:7px; }
+.btn {
+ display:inline-flex; align-items:center; gap:.4rem;
+ padding:.45rem.9rem; border-radius:8px; border:1px solid var(--border);
+ background:var(--bg-raised); color:var(--text-secondary);
+ font-size:.82rem; font-weight:500; cursor:pointer; font-family:var(--font);
+ transition:all.16s; white-space:nowrap;
+ }
+.btn:hover { background:var(--bg-surface); color:var(--text-primary); box-shadow:var(--shadow-sm); }
+.btn-primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+.btn-primary:hover { background:#1d4ed8; }
+.btn-sm { padding:.35rem.7rem; font-size:.78rem; border-radius:7px; }
 
-    .tag-add-wrap { display: flex; gap: 0.35rem; margin-top: 0.5rem; }
-    .tag-add-input {
-      flex: 1; padding: 0.3rem 0.5rem; border-radius: 6px;
-      border: 1px solid var(--border); font-size: 0.75rem;
-      outline: none; background: var(--bg-raised); color: var(--text-primary);
-    }
-    .tag-add-input:focus { border-color: var(--accent); }
+.tag-add-wrap { display: flex; gap: 0.35rem; margin-top: 0.5rem; }
+.tag-add-input {
+ flex: 1; padding: 0.3rem 0.5rem; border-radius: 6px;
+ border: 1px solid var(--border); font-size: 0.75rem;
+ outline: none; background: var(--bg-raised); color: var(--text-primary);
+ }
+.tag-add-input:focus { border-color: var(--accent); }
 
-    /* Detay sayfası edit modu textarea flex */
-    .code-panel {
-      display: none;
-      flex-direction: column;
-      overflow: hidden;
-    }
-    .code-panel.active {
-      display: flex;
-    }
+ /* Detay sayfası edit modu textarea flex */
+.code-panel {
+ display: none;
+ flex-direction: column;
+ overflow: hidden;
+ }
+.code-panel.active {
+ display: flex;
+ }
 
-    .cheat-shell {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      max-height: 72vh;
-    }
-    .cheat-hero {
-      display: flex;
-      gap: 1rem;
-      align-items: flex-start;
-      justify-content: space-between;
-      padding: 1rem 1.15rem;
-      border: 1px solid var(--border-light);
-      border-radius: 16px;
-      background: linear-gradient(135deg, rgba(37,99,235,.10), rgba(16,185,129,.08));
-      box-shadow: var(--shadow-sm);
-    }
-    .cheat-hero h3 {
-      margin: 0;
-      font-size: 1rem;
-      line-height: 1.25;
-      color: var(--text-primary);
-    }
-    .cheat-hero p {
-      margin: .3rem 0 0;
-      color: var(--text-secondary);
-      font-size: .82rem;
-      line-height: 1.45;
-    }
-    .cheat-searchbar {
-      display: flex;
-      gap: .6rem;
-      align-items: center;
-      padding: .8rem .9rem;
-      border: 1px solid var(--border-light);
-      border-radius: 14px;
-      background: var(--bg-raised);
-      position: sticky;
-      top: 0;
-      z-index: 2;
-      box-shadow: var(--shadow-sm);
-      backdrop-filter: blur(8px);
-    }
-    .cheat-count {
-      min-width: 92px;
-      text-align: center;
-      font-size: .78rem;
-      font-weight: 800;
-      padding: .34rem .6rem;
-      border-radius: 999px;
-      background: rgba(37,99,235,.1);
-      color: var(--accent-bright);
-    }
-    .cheat-scroll {
-      overflow: auto;
-      padding-right: .25rem;
-    }
-    .cheat-group {
-      margin-bottom: 1rem;
-      border: 1px solid var(--border-light);
-      border-radius: 16px;
-      background: var(--bg-surface);
-      overflow: hidden;
-      box-shadow: var(--shadow-sm);
-    }
-    .cheat-group-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: .75rem;
-      padding: .9rem 1rem;
-      background: linear-gradient(180deg, rgba(255,255,255,.72), rgba(255,255,255,.50));
-      border-bottom: 1px solid var(--border-light);
-    }
-    .cheat-group-title {
-      margin: 0;
-      font-size: .92rem;
-      font-weight: 900;
-      color: var(--text-primary);
-    }
-    .cheat-group-meta {
-      color: var(--text-muted);
-      font-size: .72rem;
-      font-weight: 700;
-      white-space: nowrap;
-    }
-    .cheat-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: .8rem;
-      padding: .9rem;
-    }
-    .cheat-card {
-      background: linear-gradient(180deg, rgba(255,255,255,.8), rgba(255,255,255,.65));
-      border: 1px solid var(--border-light);
-      border-radius: 14px;
-      padding: .85rem .85rem .8rem;
-      display: flex;
-      flex-direction: column;
-      gap: .55rem;
-      box-shadow: var(--shadow-sm);
-      transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
-    }
-    .cheat-card:hover {
-      transform: translateY(-1px);
-      box-shadow: var(--shadow-md);
-      border-color: rgba(37,99,235,.28);
-    }
-    .cheat-card-head {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: .75rem;
-    }
-    .cheat-card-title {
-      font-size: .84rem;
-      font-weight: 800;
-      color: var(--text-primary);
-      line-height: 1.35;
-      margin: 0;
-    }
-    .cheat-card-desc {
-      font-size: .72rem;
-      line-height: 1.45;
-      color: var(--text-secondary);
-    }
-    .cheat-code {
-      margin: 0;
-      padding: .75rem .8rem;
-      border-radius: 12px;
-      background: #0b1020;
-      color: #e5eefc;
-      border: 1px solid rgba(37,99,235,.18);
-      font-family: var(--mono);
-      font-size: .72rem;
-      line-height: 1.45;
-      white-space: pre-wrap;
-      word-break: break-word;
-      overflow-wrap: anywhere;
-    }
-    .cheat-card .btn {
-      align-self: flex-start;
-    }
-    @keyframes flash-red {
-      0%, 100% { background: var(--bg-raised); color: var(--text-secondary); border-color: var(--border); }
-      50% { background: var(--red); color: #fff; border-color: var(--red); box-shadow: 0 0 8px var(--red); }
-    }
-    .flash-red-btn {
-      animation: flash-red 1s infinite !important;
-    }
-  </style>
+.cheat-shell {
+ display: flex;
+ flex-direction: column;
+ gap: 1rem;
+ max-height: 72vh;
+ }
+.cheat-hero {
+ display: flex;
+ gap: 1rem;
+ align-items: flex-start;
+ justify-content: space-between;
+ padding: 1rem 1.15rem;
+ border: 1px solid var(--border-light);
+ border-radius: 16px;
+ background: linear-gradient(135deg, rgba(37,99,235,.10), rgba(16,185,129,.08));
+ box-shadow: var(--shadow-sm);
+ }
+.cheat-hero h3 {
+ margin: 0;
+ font-size: 1rem;
+ line-height: 1.25;
+ color: var(--text-primary);
+ }
+.cheat-hero p {
+ margin:.3rem 0 0;
+ color: var(--text-secondary);
+ font-size:.82rem;
+ line-height: 1.45;
+ }
+.cheat-searchbar {
+ display: flex;
+ gap:.6rem;
+ align-items: center;
+ padding:.8rem.9rem;
+ border: 1px solid var(--border-light);
+ border-radius: 14px;
+ background: var(--bg-raised);
+ position: sticky;
+ top: 0;
+ z-index: 2;
+ box-shadow: var(--shadow-sm);
+ backdrop-filter: blur(8px);
+ }
+.cheat-count {
+ min-width: 92px;
+ text-align: center;
+ font-size:.78rem;
+ font-weight: 800;
+ padding:.34rem.6rem;
+ border-radius: 999px;
+ background: rgba(37,99,235,.1);
+ color: var(--accent-bright);
+ }
+.cheat-scroll {
+ overflow: auto;
+ padding-right:.25rem;
+ }
+.cheat-group {
+ margin-bottom: 1rem;
+ border: 1px solid var(--border-light);
+ border-radius: 16px;
+ background: var(--bg-surface);
+ overflow: hidden;
+ box-shadow: var(--shadow-sm);
+ }
+.cheat-group-head {
+ display: flex;
+ align-items: center;
+ justify-content: space-between;
+ gap:.75rem;
+ padding:.9rem 1rem;
+ background: linear-gradient(180deg, rgba(255,255,255,.72), rgba(255,255,255,.50));
+ border-bottom: 1px solid var(--border-light);
+ }
+.cheat-group-title {
+ margin: 0;
+ font-size:.92rem;
+ font-weight: 900;
+ color: var(--text-primary);
+ }
+.cheat-group-meta {
+ color: var(--text-muted);
+ font-size:.72rem;
+ font-weight: 700;
+ white-space: nowrap;
+ }
+.cheat-grid {
+ display: grid;
+ grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+ gap:.8rem;
+ padding:.9rem;
+ }
+.cheat-card {
+ background: linear-gradient(180deg, rgba(255,255,255,.8), rgba(255,255,255,.65));
+ border: 1px solid var(--border-light);
+ border-radius: 14px;
+ padding:.85rem.85rem.8rem;
+ display: flex;
+ flex-direction: column;
+ gap:.55rem;
+ box-shadow: var(--shadow-sm);
+ transition: transform.15s ease, box-shadow.15s ease, border-color.15s ease;
+ }
+.cheat-card:hover {
+ transform: translateY(-1px);
+ box-shadow: var(--shadow-md);
+ border-color: rgba(37,99,235,.28);
+ }
+.cheat-card-head {
+ display: flex;
+ align-items: flex-start;
+ justify-content: space-between;
+ gap:.75rem;
+ }
+.cheat-card-title {
+ font-size:.84rem;
+ font-weight: 800;
+ color: var(--text-primary);
+ line-height: 1.35;
+ margin: 0;
+ }
+.cheat-card-desc {
+ font-size:.72rem;
+ line-height: 1.45;
+ color: var(--text-secondary);
+ }
+.cheat-code {
+ margin: 0;
+ padding:.75rem.8rem;
+ border-radius: 12px;
+ background: #0b1020;
+ color: #e5eefc;
+ border: 1px solid rgba(37,99,235,.18);
+ font-family: var(--mono);
+ font-size:.72rem;
+ line-height: 1.45;
+ white-space: pre-wrap;
+ word-break: break-word;
+ overflow-wrap: anywhere;
+ }
+.cheat-card.btn {
+ align-self: flex-start;
+ }
+ @keyframes flash-red {
+ 0%, 100% { background: var(--bg-raised); color: var(--text-secondary); border-color: var(--border); }
+ 50% { background: var(--red); color: #fff; border-color: var(--red); box-shadow: 0 0 8px var(--red); }
+ }
+.flash-red-btn {
+ animation: flash-red 1s infinite!important;
+ }
+ </style>
 </head>
 <body>
 <div class="app-wrap">
 
-  <!-- ═══════════════ TOP BAR ═══════════════ -->
-  <nav class="topbar">
-    <div class="detail-topbar-left">
-      <button class="btn-back" id="btnBack">← Listeye Dön</button>
-      <div class="brand">
-        <div>
-          <div id="pageTitle">Rapor Detayı</div>
-          <div class="brand-sub" id="pageSubTitle">FrpOku</div>
-        </div>
-      </div>
-      <button class="star-btn" id="btnFavDetail" title="Favorilere Ekle/Çıkar" style="margin-left:.5rem;">★</button>
-      <button class="pin-btn" id="btnPinDetail" title="Üste Sabitle/Kaldır" style="margin-left:.3rem;padding:.2rem .45rem;font-size:.74rem;font-weight:700;border-radius:6px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text-secondary);cursor:pointer;opacity:.6;transition:opacity .15s;">Sabitle</button>
-      <button class="btn btn-sm" id="btnTogglePoolDetail" style="display:none;margin-left:.5rem;padding:.3rem .65rem;font-size:.76rem;border-radius:8px;font-weight:700;">Havuzda Paylaş</button>
-    </div>
+ <!-- ═══════════════ TOP BAR ═══════════════ -->
+ <nav class="topbar">
+ <div class="detail-topbar-left">
+ <button class="btn-back" id="btnBack">← Listeye Dön</button>
+ <div class="brand">
+ <div>
+ <div id="pageTitle">Rapor Detayı</div>
+ <div class="brand-sub" id="pageSubTitle">FrpOku</div>
+ </div>
+ </div>
+ <button class="star-btn" id="btnFavDetail" title="Favorilere Ekle/Çıkar" style="margin-left:.5rem;">★</button>
+ <button class="pin-btn" id="btnPinDetail" title="Üste Sabitle/Kaldır" style="margin-left:.3rem;padding:.2rem.45rem;font-size:.74rem;font-weight:700;border-radius:6px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text-secondary);cursor:pointer;opacity:.6;transition:opacity.15s;">Sabitle</button>
+ <button class="btn btn-sm" id="btnTogglePoolDetail" style="display:none;margin-left:.5rem;padding:.3rem.65rem;font-size:.76rem;border-radius:8px;font-weight:700;">Havuzda Paylaş</button>
+ </div>
 
-    <div class="topbar-right">
-      <!-- Son İndirilenler -->
-      <button class="btn btn-sm" id="btnRecentDownloadsDetail" title="Son İndirilen Dosyalar ve İndirme Geçmişi">Son İndirilenler</button>
+ <div class="topbar-right">
+ <!-- Son İndirilenler -->
+ <button class="btn btn-sm" id="btnRecentDownloadsDetail" title="Son İndirilen Dosyalar ve İndirme Geçmişi">Son İndirilenler</button>
 
-      <!-- Sorgu Kütüphanesi -->
-      <button class="btn btn-sm" id="btnSnippets" title="Kaydedilmiş SQL Sorgu Kütüphanesi">Sorgu Kütüphanesi</button>
+ <!-- Sorgu Kütüphanesi -->
+ <button class="btn btn-sm" id="btnSnippets" title="Kaydedilmiş SQL Sorgu Kütüphanesi">Sorgu Kütüphanesi</button>
 
-      <!-- Tema Butonu -->
-      <button class="theme-switch-pill" id="btnThemeToggle" title="Gece / Gündüz Teması">Koyu Mod</button>
+ <!-- Tema Butonu -->
+ <button class="theme-switch-pill" id="btnThemeToggle" title="Gece / Gündüz Teması">Koyu Mod</button>
 
-      <!-- KOD İÇİ CANLI ARAMA -->
-      <div class="code-search-box">
-        <span class="search-icon" style="font-size:.78rem;">🔍</span>
-        <input type="text" class="search-input" id="codeSearchInput" placeholder="Kodda ara..." autocomplete="off" />
-        <span class="result-count" id="codeSearchCount" style="font-size:.7rem;margin:0 .2rem;"></span>
-        <button class="search-nav-btn" id="codeSearchPrev" title="Önceki">◀</button>
-        <button class="search-nav-btn" id="codeSearchNext" title="Sonraki">▶</button>
-      </div>
+ <!-- KOD İÇİ CANLI ARAMA -->
+ <div class="code-search-box">
+ <span class="search-icon" style="font-size:.78rem;"></span>
+ <input type="text" class="search-input" id="codeSearchInput" placeholder="Kodda ara..." autocomplete="off" />
+ <span class="result-count" id="codeSearchCount" style="font-size:.7rem;margin:0.2rem;"></span>
+ <button class="search-nav-btn" id="codeSearchPrev" title="Önceki">◀</button>
+ <button class="search-nav-btn" id="codeSearchNext" title="Sonraki">▶</button>
+ </div>
 
-      <!-- Yazı boyutu -->
-      <div class="font-ctrl">
-        <span class="font-ctrl-label">Yazı</span>
-        <button class="font-ctrl-btn" id="fontDec" title="Küçült">−</button>
-        <span class="font-ctrl-val" id="fontSizeVal">13px</span>
-        <button class="font-ctrl-btn" id="fontInc" title="Büyüt">+</button>
-      </div>
-    </div>
-  </nav>
+ <!-- Yazı boyutu -->
+ <div class="font-ctrl">
+ <span class="font-ctrl-label">Yazı</span>
+ <button class="font-ctrl-btn" id="fontDec" title="Küçült">−</button>
+ <span class="font-ctrl-val" id="fontSizeVal">13px</span>
+ <button class="font-ctrl-btn" id="fontInc" title="Büyüt">+</button>
+ </div>
+ </div>
+ </nav>
 
-  <!-- MOBİL GÖRÜNÜM SEKMELERİ (KODLAR VS BİLGİLER) -->
-  <div class="mobile-detail-nav" id="mobileDetailNav">
-    <button class="mobile-detail-nav-btn active" id="btnTabMobCode">Kodlar & SQL</button>
-    <button class="mobile-detail-nav-btn" id="btnTabMobInfo">Rapor Bilgileri</button>
-  </div>
+ <!-- MOBİL GÖRÜNÜM SEKMELERİ (KODLAR VS BİLGİLER) -->
+ <div class="mobile-detail-nav" id="mobileDetailNav">
+ <button class="mobile-detail-nav-btn active" id="btnTabMobCode">Kodlar & SQL</button>
+ <button class="mobile-detail-nav-btn" id="btnTabMobInfo">Rapor Bilgileri</button>
+ </div>
 
-  <!-- ═══════════════ BODY ═══════════════ -->
-  <div class="app-body">
+ <!-- ═══════════════ BODY ═══════════════ -->
+ <div class="app-body">
 
-    <!-- SOL PANEL -->
-    <aside class="sidebar">
-      <div class="sidebar-header">Rapor Bilgileri</div>
-      <div class="sidebar-body" id="sidebarBody">
-        <div class="sidebar-empty">
-          <div class="sidebar-empty-title">Yükleniyor...</div>
-        </div>
-      </div>
-    </aside>
+ <!-- SOL PANEL -->
+ <aside class="sidebar">
+ <div class="sidebar-header">Rapor Bilgileri</div>
+ <div class="sidebar-body" id="sidebarBody">
+ <div class="sidebar-empty">
+ <div class="sidebar-empty-title">Yükleniyor...</div>
+ </div>
+ </div>
+ </aside>
 
-    <!-- SAĞ: KOD GÖRÜNTÜLEYICI -->
-    <main class="main">
+ <!-- SAĞ: KOD GÖRÜNTÜLEYICI -->
+ <main class="main">
 
-      <!-- HAVUZ BİLGİ & SALT OKUNUR BANNERI -->
-      <div id="poolDetailBanner" class="pool-readonly-banner" style="display:none;margin:0.75rem 1rem 0;">
-        <div style="display:flex;align-items:center;gap:.6rem;">
-          <div>
-            <div style="font-weight:800;font-size:.88rem;color:#065f46;">Ortak Rapor Havuzu (Salt-Okunur İnceleme Modu)</div>
-            <div style="font-size:.75rem;color:#047857;" id="poolDetailOwnerInfo">Yükleyen: —</div>
-          </div>
-        </div>
-        <div style="display:flex;gap:.5rem;">
-          <button class="btn btn-sm" id="btnCloneFromPool" style="background:#059669;color:#fff;border:none;font-weight:700;cursor:pointer;">Kişisel Alanıma Kopyala</button>
-        </div>
-      </div>
+ <!-- HAVUZ BİLGİ & SALT OKUNUR BANNERI -->
+ <div id="poolDetailBanner" class="pool-readonly-banner" style="display:none;margin:0.75rem 1rem 0;">
+ <div style="display:flex;align-items:center;gap:.6rem;">
+ <div>
+ <div style="font-weight:800;font-size:.88rem;color:#065f46;">Ortak Rapor Havuzu (Salt-Okunur İnceleme Modu)</div>
+ <div style="font-size:.75rem;color:#047857;" id="poolDetailOwnerInfo">Yükleyen: —</div>
+ </div>
+ </div>
+ <div style="display:flex;gap:.5rem;">
+ <button class="btn btn-sm" id="btnCloneFromPool" style="background:#059669;color:#fff;border:none;font-weight:700;cursor:pointer;">Kişisel Alanıma Kopyala</button>
+ </div>
+ </div>
 
-      <!-- Hata / Yükleniyor -->
-      <div class="dropzone-wrap" id="errorWrap" style="display:none;">
-        <div style="text-align:center;color:var(--text-muted);">
-          <div style="font-size:3rem;margin-bottom:1rem;">⚠️</div>
-          <div id="errorMsg" style="font-size:1rem;font-weight:600;color:var(--text-secondary);"></div>
-          <div style="margin-top:1rem;">
-            <button class="btn btn-primary btn-sm" onclick="window.location.href='index.html'">← Listeye Dön</button>
-          </div>
-        </div>
-      </div>
+ <!-- Hata / Yükleniyor -->
+ <div class="dropzone-wrap" id="errorWrap" style="display:none;">
+ <div style="text-align:center;color:var(--text-muted);">
+ <div style="font-size:3rem;margin-bottom:1rem;">⚠️</div>
+ <div id="errorMsg" style="font-size:1rem;font-weight:600;color:var(--text-secondary);"></div>
+ <div style="margin-top:1rem;">
+ <button class="btn btn-primary btn-sm" onclick="window.location.href='index.html'">← Listeye Dön</button>
+ </div>
+ </div>
+ </div>
 
-      <!-- Kod görüntüleyici -->
-      <div class="viewer" id="viewer" style="display:none;position:relative;">
-        <div class="tab-bar" id="tabBar"></div>
-        <div id="panels" style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;"></div>
-        <!-- SORUNLAR VE LINTE HATA PANELİ KALDIRILDI -->
-      </div>
+ <!-- Kod görüntüleyici -->
+ <div class="viewer" id="viewer" style="display:none;position:relative;">
+ <div class="tab-bar" id="tabBar"></div>
+ <div id="panels" style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;"></div>
+ <!-- SORUNLAR VE LINTE HATA PANELİ KALDIRILDI -->
+ </div>
 
-    </main>
-  </div>
+ </main>
+ </div>
 
 </div><!-- /app-wrap -->
 

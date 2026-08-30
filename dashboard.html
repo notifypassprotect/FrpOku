@@ -1,184 +1,184 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FrpOku — İstatistik Paneli</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inconsolata:wght@400;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700;800&family=Nunito:wght@400;600;700;800&family=Open+Sans:wght@400;600;700&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&family=Raleway:wght@400;600;700;800&family=Roboto:wght@400;500;700&family=Source+Code+Pro:wght@400;600;700&family=Source+Sans+3:wght@400;600;700&family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=4.3" />
-  <link rel="stylesheet" href="css/themes.css?v=4.3" />
-  <script>
-    (function() {
-      const t = localStorage.getItem('frpoku_theme') || 'light';
-      document.documentElement.setAttribute('data-theme', t);
-    })();
-  </script>
-  <style>
-    body { margin: 0; overflow: auto; }
-    .dash-wrap {
-      max-width: 1400px; margin: 0 auto;
-      padding: 1.5rem;
-      display: flex; flex-direction: column; gap: 1.5rem;
-    }
+ <meta charset="UTF-8" />
+ <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+ <title>FrpOku — İstatistik Paneli</title>
+ <link rel="preconnect" href="https://fonts.googleapis.com">
+ <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+ <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inconsolata:wght@400;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700;800&family=Nunito:wght@400;600;700;800&family=Open+Sans:wght@400;600;700&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&family=Raleway:wght@400;600;700;800&family=Roboto:wght@400;500;700&family=Source+Code+Pro:wght@400;600;700&family=Source+Sans+3:wght@400;600;700&family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet">
+ <link rel="stylesheet" href="css/style.css?v=4.3" />
+ <link rel="stylesheet" href="css/themes.css?v=4.3" />
+ <script>
+ (function() {
+ const t = localStorage.getItem('frpoku_theme') || 'light';
+ document.documentElement.setAttribute('data-theme', t);
+ })();
+ </script>
+ <style>
+ body { margin: 0; overflow: auto; }
+.dash-wrap {
+ max-width: 1400px; margin: 0 auto;
+ padding: 1.5rem;
+ display: flex; flex-direction: column; gap: 1.5rem;
+ }
 
-    /* Header */
-    .dash-header {
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 1rem; flex-wrap: wrap;
-    }
-    .dash-title { font-size: 1.5rem; font-weight: 800; color: var(--text-primary); }
-    .dash-sub   { font-size: .82rem; color: var(--text-muted); margin-top: .15rem; }
+ /* Header */
+.dash-header {
+ display: flex; align-items: center; justify-content: space-between;
+ gap: 1rem; flex-wrap: wrap;
+ }
+.dash-title { font-size: 1.5rem; font-weight: 800; color: var(--text-primary); }
+.dash-sub { font-size:.82rem; color: var(--text-muted); margin-top:.15rem; }
 
-    /* Summary cards */
-    .dash-cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 1rem;
-    }
-    .dash-card {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-light);
-      border-radius: 14px;
-      padding: 1.2rem 1rem 1rem;
-      box-shadow: var(--shadow-sm);
-      display: flex; flex-direction: column; gap: .3rem;
-      position: relative; overflow: hidden;
-    }
-    .dash-card::before {
-      content: '';
-      position: absolute; top: 0; left: 0; right: 0; height: 3px;
-      background: var(--card-accent, var(--accent));
-    }
-    .dash-card-icon  { font-size: 1.8rem; }
-    .dash-card-value { font-size: 2rem; font-weight: 800; color: var(--text-primary); }
-    .dash-card-label { font-size: .72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
-    .dash-card-trend { font-size: .72rem; color: var(--green); margin-top: .1rem; }
+ /* Summary cards */
+.dash-cards {
+ display: grid;
+ grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+ gap: 1rem;
+ }
+.dash-card {
+ background: var(--bg-surface);
+ border: 1px solid var(--border-light);
+ border-radius: 14px;
+ padding: 1.2rem 1rem 1rem;
+ box-shadow: var(--shadow-sm);
+ display: flex; flex-direction: column; gap:.3rem;
+ position: relative; overflow: hidden;
+ }
+.dash-card::before {
+ content: '';
+ position: absolute; top: 0; left: 0; right: 0; height: 3px;
+ background: var(--card-accent, var(--accent));
+ }
+.dash-card-icon { font-size: 1.8rem; }
+.dash-card-value { font-size: 2rem; font-weight: 800; color: var(--text-primary); }
+.dash-card-label { font-size:.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing:.05em; }
+.dash-card-trend { font-size:.72rem; color: var(--green); margin-top:.1rem; }
 
-    /* Chart grid */
-    .dash-charts {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-      gap: 1.5rem;
-    }
-    .chart-box {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-light);
-      border-radius: 14px;
-      padding: 1.25rem;
-      box-shadow: var(--shadow-sm);
-    }
-    .chart-title {
-      font-size: .9rem; font-weight: 700; color: var(--text-primary);
-      margin-bottom: 1rem; display: flex; align-items: center; gap: .4rem;
-    }
-    .chart-canvas { width: 100% !important; }
+ /* Chart grid */
+.dash-charts {
+ display: grid;
+ grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+ gap: 1.5rem;
+ }
+.chart-box {
+ background: var(--bg-surface);
+ border: 1px solid var(--border-light);
+ border-radius: 14px;
+ padding: 1.25rem;
+ box-shadow: var(--shadow-sm);
+ }
+.chart-title {
+ font-size:.9rem; font-weight: 700; color: var(--text-primary);
+ margin-bottom: 1rem; display: flex; align-items: center; gap:.4rem;
+ }
+.chart-canvas { width: 100%!important; }
 
-    /* Gösterge tablosundaki tablolar */
-    .dash-table-wrap {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-light);
-      border-radius: 14px;
-      overflow: hidden;
-      box-shadow: var(--shadow-sm);
-    }
-    .dash-table-header {
-      padding: 1rem 1.25rem;
-      font-weight: 700; font-size: .9rem;
-      border-bottom: 1px solid var(--border);
-      background: var(--bg-raised);
-    }
-    .dash-tbl {
-      width: 100%; border-collapse: collapse; font-size: .82rem;
-    }
-    .dash-tbl th {
-      text-align: left; padding: .55rem 1rem;
-      background: var(--bg-raised);
-      font-size: .72rem; font-weight: 700; text-transform: uppercase;
-      letter-spacing: .04em; color: var(--text-muted);
-      border-bottom: 1px solid var(--border);
-    }
-    .dash-tbl td {
-      padding: .55rem 1rem;
-      border-bottom: 1px solid var(--border-light);
-      color: var(--text-primary);
-    }
-    .dash-tbl tr:last-child td { border-bottom: none; }
-    .dash-tbl tr:hover td { background: var(--bg-raised); }
+ /* Gösterge tablosundaki tablolar */
+.dash-table-wrap {
+ background: var(--bg-surface);
+ border: 1px solid var(--border-light);
+ border-radius: 14px;
+ overflow: hidden;
+ box-shadow: var(--shadow-sm);
+ }
+.dash-table-header {
+ padding: 1rem 1.25rem;
+ font-weight: 700; font-size:.9rem;
+ border-bottom: 1px solid var(--border);
+ background: var(--bg-raised);
+ }
+.dash-tbl {
+ width: 100%; border-collapse: collapse; font-size:.82rem;
+ }
+.dash-tbl th {
+ text-align: left; padding:.55rem 1rem;
+ background: var(--bg-raised);
+ font-size:.72rem; font-weight: 700; text-transform: uppercase;
+ letter-spacing:.04em; color: var(--text-muted);
+ border-bottom: 1px solid var(--border);
+ }
+.dash-tbl td {
+ padding:.55rem 1rem;
+ border-bottom: 1px solid var(--border-light);
+ color: var(--text-primary);
+ }
+.dash-tbl tr:last-child td { border-bottom: none; }
+.dash-tbl tr:hover td { background: var(--bg-raised); }
 
-    /* Progress bar */
-    .pbar-wrap { display: flex; align-items: center; gap: .5rem; }
-    .pbar {
-      flex: 1; height: 6px; background: var(--border);
-      border-radius: 3px; overflow: hidden;
-    }
-    .pbar-fill { height: 100%; border-radius: 3px; transition: width .4s ease; }
+ /* Progress bar */
+.pbar-wrap { display: flex; align-items: center; gap:.5rem; }
+.pbar {
+ flex: 1; height: 6px; background: var(--border);
+ border-radius: 3px; overflow: hidden;
+ }
+.pbar-fill { height: 100%; border-radius: 3px; transition: width.4s ease; }
 
-    /* Health distribution */
-    .health-dist {
-      display: flex; gap: .5rem; flex-wrap: wrap;
-    }
-    .health-dist-item {
-      flex: 1; min-width: 70px;
-      background: var(--bg-raised);
-      border-radius: 10px; padding: .7rem;
-      text-align: center;
-      border: 1px solid var(--border-light);
-    }
-    .health-dist-score { font-size: 1.4rem; font-weight: 800; }
-    .health-dist-count { font-size: .82rem; color: var(--text-muted); }
-    .health-dist-label { font-size: .7rem; color: var(--text-muted); }
-    .dash-action-btn {
-      display: inline-flex; align-items: center; gap: .45rem;
-      padding: .5rem 1.1rem; border-radius: 10px; font-weight: 700; font-size: .84rem;
-      border: 1px solid var(--border-light); cursor: pointer; transition: all .2s ease;
-      background: var(--bg-surface); color: var(--text-primary);
-      box-shadow: var(--shadow-sm);
-    }
-    .dash-action-btn:hover {
-      transform: translateY(-1px); box-shadow: var(--shadow-md);
-      border-color: var(--accent); color: var(--accent);
-    }
-    .dash-action-btn.back-btn {
-      background: linear-gradient(135deg, var(--accent), #2563eb);
-      color: #fff; border: none;
-    }
-    .dash-action-btn.back-btn:hover {
-      background: linear-gradient(135deg, #2563eb, #1d4ed8);
-      color: #fff;
-    }
+ /* Health distribution */
+.health-dist {
+ display: flex; gap:.5rem; flex-wrap: wrap;
+ }
+.health-dist-item {
+ flex: 1; min-width: 70px;
+ background: var(--bg-raised);
+ border-radius: 10px; padding:.7rem;
+ text-align: center;
+ border: 1px solid var(--border-light);
+ }
+.health-dist-score { font-size: 1.4rem; font-weight: 800; }
+.health-dist-count { font-size:.82rem; color: var(--text-muted); }
+.health-dist-label { font-size:.7rem; color: var(--text-muted); }
+.dash-action-btn {
+ display: inline-flex; align-items: center; gap:.45rem;
+ padding:.5rem 1.1rem; border-radius: 10px; font-weight: 700; font-size:.84rem;
+ border: 1px solid var(--border-light); cursor: pointer; transition: all.2s ease;
+ background: var(--bg-surface); color: var(--text-primary);
+ box-shadow: var(--shadow-sm);
+ }
+.dash-action-btn:hover {
+ transform: translateY(-1px); box-shadow: var(--shadow-md);
+ border-color: var(--accent); color: var(--accent);
+ }
+.dash-action-btn.back-btn {
+ background: linear-gradient(135deg, var(--accent), #2563eb);
+ color: #fff; border: none;
+ }
+.dash-action-btn.back-btn:hover {
+ background: linear-gradient(135deg, #2563eb, #1d4ed8);
+ color: #fff;
+ }
 
-    /* Responsive */
-    @media (max-width: 600px) {
-      .dash-charts { grid-template-columns: 1fr; }
-    }
-  </style>
+ /* Responsive */
+ @media (max-width: 600px) {
+.dash-charts { grid-template-columns: 1fr; }
+ }
+ </style>
 </head>
 <body>
 <div class="app-wrap" style="height:auto; overflow:auto;">
-  <!-- TOP BAR -->
-  <nav class="topbar" style="padding: .75rem 1.5rem;">
-    <div class="brand">
-      <div class="brand-icon">📊</div>
-      <div>
-        <div style="font-size:1.1rem;font-weight:800;">İstatistik Paneli</div>
-        <div class="brand-sub">FrpOku Analiz Merkezi</div>
-      </div>
-    </div>
-    <div class="topbar-right" style="display:flex;align-items:center;gap:.75rem;">
-      <button class="dash-action-btn" id="btnRefresh">🔄 Yenile</button>
-      <button class="dash-action-btn back-btn" onclick="window.location.href='index.html'">⬅️ Listeye Dön</button>
-    </div>
-  </nav>
+ <!-- TOP BAR -->
+ <nav class="topbar" style="padding:.75rem 1.5rem;">
+ <div class="brand">
+ <div class="brand-icon"></div>
+ <div>
+ <div style="font-size:1.1rem;font-weight:800;">İstatistik Paneli</div>
+ <div class="brand-sub">FrpOku Analiz Merkezi</div>
+ </div>
+ </div>
+ <div class="topbar-right" style="display:flex;align-items:center;gap:.75rem;">
+ <button class="dash-action-btn" id="btnRefresh"> Yenile</button>
+ <button class="dash-action-btn back-btn" onclick="window.location.href='index.html'">⬅️ Listeye Dön</button>
+ </div>
+ </nav>
 
-  <div class="dash-wrap" id="dashWrap">
-    <!-- Yükleniyor -->
-    <div id="loadingState" style="text-align:center;padding:4rem;color:var(--text-muted);">
-      <div style="font-size:3rem;margin-bottom:1rem;">📊</div>
-      <div style="font-weight:600;">Panel yükleniyor...</div>
-    </div>
-  </div>
+ <div class="dash-wrap" id="dashWrap">
+ <!-- Yükleniyor -->
+ <div id="loadingState" style="text-align:center;padding:4rem;color:var(--text-muted);">
+ <div style="font-size:3rem;margin-bottom:1rem;"></div>
+ <div style="font-weight:600;">Panel yükleniyor...</div>
+ </div>
+ </div>
 </div>
 
 <!-- Toast -->
@@ -222,332 +222,332 @@
 
 // ── ADMİN YETKİ KONTROLÜ (Pentest & Access Control Guard) ──────
 function verifyAdminAccess() {
-  const isAdmin = window.FrpAuth ? window.FrpAuth.isAdmin() : false;
-  if (!isAdmin) {
-    document.body.innerHTML = `
-      <div style="height:100vh;display:flex;align-items:center;justify-content:center;background:#0b1020;color:#fff;font-family:system-ui,sans-serif;text-align:center;padding:1.5rem;">
-        <div style="background:rgba(26,34,53,0.95);border:1px solid rgba(239,68,68,0.4);border-radius:20px;padding:2.5rem 2rem;max-width:440px;box-shadow:0 25px 50px rgba(0,0,0,0.5);">
-          <div style="font-size:3.5rem;margin-bottom:.8rem;">🛡️</div>
-          <h2 style="font-size:1.35rem;font-weight:800;color:#f87171;margin:0 0 .5rem;">Yetkisiz Erişim (403 Forbidden)</h2>
-          <p style="font-size:.88rem;color:#94a3b8;line-height:1.6;margin-bottom:1.5rem;">İstatistik ve Analiz Paneli yalnızca <strong>Sistem Yöneticisi (Admin)</strong> yetkisine sahip kullanıcılar tarafından görüntülenebilir.</p>
-          <a href="index.html" style="display:inline-block;background:#2563eb;color:#fff;padding:.65rem 1.3rem;border-radius:10px;font-weight:700;font-size:.88rem;text-decoration:none;transition:background .2s;">← Ana Sayfaya Dön</a>
-        </div>
-      </div>
-    `;
-    setTimeout(() => { window.location.href = 'index.html'; }, 2200);
-    return false;
-  }
-  return true;
+ const isAdmin = window.FrpAuth? window.FrpAuth.isAdmin(): false;
+ if (!isAdmin) {
+ document.body.innerHTML = `
+ <div style="height:100vh;display:flex;align-items:center;justify-content:center;background:#0b1020;color:#fff;font-family:system-ui,sans-serif;text-align:center;padding:1.5rem;">
+ <div style="background:rgba(26,34,53,0.95);border:1px solid rgba(239,68,68,0.4);border-radius:20px;padding:2.5rem 2rem;max-width:440px;box-shadow:0 25px 50px rgba(0,0,0,0.5);">
+ <div style="font-size:3.5rem;margin-bottom:.8rem;">️</div>
+ <h2 style="font-size:1.35rem;font-weight:800;color:#f87171;margin:0 0.5rem;">Yetkisiz Erişim (403 Forbidden)</h2>
+ <p style="font-size:.88rem;color:#94a3b8;line-height:1.6;margin-bottom:1.5rem;">İstatistik ve Analiz Paneli yalnızca <strong>Sistem Yöneticisi (Admin)</strong> yetkisine sahip kullanıcılar tarafından görüntülenebilir.</p>
+ <a href="index.html" style="display:inline-block;background:#2563eb;color:#fff;padding:.65rem 1.3rem;border-radius:10px;font-weight:700;font-size:.88rem;text-decoration:none;transition:background.2s;">← Ana Sayfaya Dön</a>
+ </div>
+ </div>
+ `;
+ setTimeout(() => { window.location.href = 'index.html'; }, 2200);
+ return false;
+ }
+ return true;
 }
 
 if (!verifyAdminAccess()) return;
 
 function esc(s) {
-  return String(s || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+ return String(s || '')
+.replace(/&/g, '&amp;')
+.replace(/</g, '&lt;')
+.replace(/>/g, '&gt;')
+.replace(/"/g, '&quot;')
+.replace(/'/g, '&#39;');
 }
 
 function toast(msg, type) {
-  const stack = document.getElementById('toastStack');
-  if (!stack) return;
-  const el = document.createElement('div');
-  el.className = 'toast-item ' + (type||'info');
-  el.textContent = msg;
-  stack.appendChild(el);
-  setTimeout(() => el.remove(), 3500);
+ const stack = document.getElementById('toastStack');
+ if (!stack) return;
+ const el = document.createElement('div');
+ el.className = 'toast-item ' + (type||'info');
+ el.textContent = msg;
+ stack.appendChild(el);
+ setTimeout(() => el.remove(), 3500);
 }
 
 function renderDashboard() {
-  const files = FrpStore.getAll();
-  const wrap  = document.getElementById('dashWrap');
+ const files = FrpStore.getAll();
+ const wrap = document.getElementById('dashWrap');
 
-  if (files.length === 0) {
-    wrap.innerHTML = `
-      <div style="text-align:center;padding:5rem;color:var(--text-muted);">
-        <div style="font-size:3rem;margin-bottom:1rem;">📂</div>
-        <div style="font-size:1.1rem;font-weight:600;">Henüz rapor yüklenmedi</div>
-        <div style="margin-top:1rem;"><a href="index.html" class="btn btn-primary btn-sm">← Rapora Git</a></div>
-      </div>`;
-    return;
-  }
+ if (files.length === 0) {
+ wrap.innerHTML = `
+ <div style="text-align:center;padding:5rem;color:var(--text-muted);">
+ <div style="font-size:3rem;margin-bottom:1rem;"></div>
+ <div style="font-size:1.1rem;font-weight:600;">Henüz rapor yüklenmedi</div>
+ <div style="margin-top:1rem;"><a href="index.html" class="btn btn-primary btn-sm">← Rapora Git</a></div>
+ </div>`;
+ return;
+ }
 
-  // — Hesaplamalar —
-  const totalReports  = files.length;
-  const totalFav      = files.filter(f => f.isFavorite).length;
-  const totalQueries  = files.reduce((a,f) => a + (f.queries||[]).length, 0);
-  const totalPascal   = files.filter(f => f.pascalScript).length;
+ // — Hesaplamalar —
+ const totalReports = files.length;
+ const totalFav = files.filter(f => f.isFavorite).length;
+ const totalQueries = files.reduce((a,f) => a + (f.queries||[]).length, 0);
+ const totalPascal = files.filter(f => f.pascalScript).length;
 
-  // SQL Parametre Kullanım Analizi
-  const paramUsageMap = {};
-  files.forEach(file => {
-    (file.queries || []).forEach(q => {
-      const fn = window.extractParamsFromSql || (() => []);
-      const params = fn(q.sql || '');
-      params.forEach(p => {
-        if (!paramUsageMap[p]) paramUsageMap[p] = { param: p, count: 0, reports: new Set() };
-        paramUsageMap[p].count++;
-        paramUsageMap[p].reports.add(file.meta?.reportName || file.name);
-      });
-    });
-  });
+ // SQL Parametre Kullanım Analizi
+ const paramUsageMap = {};
+ files.forEach(file => {
+ (file.queries || []).forEach(q => {
+ const fn = window.extractParamsFromSql || (() => []);
+ const params = fn(q.sql || '');
+ params.forEach(p => {
+ if (!paramUsageMap[p]) paramUsageMap[p] = { param: p, count: 0, reports: new Set() };
+ paramUsageMap[p].count++;
+ paramUsageMap[p].reports.add(file.meta?.reportName || file.name);
+ });
+ });
+ });
 
-  const paramAnalytics = Object.values(paramUsageMap)
-    .map(item => ({
-      param: item.param,
-      count: item.count,
-      reportCount: item.reports.size,
-      reports: Array.from(item.reports)
-    }))
-    .sort((a, b) => b.count !== a.count ? b.count - a.count : b.reportCount - a.reportCount);
+ const paramAnalytics = Object.values(paramUsageMap)
+.map(item => ({
+ param: item.param,
+ count: item.count,
+ reportCount: item.reports.size,
+ reports: Array.from(item.reports)
+ }))
+.sort((a, b) => b.count!== a.count? b.count - a.count: b.reportCount - a.reportCount);
 
-  const totalParams = paramAnalytics.length;
-  const avgQueries = totalReports > 0 ? (totalQueries / totalReports).toFixed(1) : 0;
+ const totalParams = paramAnalytics.length;
+ const avgQueries = totalReports > 0? (totalQueries / totalReports).toFixed(1): 0;
 
-  // En çok kullanılan tablolar
-  const tableUsage = FrpStore.getTableUsage();
-  const topTables = tableUsage.slice(0, 10).map(t => [t.tableName, t.count]);
+ // En çok kullanılan tablolar
+ const tableUsage = FrpStore.getTableUsage();
+ const topTables = tableUsage.slice(0, 10).map(t => [t.tableName, t.count]);
 
-  // En Çok SQL Sorgusu İçeren Raporlar
-  const topSqlReports = files
-    .map(f => ({ name: f.meta?.reportName || f.name, id: f.id, sqlCount: (f.queries || []).length }))
-    .sort((a, b) => b.sqlCount - a.sqlCount)
-    .slice(0, 8);
+ // En Çok SQL Sorgusu İçeren Raporlar
+ const topSqlReports = files
+.map(f => ({ name: f.meta?.reportName || f.name, id: f.id, sqlCount: (f.queries || []).length }))
+.sort((a, b) => b.sqlCount - a.sqlCount)
+.slice(0, 8);
 
-  // Aylık yükleme trendi (son 12 ay)
-  const monthLabels = [], monthData = [];
-  const now = new Date();
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
-    monthLabels.push(d.toLocaleString('tr-TR', {month:'short', year:'2-digit'}));
-    monthData.push(files.filter(f => {
-      const fd = new Date(f.loadedAt);
-      return fd.getFullYear() === d.getFullYear() && fd.getMonth() === d.getMonth();
-    }).length);
-  }
+ // Aylık yükleme trendi (son 12 ay)
+ const monthLabels = [], monthData = [];
+ const now = new Date();
+ for (let i = 11; i >= 0; i--) {
+ const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+ const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+ monthLabels.push(d.toLocaleString('tr-TR', {month:'short', year:'2-digit'}));
+ monthData.push(files.filter(f => {
+ const fd = new Date(f.loadedAt);
+ return fd.getFullYear() === d.getFullYear() && fd.getMonth() === d.getMonth();
+ }).length);
+ }
 
-  // — HTML Render —
-  const CHART_COLORS  = ['#3b82f6','#10b981','#f59e0b','#8b5cf6','#ef4444','#ec4899','#06b6d4','#84cc16','#f97316','#6366f1'];
+ // — HTML Render —
+ const CHART_COLORS = ['#3b82f6','#10b981','#f59e0b','#8b5cf6','#ef4444','#ec4899','#06b6d4','#84cc16','#f97316','#6366f1'];
 
-  wrap.innerHTML = `
-    <!-- HEADER -->
-    <div class="dash-header">
-      <div>
-        <div class="dash-title">📊 FrpOku Analiz & İstatistik Paneli</div>
-        <div class="dash-sub">Son güncelleme: ${new Date().toLocaleString('tr-TR')}</div>
-      </div>
-    </div>
+ wrap.innerHTML = `
+ <!-- HEADER -->
+ <div class="dash-header">
+ <div>
+ <div class="dash-title"> FrpOku Analiz & İstatistik Paneli</div>
+ <div class="dash-sub">Son güncelleme: ${new Date().toLocaleString('tr-TR')}</div>
+ </div>
+ </div>
 
-    <!-- ÖZET KARTLARI -->
-    <div class="dash-cards">
-      <div class="dash-card" style="--card-accent:#3b82f6;">
-        <div class="dash-card-icon">📄</div>
-        <div class="dash-card-value">${totalReports}</div>
-        <div class="dash-card-label">Toplam Rapor</div>
-      </div>
-      <div class="dash-card" style="--card-accent:#f59e0b;">
-        <div class="dash-card-icon">⭐</div>
-        <div class="dash-card-value">${totalFav}</div>
-        <div class="dash-card-label">Favori</div>
-        <div class="dash-card-trend">${totalReports>0?Math.round(totalFav/totalReports*100):0}% oran</div>
-      </div>
-      <div class="dash-card" style="--card-accent:#10b981;">
-        <div class="dash-card-icon">🗄️</div>
-        <div class="dash-card-value">${totalQueries}</div>
-        <div class="dash-card-label">SQL Sorgusu</div>
-        <div class="dash-card-trend">Ortalama: ${avgQueries}/rapor</div>
-      </div>
-      <div class="dash-card" style="--card-accent:#8b5cf6;">
-        <div class="dash-card-icon">📜</div>
-        <div class="dash-card-value">${totalPascal}</div>
-        <div class="dash-card-label">Pascal Script</div>
-      </div>
-      <div class="dash-card" style="--card-accent:#f97316;">
-        <div class="dash-card-icon">⚙️</div>
-        <div class="dash-card-value">${totalParams}</div>
-        <div class="dash-card-label">Benzersiz Parametre</div>
-      </div>
-      <div class="dash-card" style="--card-accent:#06b6d4;">
-        <div class="dash-card-icon">💾</div>
-        <div class="dash-card-value">${FrpStore.getStats().storageFormatted}</div>
-        <div class="dash-card-label">Depolama Boyutu</div>
-      </div>
-    </div>
+ <!-- ÖZET KARTLARI -->
+ <div class="dash-cards">
+ <div class="dash-card" style="--card-accent:#3b82f6;">
+ <div class="dash-card-icon"></div>
+ <div class="dash-card-value">${totalReports}</div>
+ <div class="dash-card-label">Toplam Rapor</div>
+ </div>
+ <div class="dash-card" style="--card-accent:#f59e0b;">
+ <div class="dash-card-icon">⭐</div>
+ <div class="dash-card-value">${totalFav}</div>
+ <div class="dash-card-label">Favori</div>
+ <div class="dash-card-trend">${totalReports>0?Math.round(totalFav/totalReports*100):0}% oran</div>
+ </div>
+ <div class="dash-card" style="--card-accent:#10b981;">
+ <div class="dash-card-icon">️</div>
+ <div class="dash-card-value">${totalQueries}</div>
+ <div class="dash-card-label">SQL Sorgusu</div>
+ <div class="dash-card-trend">Ortalama: ${avgQueries}/rapor</div>
+ </div>
+ <div class="dash-card" style="--card-accent:#8b5cf6;">
+ <div class="dash-card-icon"></div>
+ <div class="dash-card-value">${totalPascal}</div>
+ <div class="dash-card-label">Pascal Script</div>
+ </div>
+ <div class="dash-card" style="--card-accent:#f97316;">
+ <div class="dash-card-icon">⚙️</div>
+ <div class="dash-card-value">${totalParams}</div>
+ <div class="dash-card-label">Benzersiz Parametre</div>
+ </div>
+ <div class="dash-card" style="--card-accent:#06b6d4;">
+ <div class="dash-card-icon"></div>
+ <div class="dash-card-value">${FrpStore.getStats().storageFormatted}</div>
+ <div class="dash-card-label">Depolama Boyutu</div>
+ </div>
+ </div>
 
-    <!-- GRAFIKLER -->
-    <div class="dash-charts" style="grid-template-columns: 1fr;">
-      <!-- Aylık trend -->
-      <div class="chart-box">
-        <div class="chart-title">📅 Aylık Rapor Yükleme Trendi</div>
-        <canvas id="trendChart" class="chart-canvas" height="220"></canvas>
-      </div>
-    </div>
+ <!-- GRAFIKLER -->
+ <div class="dash-charts" style="grid-template-columns: 1fr;">
+ <!-- Aylık trend -->
+ <div class="chart-box">
+ <div class="chart-title"> Aylık Rapor Yükleme Trendi</div>
+ <canvas id="trendChart" class="chart-canvas" height="220"></canvas>
+ </div>
+ </div>
 
-    <!-- PARAMETRE ANALİTİĞİ -->
-    ${paramAnalytics.length > 0 ? `
-    <div class="dash-table-wrap">
-      <div class="dash-table-header">⚙️ SQL Parametre Kullanım Analitiği (Top ${Math.min(15, paramAnalytics.length)}) <span style="font-size:.72rem;color:var(--text-muted);font-weight:400;">— Hangi parametrenin kaç raporda geçtiğini görün</span></div>
-      <table class="dash-tbl">
-        <thead><tr><th>#</th><th>Parametre Adı</th><th>Kullanım Sayısı</th><th>Bağımlı Rapor Sayısı</th><th>Örnek Raporlar</th></tr></thead>
-        <tbody>
-          ${paramAnalytics.slice(0, 15).map((p, i) => `
-            <tr>
-              <td style="color:var(--text-muted);font-size:.78rem;">${i+1}</td>
-              <td><code style="color:var(--orange);font-family:var(--mono);font-weight:700;">${p.param}</code></td>
-              <td><strong>${p.count} kez</strong></td>
-              <td><span class="badge badge-purple">${p.reportCount} rapor</span></td>
-              <td style="font-size:.75rem;color:var(--text-secondary);">${p.reports.slice(0,3).join(', ')}${p.reports.length > 3 ? '...' : ''}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>` : ''}
+ <!-- PARAMETRE ANALİTİĞİ -->
+ ${paramAnalytics.length > 0? `
+ <div class="dash-table-wrap">
+ <div class="dash-table-header">⚙️ SQL Parametre Kullanım Analitiği (Top ${Math.min(15, paramAnalytics.length)}) <span style="font-size:.72rem;color:var(--text-muted);font-weight:400;">— Hangi parametrenin kaç raporda geçtiğini görün</span></div>
+ <table class="dash-tbl">
+ <thead><tr><th>#</th><th>Parametre Adı</th><th>Kullanım Sayısı</th><th>Bağımlı Rapor Sayısı</th><th>Örnek Raporlar</th></tr></thead>
+ <tbody>
+ ${paramAnalytics.slice(0, 15).map((p, i) => `
+ <tr>
+ <td style="color:var(--text-muted);font-size:.78rem;">${i+1}</td>
+ <td><code style="color:var(--orange);font-family:var(--mono);font-weight:700;">${p.param}</code></td>
+ <td><strong>${p.count} kez</strong></td>
+ <td><span class="badge badge-purple">${p.reportCount} rapor</span></td>
+ <td style="font-size:.75rem;color:var(--text-secondary);">${p.reports.slice(0,3).join(', ')}${p.reports.length > 3? '...': ''}</td>
+ </tr>
+ `).join('')}
+ </tbody>
+ </table>
+ </div>`: ''}
 
-    <!-- EN ÇOK KULLANILAN TABLOLAR -->
-    ${topTables.length > 0 ? `
-    <div class="dash-table-wrap">
-      <div class="dash-table-header">🗃️ En Çok Kullanılan Veritabanı Tabloları (Top ${topTables.length}) <span style="font-size:.72rem;color:var(--text-muted);font-weight:400;">— Filtrelemek için tabloya tıklayın</span></div>
-      <table class="dash-tbl">
-        <thead><tr><th>#</th><th>Tablo Adı</th><th>Kullanım</th><th>Oran</th></tr></thead>
-        <tbody>
-          ${topTables.map(([name, count], i) => `
-            <tr style="cursor:pointer;" onclick="filterByTable('${name}')" title="${name} tablosunu index.html'de filtrele">
-              <td style="color:var(--text-muted);font-size:.78rem;">${i+1}</td>
-              <td>🗄️ <strong>${name}</strong></td>
-              <td>${count} sorgu</td>
-              <td>
-                <div class="pbar-wrap">
-                  <div class="pbar"><div class="pbar-fill" style="width:${Math.round(count/topTables[0][1]*100)}%;background:${CHART_COLORS[i%CHART_COLORS.length]};"></div></div>
-                  <span style="font-size:.75rem;color:var(--text-muted);">${Math.round(count/topTables[0][1]*100)}%</span>
-                </div>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>` : ''}
+ <!-- EN ÇOK KULLANILAN TABLOLAR -->
+ ${topTables.length > 0? `
+ <div class="dash-table-wrap">
+ <div class="dash-table-header">️ En Çok Kullanılan Veritabanı Tabloları (Top ${topTables.length}) <span style="font-size:.72rem;color:var(--text-muted);font-weight:400;">— Filtrelemek için tabloya tıklayın</span></div>
+ <table class="dash-tbl">
+ <thead><tr><th>#</th><th>Tablo Adı</th><th>Kullanım</th><th>Oran</th></tr></thead>
+ <tbody>
+ ${topTables.map(([name, count], i) => `
+ <tr style="cursor:pointer;" onclick="filterByTable('${name}')" title="${name} tablosunu index.html'de filtrele">
+ <td style="color:var(--text-muted);font-size:.78rem;">${i+1}</td>
+ <td>️ <strong>${name}</strong></td>
+ <td>${count} sorgu</td>
+ <td>
+ <div class="pbar-wrap">
+ <div class="pbar"><div class="pbar-fill" style="width:${Math.round(count/topTables[0][1]*100)}%;background:${CHART_COLORS[i%CHART_COLORS.length]};"></div></div>
+ <span style="font-size:.75rem;color:var(--text-muted);">${Math.round(count/topTables[0][1]*100)}%</span>
+ </div>
+ </td>
+ </tr>
+ `).join('')}
+ </tbody>
+ </table>
+ </div>`: ''}
 
-    <!-- EN ÇOK SQL SORGUSU İÇEREN RAPORLAR -->
-    ${topSqlReports.length > 0 ? `
-    <div class="dash-table-wrap">
-      <div class="dash-table-header">🗄️ En Çok SQL Sorgusu İçeren Raporlar</div>
-      <table class="dash-tbl">
-        <thead><tr><th>#</th><th>Rapor Adı</th><th>SQL Adedi</th><th>Aksiyon</th></tr></thead>
-        <tbody>
-          ${topSqlReports.map((item, i) => `
-            <tr>
-              <td style="color:var(--text-muted);font-size:.78rem;">${i+1}</td>
-              <td style="font-weight:700;color:var(--text-primary);">${esc(item.name)}</td>
-              <td><span class="badge badge-blue">${item.sqlCount} Sorgu</span></td>
-              <td><a href="detail.html?id=${item.id}" class="btn btn-sm" style="text-decoration:none;">Detay</a></td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>` : ''}
-  `;
+ <!-- EN ÇOK SQL SORGUSU İÇEREN RAPORLAR -->
+ ${topSqlReports.length > 0? `
+ <div class="dash-table-wrap">
+ <div class="dash-table-header">️ En Çok SQL Sorgusu İçeren Raporlar</div>
+ <table class="dash-tbl">
+ <thead><tr><th>#</th><th>Rapor Adı</th><th>SQL Adedi</th><th>Aksiyon</th></tr></thead>
+ <tbody>
+ ${topSqlReports.map((item, i) => `
+ <tr>
+ <td style="color:var(--text-muted);font-size:.78rem;">${i+1}</td>
+ <td style="font-weight:700;color:var(--text-primary);">${esc(item.name)}</td>
+ <td><span class="badge badge-blue">${item.sqlCount} Sorgu</span></td>
+ <td><a href="detail.html?id=${item.id}" class="btn btn-sm" style="text-decoration:none;">Detay</a></td>
+ </tr>
+ `).join('')}
+ </tbody>
+ </table>
+ </div>`: ''}
+ `;
 
-  // — Canvas Grafikleri —
-  drawTrendChart(document.getElementById('trendChart'), monthLabels, monthData);
+ // — Canvas Grafikleri —
+ drawTrendChart(document.getElementById('trendChart'), monthLabels, monthData);
 }
 
 // Bar chart — aylık trend
 function drawTrendChart(canvas, labels, data) {
-  if (!canvas) return;
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  const W = canvas.offsetWidth || 400;
-  canvas.width = W; canvas.height = 220;
-  const ctx = canvas.getContext('2d');
-  const PAD = { top: 20, right: 20, bottom: 45, left: 35 };
-  const cW = W - PAD.left - PAD.right;
-  const cH = 220 - PAD.top - PAD.bottom;
-  const maxVal = Math.max(...data, 1);
-  const GRID = isDark ? '#334155' : '#e2e8f0';
-  const TEXT = isDark ? '#94a3b8' : '#6b7280';
-  const ACCENT = '#3b82f6';
+ if (!canvas) return;
+ const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+ const W = canvas.offsetWidth || 400;
+ canvas.width = W; canvas.height = 220;
+ const ctx = canvas.getContext('2d');
+ const PAD = { top: 20, right: 20, bottom: 45, left: 35 };
+ const cW = W - PAD.left - PAD.right;
+ const cH = 220 - PAD.top - PAD.bottom;
+ const maxVal = Math.max(...data, 1);
+ const GRID = isDark? '#334155': '#e2e8f0';
+ const TEXT = isDark? '#94a3b8': '#6b7280';
+ const ACCENT = '#3b82f6';
 
-  ctx.clearRect(0, 0, W, 220);
+ ctx.clearRect(0, 0, W, 220);
 
-  // Grid lines
-  for (let i = 0; i <= 4; i++) {
-    const y = PAD.top + cH - (i / 4) * cH;
-    ctx.strokeStyle = GRID; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cW, y); ctx.stroke();
-    ctx.fillStyle = TEXT; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
-    ctx.fillText(Math.round(maxVal * i / 4), PAD.left - 5, y + 3);
-  }
+ // Grid lines
+ for (let i = 0; i <= 4; i++) {
+ const y = PAD.top + cH - (i / 4) * cH;
+ ctx.strokeStyle = GRID; ctx.lineWidth = 1;
+ ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + cW, y); ctx.stroke();
+ ctx.fillStyle = TEXT; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+ ctx.fillText(Math.round(maxVal * i / 4), PAD.left - 5, y + 3);
+ }
 
-  // Bars
-  const barW = cW / labels.length * 0.6;
-  const gap   = cW / labels.length;
-  data.forEach((val, i) => {
-    const x = PAD.left + i * gap + gap * 0.2;
-    const h = (val / maxVal) * cH;
-    const y = PAD.top + cH - h;
-    // Gradient
-    const grad = ctx.createLinearGradient(x, y, x, PAD.top + cH);
-    grad.addColorStop(0, ACCENT);
-    grad.addColorStop(1, ACCENT + '44');
-    ctx.fillStyle = grad;
-    // Rounded rect top
-    const r = Math.min(4, barW/2, h/2);
-    if (h > 0) {
-      ctx.beginPath();
-      ctx.moveTo(x + r, y);
-      ctx.lineTo(x + barW - r, y);
-      ctx.arc(x + barW - r, y + r, r, -Math.PI/2, 0);
-      ctx.lineTo(x + barW, PAD.top + cH);
-      ctx.lineTo(x, PAD.top + cH);
-      ctx.arc(x + r, y + r, r, Math.PI, -Math.PI/2);
-      ctx.fill();
-    }
-    // Label
-    ctx.fillStyle = TEXT; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText(labels[i], x + barW/2, PAD.top + cH + 14);
-    if (val > 0) {
-      ctx.fillStyle = isDark ? '#e2e8f0' : '#374151';
-      ctx.font = 'bold 9px sans-serif';
-      ctx.fillText(val, x + barW/2, y - 4);
-    }
-  });
+ // Bars
+ const barW = cW / labels.length * 0.6;
+ const gap = cW / labels.length;
+ data.forEach((val, i) => {
+ const x = PAD.left + i * gap + gap * 0.2;
+ const h = (val / maxVal) * cH;
+ const y = PAD.top + cH - h;
+ // Gradient
+ const grad = ctx.createLinearGradient(x, y, x, PAD.top + cH);
+ grad.addColorStop(0, ACCENT);
+ grad.addColorStop(1, ACCENT + '44');
+ ctx.fillStyle = grad;
+ // Rounded rect top
+ const r = Math.min(4, barW/2, h/2);
+ if (h > 0) {
+ ctx.beginPath();
+ ctx.moveTo(x + r, y);
+ ctx.lineTo(x + barW - r, y);
+ ctx.arc(x + barW - r, y + r, r, -Math.PI/2, 0);
+ ctx.lineTo(x + barW, PAD.top + cH);
+ ctx.lineTo(x, PAD.top + cH);
+ ctx.arc(x + r, y + r, r, Math.PI, -Math.PI/2);
+ ctx.fill();
+ }
+ // Label
+ ctx.fillStyle = TEXT; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
+ ctx.fillText(labels[i], x + barW/2, PAD.top + cH + 14);
+ if (val > 0) {
+ ctx.fillStyle = isDark? '#e2e8f0': '#374151';
+ ctx.font = 'bold 9px sans-serif';
+ ctx.fillText(val, x + barW/2, y - 4);
+ }
+ });
 }
 
 
 // Tabloya tıklayınca index.html'e SQL filtresiyle git
 function filterByTable(tableName) {
-  window.location.href = 'index.html?filter_sql=' + encodeURIComponent(tableName);
+ window.location.href = 'index.html?filter_sql=' + encodeURIComponent(tableName);
 }
 window.filterByTable = filterByTable;
 
 // Init
 async function initDashboard() {
-  const wrap = document.getElementById('dashWrap');
-  if (window.FrpStoreReady) {
-    if (wrap) {
-      wrap.innerHTML = `
-        <div style="text-align:center;padding:5rem;color:var(--text-muted);">
-          <div style="font-size:3rem;margin-bottom:1rem;animation:pulse 1.5s infinite;">⏳</div>
-          <div style="font-size:1.1rem;font-weight:700;color:var(--text-primary);">Rapor Veritabanı Yükleniyor...</div>
-          <div style="font-size:.85rem;margin-top:.4rem;">IndexedDB ve önbellek analizi yapılıyor</div>
-        </div>`;
-    }
-    await window.FrpStoreReady;
-  }
-  renderDashboard();
+ const wrap = document.getElementById('dashWrap');
+ if (window.FrpStoreReady) {
+ if (wrap) {
+ wrap.innerHTML = `
+ <div style="text-align:center;padding:5rem;color:var(--text-muted);">
+ <div style="font-size:3rem;margin-bottom:1rem;animation:pulse 1.5s infinite;">⏳</div>
+ <div style="font-size:1.1rem;font-weight:700;color:var(--text-primary);">Rapor Veritabanı Yükleniyor...</div>
+ <div style="font-size:.85rem;margin-top:.4rem;">IndexedDB ve önbellek analizi yapılıyor</div>
+ </div>`;
+ }
+ await window.FrpStoreReady;
+ }
+ renderDashboard();
 }
 
 document.getElementById('btnRefresh')?.addEventListener('click', renderDashboard);
 
 // Tema değişince canvas grafikleri yenile
 const _themeObserver = new MutationObserver(() => {
-  const trendCanvas = document.getElementById('trendChart');
-  if (trendCanvas) {
-    setTimeout(renderDashboard, 100);
-  }
+ const trendCanvas = document.getElementById('trendChart');
+ if (trendCanvas) {
+ setTimeout(renderDashboard, 100);
+ }
 });
 _themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 

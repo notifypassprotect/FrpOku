@@ -170,9 +170,9 @@ async function exportFrpOrSqlWithVersion(tabId, queryIndex) {
   `;
 
   const confirmed = await showModal({
-    title: '📥 Rapor Versiyonu Güncelle & İndir',
+    title: 'Rapor Versiyonu Güncelle & İndir',
     body: bodyHtml,
-    confirmText: '💾 FRP Olarak İndir',
+    confirmText: 'FRP Olarak İndir',
     cancelText: 'Vazgeç',
     onOpen: (modalEl) => {
       const inp = modalEl.querySelector('#inputVersionNum');
@@ -218,7 +218,7 @@ async function exportFrpOrSqlWithVersion(tabId, queryIndex) {
     const pSub = document.getElementById('pageSubTitle');
     if (pSub) pSub.textContent = finalFrpName;
 
-    showToast(`'${finalFrpName}' indirildi ve güncellendi. 📦`, 'success');
+    showToast(`'${finalFrpName}' indirildi ve güncellendi.`, 'success');
   } catch (err) {
     showToast('İndirme hatası: ' + err.message, 'error');
   }
@@ -235,7 +235,7 @@ async function exportReportJson() {
 
   const ok = typeof showModal === 'function'
     ? await showModal({
-        title: '📄 Rapor JSON İndir',
+        title: 'Rapor JSON İndir',
         body: `<strong>${esc(reportTitle)}</strong> raporuna ait ham JSON verisini indirmek istediğinize emin misiniz?`,
         confirmText: 'Evet, İndir',
         cancelText: 'İptal'
@@ -259,7 +259,7 @@ async function exportReportJson() {
   a.href = url; a.download = fileName;
   document.body.appendChild(a); a.click();
   document.body.removeChild(a); URL.revokeObjectURL(url);
-  showToast(`'${fileName}' indirildi. 📥`, 'success');
+  showToast(`'${fileName}' indirildi.`, 'success');
 }
 
 async function exportHtmlDoc() {
@@ -268,7 +268,7 @@ async function exportHtmlDoc() {
 
   const ok = typeof showModal === 'function'
     ? await showModal({
-        title: '🌐 HTML Dokümantasyon Üret',
+        title: 'HTML Dokümantasyon Üret',
         body: `<strong>${esc(reportTitle)}</strong> raporunun tam teknik dokümantasyonunu HTML dosyası olarak indirmek istiyor musunuz?`,
         confirmText: 'Evet, Üret ve İndir',
         cancelText: 'İptal'
@@ -284,7 +284,7 @@ async function exportHtmlDoc() {
 
   const queriesHtml = queries.map((q, idx) => `
     <div class="card">
-      <h3>🗄️ Sorgu ${idx + 1}: ${esc(q.name)}</h3>
+      <h3>Sorgu ${idx + 1}: ${esc(q.name)}</h3>
       <pre class="code-block"><code>${esc(q.sql)}</code></pre>
     </div>
   `).join('');
@@ -324,15 +324,15 @@ async function exportHtmlDoc() {
 
     ${currentFile.userNote && currentFile.userNote.trim() ? `
     <div class="card" style="border-left:4px solid #3b82f6;background:rgba(59,130,246,0.06);">
-      <h2 style="color:#60a5fa;margin-top:0;">📝 Kullanıcı Notu</h2>
+      <h2 style="color:#60a5fa;margin-top:0;">Kullanıcı Notu</h2>
       <div style="font-size:0.92rem;color:#e2e8f0;white-space:pre-wrap;line-height:1.6;">${esc(currentFile.userNote.trim())}</div>
     </div>` : ''}
 
-    ${queries.length > 0 ? `<h2>🗄️ SQL Sorguları (${queries.length} Adet)</h2>${queriesHtml}` : ''}
+    ${queries.length > 0 ? `<h2>SQL Sorguları (${queries.length} Adet)</h2>${queriesHtml}` : ''}
 
     ${currentFile.pascalScript ? `
     <div class="card">
-      <h2>📜 PascalScript</h2>
+      <h2>PascalScript</h2>
       <pre class="code-block"><code>${esc(currentFile.pascalScript)}</code></pre>
     </div>` : ''}
   </div>
@@ -345,7 +345,7 @@ async function exportHtmlDoc() {
   a.href = url; a.download = fileName;
   document.body.appendChild(a); a.click();
   document.body.removeChild(a); URL.revokeObjectURL(url);
-  showToast(`'${fileName}' HTML dokümanı başarıyla üretildi. 🌐`, 'success');
+  showToast(`'${fileName}' HTML dokümanı başarıyla üretildi.`, 'success');
 }
 
 async function exportSqlQueryModal(queryIndex) {
@@ -372,7 +372,7 @@ async function exportSqlQueryModal(queryIndex) {
 
   const ok = typeof showModal === 'function'
     ? await showModal({
-        title: `📤 ${esc(q.name)} Sorgusunu İndir`,
+        title: `${esc(q.name)} Sorgusunu İndir`,
         body: body,
         confirmText: 'İndir',
         cancelText: 'İptal',
@@ -400,7 +400,7 @@ async function exportSqlQueryModal(queryIndex) {
       URL.revokeObjectURL(url);
     }, 150);
 
-    showToast(`'${fileName}' başarıyla indirildi. 📥`, 'success');
+    showToast(`'${fileName}' başarıyla indirildi.`, 'success');
   } catch (err) {
     showToast('İndirme hatası: ' + err.message, 'error');
   }
