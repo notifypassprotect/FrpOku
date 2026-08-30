@@ -4,17 +4,23 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
+const { createMailer } = require('./lib/mailer');
+const { createStagingAccessMiddleware } = require('./lib/staging_access');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
+const SUPABASE_SERVER_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || SUPABASE_ANON_KEY;
+const BROWSER_SUPABASE_ENABLED = ['1', 'true', 'yes', 'on'].includes(String(process.env.ENABLE_BROWSER_SUPABASE || '').toLowerCase());
 
 let supabase = null;
-if (SUPABASE_URL && SUPABASE_KEY) {
-  supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+if (SUPABASE_URL && SUPABASE_SERVER_KEY) {
+  supabase = createClient(SUPABASE_URL, SUPABASE_SERVER_KEY);
 }
+
+const mailer = createMailer();
 
 // ── Kullanıcı Veri Yönetimi & Yerel Yedekleme ─────────────────
 const usersJsonPath = path.join(__dirname, 'data', 'users.json');
@@ -95,15 +101,24 @@ function recordAuditLog({ userId = 'system', username = 'system', role = 'system
   }
 }
 
-// Varsayılan Admin Kullanıcısını Güvenceye Al
+// Staging/ilk kurulum admini yalnızca ortam değişkenlerinden oluşturulur.
 async function ensureAdminUser() {
-  const defaultAdmin = {
+  const bootstrapUsername = (process.env.BOOTSTRAP_ADMIN_USERNAME || '').trim().toLowerCase();
+  const bootstrapPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD || '';
+  const bootstrapEmail = (process.env.BOOTSTRAP_ADMIN_EMAIL || '').trim().toLowerCase();
+
+  if (!bootstrapUsername || !bootstrapPassword) return false;
+  if (bootstrapPassword.length < 12) {
+    throw new Error('BOOTSTRAP_ADMIN_PASSWORD en az 12 karakter olmalıdır.');
+  }
+
+  const bootstrapAdmin = {
     id: 'usr_admin_root',
-    username: 'admin',
-    password_hash: hashPassword('admin123'),
-    email: 'admin@frpoku.com',
+    username: bootstrapUsername,
+    password_hash: hashPassword(bootstrapPassword),
+    email: bootstrapEmail,
     full_name: 'Sistem Yöneticisi (Admin)',
-    phone: '05000000000',
+    phone: '',
     department: 'Bilgi İşlem ve Yönetim',
     role: 'admin',
     is_active: true,
@@ -121,8 +136,9 @@ async function ensureAdminUser() {
         .limit(1);
 
       if (!admins || admins.length === 0) {
-        console.log('Admin kullanıcısı bulunamadı, varsayılan admin oluşturuluyor...');
-        await supabase.from('app_users').upsert([defaultAdmin], { onConflict: 'username' });
+        console.log('Admin kullanıcısı bulunamadı, ortam değişkenlerinden bootstrap admin oluşturuluyor...');
+        const { error } = await supabase.from('app_users').upsert([bootstrapAdmin], { onConflict: 'username' });
+        if (error) throw error;
       }
     } catch (e) {
       console.warn('Supabase admin denetimi hatası:', e.message);
@@ -130,10 +146,11 @@ async function ensureAdminUser() {
   }
 
   const localUsers = getLocalUsers();
-  if (!localUsers.some(u => u.role === 'admin' || u.username === 'admin')) {
-    localUsers.unshift(defaultAdmin);
+  if (!localUsers.some(u => u.role === 'admin' || u.username === bootstrapUsername)) {
+    localUsers.unshift(bootstrapAdmin);
     saveLocalUsers(localUsers);
   }
+  return true;
 }
 
 // ── DENETİM GÜNLÜĞÜ (AUDIT LOGS) DEPOLAMA ────────────────────
@@ -212,7 +229,11 @@ function recordAuditLog({ userId, username, fullName, role, action, target, deta
 app.disable('x-powered-by');
 
 // ── GÜVENLİ OTURUM & HMAC TOKEN YÖNETİMİ ────────────────────
-const SESSION_SECRET = process.env.SESSION_SECRET || 'frpoku_sec_token_' + (process.env.SUPABASE_KEY ? crypto.createHash('sha256').update(process.env.SUPABASE_KEY).digest('hex') : 'default_local_secret_salt_2026');
+const isDeployedEnvironment = process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging';
+if (isDeployedEnvironment && !process.env.SESSION_SECRET) {
+  throw new Error('SESSION_SECRET production/staging ortamında zorunludur.');
+}
+const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(48).toString('hex');
 
 function signToken(payload) {
   const dataStr = Buffer.from(JSON.stringify(payload)).toString('base64url');
@@ -329,47 +350,10 @@ const adminRateLimiter = createRateLimiter({ windowMs: 60000, max: 60, message: 
 // ── ADMİN YETKİ DENETİMİ (RBAC Middleware) ────────────────────
 function requireAdmin(req, res, next) {
   const authHeader = req.headers['authorization'] || req.headers['x-admin-auth'];
-  const adminKey = req.headers['x-admin-key'] || req.body?.adminKey;
+  const raw = authHeader ? String(authHeader).replace(/^Bearer\s+/i, '').trim() : '';
+  const requestingUser = verifyToken(raw);
 
-  let requestingUser = null;
-
-  if (authHeader) {
-    const raw = String(authHeader).replace(/^Bearer\s+/i, '').trim();
-    // 1. Kriptografik İmzalı Token Doğrulaması (HMAC-SHA256)
-    const tokenPayload = verifyToken(raw);
-    if (tokenPayload && (tokenPayload.role === 'admin' || tokenPayload.username === 'admin')) {
-      requestingUser = tokenPayload;
-    }
-
-    // 2. Base64 JSON veya Düz JSON Kullanıcı Oturumu Doğrulaması
-    if (!requestingUser && raw) {
-      try {
-        let decodedStr = Buffer.from(raw, 'base64').toString('utf8');
-        if (!decodedStr.startsWith('{')) {
-          decodedStr = decodeURIComponent(escape(decodedStr));
-        }
-        const u = JSON.parse(decodedStr);
-        if (u && (u.role === 'admin' || u.username === 'admin')) {
-          requestingUser = u;
-        }
-      } catch (e) {
-        try {
-          const u = JSON.parse(raw);
-          if (u && (u.role === 'admin' || u.username === 'admin')) {
-            requestingUser = u;
-          }
-        } catch (e2) {}
-      }
-    }
-  }
-
-  // 3. Özel Sistem Admin Secret Anahtarı Doğrulaması
-  if (!requestingUser && (adminKey === 'admin123' || (process.env.ADMIN_SECRET && adminKey === process.env.ADMIN_SECRET))) {
-    requestingUser = { role: 'admin', username: 'admin' };
-  }
-
-  // Yetkisiz çağrıları 403 Forbidden ile engelle
-  if (!requestingUser) {
+  if (!requestingUser || requestingUser.role !== 'admin') {
     return res.status(403).json({
       success: false,
       reason: 'Yetkisiz Erişim (403 Forbidden): Bu yönetim işlemini gerçekleştirmek için geçerli Sistem Yöneticisi (Admin) oturumu gereklidir.'
@@ -382,13 +366,43 @@ function requireAdmin(req, res, next) {
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-app.use(express.static(path.join(__dirname)));
+app.use(createStagingAccessMiddleware());
+
+// Yalnızca tarayıcıya gerekli dosyaları yayınla; sunucu, test, migration ve
+// deployment dosyaları statik olarak erişilebilir değildir.
+app.use('/css', express.static(path.join(__dirname, 'css')));
+app.use('/js', express.static(path.join(__dirname, 'js')));
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+['index.html', 'detail.html', 'compare.html', 'dashboard.html'].forEach(page => {
+  app.get(`/${page}`, (req, res) => res.sendFile(path.join(__dirname, page)));
+});
+
+app.get('/api/health', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({
+    status: 'ok',
+    service: 'frpoku',
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get('/runtime-config.js', (req, res) => {
+  res.type('application/javascript');
+  res.setHeader('Cache-Control', 'no-store');
+  const publicConfig = {
+    supabaseUrl: SUPABASE_URL || '',
+    supabaseAnonKey: BROWSER_SUPABASE_ENABLED ? SUPABASE_ANON_KEY : '',
+    environment: process.env.NODE_ENV || 'development'
+  };
+  res.send(`window.FRP_RUNTIME_CONFIG = ${JSON.stringify(publicConfig)};`);
+});
 
 // Config endpoint for client-side Supabase connection
 app.get('/api/config', (req, res) => {
   res.json({
     supabaseUrl: SUPABASE_URL || '',
-    supabaseKey: SUPABASE_KEY || ''
+    supabaseAnonKey: BROWSER_SUPABASE_ENABLED ? SUPABASE_ANON_KEY : ''
   });
 });
 
@@ -408,8 +422,8 @@ app.post('/api/auth/register', authRateLimiter, async (req, res) => {
     return res.status(400).json({ success: false, reason: 'Lütfen geçerli bir e-posta formatı giriniz (Örn: ad.soyad@kurum.com).' });
   }
 
-  if (password.length < 3) {
-    return res.status(400).json({ success: false, reason: 'Şifreniz en az 3 karakter olmalıdır.' });
+  if (password.length < 10) {
+    return res.status(400).json({ success: false, reason: 'Şifreniz en az 10 karakter olmalıdır.' });
   }
 
   try {
@@ -679,30 +693,50 @@ app.post('/api/admin/approve-user', adminRateLimiter, requireAdmin, async (req, 
 
   try {
     const updates = { is_active: true };
+    let approvedUser = null;
 
-    // 1. Yerel kaydı mutlaka güncelle
+    // 1. Yerel kaydı bul; Supabase kaydı yoksa fallback olarak kullanılabilir.
     const localUsers = getLocalUsers();
     const idx = localUsers.findIndex(u => u.id === userId || u.username === userId);
     let targetUsername = userId;
     if (idx !== -1) {
+      approvedUser = { ...localUsers[idx] };
+      targetUsername = approvedUser.username || userId;
+    }
+
+    // 2. Supabase kaydını güncelle ve mail alıcısı için güvenli alanları geri al.
+    if (supabase) {
+      let updateResult = await supabase
+        .from('app_users')
+        .update(updates)
+        .eq('id', userId)
+        .select('id, username, email, full_name, role, is_active')
+        .limit(1);
+
+      if (!updateResult.error && (!updateResult.data || updateResult.data.length === 0) && targetUsername !== userId) {
+        updateResult = await supabase
+          .from('app_users')
+          .update(updates)
+          .eq('username', targetUsername)
+          .select('id, username, email, full_name, role, is_active')
+          .limit(1);
+      }
+
+      if (updateResult.error) throw new Error('Kullanıcı bulut veritabanında onaylanamadı.');
+      if (updateResult.data && updateResult.data[0]) approvedUser = updateResult.data[0];
+    }
+
+    if (!approvedUser) {
+      return res.status(404).json({ success: false, reason: 'Onaylanacak kullanıcı bulunamadı.' });
+    }
+
+    // 3. Yerel fallback kaydını bulut işlemi başarılı olduktan sonra güncelle.
+    if (idx !== -1) {
       localUsers[idx] = { ...localUsers[idx], ...updates };
-      targetUsername = localUsers[idx].username || userId;
       saveLocalUsers(localUsers);
     }
 
-    // 2. Supabase varsa güvenle güncelle
-    if (supabase) {
-      try {
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId);
-        if (isUuid) {
-          await supabase.from('app_users').update(updates).eq('id', userId);
-        } else {
-          await supabase.from('app_users').update(updates).eq('username', targetUsername);
-        }
-      } catch (sbErr) {
-        console.warn('Supabase approve-user warning:', sbErr.message);
-      }
-    }
+    targetUsername = approvedUser.username || targetUsername;
 
     recordAuditLog({
       action: 'USER_APPROVE',
@@ -712,14 +746,65 @@ app.post('/api/admin/approve-user', adminRateLimiter, requireAdmin, async (req, 
 
     console.log('Kullanıcı Başarıyla Onaylandı:', safeLogStr(targetUsername));
 
+    // Mail hatası hesap onayını geri almaz; durum ayrıca audit kaydına yazılır.
+    const mailResult = await mailer.sendAccountApproved({
+      to: approvedUser.email,
+      fullName: approvedUser.full_name,
+      username: approvedUser.username
+    });
+
+    recordAuditLog({
+      userId: approvedUser.id || userId,
+      username: targetUsername,
+      role: approvedUser.role || 'user',
+      action: mailResult.sent ? 'MAIL_ACCOUNT_APPROVED' : 'MAIL_ACCOUNT_APPROVED_SKIPPED',
+      target: approvedUser.email || '-',
+      details: `Hesap onay e-postası durumu: ${mailResult.status}`,
+      ip: req.ip
+    });
+
     res.json({
       success: true,
-      message: 'Kullanıcı hesabı başarıyla onaylandı ve aktifleştirildi.'
+      message: 'Kullanıcı hesabı başarıyla onaylandı ve aktifleştirildi.',
+      notification: {
+        email: {
+          sent: mailResult.sent,
+          status: mailResult.status
+        }
+      }
     });
   } catch (err) {
     console.error('Onaylama hatası:', safeLogStr(err.message));
     res.status(500).json({ success: false, reason: 'Kullanıcı onaylanamadı: ' + err.message });
   }
+});
+
+app.get('/api/admin/mail/status', adminRateLimiter, requireAdmin, (req, res) => {
+  res.json({ success: true, mail: mailer.getStatus() });
+});
+
+app.post('/api/admin/mail/test', adminRateLimiter, requireAdmin, async (req, res) => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  if (!EMAIL_REGEX.test(email)) {
+    return res.status(400).json({ success: false, reason: 'Geçerli bir test e-posta adresi gereklidir.' });
+  }
+
+  const result = await mailer.sendTestEmail({ to: email });
+  recordAuditLog({
+    userId: req.adminUser.id,
+    username: req.adminUser.username,
+    role: req.adminUser.role,
+    action: result.sent ? 'MAIL_TEST_SENT' : 'MAIL_TEST_FAILED',
+    target: email,
+    details: `SMTP test e-postası durumu: ${result.status}`,
+    ip: req.ip
+  });
+
+  res.status(result.sent ? 200 : 503).json({
+    success: result.sent,
+    mail: { sent: result.sent, status: result.status },
+    reason: result.sent ? undefined : 'Test e-postası gönderilemedi. Mail yapılandırmasını kontrol edin.'
+  });
 });
 
 // ── 6. ADMİN: KULLANICIYI REDDET VEYA SİL ────────────────────
@@ -863,8 +948,8 @@ app.post('/api/admin/toggle-admin', adminRateLimiter, requireAdmin, async (req, 
 // ── 9. ADMİN: DOĞRUDAN ŞİFRE SIFIRLAMA ────────────────────────
 app.post('/api/admin/reset-password', adminRateLimiter, requireAdmin, async (req, res) => {
   const { userId, newPassword } = req.body;
-  if (!userId || !newPassword || newPassword.length < 3) {
-    return res.status(400).json({ success: false, reason: 'Lütfen en az 3 karakterden oluşan geçerli bir yeni şifre giriniz.' });
+  if (!userId || !newPassword || newPassword.length < 10) {
+    return res.status(400).json({ success: false, reason: 'Lütfen en az 10 karakterden oluşan geçerli bir yeni şifre giriniz.' });
   }
 
   try {
@@ -889,8 +974,8 @@ app.post('/api/admin/reset-user-password', adminRateLimiter, requireAdmin, (req,
   if (handler) {
     // call the same reset-password logic
     const { userId, newPassword } = req.body;
-    if (!userId || !newPassword || newPassword.length < 3) {
-      return res.status(400).json({ success: false, reason: 'Lütfen en az 3 karakterden oluşan geçerli bir yeni şifre giriniz.' });
+    if (!userId || !newPassword || newPassword.length < 10) {
+      return res.status(400).json({ success: false, reason: 'Lütfen en az 10 karakterden oluşan geçerli bir yeni şifre giriniz.' });
     }
     try {
       const passwordHash = hashPassword(newPassword);
@@ -953,8 +1038,8 @@ app.post('/api/auth/change-password', async (req, res) => {
     return res.status(400).json({ success: false, reason: 'Lütfen mevcut ve yeni şifrenizi giriniz.' });
   }
 
-  if (newPassword.length < 3) {
-    return res.status(400).json({ success: false, reason: 'Yeni şifre en az 3 karakter olmalıdır.' });
+  if (newPassword.length < 10) {
+    return res.status(400).json({ success: false, reason: 'Yeni şifre en az 10 karakter olmalıdır.' });
   }
 
   try {
@@ -1035,15 +1120,11 @@ app.post('/api/auth/verify-password', async (req, res) => {
       user = localUsers.find(u => u.id === userId || u.username === userId);
     }
     if (!user) {
-      // Default admin fallback
-      if (password === 'admin123' || password === 'admin') {
-        return res.json({ success: true, verified: true });
-      }
       return res.status(404).json({ success: false, verified: false, reason: 'Kullanıcı bulunamadı.' });
     }
 
     const pHash = hashPassword(password);
-    const verified = (user.password_hash === pHash || user.password_hash === password || (user.username === 'admin' && password === 'admin123'));
+    const verified = user.password_hash === pHash;
     res.json({ success: true, verified });
   } catch (err) {
     res.status(500).json({ success: false, verified: false, reason: err.message });
@@ -1529,6 +1610,14 @@ app.post('/api/reports/bulk-toggle-pool', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`FrpOku Supabase Bulut Sunucusu http://localhost:${PORT} üzerinde çalışıyor.`);
+async function startServer() {
+  await ensureAdminUser();
+  app.listen(PORT, () => {
+    console.log(`FrpOku Supabase Bulut Sunucusu http://localhost:${PORT} üzerinde çalışıyor.`);
+  });
+}
+
+startServer().catch(error => {
+  console.error('Sunucu başlatılamadı:', safeLogStr(error.message));
+  process.exit(1);
 });

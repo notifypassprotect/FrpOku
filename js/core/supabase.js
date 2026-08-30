@@ -6,15 +6,17 @@
 (function () {
   'use strict';
 
+  const runtimeConfig = window.FRP_RUNTIME_CONFIG || {};
   const SUPABASE_CONFIG = {
-    url: 'https://wxlmbpognkjlwyksmosd.supabase.co',
-    key: 'sb_publishable_ASaLwO7-3T7nRqneM0GW6g_8cgCNzQJ'
+    url: runtimeConfig.supabaseUrl || '',
+    key: runtimeConfig.supabaseAnonKey || ''
   };
 
   let client = null;
 
   function getClient() {
     if (client) return client;
+    if (!SUPABASE_CONFIG.url || !SUPABASE_CONFIG.key) return null;
     if (window.supabase && typeof window.supabase.createClient === 'function') {
       try {
         client = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.key);

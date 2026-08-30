@@ -5,11 +5,8 @@
 (function () {
  'use strict';
 
- const SUPABASE_REST_URL = 'https://wxlmbpognkjlwyksmosd.supabase.co';
- const SUPABASE_ANON_KEY = 'sb_publishable_ASaLwO7-3T7nRqneM0GW6g_8cgCNzQJ';
-
  function escHtml(str) {
- return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+ return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
  }
 
  function formatRelativeTime(isoDate) {
@@ -109,6 +106,9 @@
  <span> Tüm Kullanıcılar</span>
  <span id="adminAllTabBadge" class="badge badge-blue" style="font-size:.72rem;padding:.15rem.45rem;">...</span>
  </button>
+ <button type="button" id="tabAdminMail" class="admin-tab-btn ${initialTab === 'mail'? 'active': ''}">
+ <span> E-posta Altyapısı</span>
+ </button>
  </div>
 
  <!-- İçerik Alanı -->
@@ -129,18 +129,91 @@
 
  const tabPending = overlay.querySelector('#tabAdminPending');
  const tabAll = overlay.querySelector('#tabAdminAll');
+ const tabMail = overlay.querySelector('#tabAdminMail');
+
+ const activateTab = activeTab => {
+ [tabPending, tabAll, tabMail].forEach(tab => tab.classList.toggle('active', tab === activeTab));
+ };
 
  tabPending.onclick = () => {
- tabPending.classList.add('active');
- tabAll.classList.remove('active');
+ activateTab(tabPending);
  renderPendingTab();
  };
 
  tabAll.onclick = () => {
- tabAll.classList.add('active');
- tabPending.classList.remove('active');
+ activateTab(tabAll);
  renderAllUsersTab();
  };
+
+ tabMail.onclick = () => {
+ activateTab(tabMail);
+ renderMailTab();
+ };
+
+ // ── Sekme 3: E-posta altyapısı ──
+ async function renderMailTab() {
+ const body = overlay.querySelector('#adminModalBody');
+ body.innerHTML = `<div style="text-align:center;padding:2.5rem;color:var(--text-muted,#64748b);"><div class="splash-spinner" style="margin-bottom:1rem;"></div><div>SMTP durumu kontrol ediliyor...</div></div>`;
+
+ try {
+ const headers = (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function')? window.FrpAuth.getAuthHeaders(): {};
+ const response = await fetch('/api/admin/mail/status', { headers });
+ const data = await response.json();
+ if (!response.ok || !data.success) throw new Error(data.reason || 'Mail durumu alınamadı.');
+
+ const mail = data.mail || {};
+ const ready = mail.enabled && mail.configured;
+ body.innerHTML = `
+ <div style="max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:1rem;">
+ <div style="padding:1.1rem;border:1px solid var(--border,#cbd5e1);border-radius:14px;background:var(--bg-surface,#fff);">
+ <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+ <div><div style="font-size:1rem;font-weight:900;">SMTP Gönderim Durumu</div><div style="font-size:.78rem;color:var(--text-muted,#64748b);margin-top:.25rem;">Google App Password daha sonra Render secret alanlarına eklenecek.</div></div>
+ <span class="badge ${ready? 'badge-green': 'badge-amber'}">${ready? 'Hazır': mail.enabled? 'Eksik Yapılandırma': 'Kapalı'}</span>
+ </div>
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.75rem;margin-top:1rem;font-size:.8rem;">
+ <div><strong>Sunucu</strong><br>${escHtml(mail.provider || 'Tanımlanmadı')}</div>
+ <div><strong>Gönderen</strong><br>${escHtml(mail.from || 'Tanımlanmadı')}</div>
+ <div><strong>Mail Enabled</strong><br>${mail.enabled? 'Evet': 'Hayır'}</div>
+ </div>
+ </div>
+ <div style="padding:1.1rem;border:1px solid var(--border,#cbd5e1);border-radius:14px;background:var(--bg-surface,#fff);">
+ <div style="font-size:.95rem;font-weight:900;margin-bottom:.3rem;">Test E-postası</div>
+ <div style="font-size:.78rem;color:var(--text-muted,#64748b);margin-bottom:.9rem;">SMTP etkinleştirildikten sonra bu alandan gerçek gönderim testi yapılabilir.</div>
+ <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+ <input type="email" id="adminMailTestAddress" class="master-search-input" placeholder="ornek@gmail.com" style="flex:1;min-width:220px;" />
+ <button type="button" id="btnAdminMailTest" class="btn btn-primary" ${ready? '': 'disabled'}>Test Maili Gönder</button>
+ </div>
+ <div id="adminMailTestResult" style="font-size:.78rem;margin-top:.7rem;color:var(--text-muted,#64748b);"></div>
+ </div>
+ </div>`;
+
+ body.querySelector('#btnAdminMailTest')?.addEventListener('click', async event => {
+ const email = (body.querySelector('#adminMailTestAddress')?.value || '').trim();
+ const resultEl = body.querySelector('#adminMailTestResult');
+ if (!email || !email.includes('@')) {
+ resultEl.textContent = 'Geçerli bir e-posta adresi girin.';
+ return;
+ }
+ event.currentTarget.disabled = true;
+ resultEl.textContent = 'Test e-postası gönderiliyor...';
+ try {
+ const testResponse = await fetch('/api/admin/mail/test', {
+ method: 'POST',
+ headers: (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function')? window.FrpAuth.getAuthHeaders(): { 'Content-Type': 'application/json' },
+ body: JSON.stringify({ email })
+ });
+ const testData = await testResponse.json();
+ resultEl.textContent = testData.success? 'Test e-postası başarıyla gönderildi.': (testData.reason || 'E-posta gönderilemedi.');
+ } catch (error) {
+ resultEl.textContent = 'Mail servisine ulaşılamadı.';
+ } finally {
+ event.currentTarget.disabled = false;
+ }
+ });
+ } catch (error) {
+ body.innerHTML = `<div style="padding:2rem;text-align:center;color:#ef4444;font-weight:700;">${escHtml(error.message)}</div>`;
+ }
+ }
 
  // ── Sekme 1: Onay Bekleyenler ──
  async function renderPendingTab() {
@@ -158,14 +231,7 @@
  const res = await fetch('/api/admin/pending-users', { headers });
  const data = await res.json();
  if (data && data.success && Array.isArray(data.users)) pendingUsers = data.users;
- } catch (e) {
- try {
- const res = await fetch(`${SUPABASE_REST_URL}/rest/v1/app_users?is_active=eq.false&order=created_at.desc`, {
- headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
- });
- if (res.ok) pendingUsers = await res.json();
- } catch {}
- }
+ } catch (e) {}
 
  const badge = overlay.querySelector('#adminPendingTabBadge');
  if (badge) badge.textContent = pendingUsers.length;
@@ -248,7 +314,9 @@
  const data = await res.json();
  if (data.success) {
  if (card) card.remove();
- if (typeof window.toast === 'function') window.toast(`✅ "${uName}" kullanıcısı başarıyla onaylandı!`, 'success');
+ const emailStatus = data.notification?.email?.status;
+ const emailNote = emailStatus === 'sent' ? ' Onay e-postası gönderildi.' : emailStatus === 'disabled' || emailStatus === 'not_configured' ? ' E-posta bildirimi henüz yapılandırılmadı.' : ' E-posta gönderilemedi.';
+ if (typeof window.toast === 'function') window.toast(`✅ "${uName}" kullanıcısı başarıyla onaylandı!${emailNote}`, emailStatus === 'failed' ? 'warning' : 'success');
  renderPendingTab();
  } else {
  throw new Error(data.reason || 'Onaylanamadı');
@@ -440,6 +508,7 @@
  updateTabBadges();
 
  if (initialTab === 'all') renderAllUsersTab();
+ else if (initialTab === 'mail') renderMailTab();
  else renderPendingTab();
  }
 
