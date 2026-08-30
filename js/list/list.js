@@ -173,12 +173,21 @@ async function handleFiles(fileList) {
     const file = validFiles[i];
     try {
       const text = await readFileAsText(file);
-      if (!text || text.trim().length === 0) continue;
+      const validation = window.FrpSyntaxCheck?.validateFrpFileContent(file, text);
+      if (!validation || !validation.isValid) {
+        rejectedFiles.push({ name: file.name, reason: validation?.errors?.join(' ') || 'Geçersiz FRP içeriği.' });
+        continue;
+      }
       const parsed = typeof parseFrp === 'function' ? parseFrp(text) : { reportName: file.name, queries: [] };
       resultsToSave.push({ parsedData: parsed, fileName: file.name, fileSize: file.size });
     } catch (err) {
       console.warn('Dosya okuma hatası:', file.name, err);
     }
+  }
+
+  if (rejectedFiles.length > 0) {
+    const firstReason = rejectedFiles[0]?.reason || 'Geçersiz dosya.';
+    toast(`${rejectedFiles.length} dosya yüklenmedi: ${firstReason}`, 'warning');
   }
 
   if (resultsToSave.length > 0) {
@@ -884,19 +893,20 @@ function exportReportListExcel() {
     return;
   }
 
-  let csvContent = '\uFEFF"Rapor Adı";"Dosya Adı";"Boyut (Bayt)";"Kategori";"GUID";"Etiketler";"SQL Sayısı";"Yüklenme Tarihi"\n';
+  const csvEsc = value => window.FrpFileSafety ? window.FrpFileSafety.safeCsvCell(value) : `"${String(value ?? '').replace(/"/g, '""')}"`;
+  const rows = [['Rapor Adı', 'Dosya Adı', 'Boyut (Bayt)', 'Kategori', 'GUID', 'Etiketler', 'SQL Sayısı', 'Yüklenme Tarihi']];
   sorted.forEach(f => {
-    const rName = (f.meta?.reportName || f.name || '').replace(/"/g, '""');
-    const fName = (f.name || '').replace(/"/g, '""');
+    const rName = f.meta?.reportName || f.name || '';
+    const fName = f.name || '';
     const size = Number(f.sizeBytes || f.size) || 0;
-    const cat = (f.category || '').replace(/"/g, '""');
-    const guid = (f.meta?.guid || '').replace(/"/g, '""');
-    const tags = (f.tags || []).join(', ').replace(/"/g, '""');
+    const cat = f.category || '';
+    const guid = f.meta?.guid || '';
+    const tags = (f.tags || []).join(', ');
     const qCount = (f.queries || []).length;
     const date = new Date(f.loadedAt).toLocaleString('tr-TR');
-
-    csvContent += `"${rName}";"${fName}";"${size}";"${cat}";"${guid}";"${tags}";"${qCount}";"${date}"\n`;
+    rows.push([rName, fName, size, cat, guid, tags, qCount, date]);
   });
+  const csvContent = '\uFEFF' + rows.map(row => row.map(csvEsc).join(';')).join('\r\n');
 
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);

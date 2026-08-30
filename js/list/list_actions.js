@@ -500,7 +500,7 @@ async function downloadBulkReports() {
       let entered = (zipNameInp?.value || '').trim();
       if (entered) {
         if (!entered.toLowerCase().endsWith('.zip')) entered += '.zip';
-        customZipName = entered;
+        customZipName = window.FrpFileSafety ? window.FrpFileSafety.sanitizeZipSegment(entered, defaultZipName) : entered.replace(/[/\\?%*:|"<>]/g, '_');
       } else {
         customZipName = defaultZipName;
       }
@@ -523,9 +523,15 @@ async function downloadBulkReports() {
         if (versionBump > 0 && typeof FrpStore.bumpVersionFilename === 'function') {
           fName = FrpStore.bumpVersionFilename(fName, versionBump);
         }
-        if (useFolders) {
-          const cat = (file.category && file.category.trim()) ? file.category.trim().replace(/[/\\?%*:|"<>]/g, '_') : 'Kategorisiz';
-          fName = `${cat}/${fName}`;
+        if (window.FrpFileSafety) {
+          const segments = useFolders ? [file.category?.trim() || 'Kategorisiz', fName] : [fName];
+          fName = window.FrpFileSafety.safeZipPath(segments);
+        } else {
+          fName = fName.replace(/\.\.+|[/\\?%*:|"<>]/g, '_');
+          if (useFolders) {
+            const cat = (file.category && file.category.trim()) ? file.category.trim().replace(/\.\.+|[/\\?%*:|"<>]/g, '_') : 'Kategorisiz';
+            fName = `${cat}/${fName}`;
+          }
         }
         const xml = window.buildUpdatedFrpXml ? window.buildUpdatedFrpXml(file, null) : (file.rawXml || '');
         zip.addFile(fName, xml);

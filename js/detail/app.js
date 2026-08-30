@@ -1440,8 +1440,8 @@ async function init() {
  let file = FrpStore.getById(id);
 
  // Eğer LocalStorage boşsa veya rapor tekil bulunamadıysa IndexedDB yedeğinden çekmeyi dene
- if (!file && FrpStore.restoreFromIndexedDB) {
- const restored = await FrpStore.restoreFromIndexedDB();
+ if (!file && FrpStore.hydrateFromIndexedDB) {
+ const restored = await FrpStore.hydrateFromIndexedDB();
  if (restored && restored.length > 0) {
  file = FrpStore.getById(id);
  }
@@ -3287,4 +3287,3 @@ if (document.readyState === 'loading') {
  setupMobileDetailTabs();
  setupDownloadHistoryDetail();
 }
-

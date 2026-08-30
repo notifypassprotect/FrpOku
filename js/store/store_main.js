@@ -14,6 +14,7 @@
   const RECENT_KEY = 'frpoku_recent';
   const PREFS_KEY = 'frpoku_preferences';
   const PROFILE_KEY = 'frpoku_user_profile';
+  const TRASH_KEY = 'frpoku_trash';
 
   const DB_NAME = 'FrpOkuDB';
   const DB_STORE = 'files';
@@ -82,6 +83,14 @@
     } catch {
       return [];
     }
+  }
+
+  async function hydrateFromIndexedDB() {
+    const restored = await restoreFromIndexedDB();
+    if (!Array.isArray(restored)) return [];
+    _memoryStore = restored;
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(restored)); } catch {}
+    return restored;
   }
 
   // ── 2. Bellek ve Yerel Okuma/Yazma ───────────────────────────
@@ -163,8 +172,7 @@
         try {
           const trashCloud = await window.FrpCloud.loadTrashReports();
           if (Array.isArray(trashCloud)) {
-            _trashStore = trashCloud;
-            syncTrashToIndexedDB(_trashStore);
+            _writeTrash(trashCloud);
           }
         } catch (e) {}
       }
@@ -183,6 +191,11 @@
             if (Array.isArray(cloudSnippets) && cloudSnippets.length > 0) {
               localStorage.setItem(SNIPPET_KEY, JSON.stringify(cloudSnippets));
             }
+          }
+          if (typeof window.FrpCloud.loadSettings === 'function') {
+            const cloudSettings = await window.FrpCloud.loadSettings();
+            const cloudTags = cloudSettings?.custom_tags ?? cloudSettings?.customTags;
+            if (Array.isArray(cloudTags)) localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(cloudTags));
           }
         } catch (e) {}
       }
@@ -375,8 +388,6 @@
   }
 
   // ── 5. Çöp Kutusu (Soft Delete) Metotları ─────────────────────
-  const TRASH_KEY = 'frpoku_trash';
-
   function _readTrash() {
     if (_trashStore && _trashStore.length > 0) return _trashStore;
     try {
@@ -1361,7 +1372,7 @@
 
   function exportAllSqlsCsv() {
     const files = _read();
-    const csvEsc = s => '"' + String(s || '').replace(/"/g, '""') + '"';
+    const csvEsc = s => window.FrpFileSafety ? window.FrpFileSafety.safeCsvCell(s) : '"' + String(s || '').replace(/"/g, '""') + '"';
     const rows = [['Rapor Adı', 'Dosya Adı', 'Sorgu Adı', 'Satır Sayısı', 'Parametre Sayısı', 'SQL Metni']];
     files.forEach(file => {
       const reportName = file.meta?.reportName || file.name;
@@ -1459,21 +1470,30 @@
     try {
       const data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
       let importedCount = 0;
+      const imported = { reports: 0, categories: 0, customTags: 0, snippets: 0, preferences: 0, trash: 0 };
 
       // Format 1: Tam Yedek Paketi
       if (data && typeof data === 'object' && !Array.isArray(data) && Array.isArray(data.reports || data.files)) {
         const reportList = data.reports || data.files || [];
         if (data.categories && Array.isArray(data.categories)) {
           try { localStorage.setItem(CATEGORIES_KEY, JSON.stringify(data.categories)); } catch (e) {}
+          imported.categories = data.categories.length;
         }
         if (data.customTags && Array.isArray(data.customTags)) {
           try { localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(data.customTags)); } catch (e) {}
+          imported.customTags = data.customTags.length;
         }
         if (data.snippets && Array.isArray(data.snippets)) {
-          try { localStorage.setItem(SNIPPETS_KEY, JSON.stringify(data.snippets)); } catch (e) {}
+          try { localStorage.setItem(SNIPPET_KEY, JSON.stringify(data.snippets)); } catch (e) {}
+          imported.snippets = data.snippets.length;
         }
         if (data.preferences) {
           setPreferences(data.preferences);
+          imported.preferences = 1;
+        }
+        if (Array.isArray(data.trash)) {
+          _writeTrash(data.trash);
+          imported.trash = data.trash.length;
         }
         const existing = _read();
         const existingIds = new Set(existing.map(f => f.id));
@@ -1481,6 +1501,7 @@
         const combined = [...existing, ...newReports];
         _write(combined);
         importedCount = newReports.length;
+        imported.reports = importedCount;
       }
       // Format 2: Doğrudan Rapor Listesi Dizisi
       else if (Array.isArray(data)) {
@@ -1489,11 +1510,12 @@
         const newReports = data.filter(r => r && r.id && !existingIds.has(r.id));
         const combined = [...existing, ...newReports];
         _write(combined);
-        importedCount = newReports.length || data.length;
+        importedCount = newReports.length;
+        imported.reports = importedCount;
       }
 
       _audit('BACKUP_IMPORT', 'Yedek İçe Aktarma', `${importedCount} adet rapor sisteme aktarıldı.`);
-      return { success: true, count: importedCount };
+      return { success: true, count: importedCount, imported };
     } catch (e) {
       console.error('Backup import error:', e);
       return { success: false, reason: e.message };
@@ -1510,7 +1532,7 @@
   // ── Public Store API (Köprü ve Delegasyon) ─────────────────────
   const FrpStore = {
     getAll, getById, add, addMany, deleteOne, deleteMany, deleteAll,
-    updateNote, updateMeta, updateCode, updateFileName, restoreFromIndexedDB,
+    updateNote, updateMeta, updateCode, updateFileName, restoreFromIndexedDB, hydrateFromIndexedDB,
     exportBackup, importBackup,
     toggleFavorite, togglePin, setFavoriteMany, toggleFavoriteMany, addTag, removeTag, getAllTags, getCustomTags, addCustomTag, deleteCustomTag,
     setCategory, getCategories, getCategoryObjects, addCategory, updateCategory, deleteCategory,

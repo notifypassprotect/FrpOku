@@ -609,10 +609,20 @@
 
     // ── 10. KULLANICI AYARLARI (Settings Sync) ─────────────────────
     async loadSettings() {
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest('/api/settings');
+          return data?.settings || null;
+        } catch {
+          return null;
+        }
+      }
       const sb = getClient();
       if (!sb) return null;
       try {
-        const { data, error } = await sb.from('user_settings').select('*').eq('id', 'default_user').single();
+        const user = window.FrpAuth?.getUser();
+        if (!user?.id) return null;
+        const { data, error } = await sb.from('user_settings').select('*').eq('id', String(user.id)).single();
         if (error || !data) return null;
         return data;
       } catch {
@@ -621,19 +631,29 @@
     },
 
     async saveSettings(settings) {
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest('/api/settings', { method: 'PATCH', body: JSON.stringify(settings) });
+          return Boolean(data?.success);
+        } catch {
+          return false;
+        }
+      }
       const sb = getClient();
       if (!sb || !settings) return false;
       try {
+        const user = window.FrpAuth?.getUser();
+        if (!user?.id) return false;
         const row = {
-          id: 'default_user',
+          id: String(user.id),
           theme: settings.theme || 'light',
           preferences: settings.preferences || {},
           recent_reports: settings.recent_reports || [],
-          custom_tags: settings.custom_tags || [],
+          custom_tags: settings.custom_tags ?? settings.customTags ?? [],
           updated_at: new Date().toISOString()
         };
-        await sb.from('user_settings').upsert(row, { onConflict: 'id' });
-        return true;
+        const { error } = await sb.from('user_settings').upsert(row, { onConflict: 'id' });
+        return !error;
       } catch {
         return false;
       }

@@ -250,6 +250,15 @@ function safeLogStr(str) {
   return str.replace(/[\r\n\x00-\x1f\x7f]/g, '').slice(0, 150);
 }
 
+function boundedSetting(value, maxLength, fallback = '') {
+  const text = String(value ?? fallback).trim();
+  return text.slice(0, maxLength) || fallback;
+}
+
+function plainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
 // ── PENTESTING & GÜVENLİK HEADERLARI (Security Hardening & Mozilla Observatory A+) ─────
 app.use((req, res, next) => {
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
@@ -1176,6 +1185,43 @@ app.get('/api/store/trash', requireAuth, async (req, res) => {
   } catch (error) {
     console.warn('Çöp kutusu yüklenemedi:', safeLogStr(error.message));
     res.status(503).json({ success: false, reason: 'Çöp kutusu geçici olarak yüklenemiyor.' });
+  }
+});
+
+app.get('/api/settings', requireAuth, async (req, res) => {
+  if (!supabase) return res.json({ success: true, settings: null });
+  try {
+    const { data, error } = await supabase.from('user_settings').select('*').eq('id', String(req.authUser.id)).limit(1);
+    if (error) throw error;
+    const settings = data && data[0] ? data[0] : null;
+    res.json({ success: true, settings: settings ? { ...settings, customTags: settings.custom_tags || [] } : null });
+  } catch (error) {
+    console.warn('Kullanıcı ayarları yüklenemedi:', safeLogStr(error.message));
+    res.status(503).json({ success: false, reason: 'Kullanıcı ayarları yüklenemedi.' });
+  }
+});
+
+app.patch('/api/settings', apiWriteRateLimiter, requireAuth, async (req, res) => {
+  if (!supabase) return res.status(503).json({ success: false, reason: 'Ayar senkronizasyonu kullanılamıyor.' });
+  try {
+    const currentResult = await supabase.from('user_settings').select('*').eq('id', String(req.authUser.id)).limit(1);
+    if (currentResult.error) throw currentResult.error;
+    const current = currentResult.data?.[0] || {};
+    const customTagsInput = req.body?.custom_tags ?? req.body?.customTags;
+    const row = {
+      id: String(req.authUser.id),
+      theme: boundedSetting(req.body?.theme ?? current.theme, 50, 'light'),
+      preferences: plainObject(req.body?.preferences) ? req.body.preferences : (current.preferences || {}),
+      recent_reports: Array.isArray(req.body?.recent_reports) ? req.body.recent_reports.slice(0, 100) : (current.recent_reports || []),
+      custom_tags: Array.isArray(customTagsInput) ? customTagsInput.slice(0, 100).map(tag => boundedSetting(tag, 100)).filter(Boolean) : (current.custom_tags || []),
+      updated_at: new Date().toISOString()
+    };
+    const { error } = await supabase.from('user_settings').upsert(row, { onConflict: 'id' });
+    if (error) throw error;
+    res.json({ success: true, settings: { ...row, customTags: row.custom_tags } });
+  } catch (error) {
+    console.warn('Kullanıcı ayarları kaydedilemedi:', safeLogStr(error.message));
+    res.status(503).json({ success: false, reason: 'Kullanıcı ayarları kaydedilemedi.' });
   }
 });
 

@@ -23,7 +23,8 @@ window.FrpListRenderers.renderCards = function(files, container) {
     const encodedId = encodeInlineArg(file.id);
     const reportName = file.meta?.reportName || file.name;
     const date = new Date(file.loadedAt).toLocaleDateString('tr-TR');
-    const size = typeof formatBytes === 'function' ? formatBytes(file.size) : (file.size || '');
+    const sizeValue = file.sizeBytes ?? file.size ?? 0;
+    const size = window.FrpFileSafety ? window.FrpFileSafety.formatBytes(sizeValue) : `${Number(sizeValue) || 0} B`;
     const guidBadge = (file.meta && file.meta.guid)
       ? `<span class="badge badge-gray" style="font-family:var(--mono);font-size:.7rem;" title="GUID: ${escHtml(file.meta.guid)}">${escHtml(file.meta.guid.slice(0, 8))}...</span>`
       : '';
