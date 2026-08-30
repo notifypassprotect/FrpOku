@@ -182,8 +182,8 @@ body {
  transition: transform 0.2s ease;
 }
 
-.topbar-dropdown:hover.topbar-dropdown-toggle::after,
-.topbar-dropdown.open.topbar-dropdown-toggle::after {
+.topbar-dropdown:hover .topbar-dropdown-toggle::after,
+.topbar-dropdown.open .topbar-dropdown-toggle::after {
  transform: rotate(180deg);
 }
 
@@ -217,9 +217,45 @@ body {
  background: transparent;
 }
 
-.topbar-dropdown:hover.topbar-dropdown-menu,
-.topbar-dropdown.open.topbar-dropdown-menu {
+.topbar-dropdown:hover .topbar-dropdown-menu,
+.topbar-dropdown.open .topbar-dropdown-menu {
  display: flex;
+}
+
+.btn-admin-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 9px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1.5px solid #f59e0b;
+  color: #f59e0b;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+.btn-admin-pending:hover {
+  background: #f59e0b;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+.btn-admin-pending.has-pending {
+  background: linear-gradient(135deg, #ef4444, #f59e0b);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+  animation: pulse 2s infinite ease-in-out;
+}
+.admin-pending-badge {
+  background: #ffffff;
+  color: #ef4444;
+  font-weight: 900;
+  font-size: 0.7rem;
+  border-radius: 999px;
+  padding: 0.1rem 0.4rem;
 }
 
 .topbar-dropdown-item {

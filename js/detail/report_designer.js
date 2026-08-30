@@ -298,6 +298,10 @@
  ${(currentMode === 'designer' && isDesignEditing)? `
  <div class="designer-comp-palette">
  <button type="button" class="designer-palette-btn" id="btnToolAddMemo" title="Yeni Metin / Memo Ekle">Memo</button>
+  <button type="button" class="designer-palette-btn" id="btnToolAddSysMemo" title="Sayfa No / Tarih / Saat (System Text)">SysText</button>
+  <button type="button" class="designer-palette-btn" id="btnToolAddGradient" title="Yeni Gradyan Dolgu Ekle">Gradient</button>
+  <button type="button" class="designer-palette-btn" id="btnToolAddSubreport" title="Yeni Alt Rapor Ekle">Subreport</button>
+  <button type="button" class="designer-palette-btn" id="btnToolAddCrosstab" title="Yeni Çapraz Tablo Ekle">CrossTab</button>
  <button type="button" class="designer-palette-btn" id="btnToolAddPicture" title="Yeni Resim / Logo Ekle">Resim</button>
  <button type="button" class="designer-palette-btn" id="btnToolAddLine" title="Yeni Çizgi Ekle">Çizgi</button>
  <button type="button" class="designer-palette-btn" id="btnToolAddBarcode" title="Yeni Barkod Ekle">Barkod</button>
@@ -1349,47 +1353,46 @@
     ];
   } else if (isBand) {
  // BANT NESNESİ ÖZELLİKLERİ
- propList = [
- { name: 'Name', val: obj.name || '', propKey: 'name', editable: isDesignEditing },
- { name: 'Class', val: obj.type || 'TfrxBand', readOnly: true },
- { name: 'Top', val: obj.top?? 0, propKey: 'top', isNumber: true, editable: isDesignEditing },
- { name: 'Height', val: obj.height?? 0, propKey: 'height', isNumber: true, editable: isDesignEditing },
- { name: 'DataSet', val: obj.dataSet || '', propKey: 'dataSet', editable: isDesignEditing },
- { name: 'Condition', val: obj.condition || '', propKey: 'condition', editable: isDesignEditing },
- { name: 'KeepTogether', val: obj.keepTogether!== false? 'true': 'false', propKey: 'keepTogether', isSelect: isDesignEditing, options: ['true', 'false'] },
- { name: 'StartNewPage', val: obj.startNewPage? 'true': 'false', propKey: 'startNewPage', isSelect: isDesignEditing, options: ['true', 'false'] },
- { name: 'PrintIfDetailEmpty', val: obj.printIfDetailEmpty? 'true': 'false', propKey: 'printIfDetailEmpty', isSelect: isDesignEditing, options: ['true', 'false'] },
- { name: 'Visible', val: obj.visible!== false? 'true': 'false', propKey: 'visible', isSelect: isDesignEditing, options: ['true', 'false'] }
- ];
- } else if (inspectorTab === 'favorites') {
- propList = [
- { name: 'Name', val: obj.name || '', propKey: 'name', editable: isDesignEditing },
- { name: 'Caption / Text', val: obj.caption || obj.text || '', propKey: 'text', editable: isDesignEditing },
- { name: 'DataSet', val: obj.dataSet || obj.listSource || '', propKey: 'dataSet', editable: isDesignEditing },
- { name: 'DataField', val: obj.dataField || obj.listField || '', propKey: 'dataField', editable: isDesignEditing },
- { name: 'Font.Color', rawVal: obj.fontColor, val: obj.fontColor || '-16777208', propKey: 'fontColor', isColor: true, editable: isDesignEditing },
- { name: 'Fill.BackColor', rawVal: obj.fillBackColor || obj.color, val: obj.fillBackColor || obj.color || 'clNone', propKey: 'fillBackColor', isColor: true, editable: isDesignEditing },
- { name: 'Visible', val: obj.visible!== false? 'true': 'false', propKey: 'visible', isSelect: isDesignEditing, options: ['true', 'false'] }
- ];
- } else {
- propList = [
- { name: 'Name', val: obj.name || '', propKey: 'name', editable: isDesignEditing },
- { name: 'Class', val: obj.type || 'TfrxComponent', readOnly: true },
- { name: 'Left', val: obj.left?? 0, propKey: 'left', isNumber: true, editable: isDesignEditing },
- { name: 'Top', val: obj.top?? 0, propKey: 'top', isNumber: true, editable: isDesignEditing },
- { name: 'Width', val: obj.width?? 0, propKey: 'width', isNumber: true, editable: isDesignEditing },
- { name: 'Height', val: obj.height?? 0, propKey: 'height', isNumber: true, editable: isDesignEditing },
- { name: 'Caption / Text', val: obj.caption || obj.text || '', propKey: 'text', editable: isDesignEditing },
- { name: 'DataSet', val: obj.dataSet || obj.listSource || '', propKey: 'dataSet', editable: isDesignEditing },
- { name: 'DataField', val: obj.dataField || obj.listField || '', propKey: 'dataField', editable: isDesignEditing },
- { name: 'Font.Name', val: obj.fontName || 'Arial', propKey: 'fontName', isSelect: isDesignEditing, options: ['Arial', 'Segoe UI', 'Tahoma', 'Courier New', 'Times New Roman', 'Consolas', 'Roboto'] },
- { name: 'Font.Size', val: obj.fontSize || 10, propKey: 'fontSize', isNumber: true, editable: isDesignEditing },
- { name: 'Font.Color', rawVal: obj.fontColor, val: obj.fontColor || '-16777208', propKey: 'fontColor', isColor: true, editable: isDesignEditing },
- { name: 'Fill.BackColor', rawVal: (obj.fillBackColor || obj.color), val: obj.fillBackColor || obj.color || 'clNone', propKey: 'fillBackColor', isColor: true, editable: isDesignEditing },
- { name: 'Frame.Color', rawVal: obj.frameColor, val: obj.frameColor || '-16777208', propKey: 'frameColor', isColor: true, editable: isDesignEditing },
- { name: 'Visible', val: obj.visible!== false? 'true': 'false', propKey: 'visible', isSelect: isDesignEditing, options: ['true', 'false'] },
- { name: 'Enabled', val: obj.enabled!== false? 'true': 'false', propKey: 'enabled', isSelect: isDesignEditing, options: ['true', 'false'] }
- ];
+     const isBoldVal = (obj.fontStyle && (obj.fontStyle.includes('fsBold') || obj.fontStyle.includes('bold'))) || obj.isBold;
+    const isItalicVal = (obj.fontStyle && (obj.fontStyle.includes('fsItalic') || obj.fontStyle.includes('italic'))) || obj.isItalic;
+    const isUnderlineVal = (obj.fontStyle && (obj.fontStyle.includes('fsUnderline') || obj.fontStyle.includes('underline'))) || obj.isUnderline;
+
+    propList = [
+      { name: 'Name', val: obj.name || '', propKey: 'name', editable: isDesignEditing },
+      { name: 'Class', val: obj.type || 'TfrxComponent', readOnly: true },
+      { name: 'Left', val: obj.left ?? 0, propKey: 'left', isNumber: true, editable: isDesignEditing },
+      { name: 'Top', val: obj.top ?? 0, propKey: 'top', isNumber: true, editable: isDesignEditing },
+      { name: 'Width', val: obj.width ?? 0, propKey: 'width', isNumber: true, editable: isDesignEditing },
+      { name: 'Height', val: obj.height ?? 0, propKey: 'height', isNumber: true, editable: isDesignEditing },
+      { name: 'Align', val: obj.align || 'alNone', propKey: 'align', isSelect: isDesignEditing, options: ['alNone', 'alLeft', 'alRight', 'alTop', 'alBottom', 'alClient', 'alCustom'] },
+      { name: 'Caption / Text', val: obj.caption || obj.text || '', propKey: 'text', editable: isDesignEditing },
+      { name: 'DataSet', val: obj.dataSet || obj.listSource || '', propKey: 'dataSet', editable: isDesignEditing },
+      { name: 'DataField', val: obj.dataField || obj.listField || '', propKey: 'dataField', editable: isDesignEditing },
+      { name: 'HAlign', val: obj.hAlign || obj.alignment || 'haLeft', propKey: 'hAlign', isSelect: isDesignEditing, options: ['haLeft', 'haCenter', 'haRight', 'haBlock'] },
+      { name: 'VAlign', val: obj.vAlign || 'vaTop', propKey: 'vAlign', isSelect: isDesignEditing, options: ['vaTop', 'vaCenter', 'vaBottom'] },
+      { name: 'Font.Name', val: obj.fontName || 'Arial', propKey: 'fontName', isSelect: isDesignEditing, options: ['Arial', 'Segoe UI', 'Tahoma', 'Courier New', 'Times New Roman', 'Consolas', 'Roboto', 'JetBrains Mono', 'Plus Jakarta Sans'] },
+      { name: 'Font.Size', val: obj.fontSize || 10, propKey: 'fontSize', isNumber: true, editable: isDesignEditing },
+      { name: 'Font.Bold', val: isBoldVal ? 'true' : 'false', propKey: 'isBold', isSelect: isDesignEditing, options: ['true', 'false'] },
+      { name: 'Font.Italic', val: isItalicVal ? 'true' : 'false', propKey: 'isItalic', isSelect: isDesignEditing, options: ['true', 'false'] },
+      { name: 'Font.Underline', val: isUnderlineVal ? 'true' : 'false', propKey: 'isUnderline', isSelect: isDesignEditing, options: ['true', 'false'] },
+      { name: 'Font.Color', rawVal: obj.fontColor, val: obj.fontColor || '-16777208', propKey: 'fontColor', isColor: true, editable: isDesignEditing },
+      { name: 'Fill.BackColor', rawVal: (obj.fillBackColor || obj.color), val: obj.fillBackColor || obj.color || 'clNone', propKey: 'fillBackColor', isColor: true, editable: isDesignEditing },
+      { name: 'Frame.Typ', val: obj.frameTyp || '[ftLeft, ftRight, ftTop, ftBottom]', propKey: 'frameTyp', isSelect: isDesignEditing, options: ['[ftLeft, ftRight, ftTop, ftBottom]', '[ftLeft, ftRight]', '[ftTop, ftBottom]', '[]', '[ftLeft]', '[ftRight]', '[ftTop]', '[ftBottom]'] },
+      { name: 'Frame.Width', val: obj.frameWidth || 1, propKey: 'frameWidth', isNumber: true, editable: isDesignEditing },
+      { name: 'Frame.Style', val: obj.frameStyle || 'fsSolid', propKey: 'frameStyle', isSelect: isDesignEditing, options: ['fsSolid', 'fsDash', 'fsDot', 'fsDashDot'] },
+      { name: 'Frame.Color', rawVal: obj.frameColor, val: obj.frameColor || '-16777208', propKey: 'frameColor', isColor: true, editable: isDesignEditing },
+      { name: 'StretchMode', val: obj.stretchMode || 'smDontStretch', propKey: 'stretchMode', isSelect: isDesignEditing, options: ['smDontStretch', 'smActualHeight', 'smMaxHeight'] },
+      { name: 'ShiftMode', val: obj.shiftMode || 'smAlways', propKey: 'shiftMode', isSelect: isDesignEditing, options: ['smAlways', 'smDontShift', 'smWhenOverlapped'] },
+      { name: 'WordWrap', val: obj.wordWrap !== false ? 'true' : 'false', propKey: 'wordWrap', isSelect: isDesignEditing, options: ['true', 'false'] },
+      { name: 'AutoWidth', val: obj.autoWidth ? 'true' : 'false', propKey: 'autoWidth', isSelect: isDesignEditing, options: ['true', 'false'] },
+      { name: 'AllowExpressions', val: obj.allowExpressions !== false ? 'true' : 'false', propKey: 'allowExpressions', isSelect: isDesignEditing, options: ['true', 'false'] },
+      { name: 'AllowHTMLTags', val: obj.allowHTMLTags ? 'true' : 'false', propKey: 'allowHTMLTags', isSelect: isDesignEditing, options: ['true', 'false'] },
+      { name: 'DisplayFormat', val: obj.formatStr || obj.displayFormat || '', propKey: 'formatStr', editable: isDesignEditing },
+      { name: 'Rotation', val: String(obj.rotation || 0), propKey: 'rotation', isSelect: isDesignEditing, options: ['0', '90', '180', '270'] },
+      { name: 'Visible', val: obj.visible !== false ? 'true' : 'false', propKey: 'visible', isSelect: isDesignEditing, options: ['true', 'false'] },
+      { name: 'Enabled', val: obj.enabled !== false ? 'true' : 'false', propKey: 'enabled', isSelect: isDesignEditing, options: ['true', 'false'] },
+      { name: 'Printable', val: obj.printable !== false ? 'true' : 'false', propKey: 'printable', isSelect: isDesignEditing, options: ['true', 'false'] }
+    ];
  }
 
  const filtered = inspectorSearchQuery

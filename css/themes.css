@@ -1,448 +1,437 @@
 /* ============================================================
- themes.css — 5 Kod Renk Teması
- FrpOku Dark (varsayılan) | FrpOku Light | Dracula | GitHub Dark | Monokai
- ============================================================ */
+   themes.css — 13 Kod & Editör Renk Teması
+   FrpOku Dark | FrpOku Light | Dracula | GitHub Dark | Monokai |
+   Nord | Tokyo Night | Cyberpunk | Matrix | Synthwave | Deep Ocean |
+   Solarized Light | Solarized Dark
+   ============================================================ */
 
 /* ── TEMA SEÇİCİ UI ─────────────────────────────────────── */
 .theme-selector-wrap {
- display: flex;
- align-items: center;
- gap:.45rem;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
 }
 
 .theme-selector-label {
- font-size:.75rem;
- font-weight: 600;
- color: var(--text-muted);
- white-space: nowrap;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .theme-selector-select {
- padding:.28rem.55rem;
- border-radius: 6px;
- border: 1px solid var(--border);
- background: var(--bg-raised);
- color: var(--text-primary);
- font-size:.78rem;
- font-family: var(--font);
- cursor: pointer;
- outline: none;
- transition: border-color.15s;
+  padding: 0.28rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-family: var(--font);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
 }
 .theme-selector-select:focus { border-color: var(--accent-bright); }
 
 /* ══════════════════════════════════════════════════════════
- TEMA 1 — FrpOku Dark (varsayılan, zaten style.css'te)
- ══════════════════════════════════════════════════════════ */
- .,
- .,
- . {
- background: #0b1325!important;
- color: #e2e8f0!important;
+   TEMA 1 — FrpOku Dark (Varsayılan)
+   ══════════════════════════════════════════════════════════ */
+.code-theme-frpoku-dark .code-scroll,
+.code-theme-frpoku-dark .code-editor-backdrop,
+.code-theme-frpoku-dark .code-editor-wrap,
+.code-theme-frpoku-dark .editor-main {
+  background: #0b1325 !important;
+  color: #e2e8f0 !important;
 }
- . { color: #e2e8f0!important; }
- .,
- . { color: #60a5fa; font-weight: 700; }
+.code-theme-frpoku-dark .line-src { color: #e2e8f0 !important; }
+.code-theme-frpoku-dark .code-line { color: #e2e8f0; }
+.code-theme-frpoku-dark .line-num { background: #080f1d !important; color: #64748b !important; border-right: 1px solid #1e293b; }
+.code-theme-frpoku-dark .editor-gutter { background: #080f1d !important; border-right: 1px solid #1e293b !important; }
+.code-theme-frpoku-dark .editor-gutter-line { color: #64748b !important; }
 
- .,
- . { color: #34d399; font-weight: 600; }
-
- .,
- . { color: #fbbf24; }
-
- .,
- . { color: #64748b; font-style: italic; }
-
- .,
- . { color: #f87171; }
-
- . { color: #f97316; font-weight: 700; }
- .,
- . { color: #94a3b8; }
+.code-theme-frpoku-dark .sql-keyword,
+.code-theme-frpoku-dark .pas-keyword { color: #60a5fa !important; font-weight: 700; }
+.code-theme-frpoku-dark .sql-fn,
+.code-theme-frpoku-dark .pas-type { color: #34d399 !important; font-weight: 600; }
+.code-theme-frpoku-dark .sql-string,
+.code-theme-frpoku-dark .pas-string { color: #fbbf24 !important; }
+.code-theme-frpoku-dark .sql-comment,
+.code-theme-frpoku-dark .pas-comment { color: #64748b !important; font-style: italic; }
+.code-theme-frpoku-dark .sql-number,
+.code-theme-frpoku-dark .pas-number { color: #f87171 !important; }
+.code-theme-frpoku-dark .sql-param { color: #f97316 !important; font-weight: 700; }
+.code-theme-frpoku-dark .sql-operator,
+.code-theme-frpoku-dark .pas-special { color: #94a3b8 !important; }
+.code-theme-frpoku-dark .pas-proc { color: #38bdf8 !important; font-weight: 700; }
 
 /* ══════════════════════════════════════════════════════════
- TEMA 2 — FrpOku Light
- ══════════════════════════════════════════════════════════ */
- .,
- .,
- . {
- background: #f8fafc!important;
- color: #1e293b!important;
+   TEMA 2 — FrpOku Light
+   ══════════════════════════════════════════════════════════ */
+.code-theme-frpoku-light .code-scroll,
+.code-theme-frpoku-light .code-editor-backdrop,
+.code-theme-frpoku-light .code-editor-wrap,
+.code-theme-frpoku-light .editor-main {
+  background: #f8fafc !important;
+  color: #1e293b !important;
 }
+.code-theme-frpoku-light .line-src { color: #1e293b !important; }
+.code-theme-frpoku-light .code-line { color: #1e293b; }
+.code-theme-frpoku-light .line-num { background: #f1f5f9 !important; color: #94a3b8 !important; border-right: 1px solid #e2e8f0; }
+.code-theme-frpoku-light .editor-gutter { background: #f1f5f9 !important; border-right: 1px solid #e2e8f0 !important; }
+.code-theme-frpoku-light .editor-gutter-line { color: #94a3b8 !important; }
 
- . { color: #1e293b!important; }
- . { color: #1e293b; }
- . { background: #f1f5f9!important; color: #94a3b8!important; }
-
- .,
- . { color: #1d4ed8; font-weight: 700; }
-
- .,
- . { color: #059669; font-weight: 600; }
-
- .,
- . { color: #b45309; }
-
- .,
- . { color: #6b7280; font-style: italic; }
-
- .,
- . { color: #dc2626; }
-
- . { color: #d97706; font-weight: 700; }
- .,
- . { color: #6b7280; }
+.code-theme-frpoku-light .sql-keyword,
+.code-theme-frpoku-light .pas-keyword { color: #1d4ed8 !important; font-weight: 700; }
+.code-theme-frpoku-light .sql-fn,
+.code-theme-frpoku-light .pas-type { color: #059669 !important; font-weight: 600; }
+.code-theme-frpoku-light .sql-string,
+.code-theme-frpoku-light .pas-string { color: #b45309 !important; }
+.code-theme-frpoku-light .sql-comment,
+.code-theme-frpoku-light .pas-comment { color: #6b7280 !important; font-style: italic; }
+.code-theme-frpoku-light .sql-number,
+.code-theme-frpoku-light .pas-number { color: #dc2626 !important; }
+.code-theme-frpoku-light .sql-param { color: #d97706 !important; font-weight: 700; }
+.code-theme-frpoku-light .sql-operator,
+.code-theme-frpoku-light .pas-special { color: #6b7280 !important; }
+.code-theme-frpoku-light .pas-proc { color: #0284c7 !important; font-weight: 700; }
 
 /* ══════════════════════════════════════════════════════════
- TEMA 3 — Dracula
- ══════════════════════════════════════════════════════════ */
- .,
- .,
- . {
- background: #282a36!important;
- color: #f8f8f2!important;
+   TEMA 3 — Dracula
+   ══════════════════════════════════════════════════════════ */
+.code-theme-dracula .code-scroll,
+.code-theme-dracula .code-editor-backdrop,
+.code-theme-dracula .code-editor-wrap,
+.code-theme-dracula .editor-main {
+  background: #282a36 !important;
+  color: #f8f8f2 !important;
 }
- . { color: #f8f8f2!important; }
- . { color: #f8f8f2; }
- . { background: #21222c!important; color: #6272a4!important; }
+.code-theme-dracula .line-src { color: #f8f8f2 !important; }
+.code-theme-dracula .code-line { color: #f8f8f2; }
+.code-theme-dracula .line-num { background: #21222c !important; color: #6272a4 !important; border-right: 1px solid #383a59; }
+.code-theme-dracula .editor-gutter { background: #21222c !important; border-right: 1px solid #383a59 !important; }
+.code-theme-dracula .editor-gutter-line { color: #6272a4 !important; }
 
- .,
- . { color: #ff79c6; font-weight: 700; }
-
- .,
- . { color: #50fa7b; font-weight: 600; }
-
- .,
- . { color: #f1fa8c; }
-
- .,
- . { color: #6272a4; font-style: italic; }
-
- .,
- . { color: #bd93f9; }
-
- . { color: #ffb86c; font-weight: 700; }
- .,
- . { color: #ff79c6; }
+.code-theme-dracula .sql-keyword,
+.code-theme-dracula .pas-keyword { color: #ff79c6 !important; font-weight: 700; }
+.code-theme-dracula .sql-fn,
+.code-theme-dracula .pas-type { color: #50fa7b !important; font-weight: 600; }
+.code-theme-dracula .sql-string,
+.code-theme-dracula .pas-string { color: #f1fa8c !important; }
+.code-theme-dracula .sql-comment,
+.code-theme-dracula .pas-comment { color: #6272a4 !important; font-style: italic; }
+.code-theme-dracula .sql-number,
+.code-theme-dracula .pas-number { color: #bd93f9 !important; }
+.code-theme-dracula .sql-param { color: #ffb86c !important; font-weight: 700; }
+.code-theme-dracula .sql-operator,
+.code-theme-dracula .pas-special { color: #ff79c6 !important; }
+.code-theme-dracula .pas-proc { color: #8be9fd !important; font-weight: 700; }
 
 /* ══════════════════════════════════════════════════════════
- TEMA 4 — GitHub Dark
- ══════════════════════════════════════════════════════════ */
- .,
- .,
- . {
- background: #0d1117!important;
- color: #e6edf3!important;
+   TEMA 4 — GitHub Dark
+   ══════════════════════════════════════════════════════════ */
+.code-theme-github-dark .code-scroll,
+.code-theme-github-dark .code-editor-backdrop,
+.code-theme-github-dark .code-editor-wrap,
+.code-theme-github-dark .editor-main {
+  background: #0d1117 !important;
+  color: #c9d1d9 !important;
 }
- . { color: #e6edf3!important; }
- . { color: #e6edf3; }
- . { background: #0d1117!important; color: #6e7681!important;
- border-right: 1px solid #21262d; }
+.code-theme-github-dark .line-src { color: #c9d1d9 !important; }
+.code-theme-github-dark .code-line { color: #c9d1d9; }
+.code-theme-github-dark .line-num { background: #090d12 !important; color: #484f58 !important; border-right: 1px solid #21262d; }
+.code-theme-github-dark .editor-gutter { background: #090d12 !important; border-right: 1px solid #21262d !important; }
+.code-theme-github-dark .editor-gutter-line { color: #484f58 !important; }
 
- .,
- . { color: #ff7b72; font-weight: 700; }
-
- .,
- . { color: #d2a8ff; font-weight: 600; }
-
- .,
- . { color: #a5d6ff; }
-
- .,
- . { color: #8b949e; font-style: italic; }
-
- .,
- . { color: #79c0ff; }
-
- . { color: #ffa657; font-weight: 700; }
- .,
- . { color: #ff7b72; }
+.code-theme-github-dark .sql-keyword,
+.code-theme-github-dark .pas-keyword { color: #ff7b72 !important; font-weight: 700; }
+.code-theme-github-dark .sql-fn,
+.code-theme-github-dark .pas-type { color: #7ee787 !important; font-weight: 600; }
+.code-theme-github-dark .sql-string,
+.code-theme-github-dark .pas-string { color: #a5d6ff !important; }
+.code-theme-github-dark .sql-comment,
+.code-theme-github-dark .pas-comment { color: #8b949e !important; font-style: italic; }
+.code-theme-github-dark .sql-number,
+.code-theme-github-dark .pas-number { color: #79c0ff !important; }
+.code-theme-github-dark .sql-param { color: #ffa657 !important; font-weight: 700; }
+.code-theme-github-dark .sql-operator,
+.code-theme-github-dark .pas-special { color: #d2a8ff !important; }
+.code-theme-github-dark .pas-proc { color: #d2a8ff !important; font-weight: 700; }
 
 /* ══════════════════════════════════════════════════════════
- TEMA 5 — Monokai
- ══════════════════════════════════════════════════════════ */
- .,
- .,
- . {
- background: #272822!important;
- color: #f8f8f2!important;
+   TEMA 5 — Monokai
+   ══════════════════════════════════════════════════════════ */
+.code-theme-monokai .code-scroll,
+.code-theme-monokai .code-editor-backdrop,
+.code-theme-monokai .code-editor-wrap,
+.code-theme-monokai .editor-main {
+  background: #272822 !important;
+  color: #f8f8f2 !important;
 }
- . { color: #f8f8f2!important; }
- . { color: #f8f8f2; }
- . { background: #1e1f1c!important; color: #75715e!important; }
+.code-theme-monokai .line-src { color: #f8f8f2 !important; }
+.code-theme-monokai .code-line { color: #f8f8f2; }
+.code-theme-monokai .line-num { background: #1e1f1c !important; color: #75715e !important; border-right: 1px solid #3e3d32; }
+.code-theme-monokai .editor-gutter { background: #1e1f1c !important; border-right: 1px solid #3e3d32 !important; }
+.code-theme-monokai .editor-gutter-line { color: #75715e !important; }
 
- .,
- . { color: #f92672; font-weight: 700; }
-
- .,
- . { color: #66d9e8; font-weight: 600; }
-
- .,
- . { color: #e6db74; }
-
- .,
- . { color: #75715e; font-style: italic; }
-
- .,
- . { color: #ae81ff; }
-
- . { color: #fd971f; font-weight: 700; }
- .,
- . { color: #f92672; }
+.code-theme-monokai .sql-keyword,
+.code-theme-monokai .pas-keyword { color: #f92672 !important; font-weight: 700; }
+.code-theme-monokai .sql-fn,
+.code-theme-monokai .pas-type { color: #66d9ef !important; font-weight: 600; }
+.code-theme-monokai .sql-string,
+.code-theme-monokai .pas-string { color: #e6db74 !important; }
+.code-theme-monokai .sql-comment,
+.code-theme-monokai .pas-comment { color: #75715e !important; font-style: italic; }
+.code-theme-monokai .sql-number,
+.code-theme-monokai .pas-number { color: #ae81ff !important; }
+.code-theme-monokai .sql-param { color: #fd971f !important; font-weight: 700; }
+.code-theme-monokai .sql-operator,
+.code-theme-monokai .pas-special { color: #f92672 !important; }
+.code-theme-monokai .pas-proc { color: #a6e22e !important; font-weight: 700; }
 
 /* ══════════════════════════════════════════════════════════
- TEMA 6 — Nord Frost (❄️)
- ══════════════════════════════════════════════════════════ */
- .,
- .,
- . {
- background: #2e3440!important;
- color: #eceff4!important;
+   TEMA 6 — Nord Frost
+   ══════════════════════════════════════════════════════════ */
+.code-theme-nord .code-scroll,
+.code-theme-nord .code-editor-backdrop,
+.code-theme-nord .code-editor-wrap,
+.code-theme-nord .editor-main {
+  background: #2e3440 !important;
+  color: #d8dee9 !important;
 }
- . { color: #eceff4!important; }
- . { color: #eceff4; }
- . { background: #242933!important; color: #4c566a!important; border-right: 1px solid #3b4252; }
+.code-theme-nord .line-src { color: #d8dee9 !important; }
+.code-theme-nord .code-line { color: #d8dee9; }
+.code-theme-nord .line-num { background: #242933 !important; color: #4c566a !important; border-right: 1px solid #3b4252; }
+.code-theme-nord .editor-gutter { background: #242933 !important; border-right: 1px solid #3b4252 !important; }
+.code-theme-nord .editor-gutter-line { color: #4c566a !important; }
 
- .,
- . { color: #81a1c1; font-weight: 700; }
-
- .,
- . { color: #88c0d0; font-weight: 600; }
-
- .,
- . { color: #a3be8c; }
-
- .,
- . { color: #616e88; font-style: italic; }
-
- .,
- . { color: #b48ead; }
-
- . { color: #d08770; font-weight: 700; }
- .,
- . { color: #81a1c1; }
+.code-theme-nord .sql-keyword,
+.code-theme-nord .pas-keyword { color: #81a1c1 !important; font-weight: 700; }
+.code-theme-nord .sql-fn,
+.code-theme-nord .pas-type { color: #88c0d0 !important; font-weight: 600; }
+.code-theme-nord .sql-string,
+.code-theme-nord .pas-string { color: #a3be8c !important; }
+.code-theme-nord .sql-comment,
+.code-theme-nord .pas-comment { color: #4c566a !important; font-style: italic; }
+.code-theme-nord .sql-number,
+.code-theme-nord .pas-number { color: #b48ead !important; }
+.code-theme-nord .sql-param { color: #d08770 !important; font-weight: 700; }
+.code-theme-nord .sql-operator,
+.code-theme-nord .pas-special { color: #81a1c1 !important; }
+.code-theme-nord .pas-proc { color: #8fbcbb !important; font-weight: 700; }
 
 /* ══════════════════════════════════════════════════════════
- TEMA 7 — Tokyo Night ()
- ══════════════════════════════════════════════════════════ */
- .,
- .,
- . {
- background: #1a1b26!important;
- color: #c0caf5!important;
+   TEMA 7 — Tokyo Night
+   ══════════════════════════════════════════════════════════ */
+.code-theme-tokyo-night .code-scroll,
+.code-theme-tokyo-night .code-editor-backdrop,
+.code-theme-tokyo-night .code-editor-wrap,
+.code-theme-tokyo-night .editor-main {
+  background: #1a1b26 !important;
+  color: #a9b1d6 !important;
 }
- . { color: #c0caf5!important; }
- . { color: #c0caf5; }
- . { background: #16161e!important; color: #565f89!important; border-right: 1px solid #292e42; }
+.code-theme-tokyo-night .line-src { color: #a9b1d6 !important; }
+.code-theme-tokyo-night .code-line { color: #a9b1d6; }
+.code-theme-tokyo-night .line-num { background: #16161e !important; color: #565f89 !important; border-right: 1px solid #292e42; }
+.code-theme-tokyo-night .editor-gutter { background: #16161e !important; border-right: 1px solid #292e42 !important; }
+.code-theme-tokyo-night .editor-gutter-line { color: #565f89 !important; }
 
- .,
- . { color: #bb9af7; font-weight: 700; }
-
- .,
- . { color: #7aa2f7; font-weight: 600; }
-
- .,
- . { color: #9ece6a; }
-
- .,
- . { color: #565f89; font-style: italic; }
-
- .,
- . { color: #ff9e64; }
-
- . { color: #e0af68; font-weight: 700; }
- .,
- . { color: #89ddff; }
+.code-theme-tokyo-night .sql-keyword,
+.code-theme-tokyo-night .pas-keyword { color: #bb9af7 !important; font-weight: 700; }
+.code-theme-tokyo-night .sql-fn,
+.code-theme-tokyo-night .pas-type { color: #7aa2f7 !important; font-weight: 600; }
+.code-theme-tokyo-night .sql-string,
+.code-theme-tokyo-night .pas-string { color: #9ece6a !important; }
+.code-theme-tokyo-night .sql-comment,
+.code-theme-tokyo-night .pas-comment { color: #565f89 !important; font-style: italic; }
+.code-theme-tokyo-night .sql-number,
+.code-theme-tokyo-night .pas-number { color: #ff9e64 !important; }
+.code-theme-tokyo-night .sql-param { color: #e0af68 !important; font-weight: 700; }
+.code-theme-tokyo-night .sql-operator,
+.code-theme-tokyo-night .pas-special { color: #89ddff !important; }
+.code-theme-tokyo-night .pas-proc { color: #7dcfff !important; font-weight: 700; }
 
 /* ══════════════════════════════════════════════════════════
- TEMA 8 — Cyberpunk Neon ()
- ══════════════════════════════════════════════════════════ */
- .,
- .,
- . {
- background: #0d0221!important;
- color: #00f0ff!important;
+   TEMA 8 — Cyberpunk Neon
+   ══════════════════════════════════════════════════════════ */
+.code-theme-cyberpunk .code-scroll,
+.code-theme-cyberpunk .code-editor-backdrop,
+.code-theme-cyberpunk .code-editor-wrap,
+.code-theme-cyberpunk .editor-main {
+  background: #000b1e !important;
+  color: #00f0ff !important;
 }
- . { color: #00f0ff!important; }
- . { color: #00f0ff; }
- . { background: #080014!important; color: #ff007f!important; border-right: 1px solid #2d004d; }
+.code-theme-cyberpunk .line-src { color: #00f0ff !important; }
+.code-theme-cyberpunk .code-line { color: #00f0ff; }
+.code-theme-cyberpunk .line-num { background: #000511 !important; color: #ff007f !important; border-right: 1px solid #1a0033; }
+.code-theme-cyberpunk .editor-gutter { background: #000511 !important; border-right: 1px solid #1a0033 !important; }
+.code-theme-cyberpunk .editor-gutter-line { color: #ff007f !important; }
 
- .,
- . { color: #ff007f; font-weight: 800; text-shadow: 0 0 4px rgba(255, 0, 127, 0.4); }
-
- .,
- . { color: #00f0ff; font-weight: 700; text-shadow: 0 0 4px rgba(0, 240, 255, 0.4); }
-
- .,
- . { color: #ffe600; }
-
- .,
- . { color: #795290; font-style: italic; }
-
- .,
- . { color: #ff5e00; }
-
- . { color: #05ffa1; font-weight: 800; }
- .,
- . { color: #ff007f; }
+.code-theme-cyberpunk .sql-keyword,
+.code-theme-cyberpunk .pas-keyword { color: #ff007f !important; font-weight: 800; text-shadow: 0 0 4px rgba(255, 0, 127, 0.4); }
+.code-theme-cyberpunk .sql-fn,
+.code-theme-cyberpunk .pas-type { color: #00f0ff !important; font-weight: 700; text-shadow: 0 0 4px rgba(0, 240, 255, 0.4); }
+.code-theme-cyberpunk .sql-string,
+.code-theme-cyberpunk .pas-string { color: #ffe600 !important; }
+.code-theme-cyberpunk .sql-comment,
+.code-theme-cyberpunk .pas-comment { color: #795290 !important; font-style: italic; }
+.code-theme-cyberpunk .sql-number,
+.code-theme-cyberpunk .pas-number { color: #ff5e00 !important; }
+.code-theme-cyberpunk .sql-param { color: #05ffa1 !important; font-weight: 800; }
+.code-theme-cyberpunk .sql-operator,
+.code-theme-cyberpunk .pas-special { color: #ff007f !important; }
+.code-theme-cyberpunk .pas-proc { color: #05ffa1 !important; font-weight: 800; }
 
 /* ══════════════════════════════════════════════════════════
- TEMA 9 — Matrix Emerald ()
- ══════════════════════════════════════════════════════════ */
- .,
- .,
- . {
- background: #040d06!important;
- color: #00ff66!important;
+   TEMA 9 — Matrix Emerald
+   ══════════════════════════════════════════════════════════ */
+.code-theme-matrix .code-scroll,
+.code-theme-matrix .code-editor-backdrop,
+.code-theme-matrix .code-editor-wrap,
+.code-theme-matrix .editor-main {
+  background: #040d06 !important;
+  color: #00ff66 !important;
 }
- . { color: #00ff66!important; }
- . { color: #00ff66; }
- . { background: #020803!important; color: #008833!important; border-right: 1px solid #0d3816; }
+.code-theme-matrix .line-src { color: #00ff66 !important; }
+.code-theme-matrix .code-line { color: #00ff66; }
+.code-theme-matrix .line-num { background: #020803 !important; color: #008833 !important; border-right: 1px solid #0d3816; }
+.code-theme-matrix .editor-gutter { background: #020803 !important; border-right: 1px solid #0d3816 !important; }
+.code-theme-matrix .editor-gutter-line { color: #008833 !important; }
 
- .,
- . { color: #55ff99; font-weight: 800; }
-
- .,
- . { color: #00e5ff; font-weight: 700; }
-
- .,
- . { color: #a3e635; }
-
- .,
- . { color: #2d6a4f; font-style: italic; }
-
- .,
- . { color: #facc15; }
-
- . { color: #38bdf8; font-weight: 800; }
- .,
- . { color: #4ade80; }
+.code-theme-matrix .sql-keyword,
+.code-theme-matrix .pas-keyword { color: #55ff99 !important; font-weight: 800; }
+.code-theme-matrix .sql-fn,
+.code-theme-matrix .pas-type { color: #00e5ff !important; font-weight: 700; }
+.code-theme-matrix .sql-string,
+.code-theme-matrix .pas-string { color: #a3e635 !important; }
+.code-theme-matrix .sql-comment,
+.code-theme-matrix .pas-comment { color: #2d6a4f !important; font-style: italic; }
+.code-theme-matrix .sql-number,
+.code-theme-matrix .pas-number { color: #facc15 !important; }
+.code-theme-matrix .sql-param { color: #38bdf8 !important; font-weight: 800; }
+.code-theme-matrix .sql-operator,
+.code-theme-matrix .pas-special { color: #4ade80 !important; }
+.code-theme-matrix .pas-proc { color: #55ff99 !important; font-weight: 800; }
 
 /* ══════════════════════════════════════════════════════════
- TEMA 10 — Synthwave Sunset ()
- ══════════════════════════════════════════════════════════ */
- .,
- .,
- . {
- background: #241734!important;
- color: #f92aad!important;
+   TEMA 10 — Synthwave Sunset
+   ══════════════════════════════════════════════════════════ */
+.code-theme-synthwave .code-scroll,
+.code-theme-synthwave .code-editor-backdrop,
+.code-theme-synthwave .code-editor-wrap,
+.code-theme-synthwave .editor-main {
+  background: #241734 !important;
+  color: #fdfdfd !important;
 }
- . { color: #fdfdfd!important; }
- . { color: #fdfdfd; }
- . { background: #190f24!important; color: #72568f!important; border-right: 1px solid #3d2459; }
+.code-theme-synthwave .line-src { color: #fdfdfd !important; }
+.code-theme-synthwave .code-line { color: #fdfdfd; }
+.code-theme-synthwave .line-num { background: #190f24 !important; color: #72568f !important; border-right: 1px solid #3d2459; }
+.code-theme-synthwave .editor-gutter { background: #190f24 !important; border-right: 1px solid #3d2459 !important; }
+.code-theme-synthwave .editor-gutter-line { color: #72568f !important; }
 
- .,
- . { color: #fede5d; font-weight: 800; }
-
- .,
- . { color: #36f9f6; font-weight: 700; }
-
- .,
- . { color: #ff7edb; }
-
- .,
- . { color: #6d558a; font-style: italic; }
-
- .,
- . { color: #fe4450; }
-
- . { color: #ff8b39; font-weight: 800; }
- .,
- . { color: #fede5d; }
+.code-theme-synthwave .sql-keyword,
+.code-theme-synthwave .pas-keyword { color: #fede5d !important; font-weight: 800; }
+.code-theme-synthwave .sql-fn,
+.code-theme-synthwave .pas-type { color: #36f9f6 !important; font-weight: 700; }
+.code-theme-synthwave .sql-string,
+.code-theme-synthwave .pas-string { color: #ff7edb !important; }
+.code-theme-synthwave .sql-comment,
+.code-theme-synthwave .pas-comment { color: #6d558a !important; font-style: italic; }
+.code-theme-synthwave .sql-number,
+.code-theme-synthwave .pas-number { color: #fe4450 !important; }
+.code-theme-synthwave .sql-param { color: #ff8b39 !important; font-weight: 800; }
+.code-theme-synthwave .sql-operator,
+.code-theme-synthwave .pas-special { color: #fede5d !important; }
+.code-theme-synthwave .pas-proc { color: #36f9f6 !important; font-weight: 700; }
 
 /* ══════════════════════════════════════════════════════════
- TEMA 11 — Deep Ocean Blue ()
- ══════════════════════════════════════════════════════════ */
- .,
- .,
- . {
- background: #0a192f!important;
- color: #ccd6f6!important;
+   TEMA 11 — Deep Ocean Blue
+   ══════════════════════════════════════════════════════════ */
+.code-theme-deep-ocean .code-scroll,
+.code-theme-deep-ocean .code-editor-backdrop,
+.code-theme-deep-ocean .code-editor-wrap,
+.code-theme-deep-ocean .editor-main {
+  background: #0a192f !important;
+  color: #ccd6f6 !important;
 }
- . { color: #ccd6f6!important; }
- . { color: #ccd6f6; }
- . { background: #071224!important; color: #495670!important; border-right: 1px solid #172a45; }
+.code-theme-deep-ocean .line-src { color: #ccd6f6 !important; }
+.code-theme-deep-ocean .code-line { color: #ccd6f6; }
+.code-theme-deep-ocean .line-num { background: #071224 !important; color: #495670 !important; border-right: 1px solid #172a45; }
+.code-theme-deep-ocean .editor-gutter { background: #071224 !important; border-right: 1px solid #172a45 !important; }
+.code-theme-deep-ocean .editor-gutter-line { color: #495670 !important; }
 
- .,
- . { color: #64ffda; font-weight: 800; }
-
- .,
- . { color: #57cbff; font-weight: 700; }
-
- .,
- . { color: #ffb86c; }
-
- .,
- . { color: #5a6e85; font-style: italic; }
-
- .,
- . { color: #f7768e; }
-
- . { color: #ff9e64; font-weight: 800; }
- .,
- . { color: #82aaff; }
+.code-theme-deep-ocean .sql-keyword,
+.code-theme-deep-ocean .pas-keyword { color: #64ffda !important; font-weight: 800; }
+.code-theme-deep-ocean .sql-fn,
+.code-theme-deep-ocean .pas-type { color: #57cbff !important; font-weight: 700; }
+.code-theme-deep-ocean .sql-string,
+.code-theme-deep-ocean .pas-string { color: #ffb86c !important; }
+.code-theme-deep-ocean .sql-comment,
+.code-theme-deep-ocean .pas-comment { color: #5a6e85 !important; font-style: italic; }
+.code-theme-deep-ocean .sql-number,
+.code-theme-deep-ocean .pas-number { color: #f7768e !important; }
+.code-theme-deep-ocean .sql-param { color: #ff9e64 !important; font-weight: 800; }
+.code-theme-deep-ocean .sql-operator,
+.code-theme-deep-ocean .pas-special { color: #82aaff !important; }
+.code-theme-deep-ocean .pas-proc { color: #57cbff !important; font-weight: 700; }
 
 /* ══════════════════════════════════════════════════════════
- TEMA 12 — Solarized Light (☀️)
- ══════════════════════════════════════════════════════════ */
- .,
- .,
- . {
- background: #fdf6e3!important;
- color: #586e75!important;
+   TEMA 12 — Solarized Light
+   ══════════════════════════════════════════════════════════ */
+.code-theme-solarized-light .code-scroll,
+.code-theme-solarized-light .code-editor-backdrop,
+.code-theme-solarized-light .code-editor-wrap,
+.code-theme-solarized-light .editor-main {
+  background: #fdf6e3 !important;
+  color: #586e75 !important;
 }
- . { color: #586e75!important; }
- . { color: #586e75; }
- . { background: #eee8d5!important; color: #93a1a1!important; border-right: 1px solid #e0d8c3; }
+.code-theme-solarized-light .line-src { color: #586e75 !important; }
+.code-theme-solarized-light .code-line { color: #586e75; }
+.code-theme-solarized-light .line-num { background: #eee8d5 !important; color: #93a1a1 !important; border-right: 1px solid #e0d8c3; }
+.code-theme-solarized-light .editor-gutter { background: #eee8d5 !important; border-right: 1px solid #e0d8c3 !important; }
+.code-theme-solarized-light .editor-gutter-line { color: #93a1a1 !important; }
 
- .,
- . { color: #859900; font-weight: 700; }
-
- .,
- . { color: #268bd2; font-weight: 600; }
-
- .,
- . { color: #2aa198; }
-
- .,
- . { color: #93a1a1; font-style: italic; }
-
- .,
- . { color: #d33682; }
-
- . { color: #cb4b16; font-weight: 700; }
- .,
- . { color: #657b83; }
+.code-theme-solarized-light .sql-keyword,
+.code-theme-solarized-light .pas-keyword { color: #859900 !important; font-weight: 700; }
+.code-theme-solarized-light .sql-fn,
+.code-theme-solarized-light .pas-type { color: #268bd2 !important; font-weight: 600; }
+.code-theme-solarized-light .sql-string,
+.code-theme-solarized-light .pas-string { color: #2aa198 !important; }
+.code-theme-solarized-light .sql-comment,
+.code-theme-solarized-light .pas-comment { color: #93a1a1 !important; font-style: italic; }
+.code-theme-solarized-light .sql-number,
+.code-theme-solarized-light .pas-number { color: #d33682 !important; }
+.code-theme-solarized-light .sql-param { color: #cb4b16 !important; font-weight: 700; }
+.code-theme-solarized-light .sql-operator,
+.code-theme-solarized-light .pas-special { color: #657b83 !important; }
+.code-theme-solarized-light .pas-proc { color: #268bd2 !important; font-weight: 700; }
 
 /* ══════════════════════════════════════════════════════════
- TEMA 13 — Solarized Dark ()
- ══════════════════════════════════════════════════════════ */
- .,
- .,
- . {
- background: #002b36!important;
- color: #839496!important;
+   TEMA 13 — Solarized Dark
+   ══════════════════════════════════════════════════════════ */
+.code-theme-solarized-dark .code-scroll,
+.code-theme-solarized-dark .code-editor-backdrop,
+.code-theme-solarized-dark .code-editor-wrap,
+.code-theme-solarized-dark .editor-main {
+  background: #002b36 !important;
+  color: #839496 !important;
 }
- . { color: #839496!important; }
- . { color: #839496; }
- . { background: #073642!important; color: #586e75!important; border-right: 1px solid #0a4756; }
+.code-theme-solarized-dark .line-src { color: #839496 !important; }
+.code-theme-solarized-dark .code-line { color: #839496; }
+.code-theme-solarized-dark .line-num { background: #073642 !important; color: #586e75 !important; border-right: 1px solid #0a4756; }
+.code-theme-solarized-dark .editor-gutter { background: #073642 !important; border-right: 1px solid #0a4756 !important; }
+.code-theme-solarized-dark .editor-gutter-line { color: #586e75 !important; }
 
- .,
- . { color: #859900; font-weight: 700; }
-
- .,
- . { color: #268bd2; font-weight: 600; }
-
- .,
- . { color: #2aa198; }
-
- .,
- . { color: #586e75; font-style: italic; }
-
- .,
- . { color: #d33682; }
-
- . { color: #cb4b16; font-weight: 700; }
- .,
- . { color: #93a1a1; }
-
+.code-theme-solarized-dark .sql-keyword,
+.code-theme-solarized-dark .pas-keyword { color: #859900 !important; font-weight: 700; }
+.code-theme-solarized-dark .sql-fn,
+.code-theme-solarized-dark .pas-type { color: #268bd2 !important; font-weight: 600; }
+.code-theme-solarized-dark .sql-string,
+.code-theme-solarized-dark .pas-string { color: #2aa198 !important; }
+.code-theme-solarized-dark .sql-comment,
+.code-theme-solarized-dark .pas-comment { color: #586e75 !important; font-style: italic; }
+.code-theme-solarized-dark .sql-number,
+.code-theme-solarized-dark .pas-number { color: #d33682 !important; }
+.code-theme-solarized-dark .sql-param { color: #cb4b16 !important; font-weight: 700; }
+.code-theme-solarized-dark .sql-operator,
+.code-theme-solarized-dark .pas-special { color: #93a1a1 !important; }
+.code-theme-solarized-dark .pas-proc { color: #268bd2 !important; font-weight: 700; }

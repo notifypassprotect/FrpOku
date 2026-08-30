@@ -346,28 +346,35 @@
  }
  }
 
- document.addEventListener('DOMContentLoaded', () => {
- if (!isLoggedIn()) {
- if (typeof window.showAuthFullScreenPortal === 'function') window.showAuthFullScreenPortal('login');
- } else {
- const appWrap = document.querySelector('.app-wrap');
- if (appWrap) appWrap.style.display = 'flex';
- updateNavbarUserBadge();
- setupAdminFeatures();
- }
+  function initAuthUI() {
+    if (!isLoggedIn()) {
+      if (typeof window.showAuthFullScreenPortal === 'function') window.showAuthFullScreenPortal('login');
+    } else {
+      const appWrap = document.querySelector('.app-wrap');
+      if (appWrap) appWrap.style.display = 'flex';
+      updateNavbarUserBadge();
+      setupAdminFeatures();
+    }
 
- const btnProfile = document.getElementById('btnUserProfile') || document.querySelector('[data-auth-badge]');
- if (btnProfile) {
- btnProfile.addEventListener('click', (e) => {
- e.stopPropagation();
- if (isLoggedIn()) {
- if (typeof window.showUserDropdown === 'function') window.showUserDropdown(btnProfile);
- } else {
- if (typeof window.showAuthFullScreenPortal === 'function') window.showAuthFullScreenPortal('login');
- }
- });
- }
- });
+    const btnProfile = document.getElementById('btnUserProfile') || document.querySelector('[data-auth-badge]');
+    if (btnProfile && !btnProfile._boundClick) {
+      btnProfile._boundClick = true;
+      btnProfile.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (isLoggedIn()) {
+          if (typeof window.showUserDropdown === 'function') window.showUserDropdown(btnProfile);
+        } else {
+          if (typeof window.showAuthFullScreenPortal === 'function') window.showAuthFullScreenPortal('login');
+        }
+      });
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAuthUI);
+  } else {
+    initAuthUI();
+  }
 
  async function updatePassword({ oldPassword, newPassword }) {
  const user = getSession();

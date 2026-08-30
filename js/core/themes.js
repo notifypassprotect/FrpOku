@@ -54,6 +54,14 @@
 
     document.documentElement.classList.add('code-theme-' + target);
     document.documentElement.classList.add('ui-theme-' + target);
+    if (document.body) {
+      CODE_THEMES.forEach(t => {
+        document.body.classList.remove('code-theme-' + t.id);
+        document.body.classList.remove('ui-theme-' + t.id);
+      });
+      document.body.classList.add('code-theme-' + target);
+      document.body.classList.add('ui-theme-' + target);
+    }
     
     // UI tema eşlemesi (light / dark)
     const isDark = target === 'frpoku-dark' || target === 'dracula' || target === 'github-dark' || 
@@ -62,6 +70,7 @@
                    target === 'solarized-dark';
     const uiTheme = isDark ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', uiTheme);
+    if (document.body) document.body.setAttribute('data-theme', uiTheme);
 
     if (!skipStorage) {
       try {
@@ -142,6 +151,17 @@
       document.querySelectorAll('#btnThemeToggle').forEach(btn => {
         btn.textContent = isDark ? 'Aydınlık Mod' : 'Koyu Mod';
       });
+    }
+  });
+
+  // Global Theme Toggle Click Handler
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('#btnThemeToggle');
+    if (btn) {
+      e.preventDefault();
+      const cur = getGlobalTheme();
+      const next = cur === 'dark' ? 'light' : 'dark';
+      setTheme(next);
     }
   });
 

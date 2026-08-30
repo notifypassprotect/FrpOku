@@ -229,7 +229,7 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
             <span>İşlem Detay Kartı</span>
             <span class="badge ${actInfo.badge}">${escHtml(actInfo.label)}</span>
           </div>
-          <button type="button" class="btn btn-sm btn-ghost btn-close-detail" style="font-size:1rem;padding:4px 8px;border-radius:8px;" title="Kapat">Kapat</button>
+          <button type="button" class="btn btn-sm btn-ghost btn-close-detail" style="font-size:1.15rem;padding:2px 8px;border-radius:8px;line-height:1;color:var(--text-muted);" title="Kapat">✕</button>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.85rem;font-size:.84rem;margin-bottom:1.2rem;background:var(--bg-raised);padding:1rem;border-radius:12px;border:1px solid var(--border-light);">
