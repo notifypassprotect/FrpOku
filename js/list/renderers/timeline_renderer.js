@@ -7,7 +7,7 @@ window.FrpListRenderers = window.FrpListRenderers || {};
 window.FrpListRenderers.renderTimeline = function(files, container) {
   if (!container) return;
 
-  const escHtml = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const escHtml = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
   if (files.length === 0) {
     container.innerHTML = `<div style="text-align:center;padding:4rem;color:var(--text-muted);">Sonuç bulunamadı.</div>`;
@@ -28,6 +28,7 @@ window.FrpListRenderers.renderTimeline = function(files, container) {
       <div class="timeline-group-header">${groupTitle} (${items.length} rapor)</div>
       <div class="timeline-items">
         ${items.map(file => {
+          const encodedId = encodeInlineArg(file.id);
           const reportName = file.meta?.reportName || file.name;
           const timeStr = new Date(file.loadedAt).toLocaleDateString('tr-TR');
           const guidVal = (file.meta && file.meta.guid) ? file.meta.guid : '—';
@@ -38,7 +39,7 @@ window.FrpListRenderers.renderTimeline = function(files, container) {
           const poolBadge = isPublic ? `<span class="badge badge-pool" style="font-size:.68rem;padding:.1rem .35rem;" title="Ortak Havuzda Paylaşıldı">Havuzda</span>` : '';
 
           return `
-            <div class="timeline-item" onclick="openDetail('${file.id}')" style="cursor:pointer;">
+            <div class="timeline-item" onclick="openDetail(decodeURIComponent('${encodedId}'))" style="cursor:pointer;">
               <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;">
                 <div style="display:flex;align-items:center;gap:.4rem;">
                   <strong style="font-size:.9rem;color:var(--text-primary);">${escHtml(reportName)}</strong>

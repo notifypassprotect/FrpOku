@@ -302,7 +302,7 @@
  alertBox.style.border = '1px solid #bbf7d0';
  alertBox.style.color = '#15803d';
  }
- alertBox.innerHTML = msg;
+ alertBox.textContent = String(msg || '');
  };
  const hideAlert = () => { alertBox.style.display = 'none'; };
 

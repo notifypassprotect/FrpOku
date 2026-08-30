@@ -6,6 +6,8 @@
 (function () {
   'use strict';
 
+  const USE_SERVER_BRIDGE = window.location.protocol !== 'file:';
+
   const runtimeConfig = window.FRP_RUNTIME_CONFIG || {};
   const SUPABASE_CONFIG = {
     url: runtimeConfig.supabaseUrl || '',
@@ -29,6 +31,23 @@
     return client;
   }
   getClient();
+
+  function serverAuthHeaders(extra = {}) {
+    if (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') {
+      return window.FrpAuth.getAuthHeaders(extra);
+    }
+    return { 'Content-Type': 'application/json', ...extra };
+  }
+
+  async function serverRequest(path, options = {}) {
+    const response = await fetch(path, {
+      ...options,
+      headers: serverAuthHeaders(options.headers || {})
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(data?.reason || `Sunucu isteği başarısız (${response.status}).`);
+    return data;
+  }
 
   // Rapor nesnesini DB şemasına dönüştür
   function formatReportRow(report, isDeleted = false) {
@@ -129,6 +148,15 @@
 
     // ── 1. AKTİF RAPORLAR (is_deleted = false) ─────────────────────
     async loadActiveReports() {
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest('/api/store/load');
+          return Array.isArray(data) ? data : null;
+        } catch (error) {
+          console.warn('Sunucu raporları çekilemedi:', error.message);
+          return null;
+        }
+      }
       const sb = getClient();
       if (!sb) return null;
       try {
@@ -164,6 +192,14 @@
 
     // ── 2. ÇÖP KUTUSUNDAKİ RAPORLAR (is_deleted = true) ─────────────
     async loadTrashReports() {
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest('/api/store/trash');
+          return Array.isArray(data) ? data : null;
+        } catch (error) {
+          return null;
+        }
+      }
       const sb = getClient();
       if (!sb) return null;
       try {
@@ -202,6 +238,14 @@
 
     // ── 3. RAPOR KAYDET / GÜNCELLE ──────────────────────────────────
     async saveReport(report) {
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest('/api/store/save', { method: 'POST', body: JSON.stringify([report]) });
+          return Boolean(data?.success);
+        } catch {
+          return false;
+        }
+      }
       const sb = getClient();
       if (!sb || !report) return false;
       try {
@@ -215,6 +259,15 @@
 
     // ── 4. ÇOKLU RAPOR KAYDET (Batch) ───────────────────────────────
     async saveReports(reports) {
+      if (USE_SERVER_BRIDGE) {
+        if (!Array.isArray(reports) || reports.length === 0) return true;
+        try {
+          const data = await serverRequest('/api/store/save', { method: 'POST', body: JSON.stringify(reports) });
+          return Boolean(data?.success);
+        } catch {
+          return false;
+        }
+      }
       const sb = getClient();
       if (!sb || !Array.isArray(reports) || reports.length === 0) return false;
       try {
@@ -232,6 +285,14 @@
 
     // ── 5. ÇÖP KUTUSUNA TAŞI (Soft Delete) ─────────────────────────
     async moveToTrash(id, reportObj) {
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest(`/api/reports/${encodeURIComponent(id)}/trash`, { method: 'PATCH', body: JSON.stringify({ deleted: true }) });
+          return Boolean(data?.success);
+        } catch {
+          return false;
+        }
+      }
       const sb = getClient();
       if (!sb || !id) return false;
       try {
@@ -250,6 +311,11 @@
     },
 
     async moveManyToTrash(ids) {
+      if (USE_SERVER_BRIDGE) {
+        if (!Array.isArray(ids) || ids.length === 0) return false;
+        const results = await Promise.all(ids.map(id => this.moveToTrash(id)));
+        return results.every(Boolean);
+      }
       const sb = getClient();
       if (!sb || !Array.isArray(ids) || ids.length === 0) return false;
       try {
@@ -264,6 +330,14 @@
 
     // ── 6. ÇÖP KUTUSUNDAN GERİ YÜKLE (Restore) ─────────────────────
     async restoreFromTrash(id) {
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest(`/api/reports/${encodeURIComponent(id)}/trash`, { method: 'PATCH', body: JSON.stringify({ deleted: false }) });
+          return Boolean(data?.success);
+        } catch {
+          return false;
+        }
+      }
       const sb = getClient();
       if (!sb || !id) return false;
       try {
@@ -275,6 +349,11 @@
     },
 
     async restoreManyFromTrash(ids) {
+      if (USE_SERVER_BRIDGE) {
+        if (!Array.isArray(ids) || ids.length === 0) return false;
+        const results = await Promise.all(ids.map(id => this.restoreFromTrash(id)));
+        return results.every(Boolean);
+      }
       const sb = getClient();
       if (!sb || !Array.isArray(ids) || ids.length === 0) return false;
       try {
@@ -292,11 +371,11 @@
       if (!reportId) return false;
       try {
         if (USE_SERVER_BRIDGE) {
-          fetch('/api/reports/toggle-pool', {
+          const data = await serverRequest('/api/reports/toggle-pool', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ reportId, makePublic, ownerInfo })
-          }).catch(() => {});
+          });
+          return Boolean(data?.success);
         }
 
         if (sb) {
@@ -328,11 +407,11 @@
       if (!Array.isArray(reportIds) || reportIds.length === 0) return false;
       try {
         if (USE_SERVER_BRIDGE) {
-          fetch('/api/reports/bulk-toggle-pool', {
+          const data = await serverRequest('/api/reports/bulk-toggle-pool', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ reportIds, makePublic, ownerInfo })
-          }).catch(() => {});
+          });
+          return Boolean(data?.success);
         }
 
         if (sb) {
@@ -361,6 +440,14 @@
 
     // ── 8. KALICI SİL (Purge from Database) ─────────────────────────
     async purgeReport(id) {
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest(`/api/reports/${encodeURIComponent(id)}`, { method: 'DELETE' });
+          return Boolean(data?.success);
+        } catch {
+          return false;
+        }
+      }
       const sb = getClient();
       if (!sb || !id) return false;
       try {
@@ -371,7 +458,16 @@
       }
     },
 
+    async deleteReport(id) {
+      return this.purgeReport(id);
+    },
+
     async purgeManyReports(ids) {
+      if (USE_SERVER_BRIDGE) {
+        if (!Array.isArray(ids) || ids.length === 0) return false;
+        const results = await Promise.all(ids.map(id => this.purgeReport(id)));
+        return results.every(Boolean);
+      }
       const sb = getClient();
       if (!sb || !Array.isArray(ids) || ids.length === 0) return false;
       try {
@@ -383,7 +479,39 @@
       }
     },
 
+    async deleteReports(ids) {
+      return this.purgeManyReports(ids);
+    },
+
+    async deleteAllReports() {
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest('/api/reports', { method: 'DELETE' });
+          return Boolean(data?.success);
+        } catch {
+          return false;
+        }
+      }
+      const sb = getClient();
+      const user = window.FrpAuth?.getUser();
+      if (!sb || !user?.id) return false;
+      try {
+        const { error } = await sb.from('reports').delete().eq('user_id', String(user.id));
+        return !error;
+      } catch {
+        return false;
+      }
+    },
+
     async emptyTrash() {
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest('/api/reports/trash/all', { method: 'DELETE' });
+          return Boolean(data?.success);
+        } catch {
+          return false;
+        }
+      }
       const sb = getClient();
       if (!sb) return false;
       try {

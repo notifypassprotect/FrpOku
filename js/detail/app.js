@@ -204,7 +204,7 @@ function renderSidebar(file) {
  const tagsList = tags.map(t => `
  <span class="tag-pill">
  ${esc(t)}
- <span class="tag-pill-remove" onclick="removeTagFromDetail('${esc(t)}')">×</span>
+ <span class="tag-pill-remove" onclick="removeTagFromDetail(decodeURIComponent('${encodeInlineArg(t)}'))">×</span>
  </span>
  `).join('');
 
@@ -217,7 +217,7 @@ function renderSidebar(file) {
  <div class="meta-label">GUID</div>
  <div class="meta-value" style="font-family:var(--mono);font-size:.68rem;display:flex;align-items:center;justify-content:space-between;gap:.3rem;">
  <span style="overflow:hidden;text-overflow:ellipsis;" title="${esc(meta.guid || '—')}">${esc(meta.guid || '—')}</span>
- ${meta.guid? `<button class="btn btn-sm" style="padding:.1rem.35rem;font-size:.65rem;" onclick="copyGuidText('${esc(meta.guid)}')">Kopyala</button>`: ''}
+ ${meta.guid? `<button class="btn btn-sm" style="padding:.1rem.35rem;font-size:.65rem;" onclick="copyGuidText(decodeURIComponent('${encodeInlineArg(meta.guid)}'))">Kopyala</button>`: ''}
  </div>
  </div>
  ${metaRow('Dosya Boyutu', file.sizeBytes > 1024? Math.round(file.sizeBytes / 1024) + ' KB': file.sizeBytes + ' B')}
@@ -736,7 +736,7 @@ function updateSyntaxErrorNotice(tabId, existingErrors) {
  <div style="display:flex;gap:.35rem;flex-wrap:wrap;flex:1;">
  ${errors.slice(0, 6).map(e => `
  <span style="font-family:var(--mono);font-size:.74rem;background:rgba(239,68,68,.15);color:var(--red);padding:.15rem.5rem;border-radius:6px;border:1px solid rgba(239,68,68,.3);cursor:pointer;"
- onclick="jumpToEditorLine('${tabId}', ${e.line}, '${esc(e.token || '')}')"
+ onclick="jumpToEditorLine('${tabId}', ${e.line}, decodeURIComponent('${encodeInlineArg(e.token || '')}'))"
  title="${esc(e.message)} — Satıra sıçramak için tıklayın">
  Satır ${e.line}: <strong>${esc(e.token)}</strong> (${esc(e.suggestion)})
  </span>
@@ -766,7 +766,7 @@ function openAllSyntaxErrorsModal(tabId) {
 
  const errItemsHtml = errors.map((e, idx) => `
  <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:.6rem.8rem;margin-bottom:.5rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem;cursor:pointer;"
- onclick="jumpToEditorLine('${tabId}', ${e.line}, '${esc(e.token || '')}'); const m = document.querySelector('.modal-overlay'); if (m) m.remove();"
+ onclick="jumpToEditorLine('${tabId}', ${e.line}, decodeURIComponent('${encodeInlineArg(e.token || '')}')); const m = document.querySelector('.modal-overlay'); if (m) m.remove();"
  title="Satır ${e.line}'e git">
  <div style="flex:1;">
  <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.2rem;">
@@ -1953,14 +1953,14 @@ function openComplexityModal(qIdx) {
  <div style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.25);border-radius:8px;padding:.6rem.75rem;">
  <div style="font-size:.7rem;font-weight:700;color:var(--red);margin-bottom:.3rem;display:flex;align-items:center;justify-content:space-between;">
  <span>❌ Mevcut / Riskli Kod:</span>
- <button type="button" class="btn btn-sm" style="font-size:.65rem;padding:.1rem.35rem;" onclick="navigator.clipboard.writeText(decodeURIComponent('${encodeURIComponent(rec.before || '')}')); showToast('Kopyalandı', 'success');"></button>
+ <button type="button" class="btn btn-sm" style="font-size:.65rem;padding:.1rem.35rem;" onclick="navigator.clipboard.writeText(decodeURIComponent('${encodeInlineArg(rec.before || '')}')); showToast('Kopyalandı', 'success');"></button>
  </div>
  <pre style="margin:0;font-family:var(--mono);font-size:.73rem;color:var(--text-primary);white-space:pre-wrap;line-height:1.4;max-height:140px;overflow-y:auto;">${esc(rec.before || '')}</pre>
  </div>
  <div style="background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.25);border-radius:8px;padding:.6rem.75rem;">
  <div style="font-size:.7rem;font-weight:700;color:var(--green);margin-bottom:.3rem;display:flex;align-items:center;justify-content:space-between;">
  <span>✅ Önerilen Optimize Kod:</span>
- <button type="button" class="btn btn-sm" style="font-size:.65rem;padding:.1rem.35rem;" onclick="navigator.clipboard.writeText(decodeURIComponent('${encodeURIComponent(rec.after || '')}')); showToast('Kopyalandı', 'success');"></button>
+ <button type="button" class="btn btn-sm" style="font-size:.65rem;padding:.1rem.35rem;" onclick="navigator.clipboard.writeText(decodeURIComponent('${encodeInlineArg(rec.after || '')}')); showToast('Kopyalandı', 'success');"></button>
  </div>
  <pre style="margin:0;font-family:var(--mono);font-size:.73rem;color:var(--text-primary);white-space:pre-wrap;line-height:1.4;max-height:140px;overflow-y:auto;">${esc(rec.after || '')}</pre>
  </div>
@@ -3287,5 +3287,4 @@ if (document.readyState === 'loading') {
  setupMobileDetailTabs();
  setupDownloadHistoryDetail();
 }
-
 

@@ -63,7 +63,7 @@
       try {
         fetch('/api/audit-log', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') ? window.FrpAuth.getAuthHeaders() : { 'Content-Type': 'application/json' },
           body: JSON.stringify(logEntry)
         }).catch(() => {});
       } catch (e) {}

@@ -126,14 +126,13 @@ window.FrpSettingsTabs.storage = {
     });
 
     overlay.querySelector('#btnActionResetAll')?.addEventListener('click', () => {
-      const authUser = window.FrpAuth?.getUser();
       const promptPass = prompt('DİKKAT: Tüm yüklenen raporları ve veritabanını temizlemek üzeresiniz!\n\nİşlemi onaylamak için lütfen hesap şifrenizi giriniz:');
       if (!promptPass) return;
 
       fetch('/api/auth/verify-password', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: authUser?.id || 'admin', password: promptPass })
+        headers: window.FrpAuth?.getAuthHeaders() || { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: promptPass })
       }).then(r => r.json()).then(res => {
         if (!res.success || !res.verified) {
           alert('Hata: Girdiğiniz şifre hatalı! İşlem iptal edildi.');

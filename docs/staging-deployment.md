@@ -3,8 +3,8 @@
 ## 1. Supabase
 
 1. Boş bir staging Supabase projesi oluşturun.
-2. SQL Editor içinde `supabase/migrations/001_staging_schema.sql` dosyasını çalıştırın.
-3. Project URL ve service-role key değerlerini yalnızca Render secret alanlarında saklayın.
+2. SQL Editor içinde sırasıyla `supabase/migrations/001_staging_schema.sql` ve `supabase/migrations/002_audit_logs.sql` dosyalarını çalıştırın. Yeni kurulumlarda ikinci dosya idempotent olduğu için güvenle tekrar çalıştırılabilir.
+3. Project URL ve secret/service-role key değerlerini yalnızca Render secret alanlarında saklayın. Publishable (`sb_publishable_...`) anahtarı `SUPABASE_SERVICE_ROLE_KEY` olarak kullanmayın.
 4. `ENABLE_BROWSER_SUPABASE=false` bırakın. Bu sürümde tarayıcı Supabase'e doğrudan bağlanmaz.
 
 ## 2. Render Blueprint
@@ -22,6 +22,8 @@ Gerekli staging değerleri:
 - `BOOTSTRAP_ADMIN_USERNAME` / `BOOTSTRAP_ADMIN_PASSWORD` / `BOOTSTRAP_ADMIN_EMAIL`
 
 `SUPABASE_ANON_KEY` bu aşamada boş bırakılabilir. `MAIL_ENABLED=false` olarak kalır.
+
+Eski `SUPABASE_KEY` değişkeni deployed ortamda sunucu anahtarı olarak kabul edilmez. Publishable anahtar gerekiyorsa `SUPABASE_ANON_KEY` adıyla tutulur.
 
 ## 3. İlk doğrulama
 

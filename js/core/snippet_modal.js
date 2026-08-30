@@ -218,7 +218,7 @@
             const sqlPreview = escHtml(s.sql || '');
 
             return `
-              <div class="snippet-item" data-id="${s.id}" style="background:var(--bg-raised);border:1px solid var(--border-light);border-radius:12px;padding:.9rem;display:flex;flex-direction:column;gap:.5rem;transition:border-color .15s;">
+              <div class="snippet-item" data-id="${escHtml(s.id)}" style="background:var(--bg-raised);border:1px solid var(--border-light);border-radius:12px;padding:.9rem;display:flex;flex-direction:column;gap:.5rem;transition:border-color .15s;">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem;flex-wrap:wrap;">
                   <div>
                     <div class="snippet-title" style="font-weight:700;color:var(--accent-bright);font-size:.92rem;display:flex;align-items:center;gap:.35rem;">
@@ -229,8 +229,8 @@
                     </div>
                   </div>
                   <div style="display:flex;gap:.35rem;flex-wrap:wrap;align-items:center;">
-                    <button type="button" class="btn btn-sm btn-ghost btn-edit-snippet" style="padding:.25rem .55rem;font-size:.76rem;" data-id="${s.id}" title="Düzenle">Düzenle</button>
-                    <button type="button" class="btn btn-sm btn-danger btn-delete-snippet" style="padding:.25rem .55rem;font-size:.76rem;" data-id="${s.id}" title="Sil">Sil</button>
+                    <button type="button" class="btn btn-sm btn-ghost btn-edit-snippet" style="padding:.25rem .55rem;font-size:.76rem;" data-id="${escHtml(s.id)}" title="Düzenle">Düzenle</button>
+                    <button type="button" class="btn btn-sm btn-danger btn-delete-snippet" style="padding:.25rem .55rem;font-size:.76rem;" data-id="${escHtml(s.id)}" title="Sil">Sil</button>
                   </div>
                 </div>
 
@@ -240,10 +240,10 @@
 
                 <div style="display:flex;justify-content:flex-end;gap:.5rem;margin-top:.15rem;flex-wrap:wrap;">
                   ${window.currentFile ? `
-                    <button type="button" class="btn btn-sm btn-primary btn-add-new-query" style="padding:.3rem .75rem;font-size:.78rem;background:linear-gradient(135deg, #059669, #10b981);color:#fff;border:none;font-weight:700;" data-id="${s.id}" title="Bu sorguyu mevcut rapora yeni bir sekme/Dataset olarak ekle">+ Rapora Yeni Sorgu Ekle</button>
-                    <button type="button" class="btn btn-sm btn-secondary btn-insert-snippet" style="padding:.3rem .75rem;font-size:.78rem;" data-id="${s.id}" title="Açık olan SQL editörüne yapıştır">Aktif Editöre Yapıştır</button>
+                    <button type="button" class="btn btn-sm btn-primary btn-add-new-query" style="padding:.3rem .75rem;font-size:.78rem;background:linear-gradient(135deg, #059669, #10b981);color:#fff;border:none;font-weight:700;" data-id="${escHtml(s.id)}" title="Bu sorguyu mevcut rapora yeni bir sekme/Dataset olarak ekle">+ Rapora Yeni Sorgu Ekle</button>
+                    <button type="button" class="btn btn-sm btn-secondary btn-insert-snippet" style="padding:.3rem .75rem;font-size:.78rem;" data-id="${escHtml(s.id)}" title="Açık olan SQL editörüne yapıştır">Aktif Editöre Yapıştır</button>
                   ` : ''}
-                  <button type="button" class="btn btn-sm btn-ghost btn-copy-snippet" style="padding:.3rem .75rem;font-size:.78rem;" data-id="${s.id}">Panoya Kopyala</button>
+                  <button type="button" class="btn btn-sm btn-ghost btn-copy-snippet" style="padding:.3rem .75rem;font-size:.78rem;" data-id="${escHtml(s.id)}">Panoya Kopyala</button>
                 </div>
               </div>
             `;

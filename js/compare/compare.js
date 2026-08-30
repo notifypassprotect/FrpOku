@@ -332,7 +332,7 @@ document.getElementById('btnBack')?.addEventListener('click', () => {
 });
 
 function esc(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 function countLines(text) {
@@ -801,8 +801,8 @@ function renderDiff() {
       }
     }
 
-    const actionsA = (lA.type === 'del' || lA.type === 'add') && lA.text ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('A', ${i})" title="Sağ panele aktar">Aktar</button><button class="btn-inline-action" onclick="copyLineText('${encodeURIComponent(lA.text)}')" title="Kopyala">Kopyala</button></span>` : '';
-    const actionsB = (lB.type === 'add' || lB.type === 'del') && lB.text ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('B', ${i})" title="Sol panele aktar">Aktar</button><button class="btn-inline-action" onclick="copyLineText('${encodeURIComponent(lB.text)}')" title="Kopyala">Kopyala</button></span>` : '';
+    const actionsA = (lA.type === 'del' || lA.type === 'add') && lA.text ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('A', ${i})" title="Sağ panele aktar">Aktar</button><button class="btn-inline-action" onclick="copyLineText('${encodeInlineArg(lA.text)}')" title="Kopyala">Kopyala</button></span>` : '';
+    const actionsB = (lB.type === 'add' || lB.type === 'del') && lB.text ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('B', ${i})" title="Sol panele aktar">Aktar</button><button class="btn-inline-action" onclick="copyLineText('${encodeInlineArg(lB.text)}')" title="Kopyala">Kopyala</button></span>` : '';
 
     if (lA.type === 'del' && lB.type === 'add' && lA.pairedText !== undefined) {
       const { wordsA, wordsB } = DiffEngine.computeWordDiff(lA.text, lB.text);

@@ -18,8 +18,6 @@
   const DB_NAME = 'FrpOkuDB';
   const DB_STORE = 'files';
   const DB_TRASH_STORE = 'trash';
-  const USE_SERVER_BRIDGE = window.location.protocol !== 'file:';
-
   let dbPromise = null;
   let _memoryStore = null;
   let _trashStore = [];
@@ -108,6 +106,12 @@
     } catch (e) {}
   }
 
+  function _reportsOwnedBySession(files) {
+    const user = window.FrpAuth && typeof window.FrpAuth.getUser === 'function' ? window.FrpAuth.getUser() : null;
+    if (!user) return [];
+    return files.filter(file => !file.userId && !file.user_id || String(file.userId || file.user_id) === String(user.id));
+  }
+
   function _write(files) {
     _memoryStore = files;
     try {
@@ -115,21 +119,13 @@
       syncToIndexedDB(files);
 
       if (window.FrpCloud && typeof window.FrpCloud.saveReports === 'function') {
-        window.FrpCloud.saveReports(files).catch(err => console.warn('Supabase sync warning:', err));
-      }
-
-      if (USE_SERVER_BRIDGE) {
-        fetch('/api/store/save', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(files)
-        }).catch(() => {});
+        window.FrpCloud.saveReports(_reportsOwnedBySession(files)).catch(err => console.warn('Supabase sync warning:', err));
       }
       return true;
     } catch (e) {
       syncToIndexedDB(files);
       if (window.FrpCloud && typeof window.FrpCloud.saveReports === 'function') {
-        window.FrpCloud.saveReports(files).catch(() => {});
+        window.FrpCloud.saveReports(_reportsOwnedBySession(files)).catch(() => {});
       }
       return true;
     }

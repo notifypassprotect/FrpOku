@@ -25,7 +25,7 @@ create table if not exists public.reports
 (
     id text primary key,
     name text not null,
-    user_id text not null default 'public',
+    user_id text not null references public.app_users(id) on delete cascade,
     file_size bigint not null default 0,
     category text not null default '',
     tags jsonb not null default '[]'::jsonb,
@@ -86,14 +86,34 @@ create table if not exists public.user_settings
     updated_at timestamptz not null default now()
 );
 
+create table if not exists public.audit_logs
+(
+    id text primary key,
+    occurred_at timestamptz not null default now(),
+    user_id text not null,
+    username text not null default '',
+    full_name text not null default '',
+    role text not null default 'user',
+    action text not null,
+    target text not null default '',
+    details text not null default '',
+    ip text not null default ''
+);
+
+create index if not exists audit_logs_occurred_at_idx on public.audit_logs (occurred_at desc);
+create index if not exists audit_logs_user_id_idx on public.audit_logs (user_id);
+create index if not exists audit_logs_action_idx on public.audit_logs (action);
+
 alter table public.app_users enable row level security;
 alter table public.reports enable row level security;
 alter table public.categories enable row level security;
 alter table public.snippets enable row level security;
 alter table public.user_settings enable row level security;
+alter table public.audit_logs enable row level security;
 
 revoke all on public.app_users from anon, authenticated;
 revoke all on public.reports from anon, authenticated;
 revoke all on public.categories from anon, authenticated;
 revoke all on public.snippets from anon, authenticated;
 revoke all on public.user_settings from anon, authenticated;
+revoke all on public.audit_logs from anon, authenticated;
