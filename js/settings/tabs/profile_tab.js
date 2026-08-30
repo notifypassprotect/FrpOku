@@ -84,11 +84,9 @@ window.FrpSettingsTabs.profile = {
             </div>
 
             <div>
-              <label style="font-size:.75rem;font-weight:700;color:var(--text-secondary);margin-bottom:.2rem;display:block;">E-Posta Adresiniz</label>
-              <div style="display:flex;gap:.4rem;">
-                <input type="email" id="profEmail" class="master-search-input" style="flex:1;" value="${escHtml(stagedProfile.email || '')}" />
-                <button type="button" class="btn btn-sm btn-primary" id="btnUpdateEmailDirectly" style="font-weight:700;font-size:.75rem;padding:.3rem .65rem;">Değiştir</button>
-              </div>
+              <label style="font-size:.75rem;font-weight:700;color:var(--text-secondary);margin-bottom:.2rem;display:block;">Kayıtlı E-Posta Adresi</label>
+              <input type="email" id="profEmailDisplay" class="master-search-input" style="width:100%;background:rgba(0,0,0,.03);cursor:not-allowed;" value="${escHtml(stagedProfile.email || '')}" readonly />
+              <div style="font-size:.7rem;color:var(--text-muted);margin-top:.2rem;">E-posta adresinizi aşağıdaki güvenlik alanından değiştirebilirsiniz.</div>
             </div>
 
             <div>
@@ -145,7 +143,38 @@ window.FrpSettingsTabs.profile = {
 
           </div>
 
-          <!-- Alt Kart: Şifre ve Hesap Güvenliği -->
+          <!-- Alt Kart 1: E-Posta Değiştirme -->
+          <div class="settings-card" style="grid-column: 1 / -1; display:flex; flex-direction:column; gap:.85rem; border: 1.5px solid var(--border); background: var(--bg-surface); padding: 1.25rem; border-radius: 14px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-light); padding-bottom:.5rem;">
+              <div>
+                <div style="font-weight:800; font-size:.92rem; color:var(--text-primary);">E-Posta Adresi Güncelleme</div>
+                <div style="font-size:.74rem; color:var(--text-muted);">Hesabınıza bağlı iletişim e-posta adresini doğrulayarak güncelleyin</div>
+              </div>
+              <span class="badge badge-purple" style="font-weight:700; font-size:.7rem;">İletişim & Bildirim</span>
+            </div>
+
+            <!-- Canlı Uyarı / Bilgi Kutusu -->
+            <div id="profileEmailAlert" style="display:none; padding:.75rem 1rem; border-radius:10px; font-size:.82rem; font-weight:600;"></div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:.85rem;">
+              <div>
+                <label style="font-size:.75rem; font-weight:700; color:var(--text-secondary); margin-bottom:.3rem; display:block;">Mevcut Şifreniz</label>
+                <input type="password" id="profEmailCurrentPass" class="master-search-input" style="width:100%;" placeholder="Güvenlik için mevcut şifrenizi girin" />
+              </div>
+              <div>
+                <label style="font-size:.75rem; font-weight:700; color:var(--text-secondary); margin-bottom:.3rem; display:block;">Yeni E-Posta Adresi</label>
+                <input type="email" id="profNewEmail" class="master-search-input" style="width:100%;" placeholder="yeni_eposta@alanadi.com" />
+              </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; margin-top:.2rem;">
+              <button type="button" id="btnUpdateEmailSecurely" class="btn btn-primary" style="padding:.55rem 1.35rem; font-weight:800; font-size:.84rem; border-radius:10px;">
+                E-Posta Adresimi Güncelle
+              </button>
+            </div>
+          </div>
+
+          <!-- Alt Kart 2: Şifre ve Hesap Güvenliği -->
           <div class="settings-card" style="grid-column: 1 / -1; display:flex; flex-direction:column; gap:.85rem; border: 1.5px solid var(--accent); background: var(--bg-surface); padding: 1.25rem; border-radius: 14px;">
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-light); padding-bottom:.5rem;">
               <div>
@@ -173,8 +202,8 @@ window.FrpSettingsTabs.profile = {
               </div>
             </div>
 
-            <div style="display:flex; justify-content:flex-end; margin-top:.3rem;">
-              <button type="button" id="btnUpdatePasswordProfile" class="btn btn-primary" style="padding:.6rem 1.4rem; font-weight:800; font-size:.85rem; border-radius:10px;">
+            <div style="display:flex; justify-content:flex-end; margin-top:.2rem;">
+              <button type="button" id="btnUpdatePasswordProfile" class="btn btn-primary" style="padding:.55rem 1.35rem; font-weight:800; font-size:.84rem; border-radius:10px;">
                 Şifremi Güncelle
               </button>
             </div>
@@ -196,29 +225,69 @@ window.FrpSettingsTabs.profile = {
     bindInput('#profFirstName', 'firstName');
     bindInput('#profLastName', 'lastName');
     bindInput('#profUsername', 'username');
-    bindInput('#profEmail', 'email');
 
-    // E-Posta anında güncelle butonu
-    overlay.querySelector('#btnUpdateEmailDirectly')?.addEventListener('click', async () => {
-      const emailInput = overlay.querySelector('#profEmail');
+    // E-Posta Güvenli Güncelle Butonu
+    overlay.querySelector('#btnUpdateEmailSecurely')?.addEventListener('click', async () => {
+      const emailInput = overlay.querySelector('#profNewEmail');
+      const passInput = overlay.querySelector('#profEmailCurrentPass');
+      const alertEl = overlay.querySelector('#profileEmailAlert');
+      const displayEl = overlay.querySelector('#profEmailDisplay');
+
       const newEmail = (emailInput?.value || '').trim();
+      const currentPass = (passInput?.value || '').trim();
+
+      const showEmailAlert = (msg, type) => {
+        if (!alertEl) return;
+        alertEl.style.display = 'block';
+        alertEl.textContent = msg;
+        if (type === 'error') {
+          alertEl.style.background = 'rgba(239, 68, 68, 0.12)';
+          alertEl.style.color = '#ef4444';
+          alertEl.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+        } else if (type === 'success') {
+          alertEl.style.background = 'rgba(16, 185, 129, 0.12)';
+          alertEl.style.color = '#10b981';
+          alertEl.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+        } else {
+          alertEl.style.background = 'rgba(245, 158, 11, 0.12)';
+          alertEl.style.color = '#f59e0b';
+          alertEl.style.border = '1px solid rgba(245, 158, 11, 0.3)';
+        }
+      };
 
       if (!newEmail || !newEmail.includes('@')) {
-        safeToast('Geçerli bir e-posta adresi giriniz.', 'warning');
+        showEmailAlert('Lütfen geçerli bir e-posta adresi giriniz.', 'warning');
         return;
       }
 
+      if (!currentPass) {
+        showEmailAlert('Güvenliğiniz için lütfen mevcut şifrenizi giriniz.', 'warning');
+        return;
+      }
+
+      const btn = overlay.querySelector('#btnUpdateEmailSecurely');
+      if (btn) { btn.disabled = true; btn.textContent = 'Güncelleniyor...'; }
+
       if (window.FrpAuth?.updateEmail) {
         const res = await window.FrpAuth.updateEmail(newEmail);
+        if (btn) { btn.disabled = false; btn.textContent = 'E-Posta Adresimi Güncelle'; }
+
         if (res.success) {
           stagedProfile.email = newEmail;
+          if (displayEl) displayEl.value = newEmail;
+          if (emailInput) emailInput.value = '';
+          if (passInput) passInput.value = '';
+          showEmailAlert('E-posta adresi başarıyla güncellendi.', 'success');
           safeToast('E-posta adresi başarıyla güncellendi.', 'success');
         } else {
-          safeToast(res.reason || 'E-posta güncellenemedi.', 'error');
+          showEmailAlert(res.reason || 'E-posta güncellenemedi.', 'error');
         }
       } else {
         stagedProfile.email = newEmail;
+        if (displayEl) displayEl.value = newEmail;
+        if (btn) { btn.disabled = false; btn.textContent = 'E-Posta Adresimi Güncelle'; }
         markDirty();
+        showEmailAlert('E-posta kaydedilmek üzere hazırlandı.', 'success');
         safeToast('E-posta kaydedilmek üzere hazırlandı.', 'info');
       }
     });

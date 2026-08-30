@@ -25,16 +25,26 @@
   ];
 
   function getCodeTheme() {
-    return localStorage.getItem(THEME_CODE_KEY) || 'frpoku-light';
+    const saved = localStorage.getItem(THEME_CODE_KEY);
+    if (saved) return saved;
+    const globalT = getGlobalTheme();
+    return globalT === 'dark' ? 'frpoku-dark' : 'frpoku-light';
   }
 
   function getGlobalTheme() {
-    return localStorage.getItem(THEME_GLOBAL_KEY) || 'light';
+    let t = localStorage.getItem(THEME_GLOBAL_KEY);
+    if (!t) {
+      try {
+        const p = JSON.parse(localStorage.getItem('frpoku_preferences') || '{}');
+        if (p && p.theme) t = p.theme;
+      } catch (e) {}
+    }
+    return t === 'dark' ? 'dark' : 'light';
   }
 
   function applyCodeTheme(themeId, skipStorage = false) {
     const valid = CODE_THEMES.some(t => t.id === themeId);
-    const target = valid ? themeId : 'frpoku-light';
+    const target = valid ? themeId : (getGlobalTheme() === 'dark' ? 'frpoku-dark' : 'frpoku-light');
 
     // Eski tema class'larını kaldır
     CODE_THEMES.forEach(t => {
@@ -47,7 +57,7 @@
     
     // UI tema eşlemesi (light / dark)
     const isDark = target === 'frpoku-dark' || target === 'dracula' || target === 'github-dark' || 
-                   target === 'monokai' || target === 'tokyo-night' || target === 'cyberpunk' || 
+                   target === 'monokai' || target === 'nord' || target === 'tokyo-night' || target === 'cyberpunk' || 
                    target === 'matrix' || target === 'synthwave' || target === 'deep-ocean' || 
                    target === 'solarized-dark';
     const uiTheme = isDark ? 'dark' : 'light';
@@ -58,6 +68,9 @@
         localStorage.setItem(THEME_CODE_KEY, target);
         localStorage.setItem(THEME_UI_KEY, target);
         localStorage.setItem(THEME_GLOBAL_KEY, uiTheme);
+        const prefs = JSON.parse(localStorage.getItem('frpoku_preferences') || '{}');
+        prefs.theme = uiTheme;
+        localStorage.setItem('frpoku_preferences', JSON.stringify(prefs));
       } catch (e) {}
     }
 
@@ -82,12 +95,14 @@
   }
 
   function initCodeTheme() {
-    const savedCode = getCodeTheme();
     const savedGlobal = getGlobalTheme();
-    if (savedCode === 'frpoku-dark' && savedGlobal === 'light') {
-      applyCodeTheme('frpoku-light');
-    } else {
+    const isDark = savedGlobal === 'dark';
+    const savedCode = localStorage.getItem(THEME_CODE_KEY);
+    
+    if (savedCode) {
       applyCodeTheme(savedCode);
+    } else {
+      applyCodeTheme(isDark ? 'frpoku-dark' : 'frpoku-light');
     }
   }
 

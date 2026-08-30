@@ -15,7 +15,7 @@ window.FrpSettingsTabs.categories = {
           <span style="width:14px;height:14px;border-radius:50%;background:${cat.color};display:inline-block;box-shadow:0 0 5px ${cat.color};"></span>
           <span style="font-weight:700;font-size:.84rem;color:var(--text-primary);">${escHtml(cat.name)}</span>
         </div>
-        <button type="button" class="btn btn-sm btn-ghost btn-delete-cat" data-id="${cat.id}" style="color:var(--red);padding:.2rem .5rem;font-size:.75rem;" title="Kategoriyi Sil">
+        <button type="button" class="btn btn-sm btn-ghost btn-delete-cat" data-id="${cat.id}" data-name="${escHtml(cat.name)}" style="color:var(--red);padding:.25rem .65rem;font-size:.75rem;font-weight:700;" title="Kategoriyi Sil">
           Sil
         </button>
       </div>
@@ -24,7 +24,7 @@ window.FrpSettingsTabs.categories = {
     const customTagsHtml = customTags.map(tag => `
       <span class="custom-tag-chip" style="display:inline-flex;align-items:center;gap:.35rem;padding:.3rem .65rem;border-radius:8px;background:var(--bg-surface);border:1px solid var(--border-light);font-size:.78rem;font-weight:600;">
         <span>${escHtml(tag)}</span>
-        <button type="button" class="btn-remove-custom-tag" data-tag="${escHtml(tag)}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:.75rem;padding:0;" title="Etiketi Kaldır">✕</button>
+        <button type="button" class="btn-remove-custom-tag" data-tag="${escHtml(tag)}" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:.75rem;padding:0;line-height:1;" title="Etiketi Kaldır">✕</button>
       </span>
     `).join('');
 
@@ -58,7 +58,7 @@ window.FrpSettingsTabs.categories = {
         <!-- Özel Kullanıcı Etiketleri (Custom Tags) -->
         <div class="settings-card" style="display:flex;flex-direction:column;gap:.75rem;">
           <div style="font-weight:700;font-size:.85rem;">Özel Kullanıcı Etiketleri (Manuel Tag Havuzu)</div>
-          <div style="font-size:.74rem;color:var(--text-muted);">Otomatik etiketlerin yanı sıra kendi özel etiketlerinizi oluşturabilirsiniz.</div>
+          <div style="font-size:.74rem;color:var(--text-muted);">Otomatik etiketlerin yanı sıra kendi özel etiketlerinizi anında oluşturup kullanabilirsiniz.</div>
           <div style="display:flex;gap:.5rem;align-items:center;">
             <input type="text" id="newCustomTagName" class="master-search-input" style="flex:1;" placeholder="Yeni etiket adı (Örn: Acil, Revizyon, Onay)..." />
             <button type="button" class="btn btn-sm btn-primary" id="btnAddCustomTag" style="font-weight:700;padding:.5rem 1rem;">Etiket Ekle</button>
@@ -77,27 +77,44 @@ window.FrpSettingsTabs.categories = {
       const name = (overlay.querySelector('#newCategoryName')?.value || '').trim();
       const color = overlay.querySelector('#newCategoryColor')?.value || '#3b82f6';
       if (!name) {
-        safeToast('Lütfen bir kategori adı girin.', 'error');
+        if (typeof safeToast === 'function') safeToast('Lütfen bir kategori adı girin.', 'error');
         return;
       }
       FrpStore.addCategory(name, color);
-      safeToast(`'${name}' kategorisi eklendi.`, 'success');
-      renderModal();
+      if (typeof safeToast === 'function') safeToast(`'${name}' kategorisi eklendi.`, 'success');
+      if (typeof renderModal === 'function') renderModal();
+      if (typeof window.refreshAll === 'function') window.refreshAll();
     };
 
     overlay.querySelector('#btnAddNewCategory')?.addEventListener('click', doAddCategory);
-    overlay.querySelector('#btnSaveNewCat')?.addEventListener('click', doAddCategory);
     overlay.querySelector('#newCategoryName')?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') doAddCategory();
     });
 
-    // Kategori Sil
+    // Kategori Sil (Onay İletişim Kutulu)
     overlay.querySelectorAll('.btn-delete-cat').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const id = e.currentTarget.dataset.id;
-        FrpStore.deleteCategory(id);
-        safeToast('Kategori silindi.', 'info');
-        renderModal();
+        const catName = e.currentTarget.dataset.name || 'Bu kategori';
+
+        const doDelete = () => {
+          FrpStore.deleteCategory(id);
+          if (typeof safeToast === 'function') safeToast(`'${catName}' kategorisi silindi.`, 'info');
+          if (typeof renderModal === 'function') renderModal();
+          if (typeof window.refreshAll === 'function') window.refreshAll();
+        };
+
+        if (typeof window.showConfirmDialog === 'function') {
+          window.showConfirmDialog({
+            title: 'Kategoriyi Sil',
+            message: `"${catName}" kategorisini silmek istediğinizden emin misiniz? Bu kategoriye ait raporların kategori ataması kaldırılacaktır.`,
+            confirmText: 'Evet, Sil',
+            isDanger: true,
+            onConfirm: doDelete
+          });
+        } else if (confirm(`"${catName}" kategorisini silmek istediğinizden emin misiniz?`)) {
+          doDelete();
+        }
       });
     });
 
@@ -105,12 +122,13 @@ window.FrpSettingsTabs.categories = {
     const doAddTag = () => {
       const tag = (overlay.querySelector('#newCustomTagName')?.value || '').trim();
       if (!tag) {
-        safeToast('Lütfen bir etiket adı girin.', 'error');
+        if (typeof safeToast === 'function') safeToast('Lütfen bir etiket adı girin.', 'error');
         return;
       }
       FrpStore.addCustomTag(tag);
-      safeToast(`'${tag}' etiketi eklendi.`, 'success');
-      renderModal();
+      if (typeof safeToast === 'function') safeToast(`'${tag}' etiketi eklendi.`, 'success');
+      if (typeof renderModal === 'function') renderModal();
+      if (typeof window.refreshAll === 'function') window.refreshAll();
     };
 
     overlay.querySelector('#btnAddCustomTag')?.addEventListener('click', doAddTag);
@@ -123,8 +141,9 @@ window.FrpSettingsTabs.categories = {
       btn.addEventListener('click', (e) => {
         const tag = e.currentTarget.dataset.tag;
         FrpStore.deleteCustomTag(tag);
-        safeToast(`'${tag}' etiketi silindi.`, 'info');
-        renderModal();
+        if (typeof safeToast === 'function') safeToast(`'${tag}' etiketi silindi.`, 'info');
+        if (typeof renderModal === 'function') renderModal();
+        if (typeof window.refreshAll === 'function') window.refreshAll();
       });
     });
   }

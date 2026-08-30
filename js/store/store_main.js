@@ -893,21 +893,25 @@
     return { success: true, category: cats[idx] };
   }
 
-  function deleteCategory(name) {
-    const trimmed = (name || '').trim().toLowerCase();
+  function deleteCategory(identifier) {
+    if (!identifier) return false;
+    const trimmed = String(identifier).trim().toLowerCase();
     let cats = getCategoryObjects();
-    const toDel = cats.find(c => (c.name || '').trim().toLowerCase() === trimmed);
-    cats = cats.filter(c => (c.name || '').trim().toLowerCase() !== trimmed);
+    const toDel = cats.find(c => (c.id && String(c.id).toLowerCase() === trimmed) || (c.name && c.name.trim().toLowerCase() === trimmed));
+    if (!toDel) return false;
+
+    cats = cats.filter(c => c.id !== toDel.id && (c.name || '').trim().toLowerCase() !== (toDel.name || '').trim().toLowerCase());
     localStorage.setItem(CATEGORIES_KEY, JSON.stringify(cats));
 
-    if (toDel && window.FrpCloud && typeof window.FrpCloud.deleteCategory === 'function') {
+    if (window.FrpCloud && typeof window.FrpCloud.deleteCategory === 'function' && toDel.id) {
       window.FrpCloud.deleteCategory(toDel.id).catch(() => {});
     }
 
     const files = _read();
     let changed = false;
+    const delNameLower = (toDel.name || '').trim().toLowerCase();
     files.forEach(f => {
-      if ((f.category || '').trim().toLowerCase() === trimmed) {
+      if ((f.category || '').trim().toLowerCase() === delNameLower) {
         delete f.category;
         changed = true;
       }
@@ -1027,32 +1031,78 @@
   }
 
   // ── 10. Tercihler, Tema, Son Açılanlar ─────────────────────────
-  function getTheme() { return localStorage.getItem(THEME_KEY) || 'light'; }
+  function getTheme() { 
+    const saved = localStorage.getItem(THEME_KEY);
+    if (saved) return saved === 'dark' ? 'dark' : 'light';
+    try {
+      const p = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
+      if (p && p.theme) return p.theme === 'dark' ? 'dark' : 'light';
+    } catch (e) {}
+    return 'light'; 
+  }
+
   function setTheme(theme) {
-    localStorage.setItem(THEME_KEY, theme);
-    document.documentElement.setAttribute('data-theme', theme);
+    const safeTheme = theme === 'dark' ? 'dark' : 'light';
+    localStorage.setItem(THEME_KEY, safeTheme);
+    localStorage.setItem('frpoku_theme', safeTheme);
+    document.documentElement.setAttribute('data-theme', safeTheme);
+
+    try {
+      const p = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
+      p.theme = safeTheme;
+      localStorage.setItem(PREFS_KEY, JSON.stringify(p));
+    } catch (e) {}
+
     if (window.FrpThemes && typeof window.FrpThemes.setTheme === 'function') {
-      window.FrpThemes.setTheme(theme);
+      window.FrpThemes.setTheme(safeTheme);
     }
   }
-  function initTheme() { setTheme(getTheme()); }
+
+  function initTheme() { 
+    setTheme(getTheme()); 
+  }
   initTheme();
 
   function getPreferences() {
     try {
       const raw = localStorage.getItem(PREFS_KEY);
-      return raw ? JSON.parse(raw) : { defaultSort: 'updated_desc', compactView: false, autoTagging: true };
+      const defaults = { 
+        theme: getTheme(), 
+        fontWeight: 'normal',
+        fontFamily: 'inter',
+        codeFont: 'jetbrains',
+        fontSize: 'normal',
+        density: 'normal',
+        defaultSort: 'updated_desc', 
+        compactView: false, 
+        autoTagging: true 
+      };
+      return raw ? { ...defaults, ...JSON.parse(raw) } : defaults;
     } catch {
-      return { defaultSort: 'updated_desc', compactView: false, autoTagging: true };
+      return { 
+        theme: 'light', 
+        fontWeight: 'normal',
+        fontFamily: 'inter',
+        codeFont: 'jetbrains',
+        fontSize: 'normal',
+        density: 'normal',
+        defaultSort: 'updated_desc', 
+        compactView: false, 
+        autoTagging: true 
+      };
     }
   }
 
   function setPreferences(patch) {
     const cur = getPreferences();
     const updated = { ...cur, ...patch };
+    if (updated.theme) {
+      localStorage.setItem(THEME_KEY, updated.theme);
+      localStorage.setItem('frpoku_theme', updated.theme);
+    }
     try { localStorage.setItem(PREFS_KEY, JSON.stringify(updated)); } catch {}
     if (window.FrpCloud && typeof window.FrpCloud.saveSettings === 'function') {
-      window.FrpCloud.saveSettings({ preferences: updated });
+      window.FrpCloud.saveSettings({ preferences: updated, theme: updated.theme });
     }
     return updated;
   }
@@ -1062,12 +1112,11 @@
     if (!prefs) return;
 
     // 1. Tema
-    if (prefs.theme) {
-      if (window.FrpThemes && typeof window.FrpThemes.setTheme === 'function') {
-        window.FrpThemes.setTheme(prefs.theme);
-      } else if (typeof setTheme === 'function') {
-        setTheme(prefs.theme);
-      }
+    const themeToApply = prefs.theme || getTheme() || 'light';
+    if (window.FrpThemes && typeof window.FrpThemes.setTheme === 'function') {
+      window.FrpThemes.setTheme(themeToApply);
+    } else {
+      setTheme(themeToApply);
     }
 
     if (typeof document === 'undefined' || !document.documentElement) return;
@@ -1094,6 +1143,17 @@
     if (prefs.fontFamily && fontMap[prefs.fontFamily]) {
       root.style.setProperty('--font', fontMap[prefs.fontFamily]);
     }
+
+    // 2.1. Yazı Tipi Kalınlığı (Font Weight)
+    const weightMap = {
+      'light': '400',
+      'normal': '500',
+      'bold': '600',
+      'extrabold': '700'
+    };
+    const fw = prefs.fontWeight ? (weightMap[prefs.fontWeight] || prefs.fontWeight) : '500';
+    root.style.setProperty('--base-weight', fw);
+    if (document.body) document.body.style.fontWeight = fw;
 
     // 3. Kod Editörü Fontu (Genişletilmiş Geliştirici Fontları)
     const codeFontMap = {

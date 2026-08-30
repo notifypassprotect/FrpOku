@@ -292,10 +292,15 @@ window.openSettingsModal = function(initialTab = 'appearance') {
       });
     });
 
-    overlay.querySelector('#btnSaveAllSettingsChanges')?.addEventListener('click', async () => {
+    overlay.querySelector('#btnSaveAllSettingsChanges')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
       captureProfileInputs();
 
+      btn.disabled = true;
+      btn.innerHTML = `<span>Kaydediliyor...</span>`;
+
       FrpStore.setPreferences(stagedPrefs);
+      FrpStore.applyPreferences();
       FrpStore.saveUserProfile(stagedProfile);
 
       if (window.FrpAuth?.updateProfile) {
@@ -303,17 +308,23 @@ window.openSettingsModal = function(initialTab = 'appearance') {
           name: `${stagedProfile.firstName || ''} ${stagedProfile.lastName || ''}`.trim(),
           phone: stagedProfile.phone,
           department: stagedProfile.department
-        });
+        }).catch(() => {});
       }
 
-      safeToast('Tüm ayarlar ve profil başarıyla kaydedildi!', 'success');
-      overlay.remove();
-      if (typeof refreshAll === 'function') refreshAll();
+      btn.innerHTML = `<span style="display:flex;align-items:center;gap:.35rem;"><span>✓</span><span>Kaydedildi</span></span>`;
+      btn.style.background = 'linear-gradient(135deg, #059669, #10b981)';
+
+      safeToast('Değişiklikler başarıyla kaydedildi.', 'success');
+      
+      setTimeout(() => {
+        overlay.remove();
+        if (typeof window.refreshAll === 'function') window.refreshAll();
+      }, 350);
     });
 
     const tabModule = window.FrpSettingsTabs && window.FrpSettingsTabs[activeTab];
     if (tabModule && typeof tabModule.bind === 'function') {
-      tabModule.bind({ overlay, stagedPrefs, stagedProfile, markDirty, escHtml, safeToast });
+      tabModule.bind({ overlay, stagedPrefs, stagedProfile, markDirty, escHtml, safeToast, renderModal });
     }
   }
 

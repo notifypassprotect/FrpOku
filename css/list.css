@@ -1190,10 +1190,11 @@
 }
 
 .col-fileSize {
-  text-align: right;
+  text-align: left;
 }
 
 td.col-fileSize {
+  text-align: left;
   font-family: var(--mono);
 }
 

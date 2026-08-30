@@ -73,6 +73,25 @@ window.FrpSettingsTabs.appearance = {
           </div>
         </div>
 
+        <!-- Yazı Tipi Kalınlığı (Font Weight) -->
+        <div class="settings-card">
+          <div style="font-weight:700;font-size:.85rem;margin-bottom:.6rem;">Yazı Tipi Kalınlığı (Font Weight)</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:.5rem;">
+            ${[
+              { id: 'light', name: 'İnce (Light)', desc: 'Zarif 400', weight: '400' },
+              { id: 'normal', name: 'Normal (Medium)', desc: 'Standart 500', weight: '500' },
+              { id: 'bold', name: 'Kalın (Semi-Bold)', desc: 'Belirgin 600', weight: '600' },
+              { id: 'extrabold', name: 'Çok Kalın (Bold)', desc: 'Güçlü 700', weight: '700' }
+            ].map(w => `
+              <label class="settings-radio-card ${(stagedPrefs.fontWeight || 'normal') === w.id ? 'active' : ''}">
+                <input type="radio" name="stagedFontWeight" value="${w.id}" ${(stagedPrefs.fontWeight || 'normal') === w.id ? 'checked' : ''} style="display:none;" />
+                <div style="font-weight:${w.weight};font-size:.84rem;">${w.name}</div>
+                <div style="font-size:.68rem;color:var(--text-muted);margin-top:.15rem;">${w.desc}</div>
+              </label>
+            `).join('')}
+          </div>
+        </div>
+
         <!-- Arayüz & Yazı Boyutu (5 Seçenek) -->
         <div class="settings-card">
           <div style="font-weight:700;font-size:.85rem;margin-bottom:.6rem;">Arayüz & Yazı Boyutu (UI Scale)</div>
@@ -141,6 +160,7 @@ window.FrpSettingsTabs.appearance = {
         window.FrpThemes.setTheme('dark');
       }
       markDirty();
+      safeToast('Koyu tema önizlemesi etkinleştirildi.', 'info');
     });
 
     btnLight?.addEventListener('click', () => {
@@ -151,15 +171,34 @@ window.FrpSettingsTabs.appearance = {
         window.FrpThemes.setTheme('light');
       }
       markDirty();
+      safeToast('Açık tema önizlemesi etkinleştirildi.', 'info');
     });
 
     overlay.querySelectorAll('input[name="stagedFontFamily"]').forEach(radio => {
       radio.addEventListener('change', (e) => {
         stagedPrefs.fontFamily = e.target.value;
-        overlay.querySelectorAll('input[name="stagedFontFamily"]').forEach(r => {
-          r.parentElement?.classList.toggle('active', r.checked);
-        });
         markDirty();
+        const fontObj = this.fontList.find(f => f.id === e.target.value);
+        if (fontObj) document.documentElement.style.setProperty('--font', fontObj.fontCss);
+        
+        overlay.querySelectorAll('input[name="stagedFontFamily"]').forEach(r => {
+          r.closest('.settings-radio-card')?.classList.toggle('active', r.checked);
+        });
+      });
+    });
+
+    overlay.querySelectorAll('input[name="stagedFontWeight"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        stagedPrefs.fontWeight = e.target.value;
+        markDirty();
+        const weightMap = { 'light': '400', 'normal': '500', 'bold': '600', 'extrabold': '700' };
+        const fw = weightMap[e.target.value] || '500';
+        document.documentElement.style.setProperty('--base-weight', fw);
+        if (document.body) document.body.style.fontWeight = fw;
+        
+        overlay.querySelectorAll('input[name="stagedFontWeight"]').forEach(r => {
+          r.closest('.settings-radio-card')?.classList.toggle('active', r.checked);
+        });
       });
     });
 

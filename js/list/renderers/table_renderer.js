@@ -86,7 +86,7 @@ window.FrpListRenderers = window.FrpListRenderers || {};
         const numBytes = Number(file.sizeBytes || file.size) || 0;
         const displaySize = size || (numBytes > 1024 ? (numBytes > 1048576 ? (numBytes / 1048576).toFixed(1) + ' MB' : Math.round(numBytes / 1024) + ' KB') : (numBytes > 0 ? numBytes + ' B' : '—'));
         return `
-          <td class="col-fileSize" style="white-space:nowrap;font-size:.76rem;color:var(--text-muted);font-family:var(--mono);">
+          <td class="col-fileSize" style="white-space:nowrap;font-size:.76rem;color:var(--text-muted);font-family:var(--mono);text-align:left;">
             ${displaySize}
           </td>
         `;

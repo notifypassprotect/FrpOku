@@ -34,6 +34,7 @@
 
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
   --mono: 'Cascadia Code', 'Consolas', 'Segoe UI Mono', 'Liberation Mono', Menlo, Monaco, monospace;
+  --base-weight: 500;
 
   --code-size: 13px;
   --code-line-height: 1.7;
@@ -83,6 +84,7 @@ html, body {
 
 body {
   font-family: var(--font);
+  font-weight: var(--base-weight, 500);
   background: var(--bg-app);
   color: var(--text-primary);
   font-size: 14px;
