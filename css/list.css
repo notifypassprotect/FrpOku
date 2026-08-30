@@ -203,7 +203,7 @@
  height: 36px;
 }
 
-.view-mode-toggle.view-btn {
+.view-mode-toggle .view-btn {
  height: 28px;
  padding: 0 0.75rem;
  border-radius: 6px;
@@ -220,12 +220,12 @@
  gap: 0.3rem;
 }
 
-.view-mode-toggle.view-btn:hover {
+.view-mode-toggle .view-btn:hover {
  color: var(--text-primary);
  background: rgba(0,0,0,0.04);
 }
 
-.view-mode-toggle.view-btn.active {
+.view-mode-toggle .view-btn.active {
  background: var(--accent);
  color: #fff;
  box-shadow: 0 2px 6px rgba(37,99,235,0.3);
@@ -1473,7 +1473,7 @@ td.col-fileSize {
  padding-bottom: 2px;
  -webkit-overflow-scrolling: touch;
  }
-.bulk-actions.btn {
+.bulk-actions .btn {
  white-space: nowrap;
  font-size: 0.74rem;
  padding: 0.3rem 0.55rem;

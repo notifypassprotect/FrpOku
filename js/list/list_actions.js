@@ -565,8 +565,9 @@ async function downloadBulkReports() {
       if (window.FrpAudit) {
         window.FrpAudit.logAction({
           action: 'BULK_DOWNLOAD',
-          target: customZipName,
-          details: `${successCount} adet rapor ZIP arşivi olarak indirildi.`
+          target: `${successCount} Rapor (${customZipName})`,
+          details: `${successCount} adet rapor ZIP arşivi olarak indirildi.`,
+          reports: selectedList.map(f => ({ id: f.id, name: f.name, title: f.meta?.reportName || f.name }))
         });
       }
 
@@ -617,8 +618,9 @@ async function downloadBulkReports() {
     if (window.FrpAudit) {
       window.FrpAudit.logAction({
         action: 'BULK_DOWNLOAD',
-        target: `${successCount} Dosya`,
-        details: `${successCount} adet rapor ayrı ayrı indirildi.`
+        target: `${successCount} Rapor`,
+        details: `${successCount} adet rapor ayrı ayrı indirildi.`,
+        reports: selectedList.map(f => ({ id: f.id, name: f.name, title: f.meta?.reportName || f.name }))
       });
     }
 

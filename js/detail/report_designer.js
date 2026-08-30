@@ -498,45 +498,51 @@
  }
 
  // ── RAPOR SAYFASI HTML OLUŞTURUCU (Tam Kağıt Boyutu & Bantlar) ──
- function renderReportPageHtml(page) {
- const isLandscape = (page.orientation || '').toLowerCase().includes('landscape');
- 
- // Standart A4 Sayfa Boyutları (1mm ≈ 3.78px)
- // A4 Portrait: 210 x 297 mm -> ~794 x 1123 px
- // A4 Landscape: 297 x 210 mm -> ~1123 x 794 px
- const stdPaperWidth = isLandscape? 1123: 794;
- const stdPaperHeight = isLandscape? 794: 1123;
+   // ── RAPOR SAYFASI HTML OLUŞTURUCU (Tam Kağıt Boyutu & Bantlar) ──
+  function renderReportPageHtml(page) {
+    const isLandscape = (page.orientation || '').toLowerCase().includes('landscape');
+    const paperWidthMm = page.paperWidth || (isLandscape ? 297 : 210);
+    const paperHeightMm = page.paperHeight || (isLandscape ? 210 : 297);
+    const leftMarginMm = page.leftMargin ?? 10;
+    const rightMarginMm = page.rightMargin ?? 10;
+    const topMarginMm = page.topMargin ?? 10;
+    const bottomMarginMm = page.bottomMargin ?? 10;
 
- // Özel PaperWidth veya geniş tablolar varsa sayfayı genişlet (Asla taşma/kesilme yapmaz)
- let maxCompRight = stdPaperWidth;
- let totalBandsHeight = 0;
+    // Standart A4 Sayfa Boyutları (1mm ≈ 3.7795px @ 96DPI)
+    const PX_PER_MM = 3.779527559;
+    const stdPaperWidth = Math.round(paperWidthMm * PX_PER_MM);
+    const stdPaperHeight = Math.round(paperHeightMm * PX_PER_MM);
 
- // Dikey ve Yatay Bantları Kesin Olarak Ayır (Dikey bantlar yatay akışta tekrarlanmasın!)
- const horizontalBands = (page.bands || []).filter(b =>!(b.vertical || String(b.rawAttrs || '').includes('Vertical="True"')));
- const verticalBands = (page.bands || []).filter(b => (b.vertical || String(b.rawAttrs || '').includes('Vertical="True"')));
+    const leftMarginPx = Math.round(leftMarginMm * PX_PER_MM);
+    const rightMarginPx = Math.round(rightMarginMm * PX_PER_MM);
+    const topMarginPx = Math.round(topMarginMm * PX_PER_MM);
+    const bottomMarginPx = Math.round(bottomMarginMm * PX_PER_MM);
 
- horizontalBands.forEach(b => {
- let maxCompBottom = b.height > 0? b.height: 25;
- (b.components || []).forEach(c => {
- const bottom = (c.top || 0) + (c.height || 0);
- if (bottom > maxCompBottom) maxCompBottom = bottom;
- });
- const bHeight = Math.ceil(maxCompBottom);
- totalBandsHeight += bHeight + (currentMode === 'designer'? 22: 0);
- });
+    const printableWidth = Math.max(200, stdPaperWidth - leftMarginPx - rightMarginPx);
 
- (page.bands || []).forEach(b => {
- if (b.width > maxCompRight) maxCompRight = b.width;
- (b.components || []).forEach(c => {
- const r = (c.left || 0) + (c.width || 0);
- if (r > maxCompRight) maxCompRight = r;
- });
- });
+    // Dikey ve Yatay Bantları Kesin Olarak Ayır (Dikey bantlar yatay akışta tekrarlanmasın!)
+    const horizontalBands = (page.bands || []).filter(b => !(b.vertical || String(b.rawAttrs || '').includes('Vertical="True"')));
+    const verticalBands = (page.bands || []).filter(b => (b.vertical || String(b.rawAttrs || '').includes('Vertical="True"')));
 
- const finalPageWidth = Math.max(stdPaperWidth, Math.ceil(maxCompRight + 120));
- const finalPageMinHeight = Math.max(stdPaperHeight, totalBandsHeight + 250);
+    let maxCompRight = printableWidth;
+    let totalBandsHeight = 0;
 
- function renderResizeHandles(isSelected) {
+    horizontalBands.forEach(b => {
+      let maxCompBottom = b.height > 0 ? b.height : 25;
+      (b.components || []).forEach(c => {
+        const bottom = (c.top || 0) + (c.height || 0);
+        if (bottom > maxCompBottom) maxCompBottom = bottom;
+        const r = (c.left || 0) + (c.width || 0);
+        if (r > maxCompRight) maxCompRight = r;
+      });
+      const bHeight = Math.ceil(maxCompBottom);
+      totalBandsHeight += bHeight + (currentMode === 'designer' ? 22 : 0);
+    });
+
+    const finalPageWidth = Math.max(stdPaperWidth, Math.ceil(maxCompRight + leftMarginPx + rightMarginPx));
+    const finalPageMinHeight = Math.max(stdPaperHeight, totalBandsHeight + topMarginPx + bottomMarginPx + 60);
+
+    function renderResizeHandles(isSelected) {
  if (!isSelected || currentMode!== 'designer' ||!isDesignEditing) return '';
  return `
  <div class="fr-resize-handle fr-resize-nw" data-handle="nw"></div>
@@ -1301,6 +1307,7 @@
  if (!obj) return '<div style="padding:1rem;color:var(--text-muted);font-size:.78rem;">Seçili bileşen yok.</div>';
 
  let propList = [];
+ const isPage = (obj.type === 'TfrxReportPage' || obj.type === 'TfrxDMPPage' || (!obj.type && obj.bands) || obj.name === 'Page1');
  const isBand = (obj.type && (BAND_META[obj.type] || obj.type.includes('Band') || obj.type.includes('Header') || obj.type.includes('Footer') || obj.type === 'TfrxMasterData' || obj.type === 'TfrxReportTitle'));
 
  if (inspectorTab === 'events') {
@@ -1315,7 +1322,32 @@
  { name: 'OnExit', val: obj.onExit || '', propKey: 'onExit', editable: isDesignEditing },
  { name: 'OnKeyDown', val: obj.onKeyDown || '', propKey: 'onKeyDown', editable: isDesignEditing }
  ];
- } else if (isBand) {
+ } else if (isPage) {
+    // RAPOR SAYFASI (PAGE1) ÖZELLİKLERİ (A4: 21x29.7cm & 1cm Kenar Boşlukları)
+    const pWidth = obj.paperWidth || 210;
+    const pHeight = obj.paperHeight || 297;
+    const lMarg = obj.leftMargin ?? 10;
+    const rMarg = obj.rightMargin ?? 10;
+    const tMarg = obj.topMargin ?? 10;
+    const bMarg = obj.bottomMargin ?? 10;
+    const orient = obj.orientation || 'poPortrait';
+
+    propList = [
+      { name: 'Name', val: obj.name || 'Page1', propKey: 'name', editable: isDesignEditing },
+      { name: 'Class', val: obj.type || 'TfrxReportPage', readOnly: true },
+      { name: 'PaperWidth', val: `${(pWidth / 10).toFixed(1)} cm (${pWidth} mm)`, propKey: 'paperWidth', isNumber: true, editable: isDesignEditing },
+      { name: 'PaperHeight', val: `${(pHeight / 10).toFixed(1)} cm (${pHeight} mm)`, propKey: 'paperHeight', isNumber: true, editable: isDesignEditing },
+      { name: 'PaperSize', val: 'A4 (210 x 297 mm)', readOnly: true },
+      { name: 'Orientation', val: orient, propKey: 'orientation', isSelect: isDesignEditing, options: ['poPortrait', 'poLandscape'] },
+      { name: 'LeftMargin', val: `${(lMarg / 10).toFixed(1)} cm (${lMarg} mm)`, propKey: 'leftMargin', isNumber: true, editable: isDesignEditing },
+      { name: 'RightMargin', val: `${(rMarg / 10).toFixed(1)} cm (${rMarg} mm)`, propKey: 'rightMargin', isNumber: true, editable: isDesignEditing },
+      { name: 'TopMargin', val: `${(tMarg / 10).toFixed(1)} cm (${tMarg} mm)`, propKey: 'topMargin', isNumber: true, editable: isDesignEditing },
+      { name: 'BottomMargin', val: `${(bMarg / 10).toFixed(1)} cm (${bMarg} mm)`, propKey: 'bottomMargin', isNumber: true, editable: isDesignEditing },
+      { name: 'ColumnWidth', val: `${obj.columnWidth || 0} mm`, propKey: 'columnWidth', isNumber: true, editable: isDesignEditing },
+      { name: 'Duplex', val: 'dmNone', readOnly: true },
+      { name: 'Visible', val: obj.visible !== false ? 'true' : 'false', propKey: 'visible', isSelect: isDesignEditing, options: ['true', 'false'] }
+    ];
+  } else if (isBand) {
  // BANT NESNESİ ÖZELLİKLERİ
  propList = [
  { name: 'Name', val: obj.name || '', propKey: 'name', editable: isDesignEditing },
@@ -1813,7 +1845,20 @@
 
  // ── SAHNE İÇİ İNTERAKTİF SÜRÜKLE / BOYUTLANDIR / DÜZENLE BAĞLAYICI ──
  function bindCanvasInteraction() {
- containerEl.querySelectorAll('.fr-view-item,.fr-ctrl-item').forEach(el => {
+    const vpEl = containerEl.querySelector('#designerViewport');
+    if (vpEl && !vpEl._clickBound) {
+      vpEl._clickBound = true;
+      vpEl.addEventListener('click', (e) => {
+        if (e.target.closest('.fr-view-item') || e.target.closest('.fr-ctrl-item') || e.target.closest('.fr-vertical-band-overlay')) return;
+        const activePage = allPages[activePageIndex];
+        if (activePage) {
+          selectedItem = activePage.data;
+          updateSelection();
+        }
+      });
+    }
+
+    containerEl.querySelectorAll('.fr-view-item,.fr-ctrl-item').forEach(el => {
  el.addEventListener('click', (e) => {
  e.stopPropagation();
  const bandIdx = parseInt(el.dataset.bandIdx, 10);

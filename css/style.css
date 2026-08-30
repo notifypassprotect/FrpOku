@@ -291,7 +291,7 @@ body {
  height: 32px;
 }
 
-.code-search-box.search-input {
+.code-search-box .search-input {
  width: 110px;
  font-size: 0.78rem;
  border: none;
@@ -1245,7 +1245,7 @@ mark.code-match.current {
  z-index: 1;
 }
 
-.code-editor-backdrop.code-line-raw {
+.code-editor-backdrop .code-line-raw {
  height: 22.1px;
  line-height: 22.1px;
  white-space: pre!important;
@@ -1254,12 +1254,12 @@ mark.code-match.current {
  box-sizing: border-box;
 }
 
-.code-editor-backdrop.syntax-error-line {
+.code-editor-backdrop .syntax-error-line {
  background: rgba(239, 68, 68, 0.15)!important;
  box-shadow: inset 2px 0 0 #ef4444;
 }
 
-.code-editor-backdrop.flash-jump-line {
+.code-editor-backdrop .flash-jump-line {
  background: rgba(59, 130, 246, 0.28)!important;
  box-shadow: inset 3px 0 0 #3b82f6;
  animation: pulseJumpLine 1.5s ease-out;
@@ -1270,7 +1270,7 @@ mark.code-match.current {
  100% { background: rgba(59, 130, 246, 0.1); }
 }
 
-.code-editor-wrap.edit-mode-textarea {
+.code-editor-wrap .edit-mode-textarea {
  position: absolute;
  top: 0; left: 0; right: 0; bottom: 0;
  width: 100%; height: 100%;
@@ -1293,7 +1293,7 @@ mark.code-match.current {
  z-index: 2;
 }
 
-.code-editor-wrap.edit-mode-textarea::selection {
+.code-editor-wrap .edit-mode-textarea::selection {
  background: rgba(37, 99, 235, 0.45)!important;
  color: transparent!important;
  -webkit-text-fill-color: transparent!important;
@@ -1378,7 +1378,7 @@ mark.code-match.current {
  margin-top:.65rem;
 }
 
-.code-replace-actions.btn {
+.code-replace-actions .btn {
  flex: 1;
  justify-content: center;
 }

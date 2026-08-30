@@ -1068,8 +1068,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     const n = selectedIds.size;
     const idsToDelete = [...selectedIds];
     const performBulkDelete = () => {
+      const deletedReports = idsToDelete.map(id => {
+        const f = FrpStore.getById(id);
+        return f ? { id: f.id, name: f.name, title: f.meta?.reportName || f.name } : { id };
+      });
+
       if (FrpStore.moveManyToTrash) FrpStore.moveManyToTrash(idsToDelete);
       else idsToDelete.forEach(id => FrpStore.moveToTrash(id));
+
+      if (window.FrpAudit) {
+        window.FrpAudit.logAction({
+          action: 'REPORT_DELETE_BULK',
+          target: `${n} Rapor`,
+          details: `${n} adet rapor çöp kutusuna taşındı.`,
+          reports: deletedReports
+        });
+      }
+
       selectedIds.clear();
       toast(`${n} rapor çöp kutusuna taşındı.`, 'info');
       refreshAll();
@@ -1103,6 +1118,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else if (FrpStore.addManyToPool) {
       FrpStore.addManyToPool(unpooledIds);
     }
+
+    if (window.FrpAudit) {
+      const shareReports = unpooledIds.map(id => {
+        const f = FrpStore.getById(id);
+        return f ? { id: f.id, name: f.name, title: f.meta?.reportName || f.name } : { id };
+      });
+      window.FrpAudit.logAction({
+        action: 'POOL_ADD_BULK',
+        target: `${unpooledIds.length} Rapor`,
+        details: `${unpooledIds.length} adet rapor Ortak Havuzda paylaşıldı.`,
+        reports: shareReports
+      });
+    }
+
     toast(`${unpooledIds.length} rapor ortak havuzda paylaşıldı.`, 'success');
     refreshAll();
   });
@@ -1122,6 +1151,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else if (FrpStore.removeManyFromPool) {
       FrpStore.removeManyFromPool(pooledIds);
     }
+
+    if (window.FrpAudit) {
+      const remReports = pooledIds.map(id => {
+        const f = FrpStore.getById(id);
+        return f ? { id: f.id, name: f.name, title: f.meta?.reportName || f.name } : { id };
+      });
+      window.FrpAudit.logAction({
+        action: 'POOL_REMOVE_BULK',
+        target: `${pooledIds.length} Rapor`,
+        details: `${pooledIds.length} adet rapor Ortak Havuzdan kaldırıldı.`,
+        reports: remReports
+      });
+    }
+
     toast(`${pooledIds.length} rapor ortak havuzdan kaldırıldı.`, 'info');
     refreshAll();
   });

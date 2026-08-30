@@ -144,8 +144,86 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
     const dateStr = formatTimestamp(log.timestamp);
     const ipDisplay = (log.ip && log.ip !== '-' && log.ip !== '') ? log.ip : '127.0.0.1';
 
+    // Rapor Listesini Çıkar (Toplu veya Tekil İşlemlerde)
+    let reportsList = [];
+    if (Array.isArray(log.reports) && log.reports.length > 0) {
+      reportsList = log.reports;
+    } else if (Array.isArray(log.metadata?.reports) && log.metadata.reports.length > 0) {
+      reportsList = log.metadata.reports;
+    } else if (Array.isArray(log.items) && log.items.length > 0) {
+      reportsList = log.items;
+    } else {
+      const allStored = typeof window.FrpStore !== 'undefined' && typeof window.FrpStore.getAll === 'function' ? window.FrpStore.getAll() : [];
+      const targetStr = String(log.target || '').trim();
+      const detailsStr = String(log.details || '').trim();
+
+      if (targetStr && targetStr !== 'Genel Sistem' && !/^\d+\s*Rapor$/i.test(targetStr)) {
+        const found = allStored.find(f => f.name.toLowerCase() === targetStr.toLowerCase() || (f.meta?.reportName && f.meta.reportName.toLowerCase() === targetStr.toLowerCase()) || f.id === log.reportId);
+        if (found) {
+          reportsList.push({ id: found.id, name: found.name, title: found.meta?.reportName || found.name });
+        } else {
+          reportsList.push({ name: targetStr, title: targetStr });
+        }
+      } else {
+        const quoted = detailsStr.match(/'([^']+)'/g) || [];
+        quoted.forEach(q => {
+          const cleanName = q.replace(/^'|'$/g, '').trim();
+          if (cleanName && cleanName.endsWith('.frp')) {
+            const found = allStored.find(f => f.name.toLowerCase() === cleanName.toLowerCase() || (f.meta?.reportName && f.meta.reportName.toLowerCase() === cleanName.toLowerCase()));
+            if (found) {
+              reportsList.push({ id: found.id, name: found.name, title: found.meta?.reportName || found.name });
+            } else {
+              reportsList.push({ name: cleanName, title: cleanName });
+            }
+          }
+        });
+      }
+    }
+
+    // Tekrarlanan raporları tekilleştir
+    const uniqueReports = [];
+    const seenMap = new Set();
+    reportsList.forEach(r => {
+      const key = (r.id || '') + '_' + (r.name || r.title || '');
+      if (!seenMap.has(key)) {
+        seenMap.add(key);
+        uniqueReports.push(r);
+      }
+    });
+
+    const reportsSectionHtml = uniqueReports.length > 0 ? `
+      <div style="margin-bottom:1.2rem;">
+        <div style="font-size:.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:.45rem;display:flex;align-items:center;justify-content:space-between;">
+          <span>İşleme Dahil Edilen Raporlar (${uniqueReports.length} Rapor)</span>
+        </div>
+        <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:10px;max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;padding:6px;">
+          ${uniqueReports.map(r => {
+            const repId = r.id;
+            const repTitle = r.title || r.reportName || r.name;
+            const repFile = r.name || r.fileName || '';
+            const existsInStore = repId ? Boolean(window.FrpStore && window.FrpStore.getById && window.FrpStore.getById(repId)) : false;
+            return `
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:.6rem;padding:.5rem .75rem;background:var(--bg-surface);border-radius:8px;border:1px solid var(--border-light);">
+                <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1;">
+                  <div style="font-weight:700;font-size:.82rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(repTitle)}</div>
+                  ${repFile && repFile !== repTitle ? `<div style="font-size:.72rem;color:var(--text-muted);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(repFile)}</div>` : ''}
+                </div>
+                ${repId && existsInStore ? `
+                  <button type="button" class="btn btn-sm btn-primary btn-go-report-detail" data-rep-id="${escHtml(repId)}" style="padding:.28rem .7rem;font-size:.74rem;font-weight:700;white-space:nowrap;flex-shrink:0;">
+                    Rapora Git ➔
+                  </button>
+                ` : `
+                  <span class="badge badge-gray" style="font-size:.68rem;padding:.2rem .5rem;flex-shrink:0;">Kayıt / Arşiv</span>
+                `}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    ` : '';
+
     overlay.innerHTML = `
-      <div class="modal" style="max-width:580px;width:94vw;padding:1.6rem;border-radius:18px;box-shadow:0 28px 70px rgba(0,0,0,.5);border:1.5px solid var(--border);background:var(--bg-surface);animation:fadeIn .18s ease-out;">
+      <div class="modal" style="max-width:620px;width:94vw;padding:1.6rem;border-radius:18px;box-shadow:0 28px 70px rgba(0,0,0,.5);border:1.5px solid var(--border);background:var(--bg-surface);animation:fadeIn .18s ease-out;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;border-bottom:1px solid var(--border-light);padding-bottom:.75rem;">
           <div style="font-size:1.1rem;font-weight:900;color:var(--text-primary);display:flex;align-items:center;gap:.6rem;">
             <span>İşlem Detay Kartı</span>
@@ -168,10 +246,12 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
             <div style="font-weight:800;font-family:var(--mono);color:var(--accent);font-size:.82rem;">${escHtml(ipDisplay)}</div>
           </div>
           <div>
-            <div style="font-size:.7rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px;">Hedef Rapor / Dosya</div>
+            <div style="font-size:.7rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px;">Hedef / Rapor</div>
             <div style="font-weight:700;color:var(--text-primary);word-break:break-all;">${escHtml(log.target || 'Genel Sistem')}</div>
           </div>
         </div>
+
+        ${reportsSectionHtml}
 
         <div style="margin-bottom:1.4rem;">
           <div style="font-size:.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:.45rem;">Açıklama & Detaylar</div>
@@ -187,6 +267,14 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
     `;
 
     overlay.querySelectorAll('.btn-close-detail').forEach(btn => btn.addEventListener('click', () => overlay.remove()));
+    overlay.querySelectorAll('.btn-go-report-detail').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const repId = btn.getAttribute('data-rep-id');
+        if (repId) {
+          window.location.href = `detail.html?id=${encodeURIComponent(repId)}`;
+        }
+      });
+    });
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
     document.body.appendChild(overlay);
   }
@@ -441,7 +529,10 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
               <span class="badge ${actInfo.badge}" style="font-size:.72rem;padding:.2rem .55rem;border-radius:6px;">${escHtml(actInfo.label)}</span>
             </td>
             <td style="padding:.7rem .9rem;font-weight:700;color:var(--accent);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(targetDisplay)}">
-              ${escHtml(targetDisplay)}
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(targetDisplay)}</span>
+                <span class="badge badge-blue" style="font-size:.62rem;padding:1px 6px;border-radius:4px;cursor:pointer;flex-shrink:0;">Detay</span>
+              </div>
             </td>
             <td style="padding:.7rem .9rem;color:var(--text-secondary);max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(detailsDisplay)}">
               ${escHtml(detailsDisplay)}

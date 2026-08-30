@@ -180,6 +180,7 @@ window.FrpSettingsTabs.trash = {
     overlay.querySelector('#btnRestoreSelectedTrash')?.addEventListener('click', async () => {
       const ids = Array.from(this.selectedTrashIds);
       if (ids.length === 0) return;
+      const trashItems = (FrpStore.getTrash ? FrpStore.getTrash() : []).filter(t => ids.includes(t.id));
       for (const id of ids) {
         await FrpStore.restoreFromTrash(id);
       }
@@ -187,7 +188,8 @@ window.FrpSettingsTabs.trash = {
         window.FrpAudit.logAction({
           action: 'TRASH_RESTORE',
           target: `${ids.length} Rapor`,
-          details: `${ids.length} adet rapor çöp kutusundan geri yüklendi.`
+          details: `${ids.length} adet rapor çöp kutusundan geri yüklendi.`,
+          reports: trashItems.map(t => ({ id: t.id, name: t.name, title: t.meta?.reportName || t.name }))
         });
       }
       this.selectedTrashIds.clear();
@@ -200,6 +202,7 @@ window.FrpSettingsTabs.trash = {
     overlay.querySelector('#btnPurgeSelectedTrash')?.addEventListener('click', () => {
       const ids = Array.from(this.selectedTrashIds);
       if (ids.length === 0) return;
+      const trashItems = (FrpStore.getTrash ? FrpStore.getTrash() : []).filter(t => ids.includes(t.id));
       window.showConfirmDialog({
         title: 'Seçilenleri Kalıcı Sil',
         message: `${ids.length} adet raporu kalıcı olarak silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`,
@@ -213,7 +216,8 @@ window.FrpSettingsTabs.trash = {
             window.FrpAudit.logAction({
               action: 'TRASH_PURGE',
               target: `${ids.length} Rapor`,
-              details: `${ids.length} adet rapor çöp kutusundan kalıcı olarak silindi.`
+              details: `${ids.length} adet rapor çöp kutusundan kalıcı olarak silindi.`,
+              reports: trashItems.map(t => ({ id: t.id, name: t.name, title: t.meta?.reportName || t.name }))
             });
           }
           this.selectedTrashIds.clear();
