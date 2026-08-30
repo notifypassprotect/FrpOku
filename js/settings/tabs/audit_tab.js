@@ -449,7 +449,9 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
     render() {
       return `
         <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3rem 1.5rem;text-align:center;gap:1.25rem;">
-          <div style="width:64px;height:64px;border-radius:20px;background:var(--accent-light);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:1.8rem;font-weight:900;">📋</div>
+          <div style="width:64px;height:64px;border-radius:20px;background:var(--accent-light);color:var(--accent);display:flex;align-items:center;justify-content:center;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          </div>
           <div>
             <div style="font-size:1.2rem;font-weight:900;color:var(--text-primary);margin-bottom:.4rem;">Kullanıcı İşlem & Denetim Günlüğü</div>
             <div style="font-size:.84rem;color:var(--text-muted);max-width:480px;line-height:1.5;">

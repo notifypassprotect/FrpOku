@@ -193,7 +193,7 @@
 
     const lines = [];
 
-    lines.push(`# 📋 ${meta.reportName || file.name}`);
+    lines.push(`# ${meta.reportName || file.name}`);
     lines.push('');
     lines.push(`> **Dosya:** \`${file.name}\`  `);
     lines.push(`> **GUID:** \`${meta.guid || '—'}\`  `);

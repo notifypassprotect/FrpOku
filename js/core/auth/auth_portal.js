@@ -81,7 +81,9 @@
         color: #0f172a;
       ">
         <div style="text-align:center;margin-bottom:1.25rem;">
-          <div style="width:50px;height:50px;margin:0 auto .6rem;background:linear-gradient(135deg, #3b82f6, #6366f1);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;box-shadow:0 6px 18px rgba(59,130,246,0.28);">📋</div>
+          <div style="width:50px;height:50px;margin:0 auto .6rem;background:linear-gradient(135deg, #3b82f6, #6366f1);border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(59,130,246,0.28);">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          </div>
           <h1 style="font-size:1.35rem;font-weight:800;letter-spacing:-.02em;margin:0 0 .2rem;color:#0f172a;">FrpOku</h1>
           <p id="authSubtitle" style="font-size:.82rem;color:#64748b;margin:0;">FastReport Rapor & Kod Portalı</p>
         </div>
@@ -252,7 +254,9 @@
         <!-- 3. ŞİFREMİ UNUTTUM -->
         <div id="authForgotPanel" style="display: none; text-align: left;">
           <div style="text-align:center;margin-bottom:1.2rem;">
-            <div style="font-size:2.4rem;margin-bottom:.4rem;">🔑</div>
+            <div style="width:48px;height:48px;margin:0 auto .6rem;background:linear-gradient(135deg, #f59e0b, #d97706);border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            </div>
             <div style="font-size: 1.1rem; font-weight: 800; color: #0f172a; margin-bottom: .3rem;">Şifre Sıfırlama</div>
             <p style="font-size: .8rem; color: #475569; line-height: 1.45; margin: 0 auto;">
               Şifre sıfırlama işlemleri güvenlik amacıyla <strong>Sistem Yöneticisi (Admin)</strong> tarafından yapılmaktadır.
@@ -260,7 +264,7 @@
           </div>
 
           <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:1rem;margin-bottom:1.2rem;">
-            <div style="font-weight:700;font-size:.82rem;color:#0f172a;margin-bottom:.3rem;">📌 Nasıl Yapılır?</div>
+            <div style="font-weight:700;font-size:.82rem;color:#0f172a;margin-bottom:.3rem;">Nasıl Yapılır?</div>
             <ul style="margin:0;padding-left:1.1rem;font-size:.78rem;color:#64748b;line-height:1.5;">
               <li>Sistem Yöneticinizle iletişime geçiniz.</li>
               <li>Yönetici paneli üzerinden yeni geçici şifreniz tanımlanacaktır.</li>

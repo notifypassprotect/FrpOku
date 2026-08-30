@@ -79,10 +79,10 @@
     }
 
     const typeIcons = {
-      procedure: '⚙️',
+      procedure: 'P',
       function:  'ƒ',
-      event:     '⚡',
-      var:       '📌'
+      event:     'E',
+      var:       'V'
     };
 
     const typeBadges = {

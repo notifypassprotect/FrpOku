@@ -2,12 +2,12 @@ function copyGuidText(guid) {
   if (!guid) return;
   if (typeof copyTextToClipboard === 'function') {
     copyTextToClipboard(guid).then(ok => {
-      if (ok) showToast('GUID panoya kopyalandı! 📋', 'success');
+      if (ok) showToast('GUID panoya kopyalandı!', 'success');
       else showToast('Kopyalama başarısız oldu.', 'error');
     });
   } else {
     navigator.clipboard?.writeText(guid).then(() => {
-      showToast('GUID panoya kopyalandı! 📋', 'success');
+      showToast('GUID panoya kopyalandı!', 'success');
     });
   }
 }
@@ -37,7 +37,7 @@ async function openParamInjector(queryIndex) {
         <label style="font-family:var(--mono);font-size:.84rem;font-weight:700;color:var(--orange);min-width:110px;">${esc(p)} =</label>
         ${isDate ? `
           <input type="date" min="1900-01-01" max="2100-12-31" class="tag-add-input param-input-val" data-param="${esc(p)}" data-is-date="true" style="padding:.3rem .6rem;border-radius:8px;border:1.5px solid var(--border);color:var(--text-primary);background:var(--bg-surface);" />
-          <span style="font-size:.72rem;color:var(--text-muted);font-weight:600;">📅 Takvim Seçimi ('DD.MM.YYYY')</span>
+          <span style="font-size:.72rem;color:var(--text-muted);font-weight:600;">Takvim Seçimi ('DD.MM.YYYY')</span>
         ` : `
           <input type="text" class="tag-add-input param-input-val" data-param="${esc(p)}" placeholder="Değer (ör: 100 veya 'METIN')" style="flex:1;padding:.3rem .6rem;border-radius:8px;border:1.5px solid var(--border);" />
         `}
@@ -54,11 +54,11 @@ async function openParamInjector(queryIndex) {
       <label style="font-size:.75rem;font-weight:700;color:var(--text-muted);">Çalıştırılabilir Ham SQL:</label>
       <textarea id="paramResultSql" class="note-textarea" style="height:150px;font-family:var(--mono);font-size:.78rem;" readonly>${esc(rawSql)}</textarea>
     </div>
-    <button class="btn btn-sm btn-primary" id="btnCopyInjectedSql" style="margin-top:.6rem;">📋 Ham SQL'i Kopyala</button>
+    <button class="btn btn-sm btn-primary" id="btnCopyInjectedSql" style="margin-top:.6rem;">Ham SQL'i Kopyala</button>
   `;
 
   showModal({
-    title: `⚡ ${esc(queryName)} — SQL Parametre Injector / Testi`,
+    title: `${esc(queryName)} — SQL Parametre Testi`,
     body,
     confirmText: 'Kapat',
     maxWidth: '680px'
@@ -253,7 +253,7 @@ function renderSidebar(file) {
 
   const tagsList = tags.map(t => `
     <span class="tag-pill">
-      🏷️ ${esc(t)}
+      ${esc(t)}
       <span class="tag-pill-remove" onclick="removeTagFromDetail('${esc(t)}')">×</span>
     </span>
   `).join('');
@@ -267,14 +267,14 @@ function renderSidebar(file) {
         <div class="meta-label">GUID</div>
         <div class="meta-value" style="font-family:var(--mono);font-size:.68rem;display:flex;align-items:center;justify-content:space-between;gap:.3rem;">
           <span style="overflow:hidden;text-overflow:ellipsis;" title="${esc(meta.guid || '—')}">${esc(meta.guid || '—')}</span>
-          ${meta.guid ? `<button class="btn btn-sm" style="padding:.1rem .35rem;font-size:.65rem;" onclick="copyGuidText('${esc(meta.guid)}')">📋</button>` : ''}
+          ${meta.guid ? `<button class="btn btn-sm" style="padding:.1rem .35rem;font-size:.65rem;display:inline-flex;align-items:center;" onclick="copyGuidText('${esc(meta.guid)}')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>` : ''}
         </div>
       </div>
       ${metaRow('Dosya Boyutu', file.sizeBytes > 1024 ? Math.round(file.sizeBytes / 1024) + ' KB' : file.sizeBytes + ' B')}
     </div>
 
     <div class="meta-card">
-      <div class="meta-label">🏷️ Etiketler</div>
+      <div class="meta-label">Etiketler</div>
       <div class="tag-list" style="margin-top:.3rem;">${tagsList || '<span style="color:var(--text-muted);font-size:.75rem;">Etiket yok</span>'}</div>
       <div class="tag-add-wrap">
         <input type="text" class="tag-add-input" id="inputNewTag" placeholder="Yeni etiket..." />
@@ -283,12 +283,12 @@ function renderSidebar(file) {
     </div>
 
     <div class="meta-card meta-editable-area">
-      <div class="meta-label">📝 Açıklama</div>
+      <div class="meta-label">Açıklama</div>
       <div class="meta-value-wrap" data-field="description" data-file-id="${file.id}" style="margin-top:.3rem;">
         <div class="meta-desc-display" style="font-size:.78rem;line-height:1.5;color:var(--text-secondary);cursor:pointer;min-height:1.5em;word-break:break-all;overflow-wrap:anywhere;white-space:pre-wrap;" title="Düzenlemek için tıklayın">${esc(meta.description || '') || '<span style="color:var(--text-muted);font-style:italic;">Açıklama yok — tıklayarak ekle</span>'}</div>
         <textarea class="note-textarea" id="descEditArea" style="display:none;min-height:60px;" placeholder="Açıklama girin...">${esc(meta.description || '')}</textarea>
         <div class="desc-edit-actions" style="display:none;gap:.35rem;margin-top:.3rem;">
-          <button class="btn-save-note" id="btnSaveDesc">💾 Kaydet</button>
+          <button class="btn-save-note" id="btnSaveDesc">Kaydet</button>
           <button class="btn btn-sm" id="btnCancelDesc">İptal</button>
         </div>
       </div>
@@ -320,9 +320,9 @@ function renderSidebar(file) {
     </div>
 
     <div class="note-area">
-      <div class="meta-label">📝 Kullanıcı Notu</div>
+      <div class="meta-label">Kullanıcı Notu</div>
       <textarea class="note-textarea" id="noteTextarea" placeholder="Bu rapora not ekleyin...">${esc(file.userNote || '')}</textarea>
-      <button class="btn-save-note" id="btnSaveNote">💾 Kaydet</button>
+      <button class="btn-save-note" id="btnSaveNote">Kaydet</button>
     </div>
 
     <div class="meta-card">
@@ -330,16 +330,16 @@ function renderSidebar(file) {
       <div class="export-btns">
         ${queries.map((q, i) => `
           <button class="btn-export" onclick="exportSqlQueryModal(${i})">
-            📤 ${esc(q.name)} Sorgusunu İndir (.sql / .txt)
+            ${esc(q.name)} Sorgusunu İndir (.sql / .txt)
           </button>`).join('')}
-        <button class="btn-export" onclick="exportReportJson()">📥 Rapor JSON İndir</button>
-        <button class="btn-export" onclick="exportHtmlDoc()">🌐 HTML Dokümantasyon</button>
+        <button class="btn-export" onclick="exportReportJson()">Rapor JSON İndir</button>
+        <button class="btn-export" onclick="exportHtmlDoc()">HTML Dokümantasyon</button>
       </div>
     </div>
 
     ${file.pascalScript ? `
     <div class="meta-card">
-      <div class="meta-label">🌲 PascalScript Fonksiyon Ağacı</div>
+      <div class="meta-label">PascalScript Fonksiyon Ağacı</div>
       <div id="pascalOutlineContainer" style="margin-top:.4rem;"></div>
     </div>` : ''}
 
@@ -351,7 +351,7 @@ function renderSidebar(file) {
 
     ${Array.isArray(file.editHistory) && file.editHistory.length > 0 ? `
     <div class="meta-card">
-      <div class="meta-label">📋 Düzenleme Geçmişi</div>
+      <div class="meta-label">Düzenleme Geçmişi</div>
       <div class="audit-log">
         ${[...file.editHistory].reverse().slice(0, 10).map(h => `
           <div class="audit-row">

@@ -434,7 +434,7 @@ if (pinDetailBtn) {
     const isPinned = FrpStore.togglePin(currentFile.id);
     currentFile = FrpStore.getById(currentFile.id);
     pinDetailBtn.style.opacity = isPinned ? '1' : '0.4';
-    showToast(isPinned ? 'Rapor üste sabitlendi 📌' : 'Sabitleme kaldırıldı', 'info');
+    showToast(isPinned ? 'Rapor üste sabitlendi' : 'Sabitleme kaldırıldı', 'info');
   });
 }
 
@@ -552,24 +552,24 @@ function addTab(cfg) {
                   <span>📐</span> <span>Standart Format (Geniş)</span>
                 </button>
                 <button class="topbar-dropdown-item" onclick="formatSqlInTab('${esc(cfg.id)}', 'compact')">
-                  <span>📄</span> <span>Kompakt Format (Az Satır)</span>
+                  <span>Kompakt Format</span>
                 </button>
                 <button class="topbar-dropdown-item" onclick="minifySqlInTab('${esc(cfg.id)}')">
-                  <span>⚡</span> <span>Tek Satır (Minify)</span>
+                  <span>Tek Satır (Minify)</span>
                 </button>
               </div>
             </div>
-            <button class="btn-copy" id="${esc(cfg.id)}_casetogglebtn" onclick="changeSqlCaseInTab('${esc(cfg.id)}')" title="SQL Anahtar Kelimelerini BÜYÜK / KÜÇÜK Harfe Dönüştür">🔠 BÜYÜK</button>
-            <button class="btn-copy" onclick="openComplexityModal(${cfg.queryIndex})" title="SQL Karmaşıklık Puanı & Zeki Analiz">📊 Karmaşıklık</button>
-            <button class="btn-copy" onclick="addToSnippetLibrary(${cfg.queryIndex})">📌 Kütüphaneye Ekle</button>
-            <button class="btn-copy" onclick="openParamInjector(${cfg.queryIndex})">⚡ SQL Testi</button>
+            <button class="btn-copy" id="${esc(cfg.id)}_casetogglebtn" onclick="changeSqlCaseInTab('${esc(cfg.id)}')" title="SQL Anahtar Kelimelerini BÜYÜK / KÜÇÜK Harfe Dönüştür">BÜYÜK Harf</button>
+            <button class="btn-copy" onclick="openComplexityModal(${cfg.queryIndex})" title="SQL Karmaşıklık Puanı & Analiz">Karmaşıklık</button>
+            <button class="btn-copy" onclick="addToSnippetLibrary(${cfg.queryIndex})">Kütüphaneye Ekle</button>
+            <button class="btn-copy" onclick="openParamInjector(${cfg.queryIndex})">SQL Testi</button>
           ` : ''}
           ${cfg.type === 'pascal' ? `
-            <button class="btn-copy" id="btnCheckPascalSyntax" onclick="checkPascalSyntaxInTab()" title="PascalScript Sözdizimi Kontrolü">🔍 Sözdizimi Kontrol</button>
+            <button class="btn-copy" id="btnCheckPascalSyntax" onclick="checkPascalSyntaxInTab()" title="PascalScript Sözdizimi Kontrolü">Sözdizimi Kontrol</button>
           ` : ''}
-          <button class="btn-copy" id="${esc(cfg.id)}_lasteditbtn" onclick="openLastEditDiffModal('${esc(cfg.id)}')" title="Son yapılan değişikliklerin farkını gör">📜 Son Değişiklik</button>
-          <button class="btn-copy btn-edit-toggle" id="${esc(cfg.id)}_editbtn" onclick="toggleEditMode('${esc(cfg.id)}')">✏️ Düzenle</button>
-          <button class="btn-copy" id="${esc(cfg.id)}_copy" onclick="copyTabCode('${esc(cfg.id)}', this)">📋 Kopyala</button>
+          <button class="btn-copy" id="${esc(cfg.id)}_lasteditbtn" onclick="openLastEditDiffModal('${esc(cfg.id)}')" title="Son yapılan değişikliklerin farkını gör">Son Değişiklik</button>
+          <button class="btn-copy btn-edit-toggle" id="${esc(cfg.id)}_editbtn" onclick="toggleEditMode('${esc(cfg.id)}')">Düzenle</button>
+          <button class="btn-copy" id="${esc(cfg.id)}_copy" onclick="copyTabCode('${esc(cfg.id)}', this)">Kopyala</button>
         </div>
       </div>
 

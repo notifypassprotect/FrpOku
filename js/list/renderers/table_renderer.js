@@ -59,10 +59,10 @@ window.FrpListRenderers = window.FrpListRenderers || {};
         return `
           <td class="col-reportName" style="cursor:pointer;max-width:320px;">
             <div class="file-name" style="display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;">
-              <span class="report-name-title" style="font-weight:700;font-size:.88rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(reportName)}">${escHtml(reportName)}</span>
+              <span class="report-name-title" style="font-weight:var(--report-title-weight, 700);font-size:.88rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(reportName)}">${escHtml(reportName)}</span>
               ${poolBadge}
               ${ownerChip}
-              ${hasNote ? `<span title="Not mevcut" style="font-size:.72rem;color:var(--accent);font-weight:700;">[Not]</span>` : ''}
+              ${hasNote ? `<span title="Not mevcut" style="font-size:.72rem;color:var(--accent);font-weight:var(--bold-weight, 700);">[Not]</span>` : ''}
             </div>
           </td>
         `;

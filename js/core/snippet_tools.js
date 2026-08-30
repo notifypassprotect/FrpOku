@@ -48,7 +48,7 @@ function addToSnippetLibrary(queryIndex) {
   if (isDuplicate) {
     toastFn(`'${snippetTitle}' kütüphaneye tekrar eklendi.`, 'info');
   } else {
-    toastFn(`'${snippetTitle}' kütüphaneye eklendi. 📌`, 'success');
+    toastFn(`'${snippetTitle}' kütüphaneye eklendi.`, 'success');
   }
 }
 

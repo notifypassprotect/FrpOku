@@ -301,7 +301,9 @@
   min-width: 880px;
 }
 
-.col-reportName { min-width: 180px; max-width: 320px; font-family: var(--font); font-size: 0.85rem; font-weight: 600; }
+.col-reportName { min-width: 180px; max-width: 320px; font-family: var(--font); font-size: 0.85rem; font-weight: var(--report-title-weight, 700); }
+.report-name-title { font-weight: var(--report-title-weight, 700) !important; }
+.card-title { font-weight: var(--heading-weight, 800) !important; }
 .col-owner      { min-width: 130px; white-space: nowrap; font-family: var(--font); font-size: 0.82rem; }
 .col-fileName   { min-width: 140px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font); font-size: 0.82rem; color: var(--text-secondary); }
 .col-fileSize   { min-width: 85px; width: 95px; text-align: left; font-family: var(--mono); font-size: 0.78rem; font-weight: 600; white-space: nowrap; }

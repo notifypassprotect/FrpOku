@@ -191,10 +191,18 @@ window.FrpSettingsTabs.appearance = {
       radio.addEventListener('change', (e) => {
         stagedPrefs.fontWeight = e.target.value;
         markDirty();
-        const weightMap = { 'light': '400', 'normal': '500', 'bold': '600', 'extrabold': '700' };
-        const fw = weightMap[e.target.value] || '500';
-        document.documentElement.style.setProperty('--base-weight', fw);
-        if (document.body) document.body.style.fontWeight = fw;
+        const weightMap = {
+          'light':     { base: '300', bold: '500', heading: '600' },
+          'normal':    { base: '400', bold: '600', heading: '700' },
+          'bold':      { base: '500', bold: '700', heading: '800' },
+          'extrabold': { base: '600', bold: '800', heading: '900' }
+        };
+        const fwConfig = weightMap[e.target.value] || weightMap['normal'];
+        document.documentElement.style.setProperty('--base-weight', fwConfig.base);
+        document.documentElement.style.setProperty('--bold-weight', fwConfig.bold);
+        document.documentElement.style.setProperty('--heading-weight', fwConfig.heading);
+        document.documentElement.style.setProperty('--report-title-weight', fwConfig.bold);
+        if (document.body) document.body.style.fontWeight = fwConfig.base;
         
         overlay.querySelectorAll('input[name="stagedFontWeight"]').forEach(r => {
           r.closest('.settings-radio-card')?.classList.toggle('active', r.checked);

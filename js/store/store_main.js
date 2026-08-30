@@ -100,6 +100,14 @@
     }
   }
 
+  function _audit(action, target = '', details = '') {
+    try {
+      if (window.FrpAudit && typeof window.FrpAudit.logAction === 'function') {
+        window.FrpAudit.logAction({ action, target: String(target || ''), details: String(details || '') }).catch(() => {});
+      }
+    } catch (e) {}
+  }
+
   function _write(files) {
     _memoryStore = files;
     try {
@@ -276,10 +284,12 @@
     if (existingIdx >= 0) {
       files[existingIdx] = fileRecord;
       _write(files);
+      _audit('REPORT_UPDATE', fileName, `${fileSize ? Math.round(fileSize / 1024) + ' KB' : ''} güncellendi.`);
       return { status: 'updated', file: fileRecord };
     } else {
       files.push(fileRecord);
       _write(files);
+      _audit('REPORT_UPLOAD', fileName, `${fileSize ? Math.round(fileSize / 1024) + ' KB' : ''} yüklendi.`);
       return { status: 'added', file: fileRecord };
     }
   }
@@ -335,15 +345,18 @@
     });
 
     _write(files);
+    _audit('REPORT_BULK_UPLOAD', `${parsedList.length} Rapor`, `${added} yeni eklendi, ${updated} güncellendi.`);
     return { added, updated };
   }
 
   function deleteOne(id) {
+    const file = _read().find(f => f.id === id);
     const files = _read().filter(f => f.id !== id);
     if (window.FrpCloud && typeof window.FrpCloud.deleteReport === 'function') {
       window.FrpCloud.deleteReport(id).catch(() => {});
     }
     _write(files);
+    _audit('REPORT_DELETE', file ? file.name : id, 'Rapor kalıcı olarak silindi.');
   }
 
   function deleteMany(ids) {
@@ -353,6 +366,7 @@
       window.FrpCloud.deleteReports(ids).catch(() => {});
     }
     _write(files);
+    _audit('REPORT_BULK_DELETE', `${ids.length} Rapor`, 'Seçili raporlar kalıcı olarak silindi.');
   }
 
   function deleteAll() {
@@ -361,6 +375,7 @@
     }
     _write([]);
     syncToIndexedDB([]);
+    _audit('REPORT_CLEAR_ALL', 'Tüm Raporlar', 'Tüm rapor arşivi tamamen temizlendi.');
   }
 
   // ── 5. Çöp Kutusu (Soft Delete) Metotları ─────────────────────
@@ -411,6 +426,8 @@
     trash.unshift(fileToTrash);
     _writeTrash(trash);
 
+    _audit('TRASH_MOVE', fileToTrash.name || id, 'Rapor çöp kutusuna taşındı.');
+
     if (window.FrpCloud && typeof window.FrpCloud.moveToTrash === 'function') {
       await window.FrpCloud.moveToTrash(id, fileToTrash);
     }
@@ -434,6 +451,8 @@
     _write(remaining);
     _writeTrash(trash);
 
+    _audit('TRASH_BULK_MOVE', `${toTrash.length} Rapor`, 'Seçili raporlar çöp kutusuna taşındı.');
+
     if (window.FrpCloud && typeof window.FrpCloud.moveManyToTrash === 'function') {
       await window.FrpCloud.moveManyToTrash(ids);
     }
@@ -455,6 +474,8 @@
     files.unshift(restoredFile);
     _write(files);
 
+    _audit('TRASH_RESTORE', restoredFile.name || id, 'Rapor çöp kutusundan geri yüklendi.');
+
     if (window.FrpCloud && typeof window.FrpCloud.restoreFromTrash === 'function') {
       await window.FrpCloud.restoreFromTrash(id);
     }
@@ -475,6 +496,8 @@
     });
     _write(files);
 
+    _audit('TRASH_BULK_RESTORE', `${toRestore.length} Rapor`, 'Seçili raporlar çöp kutusundan geri yüklendi.');
+
     if (window.FrpCloud && typeof window.FrpCloud.restoreManyFromTrash === 'function') {
       await window.FrpCloud.restoreManyFromTrash(ids);
     }
@@ -483,8 +506,11 @@
 
   async function purgeFromTrash(id) {
     let trash = _readTrash();
+    const item = trash.find(t => t.id === id);
     trash = trash.filter(t => t.id !== id);
     _writeTrash(trash);
+
+    _audit('TRASH_PURGE', item ? item.name : id, 'Rapor çöp kutusundan kalıcı olarak silindi.');
 
     if (window.FrpCloud && typeof window.FrpCloud.purgeReport === 'function') {
       await window.FrpCloud.purgeReport(id);
@@ -498,6 +524,8 @@
     trash = trash.filter(t => !idSet.has(t.id));
     _writeTrash(trash);
 
+    _audit('TRASH_BULK_PURGE', `${ids.length} Rapor`, 'Seçili raporlar çöpten kalıcı olarak silindi.');
+
     if (window.FrpCloud && typeof window.FrpCloud.purgeManyReports === 'function') {
       await window.FrpCloud.purgeManyReports(ids);
     }
@@ -506,6 +534,7 @@
 
   async function emptyTrash() {
     _writeTrash([]);
+    _audit('TRASH_EMPTY', 'Çöp Kutusu', 'Çöp kutusu tamamen boşaltıldı.');
 
     if (window.FrpCloud && typeof window.FrpCloud.emptyTrash === 'function') {
       await window.FrpCloud.emptyTrash();
@@ -520,6 +549,7 @@
     if (idx >= 0) {
       files[idx].userNote = note;
       _write(files);
+      _audit('NOTE_UPDATE', files[idx].name || id, 'Rapor kullanıcı notu güncellendi.');
       return true;
     }
     return false;
@@ -538,6 +568,7 @@
       }
       files[idx].meta = currentMeta;
       _write(files);
+      _audit('REPORT_RENAME', files[idx].name || id, `Rapor meta/başlık bilgisi güncellendi: ${metaPatch.reportName || ''}`);
       return true;
     }
     return false;
@@ -566,6 +597,7 @@
     }
 
     _write(files);
+    _audit('REPORT_CODE_UPDATE', file.name || id, 'SQL veya Pascal kodu güncellendi.');
     return true;
   }
 
@@ -573,8 +605,10 @@
     const files = _read();
     const idx = files.findIndex(f => f.id === id);
     if (idx < 0) return false;
+    const oldName = files[idx].name;
     files[idx].name = newName;
     _write(files);
+    _audit('REPORT_RENAME', oldName, `Dosya adı "${newName}" olarak değiştirildi.`);
     return true;
   }
 
@@ -584,6 +618,7 @@
     if (idx >= 0) {
       files[idx].isFavorite = !files[idx].isFavorite;
       _write(files);
+      _audit('REPORT_FAVORITE', files[idx].name || id, files[idx].isFavorite ? 'Favorilere eklendi.' : 'Favorilerden çıkarıldı.');
       return files[idx].isFavorite;
     }
     return false;
@@ -600,7 +635,10 @@
         count++;
       }
     });
-    if (count > 0) _write(files);
+    if (count > 0) {
+      _write(files);
+      _audit('REPORT_BULK_FAVORITE', `${count} Rapor`, isFav ? 'Toplu favorilere eklendi.' : 'Toplu favorilerden çıkarıldı.');
+    }
     return count;
   }
 
@@ -615,7 +653,10 @@
         count++;
       }
     });
-    if (count > 0) _write(files);
+    if (count > 0) {
+      _write(files);
+      _audit('REPORT_BULK_FAVORITE', `${count} Rapor`, 'Toplu favori durumu değiştirildi.');
+    }
     return count;
   }
 
@@ -625,6 +666,7 @@
     if (idx >= 0) {
       files[idx].isPinned = !files[idx].isPinned;
       _write(files);
+      _audit('REPORT_PIN', files[idx].name || id, files[idx].isPinned ? 'Rapor üste sabitlendi.' : 'Rapor sabitlemesi kaldırıldı.');
       return files[idx].isPinned;
     }
     return false;
@@ -640,6 +682,7 @@
       if (!files[idx].tags.includes(t)) {
         files[idx].tags.push(t);
         _write(files);
+        _audit('TAG_ADD', files[idx].name || id, `"${t}" etiketi eklendi.`);
       }
       return files[idx].tags;
     }
@@ -652,6 +695,7 @@
     if (idx >= 0 && files[idx].tags) {
       files[idx].tags = files[idx].tags.filter(t => t !== tag);
       _write(files);
+      _audit('TAG_REMOVE', files[idx].name || id, `"${tag}" etiketi kaldırıldı.`);
       return files[idx].tags;
     }
     return false;
@@ -663,7 +707,43 @@
     files.forEach(f => {
       (f.tags || []).forEach(t => tagSet.add(t));
     });
+    getCustomTags().forEach(t => tagSet.add(t));
     return [...tagSet].sort();
+  }
+
+  function getCustomTags() {
+    try {
+      const raw = localStorage.getItem(CUSTOM_TAGS_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function addCustomTag(tag) {
+    const trimmed = (tag || '').trim();
+    if (!trimmed) return false;
+    let list = getCustomTags();
+    if (!list.includes(trimmed)) {
+      list.push(trimmed);
+      try { localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(list)); } catch {}
+      _audit('TAG_CREATE', trimmed, 'Yeni özel etiket havuza eklendi.');
+      if (window.FrpCloud && typeof window.FrpCloud.saveSettings === 'function') {
+        window.FrpCloud.saveSettings({ customTags: list }).catch(() => {});
+      }
+    }
+    return list;
+  }
+
+  function deleteCustomTag(tag) {
+    const trimmed = (tag || '').trim();
+    let list = getCustomTags().filter(t => t !== trimmed);
+    try { localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(list)); } catch {}
+    _audit('TAG_DELETE', trimmed, 'Özel etiket havuzdan silindi.');
+    if (window.FrpCloud && typeof window.FrpCloud.saveSettings === 'function') {
+      window.FrpCloud.saveSettings({ customTags: list }).catch(() => {});
+    }
+    return list;
   }
 
   // ── 6.5. Ortak Rapor Havuzu & Çalışma Alanı Yönetimi ─────────
@@ -829,11 +909,11 @@
 
   // ── 7. Kategoriler ──────────────────────────────────────────
   const DEFAULT_CATEGORIES = [
-    { id: 'cat_1', name: 'Finans', color: '#10b981', icon: '💰' },
-    { id: 'cat_2', name: 'HBYS / Klinik', color: '#3b82f6', icon: '🏥' },
-    { id: 'cat_3', name: 'Yönetim & İstatistik', color: '#8b5cf6', icon: '📊' },
-    { id: 'cat_4', name: 'Laboratuvar', color: '#ec4899', icon: '🔬' },
-    { id: 'cat_5', name: 'Eczane & Depo', color: '#f59e0b', icon: '💊' }
+    { id: 'cat_1', name: 'Finans', color: '#10b981', icon: '' },
+    { id: 'cat_2', name: 'HBYS / Klinik', color: '#3b82f6', icon: '' },
+    { id: 'cat_3', name: 'Yönetim & İstatistik', color: '#8b5cf6', icon: '' },
+    { id: 'cat_4', name: 'Laboratuvar', color: '#ec4899', icon: '' },
+    { id: 'cat_5', name: 'Eczane & Depo', color: '#f59e0b', icon: '' }
   ];
 
   function getCategoryObjects() {
@@ -849,16 +929,17 @@
     return getCategoryObjects().map(c => c.name);
   }
 
-  function addCategory(name, color = '#3b82f6', icon = '🏷️') {
+  function addCategory(name, color = '#3b82f6', icon = '') {
     const trimmed = (name || '').trim();
     if (!trimmed) return { success: false, reason: 'Kategori adı boş olamaz.' };
     const cats = getCategoryObjects();
     if (cats.some(c => (c.name || '').toLowerCase() === trimmed.toLowerCase())) {
       return { success: false, reason: 'Bu isimde bir kategori zaten mevcut.' };
     }
-    const newCat = { id: `cat_${Date.now()}`, name: trimmed, color: color || '#3b82f6', icon: icon || '🏷️' };
+    const newCat = { id: `cat_${Date.now()}`, name: trimmed, color: color || '#3b82f6', icon: icon || '' };
     cats.push(newCat);
     localStorage.setItem(CATEGORIES_KEY, JSON.stringify(cats));
+    _audit('CATEGORY_CREATE', trimmed, 'Yeni kategori oluşturuldu.');
     if (window.FrpCloud && typeof window.FrpCloud.saveCategory === 'function') {
       window.FrpCloud.saveCategory(newCat).catch(() => {});
     }
@@ -878,9 +959,10 @@
       cats[idx].name = cleanNew;
     }
     if (color) cats[idx].color = color;
-    if (icon) cats[idx].icon = icon;
+    if (icon !== undefined) cats[idx].icon = icon;
 
     localStorage.setItem(CATEGORIES_KEY, JSON.stringify(cats));
+    _audit('CATEGORY_UPDATE', cleanNew || oldName, `Kategori güncellendi (Eski: ${oldName}).`);
     if (window.FrpCloud && typeof window.FrpCloud.saveCategory === 'function') {
       window.FrpCloud.saveCategory(cats[idx]).catch(() => {});
     }
@@ -902,6 +984,7 @@
 
     cats = cats.filter(c => c.id !== toDel.id && (c.name || '').trim().toLowerCase() !== (toDel.name || '').trim().toLowerCase());
     localStorage.setItem(CATEGORIES_KEY, JSON.stringify(cats));
+    _audit('CATEGORY_DELETE', toDel.name || identifier, 'Kategori silindi.');
 
     if (window.FrpCloud && typeof window.FrpCloud.deleteCategory === 'function' && toDel.id) {
       window.FrpCloud.deleteCategory(toDel.id).catch(() => {});
@@ -926,6 +1009,7 @@
     if (idx < 0) return false;
     files[idx].category = categoryName || '';
     _write(files);
+    _audit('CATEGORY_ASSIGN', files[idx].name || id, `Kategori "${categoryName || 'Temizlendi'}" olarak ayarlandı.`);
     return true;
   }
 
@@ -1144,16 +1228,19 @@
       root.style.setProperty('--font', fontMap[prefs.fontFamily]);
     }
 
-    // 2.1. Yazı Tipi Kalınlığı (Font Weight)
+    // 2.1. Yazı Tipi Kalınlığı (Font Weight Dinamik Skalası)
     const weightMap = {
-      'light': '400',
-      'normal': '500',
-      'bold': '600',
-      'extrabold': '700'
+      'light':     { base: '300', bold: '500', heading: '600' },
+      'normal':    { base: '400', bold: '600', heading: '700' },
+      'bold':      { base: '500', bold: '700', heading: '800' },
+      'extrabold': { base: '600', bold: '800', heading: '900' }
     };
-    const fw = prefs.fontWeight ? (weightMap[prefs.fontWeight] || prefs.fontWeight) : '500';
-    root.style.setProperty('--base-weight', fw);
-    if (document.body) document.body.style.fontWeight = fw;
+    const fwConfig = weightMap[prefs.fontWeight] || weightMap['normal'];
+    root.style.setProperty('--base-weight', fwConfig.base);
+    root.style.setProperty('--bold-weight', fwConfig.bold);
+    root.style.setProperty('--heading-weight', fwConfig.heading);
+    root.style.setProperty('--report-title-weight', fwConfig.bold);
+    if (document.body) document.body.style.fontWeight = fwConfig.base;
 
     // 3. Kod Editörü Fontu (Genişletilmiş Geliştirici Fontları)
     const codeFontMap = {
@@ -1260,23 +1347,6 @@
     } catch { return []; }
   }
 
-  function addCustomTag(tag) {
-    const t = (tag || '').trim().toLowerCase();
-    if (!t) return false;
-    const list = getCustomTags();
-    if (!list.includes(t)) {
-      list.push(t);
-      localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(list));
-    }
-    return list;
-  }
-
-  function deleteCustomTag(tag) {
-    const list = getCustomTags().filter(t => t !== tag);
-    localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(list));
-    return list;
-  }
-
   // ── 11. Dışa Aktarma & Toplu Araçlar ──────────────────────────
   function exportAllSqls() {
     const files = _read();
@@ -1289,6 +1359,7 @@
         });
       }
     });
+    _audit('REPORT_EXPORT', 'Tüm SQL Sorguları', `${files.length} raporun SQL sorgusu dışa aktarıldı.`);
     return content;
   }
 
@@ -1304,6 +1375,7 @@
         rows.push([reportName, file.name, q.name, lineCount, paramCount, q.sql || '']);
       });
     });
+    _audit('REPORT_EXPORT', 'Tüm SQL Sorguları CSV', `${files.length} raporun SQL sorguları CSV formatında dışa aktarıldı.`);
     return '\uFEFF' + rows.map(r => r.map(csvEsc).join(';')).join('\r\n');
   }
 
@@ -1334,6 +1406,7 @@
       });
       const trimmed = list.slice(0, 50);
       localStorage.setItem(DOWNLOAD_HISTORY_KEY, JSON.stringify(trimmed));
+      _audit('REPORT_DOWNLOAD', fileName || reportName, `Format: ${format || 'frp'}`);
       return trimmed;
     } catch {
       return [];
@@ -1365,7 +1438,6 @@
           preferences: prefs
         };
         localStorage.setItem('frpoku_auto_backup_last', JSON.stringify(backupData));
-        console.log(`⏱️ [AutoBackup] ${files.length} rapor otomatik yedeklendi.`);
       } catch (e) {
         console.warn('Otomatik yedekleme hatası:', e.message);
       }
@@ -1383,6 +1455,7 @@
       preferences: getPreferences(),
       trash: getTrash()
     };
+    _audit('BACKUP_EXPORT', 'Tam Yedekleme Paketi', `${backupObj.reports.length} rapor içeren tam sistem yedeği alındı.`);
     return JSON.stringify(backupObj, null, 2);
   }
 
@@ -1411,7 +1484,7 @@
         const newReports = reportList.filter(r => r && r.id && !existingIds.has(r.id));
         const combined = [...existing, ...newReports];
         _write(combined);
-        importedCount = newReports.length || reportList.length;
+        importedCount = newReports.length;
       }
       // Format 2: Doğrudan Rapor Listesi Dizisi
       else if (Array.isArray(data)) {
@@ -1423,10 +1496,11 @@
         importedCount = newReports.length || data.length;
       }
 
-      return importedCount;
+      _audit('BACKUP_IMPORT', 'Yedek İçe Aktarma', `${importedCount} adet rapor sisteme aktarıldı.`);
+      return { success: true, count: importedCount };
     } catch (e) {
-      console.error('importBackup hatası:', e);
-      return 0;
+      console.error('Backup import error:', e);
+      return { success: false, reason: e.message };
     }
   }
 
@@ -1447,7 +1521,7 @@
     getSnippets, addSnippet, removeSnippet, updateSnippet,
     getTrash, moveToTrash, moveManyToTrash, restoreFromTrash, restoreManyFromTrash, purgeFromTrash, purgeManyFromTrash, emptyTrash,
     getTheme, setTheme, initTheme,
-    getPreferences, setPreferences, applyPreferences, getUserProfile, setUserProfile,
+    getPreferences, setPreferences, applyPreferences, getUserProfile, setUserProfile, saveUserProfile: setUserProfile,
     addRecent, getRecent, clearRecent, removeRecent,
     getDownloadHistory, addDownloadHistory, setAutoBackupInterval, startAutoBackupTimer,
     exportAllSqls, exportAllSqlsCsv, search, getStats, isStorageNearFull,

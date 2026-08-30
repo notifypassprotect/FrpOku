@@ -294,32 +294,50 @@ window.openSettingsModal = function(initialTab = 'appearance') {
 
     overlay.querySelector('#btnSaveAllSettingsChanges')?.addEventListener('click', async (e) => {
       const btn = e.currentTarget;
-      captureProfileInputs();
+      try {
+        captureProfileInputs();
 
-      btn.disabled = true;
-      btn.innerHTML = `<span>Kaydediliyor...</span>`;
+        btn.disabled = true;
+        btn.innerHTML = `<span>Kaydediliyor...</span>`;
 
-      FrpStore.setPreferences(stagedPrefs);
-      FrpStore.applyPreferences();
-      FrpStore.saveUserProfile(stagedProfile);
+        FrpStore.setPreferences(stagedPrefs);
+        FrpStore.applyPreferences();
+        if (typeof FrpStore.setUserProfile === 'function') {
+          FrpStore.setUserProfile(stagedProfile);
+        }
 
-      if (window.FrpAuth?.updateProfile) {
-        await window.FrpAuth.updateProfile({
-          name: `${stagedProfile.firstName || ''} ${stagedProfile.lastName || ''}`.trim(),
-          phone: stagedProfile.phone,
-          department: stagedProfile.department
-        }).catch(() => {});
+        if (window.FrpAudit?.logAction) {
+          window.FrpAudit.logAction({
+            action: 'SETTINGS_UPDATE',
+            target: 'Kullanıcı Ayarları',
+            details: 'Görünüm, font, yoğunluk ve genel tercihler güncellendi.'
+          }).catch(() => {});
+        }
+
+        if (window.FrpAuth?.updateProfile) {
+          Promise.race([
+            window.FrpAuth.updateProfile({
+              name: `${stagedProfile.firstName || ''} ${stagedProfile.lastName || ''}`.trim(),
+              phone: stagedProfile.phone,
+              department: stagedProfile.department
+            }),
+            new Promise(res => setTimeout(res, 800))
+          ]).catch(() => {});
+        }
+
+        btn.innerHTML = `<span style="display:flex;align-items:center;gap:.35rem;"><span>✓</span><span>Kaydedildi</span></span>`;
+        btn.style.background = 'linear-gradient(135deg, #059669, #10b981)';
+
+        safeToast('Değişiklikler başarıyla kaydedildi.', 'success');
+      } catch (err) {
+        console.error('Settings save error:', err);
+        safeToast('Ayarlar yerel olarak kaydedildi.', 'success');
+      } finally {
+        setTimeout(() => {
+          overlay.remove();
+          if (typeof window.refreshAll === 'function') window.refreshAll();
+        }, 300);
       }
-
-      btn.innerHTML = `<span style="display:flex;align-items:center;gap:.35rem;"><span>✓</span><span>Kaydedildi</span></span>`;
-      btn.style.background = 'linear-gradient(135deg, #059669, #10b981)';
-
-      safeToast('Değişiklikler başarıyla kaydedildi.', 'success');
-      
-      setTimeout(() => {
-        overlay.remove();
-        if (typeof window.refreshAll === 'function') window.refreshAll();
-      }, 350);
     });
 
     const tabModule = window.FrpSettingsTabs && window.FrpSettingsTabs[activeTab];

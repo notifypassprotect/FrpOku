@@ -310,7 +310,7 @@ async function exportHtmlDoc() {
 </head>
 <body>
   <div class="container">
-    <h1>📋 ${esc(reportTitle)}</h1>
+    <h1>${esc(reportTitle)}</h1>
     <div class="card">
       <h2>Metadatalar</h2>
       <div class="meta-grid">

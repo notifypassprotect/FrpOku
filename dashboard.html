@@ -441,9 +441,9 @@ function renderDashboard() {
           ${topSqlReports.map((item, i) => `
             <tr>
               <td style="color:var(--text-muted);font-size:.78rem;">${i+1}</td>
-              <td style="font-weight:700;color:var(--text-primary);">📋 ${esc(item.name)}</td>
+              <td style="font-weight:700;color:var(--text-primary);">${esc(item.name)}</td>
               <td><span class="badge badge-blue">${item.sqlCount} Sorgu</span></td>
-              <td><a href="detail.html?id=${item.id}" class="btn btn-sm" style="text-decoration:none;">👁️ Detay</a></td>
+              <td><a href="detail.html?id=${item.id}" class="btn btn-sm" style="text-decoration:none;">Detay</a></td>
             </tr>
           `).join('')}
         </tbody>

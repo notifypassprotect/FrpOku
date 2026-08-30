@@ -32,11 +32,13 @@
           <div style="position:relative;flex:1;min-width:240px;">
             <input type="text" id="snippetSearchInput" placeholder="Sorgularda ara (başlık, rapor adı, SQL içeriği)..."
                    style="width:100%;padding:.5rem .85rem .5rem 2.2rem;border-radius:10px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text-primary);font-size:.84rem;outline:none;" />
-            <span style="position:absolute;left:.75rem;top:50%;transform:translateY(-50%);font-size:.85rem;color:var(--text-muted);">🔍</span>
+            <span style="position:absolute;left:.75rem;top:50%;transform:translateY(-50%);display:flex;align-items:center;color:var(--text-muted);">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </span>
           </div>
           <div style="display:flex;gap:.4rem;align-items:center;">
             <button type="button" class="btn btn-sm btn-primary" id="btnToggleNewSnippetForm" style="display:flex;align-items:center;gap:.35rem;">
-              <span>➕</span> <span>Yeni Sorgu Ekle</span>
+              <span>+ Yeni Sorgu Ekle</span>
             </button>
           </div>
         </div>
@@ -45,9 +47,9 @@
         <div id="snippetEditorPanel" style="display:none;background:var(--bg-surface);border:1.5px solid var(--accent-light, #3b82f6);border-radius:12px;padding:1rem;flex-direction:column;gap:.75rem;box-shadow:0 8px 24px rgba(0,0,0,.12);">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <strong id="snippetEditorHeading" style="font-size:.9rem;color:var(--accent-bright);display:flex;align-items:center;gap:.4rem;">
-              <span>✏️</span> <span>Sorgu Ekle / Düzenle</span>
+              <span>Sorgu Ekle / Düzenle</span>
             </strong>
-            <button type="button" id="btnCloseSnippetEditor" class="btn btn-sm btn-ghost" style="padding:.15rem .45rem;font-size:.78rem;">✕ İptal</button>
+            <button type="button" id="btnCloseSnippetEditor" class="btn btn-sm btn-ghost" style="padding:.15rem .45rem;font-size:.78rem;">İptal</button>
           </div>
 
           <input type="hidden" id="editSnippetId" value="" />
@@ -68,7 +70,7 @@
           <div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem;">
               <label style="font-size:.76rem;font-weight:700;color:var(--text-secondary);">SQL Metni *</label>
-              <button type="button" class="btn btn-sm btn-ghost" id="btnFormatEditorSql" style="padding:.1rem .4rem;font-size:.72rem;">⚡ SQL Formatla</button>
+              <button type="button" class="btn btn-sm btn-ghost" id="btnFormatEditorSql" style="padding:.1rem .4rem;font-size:.72rem;">SQL Formatla</button>
             </div>
             <textarea id="editSnippetSql" rows="7" placeholder="SELECT * FROM ..."
                       style="width:100%;padding:.6rem .8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg-code, #0b1325);color:var(--text-code, #e2e8f0);font-family:var(--mono);font-size:.8rem;outline:none;resize:vertical;line-height:1.45;"></textarea>
@@ -76,7 +78,7 @@
 
           <div style="display:flex;justify-content:flex-end;gap:.5rem;margin-top:.2rem;">
             <button type="button" class="btn btn-sm btn-secondary" id="btnCancelSnippetForm">Vazgeç</button>
-            <button type="button" class="btn btn-sm btn-primary" id="btnSaveSnippetForm">💾 Kütüphaneye Kaydet</button>
+            <button type="button" class="btn btn-sm btn-primary" id="btnSaveSnippetForm">Kütüphaneye Kaydet</button>
           </div>
         </div>
 
@@ -89,7 +91,7 @@
     `;
 
     return showModal({
-      title: '📌 Favori SQL Sorguları Kütüphanesi',
+      title: 'Favori SQL Sorguları Kütüphanesi',
       body: modalBodyHtml,
       confirmText: 'Kapat',
       cancelText: '',
@@ -116,11 +118,11 @@
           sqlInput.value = initial.sql || '';
 
           if (initial.id) {
-            headingEl.innerHTML = '<span>✏️</span> <span>Sorguyu Düzenle</span>';
-            btnSave.textContent = '💾 Değişiklikleri Kaydet';
+            headingEl.innerHTML = '<span>Sorguyu Düzenle</span>';
+            btnSave.textContent = 'Değişiklikleri Kaydet';
           } else {
-            headingEl.innerHTML = '<span>➕</span> <span>Yeni SQL Sorgusu Ekle</span>';
-            btnSave.textContent = '💾 Kütüphaneye Ekle';
+            headingEl.innerHTML = '<span>Yeni SQL Sorgusu Ekle</span>';
+            btnSave.textContent = 'Kütüphaneye Ekle';
           }
 
           editorPanel.style.display = 'flex';
@@ -151,7 +153,7 @@
           const val = sqlInput.value;
           if (val && window.Formatter && typeof window.Formatter.formatSql === 'function') {
             sqlInput.value = window.Formatter.formatSql(val);
-            toast('SQL formatlandı. ⚡', 'info');
+            toast('SQL formatlandı.', 'info');
           }
         });
 
@@ -169,10 +171,10 @@
 
           if (id) {
             store.updateSnippet(id, { title, reportName: report, sql });
-            toast('Sorgu kütüphanede güncellendi. ✏️', 'success');
+            toast('Sorgu kütüphanede güncellendi.', 'success');
           } else {
             store.addSnippet(title, sql, report);
-            toast('Yeni sorgu kütüphaneye eklendi! 📌', 'success');
+            toast('Yeni sorgu kütüphaneye eklendi!', 'success');
           }
 
           closeForm();
@@ -193,10 +195,9 @@
           if (snippets.length === 0) {
             listContainer.innerHTML = `
               <div style="text-align:center;padding:3rem 1.5rem;color:var(--text-muted);background:var(--bg-raised);border-radius:12px;border:1px dashed var(--border);">
-                <div style="font-size:3rem;margin-bottom:.5rem;">📚</div>
                 <div style="font-weight:700;font-size:1.05rem;color:var(--text-primary);">Henüz Kaydedilmiş Sorgu Bulunmuyor</div>
                 <div style="font-size:.84rem;margin-top:.4rem;max-width:460px;margin-left:auto;margin-right:auto;line-height:1.5;">
-                  Rapor detay sayfasından <strong>"📌 Kütüphaneye Ekle"</strong> butonuna basarak veya yukarıdaki <strong>"➕ Yeni Sorgu Ekle"</strong> butonunu kullanarak favori sorgularınızı ekleyebilirsiniz.
+                  Rapor detay sayfasından <strong>"Kütüphaneye Ekle"</strong> butonuna basarak veya yukarıdaki <strong>"+ Yeni Sorgu Ekle"</strong> butonunu kullanarak favori sorgularınızı ekleyebilirsiniz.
                 </div>
               </div>
             `;
@@ -206,7 +207,7 @@
           if (filtered.length === 0) {
             listContainer.innerHTML = `
               <div style="text-align:center;padding:2rem 1rem;color:var(--text-muted);background:var(--bg-raised);border-radius:10px;">
-                🔍 "<strong>${escHtml(filter)}</strong>" aramasıyla eşleşen SQL sorgusu bulunamadı.
+                "<strong>${escHtml(filter)}</strong>" aramasıyla eşleşen SQL sorgusu bulunamadı.
               </div>
             `;
             return;
@@ -221,15 +222,15 @@
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem;flex-wrap:wrap;">
                   <div>
                     <div class="snippet-title" style="font-weight:700;color:var(--accent-bright);font-size:.92rem;display:flex;align-items:center;gap:.35rem;">
-                      📌 ${escHtml(s.title || 'SQL Sorgusu')}
+                      ${escHtml(s.title || 'SQL Sorgusu')}
                     </div>
                     <div class="snippet-sub" style="font-size:.75rem;color:var(--text-muted);margin-top:.2rem;">
                       Kaynak Rapor: <strong style="color:var(--text-secondary);">${escHtml(s.reportName || '—')}</strong> · Kayıt: ${dateStr}
                     </div>
                   </div>
                   <div style="display:flex;gap:.35rem;flex-wrap:wrap;align-items:center;">
-                    <button type="button" class="btn btn-sm btn-ghost btn-edit-snippet" style="padding:.25rem .55rem;font-size:.76rem;" data-id="${s.id}" title="Düzenle">✏️ Düzenle</button>
-                    <button type="button" class="btn btn-sm btn-danger btn-delete-snippet" style="padding:.25rem .55rem;font-size:.76rem;" data-id="${s.id}" title="Sil">🗑️ Sil</button>
+                    <button type="button" class="btn btn-sm btn-ghost btn-edit-snippet" style="padding:.25rem .55rem;font-size:.76rem;" data-id="${s.id}" title="Düzenle">Düzenle</button>
+                    <button type="button" class="btn btn-sm btn-danger btn-delete-snippet" style="padding:.25rem .55rem;font-size:.76rem;" data-id="${s.id}" title="Sil">Sil</button>
                   </div>
                 </div>
 
@@ -239,10 +240,10 @@
 
                 <div style="display:flex;justify-content:flex-end;gap:.5rem;margin-top:.15rem;flex-wrap:wrap;">
                   ${window.currentFile ? `
-                    <button type="button" class="btn btn-sm btn-primary btn-add-new-query" style="padding:.3rem .75rem;font-size:.78rem;background:linear-gradient(135deg, #059669, #10b981);color:#fff;border:none;font-weight:700;" data-id="${s.id}" title="Bu sorguyu mevcut rapora yeni bir sekme/Dataset olarak ekle">➕ Rapora Yeni Sorgu Ekle</button>
-                    <button type="button" class="btn btn-sm btn-secondary btn-insert-snippet" style="padding:.3rem .75rem;font-size:.78rem;" data-id="${s.id}" title="Açık olan SQL editörüne yapıştır">📥 Aktif Editöre Yapıştır</button>
+                    <button type="button" class="btn btn-sm btn-primary btn-add-new-query" style="padding:.3rem .75rem;font-size:.78rem;background:linear-gradient(135deg, #059669, #10b981);color:#fff;border:none;font-weight:700;" data-id="${s.id}" title="Bu sorguyu mevcut rapora yeni bir sekme/Dataset olarak ekle">+ Rapora Yeni Sorgu Ekle</button>
+                    <button type="button" class="btn btn-sm btn-secondary btn-insert-snippet" style="padding:.3rem .75rem;font-size:.78rem;" data-id="${s.id}" title="Açık olan SQL editörüne yapıştır">Aktif Editöre Yapıştır</button>
                   ` : ''}
-                  <button type="button" class="btn btn-sm btn-ghost btn-copy-snippet" style="padding:.3rem .75rem;font-size:.78rem;" data-id="${s.id}">📋 Panoya Kopyala</button>
+                  <button type="button" class="btn btn-sm btn-ghost btn-copy-snippet" style="padding:.3rem .75rem;font-size:.78rem;" data-id="${s.id}">Panoya Kopyala</button>
                 </div>
               </div>
             `;
@@ -255,7 +256,7 @@
               const item = snippets.find(x => x.id === id);
               if (item && item.sql) {
                 navigator.clipboard.writeText(item.sql).then(() => {
-                  toast('SQL sorgusu panoya kopyalandı! 📋', 'success');
+                  toast('SQL sorgusu panoya kopyalandı!', 'success');
                 });
               }
             });
@@ -270,7 +271,7 @@
               if (window.addSnippetAsNewQueryToReport) {
                 const qName = window.addSnippetAsNewQueryToReport(item.title, item.sql);
                 if (qName) {
-                  toast(`'${item.title || qName}' sorgusu rapora yeni sekme olarak eklendi! ➕`, 'success');
+                  toast(`'${item.title || qName}' sorgusu rapora yeni sekme olarak eklendi!`, 'success');
                   modal.remove();
                 }
               }
@@ -285,14 +286,14 @@
 
               if (typeof onInsert === 'function') {
                 onInsert(item.sql);
-                toast('SQL sorgusu editöre aktarıldı. 📥', 'success');
+                toast('SQL sorgusu editöre aktarıldı.', 'success');
                 modal.remove();
               } else if (window.insertSnippetToActiveEditor && window.insertSnippetToActiveEditor(item.sql)) {
-                toast('SQL sorgusu aktif editöre aktarıldı. 📥', 'success');
+                toast('SQL sorgusu aktif editöre aktarıldı.', 'success');
                 modal.remove();
               } else {
                 navigator.clipboard.writeText(item.sql).then(() => {
-                  toast('SQL panoya kopyalandı! 📋', 'info');
+                  toast('SQL panoya kopyalandı!', 'info');
                 });
               }
             });
@@ -314,7 +315,7 @@
               if (!item) return;
 
               const confirmDel = await showModal({
-                title: '🗑️ Sorguyu Sil',
+                title: 'Sorguyu Sil',
                 body: `<strong>"${escHtml(item.title)}"</strong> sorgusunu kütüphaneden silmek istediğinize emin misiniz?`,
                 confirmText: 'Evet, Sil',
                 cancelText: 'Vazgeç',
