@@ -253,7 +253,14 @@ window.openSettingsModal = function(initialTab = 'appearance') {
     overlay.querySelectorAll('.settings-tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         captureProfileInputs();
-        activeTab = btn.dataset.tab;
+        const tab = btn.dataset.tab;
+        if (tab === 'audit') {
+          if (typeof window.openAuditLogModal === 'function') {
+            window.openAuditLogModal();
+            return;
+          }
+        }
+        activeTab = tab;
         renderModal();
       });
     });

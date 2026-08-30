@@ -33,6 +33,16 @@ if (btnThemeToggle) {
   });
 }
 
+// Canlı Tema Senkronizasyonu
+window.addEventListener('storage', (e) => {
+  if (e.key === 'frpoku_theme' || e.key === 'frpoku_code_theme') {
+    updateThemeBtn();
+  }
+});
+window.addEventListener('frpoku:themeChanged', () => {
+  updateThemeBtn();
+});
+
 updateThemeBtn();
 
 // Yazı Boyutu Kontrolleri
@@ -3175,6 +3185,23 @@ function setupDownloadHistoryDetail() {
         window.showDownloadHistoryModal();
       } else if (typeof FrpStore?.getDownloadHistory === 'function') {
         const history = FrpStore.getDownloadHistory();
+        
+        function formatHistoryTime(raw) {
+          if (!raw) return '-';
+          try {
+            const d = new Date(raw);
+            if (isNaN(d.getTime())) return '-';
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yyyy = d.getFullYear();
+            const hh = String(d.getHours()).padStart(2, '0');
+            const min = String(d.getMinutes()).padStart(2, '0');
+            return `${dd}.${mm}.${yyyy} - ${hh}:${min}`;
+          } catch {
+            return String(raw);
+          }
+        }
+
         const bodyHtml = history.length === 0 ? `
           <div style="padding:2.5rem 1rem;text-align:center;color:var(--text-muted);">
             <div style="font-weight:700;font-size:1rem;color:var(--text-secondary);">Henüz İndirilen Dosya Yok</div>
@@ -3183,7 +3210,8 @@ function setupDownloadHistoryDetail() {
         ` : `
           <div style="display:flex;flex-direction:column;gap:.6rem;max-height:420px;overflow-y:auto;padding-right:.25rem;">
             ${history.map(item => {
-              const timeStr = new Date(item.timestamp).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+              const rawTime = item.downloadedAt || item.timestamp || item.date || item.createdAt;
+              const timeStr = formatHistoryTime(rawTime);
               const formatBadge = item.format === 'zip' ? 'ZIP' : (item.format === 'sql' ? 'SQL' : (item.format === 'html' ? 'HTML' : 'FRP'));
               return `
                 <div style="background:var(--bg-raised);padding:.75rem .95rem;border-radius:10px;border:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between;gap:.8rem;">
@@ -3192,8 +3220,8 @@ function setupDownloadHistoryDetail() {
                       <span class="badge badge-blue" style="font-size:.68rem;padding:2px 6px;">${formatBadge}</span>
                       <span style="font-weight:800;font-size:.85rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(item.fileName)}</span>
                     </div>
-                    <div style="font-size:.72rem;color:var(--text-muted);display:flex;align-items:center;gap:.6rem;">
-                      <span>${timeStr}</span>
+                    <div style="font-size:.74rem;color:var(--text-muted);display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">
+                      <span style="font-family:var(--mono);color:var(--text-secondary);">Zaman: ${timeStr}</span>
                       ${item.reportName && item.reportName !== item.fileName ? `<span>• ${esc(item.reportName)}</span>` : ''}
                     </div>
                   </div>

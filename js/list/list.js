@@ -671,6 +671,21 @@ function updateBulkBar() {
       btnCompare.style.display = count >= 2 ? 'inline-flex' : 'none';
       btnCompare.textContent = count === 2 ? 'Karşılaştır (Diff)' : `Seçilen ${count} Raporu Karşılaştır`;
     }
+
+    // Havuz Butonlarının Dinamik Durum Yönetimi
+    const btnSharePool = document.getElementById('btnBulkSharePool');
+    const btnRemovePool = document.getElementById('btnBulkRemovePool');
+    
+    const selectedFiles = [...selectedIds].map(id => FrpStore.getById(id)).filter(Boolean);
+    const inPoolCount = selectedFiles.filter(f => !!(f.isPublic || f.is_public || f.inPool)).length;
+    const notInPoolCount = selectedFiles.length - inPoolCount;
+
+    if (btnSharePool) {
+      btnSharePool.style.display = notInPoolCount > 0 ? 'inline-flex' : 'none';
+    }
+    if (btnRemovePool) {
+      btnRemovePool.style.display = inPoolCount > 0 ? 'inline-flex' : 'none';
+    }
   } else {
     bulkBar.classList.remove('show');
     bulkBar.classList.remove('visible');
@@ -1071,25 +1086,39 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('btnBulkSharePool')?.addEventListener('click', () => {
     if (selectedIds.size === 0) return;
-    const ids = [...selectedIds];
-    if (FrpStore.bulkToggleReportPool) {
-      FrpStore.bulkToggleReportPool(ids, true);
-    } else if (FrpStore.addManyToPool) {
-      FrpStore.addManyToPool(ids);
+    const selectedFiles = [...selectedIds].map(id => FrpStore.getById(id)).filter(Boolean);
+    const unpooledIds = selectedFiles.filter(f => !(f.isPublic || f.is_public || f.inPool)).map(f => f.id);
+    
+    if (unpooledIds.length === 0) {
+      toast('Seçilen raporlar zaten ortak havuzda paylaşılmış durumda.', 'info');
+      return;
     }
-    toast(`${ids.length} rapor ortak havuzda paylaşıldı.`, 'success');
+
+    if (FrpStore.bulkToggleReportPool) {
+      FrpStore.bulkToggleReportPool(unpooledIds, true);
+    } else if (FrpStore.addManyToPool) {
+      FrpStore.addManyToPool(unpooledIds);
+    }
+    toast(`${unpooledIds.length} rapor ortak havuzda paylaşıldı.`, 'success');
     refreshAll();
   });
 
   document.getElementById('btnBulkRemovePool')?.addEventListener('click', () => {
     if (selectedIds.size === 0) return;
-    const ids = [...selectedIds];
-    if (FrpStore.bulkToggleReportPool) {
-      FrpStore.bulkToggleReportPool(ids, false);
-    } else if (FrpStore.removeManyFromPool) {
-      FrpStore.removeManyFromPool(ids);
+    const selectedFiles = [...selectedIds].map(id => FrpStore.getById(id)).filter(Boolean);
+    const pooledIds = selectedFiles.filter(f => !!(f.isPublic || f.is_public || f.inPool)).map(f => f.id);
+    
+    if (pooledIds.length === 0) {
+      toast('Seçilen raporlar arasında ortak havuzda bulunan kayıt yok.', 'info');
+      return;
     }
-    toast(`${ids.length} rapor ortak havuzdan kaldırıldı.`, 'info');
+
+    if (FrpStore.bulkToggleReportPool) {
+      FrpStore.bulkToggleReportPool(pooledIds, false);
+    } else if (FrpStore.removeManyFromPool) {
+      FrpStore.removeManyFromPool(pooledIds);
+    }
+    toast(`${pooledIds.length} rapor ortak havuzdan kaldırıldı.`, 'info');
     refreshAll();
   });
 

@@ -178,11 +178,30 @@ function recordAuditLog({ userId, username, fullName, role, action, target, deta
       action: action || 'INFO',
       target: target || '',
       details: details || '',
-      ip: ip || '127.0.0.1'
+      ip: (ip || '127.0.0.1').replace(/^::ffff:/, '')
     };
     const logs = getAuditLogs();
     logs.unshift(logEntry);
     saveAuditLogs(logs);
+
+    if (supabase) {
+      supabase.from('user_settings')
+        .select('preferences')
+        .eq('id', 'system_audit_logs')
+        .single()
+        .then(({ data }) => {
+          const currentLogs = (data && data.preferences && Array.isArray(data.preferences.logs)) ? data.preferences.logs : [];
+          const updated = [logEntry, ...currentLogs.filter(l => l.id !== logEntry.id)].slice(0, 1000);
+          return supabase.from('user_settings').upsert({
+            id: 'system_audit_logs',
+            theme: 'light',
+            preferences: { logs: updated },
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'id' });
+        })
+        .catch(() => {});
+    }
+
     return logEntry;
   } catch (e) {
     console.warn('Audit log yazılamadı:', e.message);

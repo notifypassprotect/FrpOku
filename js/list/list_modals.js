@@ -513,17 +513,39 @@ window.FrpListModals = window.FrpListModals || {};
       return;
     }
 
+    function formatHistoryTime(raw) {
+      if (!raw) return '-';
+      try {
+        const d = new Date(raw);
+        if (isNaN(d.getTime())) return '-';
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yyyy = d.getFullYear();
+        const hh = String(d.getHours()).padStart(2, '0');
+        const min = String(d.getMinutes()).padStart(2, '0');
+        return `${dd}.${mm}.${yyyy} - ${hh}:${min}`;
+      } catch {
+        return String(raw);
+      }
+    }
+
     const bodyHtml = `
-      <div style="display:flex;flex-direction:column;gap:.6rem;max-height:60vh;overflow-y:auto;">
+      <div style="display:flex;flex-direction:column;gap:.65rem;max-height:60vh;overflow-y:auto;padding-right:.25rem;">
         ${history.map(item => {
-          const timeStr = item.downloadedAt ? new Date(item.downloadedAt).toLocaleString('tr-TR') : '';
+          const rawTime = item.downloadedAt || item.timestamp || item.date || item.createdAt;
+          const timeStr = formatHistoryTime(rawTime);
           return `
-            <div style="background:var(--bg-surface);border:1px solid var(--border-light);border-radius:10px;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;">
+            <div style="background:var(--bg-surface);border:1px solid var(--border-light);border-radius:10px;padding:.85rem 1.1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;">
               <div style="min-width:0;flex:1;">
                 <div style="font-weight:700;font-size:.88rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(item.fileName)}</div>
-                <div style="font-size:.72rem;color:var(--text-muted);margin-top:.15rem;">Format: ${escHtml(item.format || 'frp')} · Zaman: ${timeStr}</div>
+                <div style="font-size:.74rem;color:var(--text-muted);margin-top:.2rem;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">
+                  <span>Format: <strong>${escHtml(item.format || 'frp')}</strong></span>
+                  <span>·</span>
+                  <span>Zaman: <strong style="font-family:var(--mono);color:var(--text-secondary);">${timeStr}</strong></span>
+                  ${item.reportName && item.reportName !== item.fileName ? `<span>·</span><span>${escHtml(item.reportName)}</span>` : ''}
+                </div>
               </div>
-              <span class="badge badge-blue" style="font-size:.74rem;font-family:var(--mono);">${escHtml(item.format?.toUpperCase() || 'FRP')}</span>
+              <span class="badge badge-blue" style="font-size:.74rem;font-family:var(--mono);padding:.25rem .6rem;">${escHtml(item.format?.toUpperCase() || 'FRP')}</span>
             </div>
           `;
         }).join('')}

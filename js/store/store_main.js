@@ -1031,6 +1031,9 @@
   function setTheme(theme) {
     localStorage.setItem(THEME_KEY, theme);
     document.documentElement.setAttribute('data-theme', theme);
+    if (window.FrpThemes && typeof window.FrpThemes.setTheme === 'function') {
+      window.FrpThemes.setTheme(theme);
+    }
   }
   function initTheme() { setTheme(getTheme()); }
   initTheme();
@@ -1255,12 +1258,14 @@
     }
   }
 
-  function addDownloadHistory({ reportId, reportName, fileName, format, customVersion }) {
+  function addDownloadHistory({ reportId, reportName, fileName, format, customVersion, timestamp, downloadedAt }) {
     try {
       const list = getDownloadHistory();
+      const nowIso = new Date().toISOString();
       list.unshift({
         id: 'dl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
-        timestamp: new Date().toISOString(),
+        timestamp: timestamp || downloadedAt || nowIso,
+        downloadedAt: downloadedAt || timestamp || nowIso,
         reportId,
         reportName,
         fileName,

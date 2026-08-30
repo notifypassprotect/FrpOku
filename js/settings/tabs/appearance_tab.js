@@ -61,7 +61,7 @@ window.FrpSettingsTabs.appearance = {
 
         <!-- 15 Popüler Yazı Tipi Ailesi -->
         <div class="settings-card">
-          <div style="font-weight:700;font-size:.85rem;margin-bottom:.6rem;">🔤 Genel Yazı Tipi Ailesi (Popüler Fontlar)</div>
+          <div style="font-weight:700;font-size:.85rem;margin-bottom:.6rem;">Genel Yazı Tipi Ailesi (Popüler Fontlar)</div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:.65rem;">
             ${this.fontList.map(f => `
               <label class="settings-radio-card ${stagedPrefs.fontFamily === f.id ? 'active' : ''}" style="font-family:${f.fontCss};">
@@ -75,7 +75,7 @@ window.FrpSettingsTabs.appearance = {
 
         <!-- Arayüz & Yazı Boyutu (5 Seçenek) -->
         <div class="settings-card">
-          <div style="font-weight:700;font-size:.85rem;margin-bottom:.6rem;">🔍 Arayüz & Yazı Boyutu (UI Scale)</div>
+          <div style="font-weight:700;font-size:.85rem;margin-bottom:.6rem;">Arayüz & Yazı Boyutu (UI Scale)</div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:.5rem;">
             ${[
               { id: 'micro', name: 'Mikro (%75)', desc: 'Ultra Kompakt' },
@@ -95,7 +95,7 @@ window.FrpSettingsTabs.appearance = {
 
         <!-- Tablo / Liste Sıkışıklığı (Density) - 4 Seviye -->
         <div class="settings-card">
-          <div style="font-weight:700;font-size:.85rem;margin-bottom:.6rem;">📏 Tablo & Liste Sıkışıklığı (Density)</div>
+          <div style="font-weight:700;font-size:.85rem;margin-bottom:.6rem;">Tablo & Liste Sıkışıklığı (Density)</div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:.5rem;">
             ${[
               { id: 'comfortable', name: 'Rahat (Geniş)', desc: 'Ferah satır aralığı (44px)' },
@@ -114,7 +114,7 @@ window.FrpSettingsTabs.appearance = {
 
         <!-- SQL & Pascal Editör Fontu (Örnekli Kartlar) -->
         <div class="settings-card">
-          <div style="font-weight:700;font-size:.85rem;margin-bottom:.6rem;">💻 Kod & SQL Editör Fontu (Önizlemeli)</div>
+          <div style="font-weight:700;font-size:.85rem;margin-bottom:.6rem;">Kod & SQL Editör Fontu (Önizlemeli)</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;">
             ${this.codeFonts.map(cf => `
               <label class="settings-radio-card ${stagedPrefs.codeFont === cf.id ? 'active' : ''}" style="font-family:var(--mono);">

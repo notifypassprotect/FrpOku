@@ -230,6 +230,22 @@ async function downloadSingleReport(id) {
 async function showDownloadHistoryModal() {
   const history = typeof FrpStore.getDownloadHistory === 'function' ? FrpStore.getDownloadHistory() : [];
   
+  function formatHistoryTime(raw) {
+    if (!raw) return '-';
+    try {
+      const d = new Date(raw);
+      if (isNaN(d.getTime())) return '-';
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      const hh = String(d.getHours()).padStart(2, '0');
+      const min = String(d.getMinutes()).padStart(2, '0');
+      return `${dd}.${mm}.${yyyy} - ${hh}:${min}`;
+    } catch {
+      return String(raw);
+    }
+  }
+
   const bodyHtml = history.length === 0 ? `
     <div style="padding:2.5rem 1rem;text-align:center;color:var(--text-muted);">
       <div style="font-weight:700;font-size:1rem;color:var(--text-secondary);">Henüz İndirilen Dosya Yok</div>
@@ -238,7 +254,8 @@ async function showDownloadHistoryModal() {
   ` : `
     <div style="display:flex;flex-direction:column;gap:.6rem;max-height:420px;overflow-y:auto;padding-right:.25rem;">
       ${history.map(item => {
-        const timeStr = new Date(item.timestamp).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const rawTime = item.downloadedAt || item.timestamp || item.date || item.createdAt;
+        const timeStr = formatHistoryTime(rawTime);
         const formatBadge = item.format === 'zip' ? 'ZIP' : (item.format === 'sql' ? 'SQL' : (item.format === 'html' ? 'HTML' : 'FRP'));
         return `
           <div style="background:var(--bg-raised);padding:.75rem .95rem;border-radius:10px;border:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between;gap:.8rem;">
@@ -247,8 +264,8 @@ async function showDownloadHistoryModal() {
                 <span class="badge badge-blue" style="font-size:.68rem;padding:2px 6px;">${formatBadge}</span>
                 <span style="font-weight:800;font-size:.85rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(item.fileName)}</span>
               </div>
-              <div style="font-size:.72rem;color:var(--text-muted);display:flex;align-items:center;gap:.6rem;">
-                <span>${timeStr}</span>
+              <div style="font-size:.74rem;color:var(--text-muted);display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">
+                <span style="font-family:var(--mono);color:var(--text-secondary);">Zaman: ${timeStr}</span>
                 ${item.reportName && item.reportName !== item.fileName ? `<span>• ${escHtml(item.reportName)}</span>` : ''}
               </div>
             </div>
@@ -312,75 +329,75 @@ async function downloadBulkReports() {
       <!-- Bilgi & İstatistik Başlığı -->
       <div style="background:var(--bg-raised);padding:.85rem 1.15rem;border-radius:12px;border:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
         <div>
-          <div style="font-weight:800;font-size:.95rem;color:var(--text-primary);">📦 Toplu İndirme Paketi</div>
-          <div style="font-size:.76rem;color:var(--text-muted);margin-top:.2rem;">Toplam <strong>${count} adet</strong> rapor dışa aktarılacak.</div>
+          <div style="font-weight:800;font-size:.95rem;color:var(--text-primary);">Toplu İndirme Paketi</div>
+          <div style="font-size:.76rem;color:var(--text-muted);margin-top:.2rem;">Toplam <strong>${count} adet</strong> rapor dışa aktarılacaktır.</div>
         </div>
         <div style="display:flex;align-items:center;gap:.4rem;">
-          <span class="badge badge-purple" style="font-size:.78rem;font-weight:800;">${count} Rapor Seçili</span>
+          <span class="badge badge-purple" style="font-size:.78rem;font-weight:800;padding:.3rem .7rem;">${count} Rapor Seçili</span>
         </div>
       </div>
 
       <!-- Seçilen Tüm Raporların Canlı Önizleme Listesi -->
       <div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.35rem;">
-          <label style="font-size:.78rem;font-weight:700;color:var(--text-secondary);">Seçilen Raporların Canlı Önizleme Listesi (${count}):</label>
-          <span style="font-size:.72rem;color:var(--text-muted);">Yeni isimler anlık hesaplanır</span>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem;">
+          <label style="font-size:.8rem;font-weight:700;color:var(--text-secondary);">Seçilen Raporların Canlı Önizleme Listesi (${count}):</label>
+          <span style="font-size:.72rem;color:var(--text-muted);">Yeni dosya isimleri anlık güncellenir</span>
         </div>
-        <div id="bulkPreviewList" style="max-height:160px;overflow-y:auto;background:var(--bg-surface);border:1px solid var(--border-light);border-radius:10px;padding:.4rem .6rem;display:flex;flex-direction:column;gap:.35rem;">
+        <div id="bulkPreviewList" style="max-height:160px;overflow-y:auto;background:var(--bg-surface);border:1px solid var(--border-light);border-radius:10px;padding:.5rem .7rem;display:flex;flex-direction:column;gap:.4rem;">
         </div>
       </div>
 
       <!-- Paketleme ve İndirme Türü -->
       <div>
-        <label style="font-size:.78rem;font-weight:700;color:var(--text-secondary);margin-bottom:.4rem;display:block;">Paketleme / İndirme Türü:</label>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
-          <label class="bulk-method-card active" data-method="zip" style="display:flex;align-items:flex-start;gap:.6rem;padding:.75rem .95rem;border-radius:12px;border:1.5px solid var(--accent);background:var(--bg-raised);cursor:pointer;">
+        <label style="font-size:.8rem;font-weight:700;color:var(--text-secondary);margin-bottom:.45rem;display:block;">Paketleme / İndirme Yöntemi:</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.85rem;">
+          <label class="bulk-method-card active" data-method="zip" style="display:flex;align-items:flex-start;gap:.7rem;padding:.85rem 1rem;border-radius:12px;border:1.5px solid var(--accent);background:var(--bg-raised);cursor:pointer;transition:all .15s;">
             <input type="radio" name="bulkMethodRadio" value="zip" checked style="accent-color:var(--accent);margin-top:.2rem;" />
             <div>
-              <div style="font-weight:800;font-size:.85rem;color:var(--text-primary);">📦 ZIP Arşivi Olarak Paketle</div>
-              <div style="font-size:.72rem;color:var(--text-muted);margin-top:.15rem;">Tüm raporlar tek bir sıkıştırılmış ZIP dosyasında iner.</div>
+              <div style="font-weight:800;font-size:.86rem;color:var(--text-primary);">ZIP Arşivi Olarak Paketle</div>
+              <div style="font-size:.72rem;color:var(--text-muted);margin-top:.2rem;line-height:1.4;">Tüm raporlar tek bir sıkıştırılmış ZIP arşivinde indirilir.</div>
             </div>
           </label>
-          <label class="bulk-method-card" data-method="separate" style="display:flex;align-items:flex-start;gap:.6rem;padding:.75rem .95rem;border-radius:12px;border:1.5px solid var(--border);background:var(--bg-surface);cursor:pointer;">
+          <label class="bulk-method-card" data-method="separate" style="display:flex;align-items:flex-start;gap:.7rem;padding:.85rem 1rem;border-radius:12px;border:1.5px solid var(--border);background:var(--bg-surface);cursor:pointer;transition:all .15s;">
             <input type="radio" name="bulkMethodRadio" value="separate" style="accent-color:var(--accent);margin-top:.2rem;" />
             <div>
-              <div style="font-weight:800;font-size:.85rem;color:var(--text-primary);">📄 Ayrı Ayrı İndir</div>
-              <div style="font-size:.72rem;color:var(--text-muted);margin-top:.15rem;">Her rapor ayrı bir dosya olarak tarayıcınızdan iner.</div>
+              <div style="font-weight:800;font-size:.86rem;color:var(--text-primary);">Ayrı Ayrı İndir</div>
+              <div style="font-size:.72rem;color:var(--text-muted);margin-top:.2rem;line-height:1.4;">Her rapor ayrı bir dosya olarak tarayıcınızdan tek tek indirilir.</div>
             </div>
           </label>
         </div>
       </div>
 
       <!-- ZIP Ayarları (Özel ZIP Adı & Klasörleme) -->
-      <div id="zipSettingsBox" style="background:var(--bg-raised);padding:1rem;border-radius:12px;border:1px solid var(--border-light);display:flex;flex-direction:column;gap:.75rem;">
+      <div id="zipSettingsBox" style="background:var(--bg-raised);padding:1rem 1.15rem;border-radius:12px;border:1px solid var(--border-light);display:flex;flex-direction:column;gap:.85rem;">
         <div>
-          <label style="font-size:.78rem;font-weight:700;color:var(--text-primary);display:block;margin-bottom:.3rem;">
+          <label style="font-size:.8rem;font-weight:700;color:var(--text-primary);display:block;margin-bottom:.35rem;">
             ZIP Arşiv Adı:
           </label>
-          <input type="text" id="bulkZipNameInp" class="master-search-input" style="width:100%;font-family:var(--font);font-weight:700;" placeholder="${escHtml(defaultZipName)}" value="${escHtml(defaultZipName)}" />
-          <div style="font-size:.71rem;color:var(--text-muted);margin-top:.25rem;">Boş bırakırsanız otomatik güncel tarih ve saat atanır.</div>
+          <input type="text" id="bulkZipNameInp" class="master-search-input" style="width:100%;font-family:var(--font);font-weight:700;padding:.45rem .75rem;border-radius:8px;" placeholder="${escHtml(defaultZipName)}" value="${escHtml(defaultZipName)}" />
+          <div style="font-size:.72rem;color:var(--text-muted);margin-top:.3rem;">Boş bırakırsanız otomatik güncel tarih ve saat atanır.</div>
         </div>
 
-        <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;font-size:.8rem;font-weight:700;color:var(--text-primary);padding-top:.3rem;border-top:1px solid var(--border-light);">
+        <label style="display:flex;align-items:center;gap:.65rem;cursor:pointer;font-size:.82rem;font-weight:700;color:var(--text-primary);padding-top:.4rem;border-top:1px solid var(--border-light);">
           <input type="checkbox" id="bulkFolderCb" style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer;" />
-          <span>📁 Kategorilere göre alt klasörler oluştur (Örn: <code>Muhasebe/rapor.frp</code>)</span>
+          <span>Kategorilere göre alt klasörler oluştur (Örn: <code>Muhasebe/rapor.frp</code>)</span>
         </label>
       </div>
 
-      <!-- Versiyon Numarası Artırımı -->
-      <div style="background:var(--bg-raised);padding:1rem;border-radius:12px;border:1px solid var(--border-light);display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap;">
-        <div>
-          <div style="font-weight:700;font-size:.82rem;color:var(--text-primary);">Tüm Raporların Versiyonunu Artır:</div>
-          <div style="font-size:.72rem;color:var(--text-muted);">Örn: <code>rapor_v1.frp</code> ➔ <code>rapor_v2.frp</code></div>
+      <!-- Versiyon Numarası Artırımı (Responsive & Taşmayan Düzen) -->
+      <div style="background:var(--bg-raised);padding:1rem 1.15rem;border-radius:12px;border:1px solid var(--border-light);display:flex;flex-direction:column;gap:.65rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem;">
+          <div style="font-weight:700;font-size:.84rem;color:var(--text-primary);">Rapor Versiyon Artırımı:</div>
+          <div style="font-size:.72rem;color:var(--text-muted);">Örn: <code>rapor_v1.frp</code> → <code>rapor_v2.frp</code></div>
         </div>
-        <div style="display:flex;align-items:center;gap:.35rem;" id="bulkVersionBtns">
-          <button type="button" class="btn btn-sm btn-ghost bv-btn" data-v="0" style="padding:3px 9px;font-size:.74rem;">0 (Aynı)</button>
-          <button type="button" class="btn btn-sm btn-primary bv-btn active" data-v="1" style="padding:3px 9px;font-size:.74rem;font-weight:800;">+1</button>
-          <button type="button" class="btn btn-sm btn-ghost bv-btn" data-v="2" style="padding:3px 9px;font-size:.74rem;">+2</button>
-          <button type="button" class="btn btn-sm btn-ghost bv-btn" data-v="5" style="padding:3px 9px;font-size:.74rem;">+5</button>
-          <div style="display:flex;align-items:center;gap:.25rem;background:var(--bg-surface);padding:1px 6px;border-radius:6px;border:1px solid var(--border);">
-            <span style="font-size:.72rem;font-weight:700;color:var(--text-muted);">Özel:</span>
-            <input type="number" id="bulkCustomBumpInp" min="0" max="999" style="width:48px;font-size:.78rem;font-weight:700;border:none;background:transparent;text-align:center;color:var(--accent);" placeholder="+" />
+        <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;" id="bulkVersionBtns">
+          <button type="button" class="btn btn-sm btn-ghost bv-btn" data-v="0" style="padding:.4rem .85rem;font-size:.78rem;font-weight:600;">0 (Aynı)</button>
+          <button type="button" class="btn btn-sm btn-primary bv-btn active" data-v="1" style="padding:.4rem .85rem;font-size:.78rem;font-weight:800;">+1</button>
+          <button type="button" class="btn btn-sm btn-ghost bv-btn" data-v="2" style="padding:.4rem .85rem;font-size:.78rem;font-weight:600;">+2</button>
+          <button type="button" class="btn btn-sm btn-ghost bv-btn" data-v="5" style="padding:.4rem .85rem;font-size:.78rem;font-weight:600;">+5</button>
+          <div style="display:flex;align-items:center;gap:.35rem;background:var(--bg-surface);padding:.25rem .65rem;border-radius:8px;border:1px solid var(--border);margin-left:auto;">
+            <span style="font-size:.74rem;font-weight:700;color:var(--text-muted);">Özel:</span>
+            <input type="number" id="bulkCustomBumpInp" min="0" max="999" style="width:54px;font-size:.8rem;font-weight:700;border:none;background:transparent;text-align:center;color:var(--accent);padding:2px;" placeholder="+" />
           </div>
         </div>
       </div>
@@ -388,10 +405,10 @@ async function downloadBulkReports() {
   `;
 
   const confirmed = await showModal({
-    title: `📦 Toplu Rapor İndirme (${count} Rapor)`,
+    title: `Toplu Rapor İndirme (${count} Rapor)`,
     body: bodyHtml,
-    confirmText: `💾 ${count} Raporu İndir`,
-    cancelText: '✕ İptal',
+    confirmText: `${count} Raporu İndir`,
+    cancelText: 'İptal',
     maxWidth: '680px',
     onOpen: (modalEl) => {
       const previewList = modalEl.querySelector('#bulkPreviewList');
@@ -409,13 +426,13 @@ async function downloadBulkReports() {
           if (versionBump > 0 && typeof FrpStore.bumpVersionFilename === 'function') {
             targetName = FrpStore.bumpVersionFilename(targetName, versionBump);
           }
-          const catStr = (useFolders && file.category) ? `📁 ${escHtml(file.category)}/` : '';
+          const catStr = (useFolders && file.category) ? `${escHtml(file.category)}/` : '';
           return `
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:.6rem;font-size:.75rem;padding:.32rem .55rem;background:var(--bg-raised);border-radius:6px;">
-              <span style="font-weight:700;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:.6rem;font-size:.76rem;padding:.38rem .65rem;background:var(--bg-raised);border-radius:7px;">
+              <span style="font-weight:700;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:280px;">
                 ${idx + 1}. ${escHtml(file.meta?.reportName || file.name)}
               </span>
-              <span style="font-family:var(--font);color:var(--accent-bright);font-weight:600;white-space:nowrap;">
+              <span style="font-family:var(--font);color:var(--accent);font-weight:600;white-space:nowrap;">
                 ${catStr}${escHtml(targetName)}
               </span>
             </div>
@@ -493,7 +510,7 @@ async function downloadBulkReports() {
 
   if (!confirmed) return;
 
-  showProgressModal('Toplu Raporlar Hazırlanıyor...', `${count} dosya işleniyor`, '📦');
+  showProgressModal('Toplu Raporlar Hazırlanıyor...', `${count} dosya işleniyor`);
   const errors = [];
   let successCount = 0;
 

@@ -496,7 +496,7 @@
       try {
         const row = {
           id: 'default_user',
-          theme: settings.theme || 'dark',
+          theme: settings.theme || 'light',
           preferences: settings.preferences || {},
           recent_reports: settings.recent_reports || [],
           custom_tags: settings.custom_tags || [],
@@ -504,6 +504,47 @@
         };
         await sb.from('user_settings').upsert(row, { onConflict: 'id' });
         return true;
+      } catch {
+        return false;
+      }
+    },
+
+    // ── 11. DENETİM GÜNLÜĞÜ (Audit Logs Cloud Sync) ───────────────
+    async loadAuditLogs() {
+      const sb = getClient();
+      if (!sb) return null;
+      try {
+        const { data, error } = await sb.from('user_settings').select('*').eq('id', 'system_audit_logs').single();
+        if (error || !data || !data.preferences || !Array.isArray(data.preferences.logs)) return null;
+        return data.preferences.logs;
+      } catch {
+        return null;
+      }
+    },
+
+    async saveAuditLogs(logs) {
+      const sb = getClient();
+      if (!sb || !Array.isArray(logs)) return false;
+      try {
+        const row = {
+          id: 'system_audit_logs',
+          theme: 'light',
+          preferences: { logs: logs.slice(0, 1000) },
+          updated_at: new Date().toISOString()
+        };
+        await sb.from('user_settings').upsert(row, { onConflict: 'id' });
+        return true;
+      } catch {
+        return false;
+      }
+    },
+
+    async appendAuditLog(entry) {
+      if (!entry) return false;
+      try {
+        const current = (await this.loadAuditLogs()) || [];
+        const combined = [entry, ...current.filter(l => l.id !== entry.id)].slice(0, 1000);
+        return await this.saveAuditLogs(combined);
       } catch {
         return false;
       }

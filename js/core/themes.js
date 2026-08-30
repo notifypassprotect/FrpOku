@@ -1,35 +1,40 @@
 // ============================================================
-//  themes.js — Gelişmiş Tema Yöneticisi (13 Renk Teması, Offline)
+//  themes.js — Gelişmiş Tema Yöneticisi (13 Renk Teması & Canlı Senkronizasyon)
 // ============================================================
 (function () {
   'use strict';
 
   const THEME_CODE_KEY = 'frpoku_code_theme';
   const THEME_UI_KEY = 'frpoku_ui_theme';
+  const THEME_GLOBAL_KEY = 'frpoku_theme';
 
   const CODE_THEMES = [
-    { id: 'frpoku-dark',      label: '🌙 FrpOku Dark',      icon: '🌙' },
-    { id: 'frpoku-light',     label: '☀️ FrpOku Light',     icon: '☀️' },
-    { id: 'dracula',          label: '🧛 Dracula',           icon: '🧛' },
-    { id: 'github-dark',      label: '🐙 GitHub Dark',      icon: '🐙' },
-    { id: 'monokai',          label: '🟠 Monokai',           icon: '🟠' },
-    { id: 'nord',             label: '❄️ Nord Frost',        icon: '❄️' },
-    { id: 'tokyo-night',      label: '🌆 Tokyo Night',      icon: '🌆' },
-    { id: 'cyberpunk',        label: '🟣 Cyberpunk Neon',   icon: '🟣' },
-    { id: 'matrix',           label: '🟢 Matrix Emerald',   icon: '🟢' },
-    { id: 'synthwave',        label: '🌅 Synthwave Sunset', icon: '🌅' },
-    { id: 'deep-ocean',       label: '🌌 Deep Ocean Blue',  icon: '🌌' },
-    { id: 'solarized-light',  label: '☀️ Solarized Light',  icon: '☀️' },
-    { id: 'solarized-dark',   label: '🌑 Solarized Dark',   icon: '🌑' }
+    { id: 'frpoku-light',     label: 'Açık Tema (FrpOku Light)' },
+    { id: 'frpoku-dark',      label: 'Koyu Tema (FrpOku Dark)' },
+    { id: 'dracula',          label: 'Dracula' },
+    { id: 'github-dark',      label: 'GitHub Dark' },
+    { id: 'monokai',          label: 'Monokai' },
+    { id: 'nord',             label: 'Nord Frost' },
+    { id: 'tokyo-night',      label: 'Tokyo Night' },
+    { id: 'cyberpunk',        label: 'Cyberpunk Neon' },
+    { id: 'matrix',           label: 'Matrix Emerald' },
+    { id: 'synthwave',        label: 'Synthwave Sunset' },
+    { id: 'deep-ocean',       label: 'Deep Ocean Blue' },
+    { id: 'solarized-light',  label: 'Solarized Light' },
+    { id: 'solarized-dark',   label: 'Solarized Dark' }
   ];
 
   function getCodeTheme() {
-    return localStorage.getItem(THEME_CODE_KEY) || 'frpoku-dark';
+    return localStorage.getItem(THEME_CODE_KEY) || 'frpoku-light';
   }
 
-  function applyCodeTheme(themeId) {
+  function getGlobalTheme() {
+    return localStorage.getItem(THEME_GLOBAL_KEY) || 'light';
+  }
+
+  function applyCodeTheme(themeId, skipStorage = false) {
     const valid = CODE_THEMES.some(t => t.id === themeId);
-    const target = valid ? themeId : 'frpoku-dark';
+    const target = valid ? themeId : 'frpoku-light';
 
     // Eski tema class'larını kaldır
     CODE_THEMES.forEach(t => {
@@ -39,26 +44,57 @@
 
     document.documentElement.classList.add('code-theme-' + target);
     document.documentElement.classList.add('ui-theme-' + target);
-    localStorage.setItem(THEME_CODE_KEY, target);
-    localStorage.setItem(THEME_UI_KEY, target);
+    
+    // UI tema eşlemesi (light / dark)
+    const isDark = target === 'frpoku-dark' || target === 'dracula' || target === 'github-dark' || 
+                   target === 'monokai' || target === 'tokyo-night' || target === 'cyberpunk' || 
+                   target === 'matrix' || target === 'synthwave' || target === 'deep-ocean' || 
+                   target === 'solarized-dark';
+    const uiTheme = isDark ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', uiTheme);
+
+    if (!skipStorage) {
+      try {
+        localStorage.setItem(THEME_CODE_KEY, target);
+        localStorage.setItem(THEME_UI_KEY, target);
+        localStorage.setItem(THEME_GLOBAL_KEY, uiTheme);
+      } catch (e) {}
+    }
 
     // Varsa tüm select'leri senkronize et
     document.querySelectorAll('.theme-selector-select, #codeThemeSelect, #themeSelect').forEach(el => {
       if (el.value !== target) el.value = target;
     });
 
+    // Tema düğmelerini güncelle
+    document.querySelectorAll('#btnThemeToggle').forEach(btn => {
+      btn.textContent = uiTheme === 'dark' ? 'Aydınlık Mod' : 'Koyu Mod';
+    });
+
     // Custom event fırlat
-    window.dispatchEvent(new CustomEvent('frpoku:themeChanged', { detail: { themeId: target } }));
+    window.dispatchEvent(new CustomEvent('frpoku:themeChanged', { detail: { themeId: target, uiTheme } }));
+  }
+
+  function setTheme(theme) {
+    const isDark = theme === 'dark';
+    const targetCodeTheme = isDark ? 'frpoku-dark' : 'frpoku-light';
+    applyCodeTheme(targetCodeTheme);
   }
 
   function initCodeTheme() {
-    applyCodeTheme(getCodeTheme());
+    const savedCode = getCodeTheme();
+    const savedGlobal = getGlobalTheme();
+    if (savedCode === 'frpoku-dark' && savedGlobal === 'light') {
+      applyCodeTheme('frpoku-light');
+    } else {
+      applyCodeTheme(savedCode);
+    }
   }
 
   /**
    * Tema seçici dropdown oluştur ve verilen container'a ekle
    */
-  function createThemeSelector(container, customLabel = '🎨 Renk Teması') {
+  function createThemeSelector(container, customLabel = 'Renk Teması') {
     if (!container) return null;
 
     const wrap = document.createElement('div');
@@ -81,11 +117,26 @@
     return wrap;
   }
 
+  // Tarayıcı sekmeleri ve pencereler arası senkronizasyon (Storage Event)
+  window.addEventListener('storage', (e) => {
+    if (e.key === THEME_CODE_KEY && e.newValue) {
+      applyCodeTheme(e.newValue, true);
+    } else if (e.key === THEME_GLOBAL_KEY && e.newValue) {
+      document.documentElement.setAttribute('data-theme', e.newValue);
+      const isDark = e.newValue === 'dark';
+      document.querySelectorAll('#btnThemeToggle').forEach(btn => {
+        btn.textContent = isDark ? 'Aydınlık Mod' : 'Koyu Mod';
+      });
+    }
+  });
+
   // Public API
   window.FrpThemes = {
     CODE_THEMES,
     getCodeTheme,
+    getGlobalTheme,
     applyCodeTheme,
+    setTheme,
     initCodeTheme,
     createThemeSelector
   };

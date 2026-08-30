@@ -49,13 +49,27 @@ const slotBtnC   = document.getElementById('btnPickerC');
 
 function updateThemeBtn() {
   const cur = FrpStore.getTheme();
-  btnThemeToggle.textContent = cur === 'dark' ? '☀️ Aydınlık Mod' : '🌙 Koyu Mod';
+  if (btnThemeToggle) {
+    btnThemeToggle.textContent = cur === 'dark' ? 'Aydınlık Mod' : 'Koyu Mod';
+  }
 }
 
-btnThemeToggle.addEventListener('click', () => {
-  const cur = FrpStore.getTheme();
-  const next = cur === 'dark' ? 'light' : 'dark';
-  FrpStore.setTheme(next);
+if (btnThemeToggle) {
+  btnThemeToggle.addEventListener('click', () => {
+    const cur = FrpStore.getTheme();
+    const next = cur === 'dark' ? 'light' : 'dark';
+    FrpStore.setTheme(next);
+    updateThemeBtn();
+  });
+}
+
+// Canlı Tema Senkronizasyonu
+window.addEventListener('storage', (e) => {
+  if (e.key === 'frpoku_theme' || e.key === 'frpoku_code_theme') {
+    updateThemeBtn();
+  }
+});
+window.addEventListener('frpoku:themeChanged', () => {
   updateThemeBtn();
 });
 
@@ -66,7 +80,7 @@ if (btnToggleFold) {
   btnToggleFold.addEventListener('click', () => {
     isFoldUnchanged = !isFoldUnchanged;
     btnToggleFold.classList.toggle('active', isFoldUnchanged);
-    btnToggleFold.textContent = isFoldUnchanged ? '👁️ Tümünü Göster' : '👁️ Sadece Farklar';
+    btnToggleFold.textContent = isFoldUnchanged ? 'Tümünü Göster' : 'Sadece Farklar';
     renderDiff();
   });
 }
@@ -83,7 +97,7 @@ function toastCompare(msg, type = 'info') {
   const stack = document.getElementById('toastCompare') || document.body;
   const el = document.createElement('div');
   el.className = 'toast-item ' + type;
-  el.innerHTML = `<span>ℹ️</span><span>${esc(msg)}</span>`;
+  el.innerHTML = `<span>${esc(msg)}</span>`;
   stack.appendChild(el);
   setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 3000);
 }
@@ -91,7 +105,7 @@ function toastCompare(msg, type = 'info') {
 function copyLineText(encodedText) {
   const text = decodeURIComponent(encodedText || '');
   navigator.clipboard.writeText(text).then(() => {
-    toastCompare('Satır kopyalandı 📋', 'success');
+    toastCompare('Satır panoya kopyalandı.', 'success');
   });
 }
 window.copyLineText = copyLineText;
@@ -113,7 +127,7 @@ function undoTransfer() {
   fileB = FrpStore.getById(fileB.id);
   if (fileC) fileC = FrpStore.getById(fileC.id);
 
-  toastCompare('Aktarım geri alındı ↩️', 'info');
+  toastCompare('Aktarım geri alındı.', 'info');
   renderDiff();
 }
 window.undoTransfer = undoTransfer;
@@ -404,7 +418,7 @@ function openReportPickerForDiff(slot) {
     if (!listEl) return;
 
     if (filtered.length === 0) {
-      listEl.innerHTML = `<div class="cmp-picker-empty">🔍 Eşleşen rapor bulunamadı.<br><small>Arama terimini veya kategori filtresini değiştirin.</small></div>`;
+      listEl.innerHTML = `<div class="cmp-picker-empty">Eşleşen rapor bulunamadı.<br><small>Arama terimini veya kategori filtresini değiştirin.</small></div>`;
       return;
     }
 
@@ -417,15 +431,17 @@ function openReportPickerForDiff(slot) {
       const qCount = (f.queries || []).length;
 
       return `<div class="cmp-picker-item${isSelected ? ' is-selected' : ''}${isConflict ? ' is-conflict' : ''}" data-id="${f.id}" title="${isConflict ? 'Bu rapor diğer panelde zaten seçili' : ''}">
-        <span class="cmp-picker-item-icon">📋</span>
+        <span class="cmp-picker-item-icon" style="color:var(--accent);display:inline-flex;align-items:center;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </span>
         <div class="cmp-picker-item-body">
           <div class="cmp-picker-item-name">${isSelected ? '✓ ' : ''}${esc(rName)}</div>
           <div class="cmp-picker-item-meta">${esc(f.name)} · ${size} · ${dateStr}</div>
         </div>
         <div class="cmp-picker-item-badges">
-          ${f.category ? `<span class="badge badge-purple" style="font-size:.66rem;">🏷️ ${esc(f.category)}</span>` : ''}
-          ${qCount > 0 ? `<span class="badge badge-blue" style="font-size:.66rem;">🗄️ ${qCount}</span>` : ''}
-          ${isConflict ? `<span class="badge" style="font-size:.65rem;background:rgba(239,68,68,.12);color:#dc2626;">⚠ Seçili</span>` : `<button class="btn btn-sm ${isSelected ? 'btn-primary' : 'btn-ghost'}" style="font-size:.7rem;padding:2px 9px;" data-id="${f.id}">${isSelected ? 'Seçili ✓' : 'Seç'}</button>`}
+          ${f.category ? `<span class="badge badge-purple" style="font-size:.66rem;">${esc(f.category)}</span>` : ''}
+          ${qCount > 0 ? `<span class="badge badge-blue" style="font-size:.66rem;">${qCount} SQL</span>` : ''}
+          ${isConflict ? `<span class="badge" style="font-size:.65rem;background:rgba(239,68,68,.12);color:#dc2626;">Seçili</span>` : `<button class="btn btn-sm ${isSelected ? 'btn-primary' : 'btn-ghost'}" style="font-size:.7rem;padding:2px 9px;" data-id="${f.id}">${isSelected ? 'Seçili' : 'Seç'}</button>`}
         </div>
       </div>`;
     }).join('');
@@ -450,7 +466,7 @@ function openReportPickerForDiff(slot) {
     renderDiff();
   }
 
-  const catOptions = cats.map(c => `<option value="${esc(c)}"${c === activeCat ? ' selected' : ''}>🏷️ ${esc(c)}</option>`).join('');
+  const catOptions = cats.map(c => `<option value="${esc(c)}"${c === activeCat ? ' selected' : ''}>${esc(c)}</option>`).join('');
 
   overlay.innerHTML = `
     <div class="cmp-picker-modal">
@@ -461,7 +477,6 @@ function openReportPickerForDiff(slot) {
 
       <div class="cmp-picker-toolbar">
         <div class="cmp-picker-search-wrap">
-          <span class="search-ico">🔍</span>
           <input type="text" id="cmpPickerSearch" placeholder="Ad, dosya adı, GUID veya kategori ile ara..." autocomplete="off" />
         </div>
         <select id="cmpPickerCat" class="field-select" style="font-size:.8rem;height:36px;">
@@ -469,10 +484,10 @@ function openReportPickerForDiff(slot) {
           ${catOptions}
         </select>
         <select id="cmpPickerSort" class="field-select" style="font-size:.8rem;height:36px;">
-          <option value="date">📅 Son Yüklenen</option>
-          <option value="name">🔤 Ada Göre</option>
-          <option value="size">📦 Boyuta Göre</option>
-          <option value="queries">🗄️ SQL Sayısına Göre</option>
+          <option value="date">Son Yüklenen</option>
+          <option value="name">Ada Göre</option>
+          <option value="size">Boyuta Göre</option>
+          <option value="queries">SQL Sayısına Göre</option>
         </select>
         ${slot === 'C' && fileC ? `<button class="btn btn-sm btn-ghost" id="cmpPickerRemoveC" style="color:#ef4444;border-color:#ef4444;font-size:.75rem;">✕ Paneli Kaldır</button>` : ''}
       </div>
@@ -575,7 +590,7 @@ function buildTabs() {
   const btnMeta = document.createElement('button');
   btnMeta.className = 'tab' + (activeTab === 'meta' ? ' active' : '');
   btnMeta.dataset.tab = 'meta';
-  btnMeta.innerHTML = `📋 Meta & Yapı`;
+  btnMeta.innerHTML = `Meta & Yapı`;
   btnMeta.addEventListener('click', () => {
     activeTab = 'meta';
     updateTabActive();
@@ -586,7 +601,7 @@ function buildTabs() {
   const btnPascal = document.createElement('button');
   btnPascal.className = 'tab' + (activeTab === 'pascal' ? ' active' : '');
   btnPascal.dataset.tab = 'pascal';
-  btnPascal.innerHTML = `📜 PascalScript`;
+  btnPascal.innerHTML = `PascalScript`;
   btnPascal.addEventListener('click', () => {
     activeTab = 'pascal';
     updateTabActive();
@@ -604,7 +619,7 @@ function buildTabs() {
     const btnSql = document.createElement('button');
     btnSql.className = 'tab' + (activeTab === tabId ? ' active' : '');
     btnSql.dataset.tab = tabId;
-    btnSql.innerHTML = `🗄️ ${esc(qName)}`;
+    btnSql.innerHTML = `${esc(qName)}`;
     btnSql.addEventListener('click', () => {
       activeTab = tabId;
       updateTabActive();
@@ -618,13 +633,13 @@ function buildTabs() {
     if (allQueries.length > 3) {
       selectQueryJump.style.display = 'inline-block';
       let optionsHtml = `
-        <option value="pascal" ${activeTab === 'pascal' ? 'selected' : ''}>📜 PascalScript</option>
-        <option value="meta" ${activeTab === 'meta' ? 'selected' : ''}>📋 Meta & Yapı</option>
+        <option value="pascal" ${activeTab === 'pascal' ? 'selected' : ''}>PascalScript</option>
+        <option value="meta" ${activeTab === 'meta' ? 'selected' : ''}>Meta & Yapı</option>
         <optgroup label="SQL Sorguları (${allQueries.length})">
       `;
       allQueries.forEach(qName => {
         const tabId = 'sql_' + qName;
-        optionsHtml += `<option value="${tabId}" ${activeTab === tabId ? 'selected' : ''}>🗄️ ${esc(qName)}</option>`;
+        optionsHtml += `<option value="${tabId}" ${activeTab === tabId ? 'selected' : ''}>${esc(qName)}</option>`;
       });
       optionsHtml += `</optgroup>`;
       selectQueryJump.innerHTML = optionsHtml;
@@ -786,8 +801,8 @@ function renderDiff() {
       }
     }
 
-    const actionsA = (lA.type === 'del' || lA.type === 'add') && lA.text ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('A', ${i})" title="Sağ panele aktar">➔</button><button class="btn-inline-action" onclick="copyLineText('${encodeURIComponent(lA.text)}')" title="Kopyala">📋</button></span>` : '';
-    const actionsB = (lB.type === 'add' || lB.type === 'del') && lB.text ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('B', ${i})" title="Sol panele aktar">⬅</button><button class="btn-inline-action" onclick="copyLineText('${encodeURIComponent(lB.text)}')" title="Kopyala">📋</button></span>` : '';
+    const actionsA = (lA.type === 'del' || lA.type === 'add') && lA.text ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('A', ${i})" title="Sağ panele aktar">Aktar</button><button class="btn-inline-action" onclick="copyLineText('${encodeURIComponent(lA.text)}')" title="Kopyala">Kopyala</button></span>` : '';
+    const actionsB = (lB.type === 'add' || lB.type === 'del') && lB.text ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('B', ${i})" title="Sol panele aktar">Aktar</button><button class="btn-inline-action" onclick="copyLineText('${encodeURIComponent(lB.text)}')" title="Kopyala">Kopyala</button></span>` : '';
 
     if (lA.type === 'del' && lB.type === 'add' && lA.pairedText !== undefined) {
       const { wordsA, wordsB } = DiffEngine.computeWordDiff(lA.text, lB.text);
@@ -830,7 +845,7 @@ function unfoldAll() {
   isFoldUnchanged = false;
   if (btnToggleFold) {
     btnToggleFold.classList.remove('active');
-    btnToggleFold.textContent = '👁️ Sadece Farklar';
+    btnToggleFold.textContent = 'Sadece Farklar';
   }
   renderDiff();
 }

@@ -40,7 +40,14 @@
         ...extra
       };
 
-      // 1. Yerel Depolama
+      // 1. Supabase Bulut Depolama
+      try {
+        if (window.FrpCloud && typeof window.FrpCloud.appendAuditLog === 'function') {
+          window.FrpCloud.appendAuditLog(logEntry).catch(() => {});
+        }
+      } catch (e) {}
+
+      // 2. Yerel Depolama (Hızlı Erişim & Offline Önbellek)
       try {
         let localLogs = [];
         const stored = localStorage.getItem('frp_audit_logs');
@@ -52,7 +59,7 @@
         localStorage.setItem('frp_audit_logs', JSON.stringify(localLogs));
       } catch (e) {}
 
-      // 2. Sunucuya Gönder
+      // 3. Sunucuya Gönder
       try {
         fetch('/api/audit-log', {
           method: 'POST',
@@ -66,6 +73,14 @@
 
     async getLogs(filter = {}) {
       if (cachedClientIp === '127.0.0.1') await resolveClientIp();
+
+      let cloudLogs = [];
+      try {
+        if (window.FrpCloud && typeof window.FrpCloud.loadAuditLogs === 'function') {
+          const cLogs = await window.FrpCloud.loadAuditLogs();
+          if (Array.isArray(cLogs)) cloudLogs = cLogs;
+        }
+      } catch (e) {}
 
       let serverLogs = [];
       try {
@@ -85,11 +100,7 @@
         if (stored) localLogs = JSON.parse(stored) || [];
       } catch (e) {}
 
-      localLogs.forEach(l => {
-        if (!l.ip || l.ip === '-' || l.ip === '') l.ip = cachedClientIp || '127.0.0.1';
-      });
-
-      const all = [...serverLogs, ...localLogs];
+      const all = [...cloudLogs, ...serverLogs, ...localLogs];
       const seen = new Set();
       const unique = [];
       for (const l of all) {
@@ -101,6 +112,12 @@
         }
       }
       unique.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+      // Yerel önbelleği güncelle
+      try {
+        localStorage.setItem('frp_audit_logs', JSON.stringify(unique.slice(0, 500)));
+      } catch (e) {}
+
       return unique;
     }
   };
