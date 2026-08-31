@@ -19,8 +19,8 @@ const DiffEngine = (() => {
     let i = 0;
     while (i < ops.length) {
       if (ops[i].type === 'same') {
-        linesA.push({ num: ops[i].numA, text: ops[i].textA, type: 'same' });
-        linesB.push({ num: ops[i].numB, text: ops[i].textB, type: 'same' });
+        linesA.push({ num: ops[i].numA, aIndex: ops[i].numA - 1, bIndex: ops[i].numB - 1, text: ops[i].textA, type: 'same' });
+        linesB.push({ num: ops[i].numB, aIndex: ops[i].numA - 1, bIndex: ops[i].numB - 1, text: ops[i].textB, type: 'same' });
         i++;
       } else {
         // Ardışık del ve add bloklarını topla
@@ -38,20 +38,45 @@ const DiffEngine = (() => {
           const aItem = adds[k];
 
           if (d && aItem) {
-            linesA.push({ num: d.numA, text: d.textA, type: 'del', pairedText: aItem.textB });
-            linesB.push({ num: aItem.numB, text: aItem.textB, type: 'add', pairedText: d.textA });
+            linesA.push({ num: d.numA, aIndex: d.numA - 1, bIndex: aItem.numB - 1, text: d.textA, type: 'del', pairedText: aItem.textB });
+            linesB.push({ num: aItem.numB, aIndex: d.numA - 1, bIndex: aItem.numB - 1, text: aItem.textB, type: 'add', pairedText: d.textA });
           } else if (d) {
-            linesA.push({ num: d.numA, text: d.textA, type: 'del' });
-            linesB.push({ num: null, text: '', type: 'empty' });
+            linesA.push({ num: d.numA, aIndex: d.numA - 1, bIndex: null, text: d.textA, type: 'del' });
+            linesB.push({ num: null, aIndex: d.numA - 1, bIndex: null, text: '', type: 'empty' });
           } else if (aItem) {
-            linesA.push({ num: null, text: '', type: 'empty' });
-            linesB.push({ num: aItem.numB, text: aItem.textB, type: 'add' });
+            linesA.push({ num: null, aIndex: null, bIndex: aItem.numB - 1, text: '', type: 'empty' });
+            linesB.push({ num: aItem.numB, aIndex: null, bIndex: aItem.numB - 1, text: aItem.textB, type: 'add' });
           }
         }
       }
     }
 
     return { linesA, linesB };
+  }
+
+  function applyLineTransfer(diff, fromPane, rowIndex, textA, textB) {
+    const sourceRows = fromPane === 'A' ? diff.linesA : diff.linesB;
+    const row = sourceRows[rowIndex];
+    if (!row) return null;
+    const targetLines = String(fromPane === 'A' ? textB : textA).split('\n');
+    const targetKey = fromPane === 'A' ? 'bIndex' : 'aIndex';
+    const targetIndex = row[targetKey];
+    if (row.type === 'empty') {
+      if (targetIndex === null || targetIndex === undefined) return null;
+      targetLines.splice(targetIndex, 1);
+      return targetLines.join('\n');
+    }
+    if (targetIndex !== null && targetIndex !== undefined) {
+      targetLines[targetIndex] = row.text;
+    } else {
+      let insertAt = targetLines.length;
+      for (let i = rowIndex + 1; i < sourceRows.length; i++) {
+        const nextIndex = sourceRows[i][targetKey];
+        if (nextIndex !== null && nextIndex !== undefined) { insertAt = nextIndex; break; }
+      }
+      targetLines.splice(insertAt, 0, row.text);
+    }
+    return targetLines.join('\n');
   }
 
   function getDiffOps(a, b) {
@@ -127,8 +152,8 @@ const DiffEngine = (() => {
     return { wordsA: res1.reverse(), wordsB: res2.reverse() };
   }
 
-  return { computeLineDiff, computeWordDiff };
+  return { computeLineDiff, computeWordDiff, applyLineTransfer };
 })();
 
-window.DiffEngine = DiffEngine;
-
+if (typeof window !== 'undefined') window.DiffEngine = DiffEngine;
+if (typeof module === 'object' && module.exports) module.exports = DiffEngine;

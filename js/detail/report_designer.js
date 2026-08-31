@@ -2089,7 +2089,8 @@ function esc(str) {
  file.dialogPages = allPages.filter(p => p.type === 'dialog').map(p => p.data);
  
  if (window.FrpStore && typeof window.FrpStore.saveFile === 'function') {
- window.FrpStore.saveFile(file);
+ const savedFile = window.FrpStore.saveFile(file);
+ if (savedFile) Object.assign(file, savedFile);
  }
 
  if (window.FrpAudit) {

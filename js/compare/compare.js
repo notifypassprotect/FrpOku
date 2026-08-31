@@ -148,21 +148,18 @@ function transferLine(fromPane, lineIdx) {
       oldCode: targetFile.pascalScript || ''
     });
 
-    const linesA = String(fileA.pascalScript || '').split('\n');
-    const linesB = String(fileB.pascalScript || '').split('\n');
+    const textA = String(fileA.pascalScript || '');
+    const textB = String(fileB.pascalScript || '');
+    const alignedDiff = DiffEngine.computeLineDiff(textA, textB);
+    const transferred = DiffEngine.applyLineTransfer(alignedDiff, fromPane, lineIdx, textA, textB);
+    if (transferred === null) return;
 
     if (fromPane === 'A') {
-      const srcText = linesA[lineIdx] !== undefined ? linesA[lineIdx] : '';
-      if (lineIdx < linesB.length) linesB[lineIdx] = srcText;
-      else linesB.push(srcText);
-      FrpStore.updateCode(fileB.id, { pascalScript: linesB.join('\n') });
+      FrpStore.updateCode(fileB.id, { pascalScript: transferred });
       fileB = FrpStore.getById(fileB.id);
       toastCompare('Satır Rapor 2\'ye aktarıldı ➔ (Geri Al: Ctrl+Z)', 'success');
     } else {
-      const srcText = linesB[lineIdx] !== undefined ? linesB[lineIdx] : '';
-      if (lineIdx < linesA.length) linesA[lineIdx] = srcText;
-      else linesA.push(srcText);
-      FrpStore.updateCode(fileA.id, { pascalScript: linesA.join('\n') });
+      FrpStore.updateCode(fileA.id, { pascalScript: transferred });
       fileA = FrpStore.getById(fileA.id);
       toastCompare('Satır Rapor 1\'e aktarıldı ⬅ (Geri Al: Ctrl+Z)', 'success');
     }
@@ -185,24 +182,19 @@ function transferLine(fromPane, lineIdx) {
     const sqlA = qIdxA >= 0 ? fileA.queries[qIdxA].sql : '';
     const sqlB = qIdxB >= 0 ? fileB.queries[qIdxB].sql : '';
 
-    const linesA = sqlA.split('\n');
-    const linesB = sqlB.split('\n');
+    const alignedDiff = DiffEngine.computeLineDiff(sqlA, sqlB);
+    const transferred = DiffEngine.applyLineTransfer(alignedDiff, fromPane, lineIdx, sqlA, sqlB);
+    if (transferred === null) return;
 
     if (fromPane === 'A') {
-      const srcText = linesA[lineIdx] !== undefined ? linesA[lineIdx] : '';
-      if (lineIdx < linesB.length) linesB[lineIdx] = srcText;
-      else linesB.push(srcText);
       if (qIdxB >= 0) {
-        FrpStore.updateCode(fileB.id, { queryIndex: qIdxB, sql: linesB.join('\n') });
+        FrpStore.updateCode(fileB.id, { queryIndex: qIdxB, sql: transferred });
         fileB = FrpStore.getById(fileB.id);
         toastCompare('SQL Satırı Rapor 2\'ye aktarıldı ➔ (Geri Al: Ctrl+Z)', 'success');
       }
     } else {
-      const srcText = linesB[lineIdx] !== undefined ? linesB[lineIdx] : '';
-      if (lineIdx < linesA.length) linesA[lineIdx] = srcText;
-      else linesA.push(srcText);
       if (qIdxA >= 0) {
-        FrpStore.updateCode(fileA.id, { queryIndex: qIdxA, sql: linesA.join('\n') });
+        FrpStore.updateCode(fileA.id, { queryIndex: qIdxA, sql: transferred });
         fileA = FrpStore.getById(fileA.id);
         toastCompare('SQL Satırı Rapor 1\'e aktarıldı ⬅ (Geri Al: Ctrl+Z)', 'success');
       }
@@ -801,8 +793,12 @@ function renderDiff() {
       }
     }
 
-    const actionsA = (lA.type === 'del' || lA.type === 'add') && lA.text ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('A', ${i})" title="Sağ panele aktar">Aktar</button><button class="btn-inline-action" onclick="copyLineText('${encodeInlineArg(lA.text)}')" title="Kopyala">Kopyala</button></span>` : '';
-    const actionsB = (lB.type === 'add' || lB.type === 'del') && lB.text ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('B', ${i})" title="Sol panele aktar">Aktar</button><button class="btn-inline-action" onclick="copyLineText('${encodeInlineArg(lB.text)}')" title="Kopyala">Kopyala</button></span>` : '';
+    const actionsA = lA.type === 'empty' && lB.text
+      ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('A', ${i})" title="Bu farkı sağ panelden sil">Sağdan sil</button></span>`
+      : (lA.type === 'del' || lA.type === 'add') && lA.text ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('A', ${i})" title="Sağ panele aktar">Aktar</button><button class="btn-inline-action" onclick="copyLineText('${encodeInlineArg(lA.text)}')" title="Kopyala">Kopyala</button></span>` : '';
+    const actionsB = lB.type === 'empty' && lA.text
+      ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('B', ${i})" title="Bu farkı sol panelden sil">Soldan sil</button></span>`
+      : (lB.type === 'add' || lB.type === 'del') && lB.text ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('B', ${i})" title="Sol panele aktar">Aktar</button><button class="btn-inline-action" onclick="copyLineText('${encodeInlineArg(lB.text)}')" title="Kopyala">Kopyala</button></span>` : '';
 
     if (lA.type === 'del' && lB.type === 'add' && lA.pairedText !== undefined) {
       const { wordsA, wordsB } = DiffEngine.computeWordDiff(lA.text, lB.text);

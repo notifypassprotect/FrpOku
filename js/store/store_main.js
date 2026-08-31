@@ -608,6 +608,30 @@
     return true;
   }
 
+  function updateReport(id, reportPatch) {
+    if (!reportPatch || typeof reportPatch !== 'object') return null;
+    const files = _read();
+    const idx = files.findIndex(f => f.id === id);
+    if (idx < 0) return null;
+    const existing = files[idx];
+    const updated = {
+      ...existing,
+      ...reportPatch,
+      id: existing.id,
+      userId: existing.userId || existing.user_id,
+      user_id: existing.user_id || existing.userId
+    };
+    if (window.buildUpdatedFrpXml) updated.rawXml = window.buildUpdatedFrpXml(updated);
+    files[idx] = updated;
+    _write(files);
+    _audit('REPORT_UPDATE', updated.name || id, 'Rapor içeriği ve XML yapısı güncellendi.');
+    return updated;
+  }
+
+  function saveFile(file) {
+    return file?.id ? updateReport(file.id, file) : null;
+  }
+
   function updateFileName(id, newName) {
     const files = _read();
     const idx = files.findIndex(f => f.id === id);
@@ -1532,7 +1556,7 @@
   // ── Public Store API (Köprü ve Delegasyon) ─────────────────────
   const FrpStore = {
     getAll, getById, add, addMany, deleteOne, deleteMany, deleteAll,
-    updateNote, updateMeta, updateCode, updateFileName, restoreFromIndexedDB, hydrateFromIndexedDB,
+    updateNote, updateMeta, updateCode, updateReport, saveFile, updateFileName, restoreFromIndexedDB, hydrateFromIndexedDB,
     exportBackup, importBackup,
     toggleFavorite, togglePin, setFavoriteMany, toggleFavoriteMany, addTag, removeTag, getAllTags, getCustomTags, addCustomTag, deleteCustomTag,
     setCategory, getCategories, getCategoryObjects, addCategory, updateCategory, deleteCategory,
