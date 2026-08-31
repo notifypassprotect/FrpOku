@@ -2,10 +2,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createStagingAccessMiddleware } = require('../lib/staging_access');
 
-function invoke(middleware, { path = '/', authorization } = {}) {
+function invoke(middleware, { path = '/', authorization, cookie } = {}) {
   return new Promise(resolve => {
     const headers = {};
-    const req = { path, headers: { authorization } };
+    const req = { path, headers: { authorization, cookie } };
     const res = {
       statusCode: 200,
       headers,
@@ -35,10 +35,27 @@ test('doğru Basic Auth bilgisini kabul eder', async () => {
     env: {
       NODE_ENV: 'staging',
       STAGING_ACCESS_USER: 'tester',
-      STAGING_ACCESS_PASSWORD: 'strong-password'
+      STAGING_ACCESS_PASSWORD: 'strong-password',
+      SESSION_SECRET: 'test-session-secret-that-is-long-enough'
     }
   });
   const authorization = `Basic ${Buffer.from('tester:strong-password').toString('base64')}`;
   const result = await invoke(middleware, { authorization });
+  assert.equal(result.next, true);
+  assert.match(result.headers['Set-Cookie'], /^__Host-frpoku_staging=/);
+});
+
+test('staging çerezi Bearer oturum başlığıyla birlikte erişimi sürdürür', async () => {
+  const env = {
+    NODE_ENV: 'staging',
+    STAGING_ACCESS_USER: 'tester',
+    STAGING_ACCESS_PASSWORD: 'strong-password',
+    SESSION_SECRET: 'test-session-secret-that-is-long-enough'
+  };
+  const middleware = createStagingAccessMiddleware({ env });
+  const authorization = `Basic ${Buffer.from('tester:strong-password').toString('base64')}`;
+  const first = await invoke(middleware, { authorization });
+  const cookie = first.headers['Set-Cookie'].split(';', 1)[0];
+  const result = await invoke(middleware, { authorization: 'Bearer application-session-token', cookie });
   assert.equal(result.next, true);
 });
