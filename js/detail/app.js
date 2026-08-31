@@ -15,23 +15,16 @@ let currentMatchIdx = -1;
 const btnThemeToggle = document.getElementById('btnThemeToggle');
 
 function updateThemeBtn() {
- const cur = FrpStore.getTheme();
- if (btnThemeToggle) {
- btnThemeToggle.textContent = cur === 'dark'? 'Aydınlık Mod': 'Koyu Mod';
- }
- if (Array.isArray(activeTabs)) {
- activeTabs.forEach(t => syncEditorBackdrop(t.id));
- }
+  const cur = window.FrpThemes ? window.FrpThemes.getGlobalTheme() : (window.FrpStore ? FrpStore.getTheme() : 'light');
+  if (btnThemeToggle) {
+    btnThemeToggle.textContent = cur === 'dark' ? 'Aydınlık Mod' : 'Koyu Mod';
+  }
+  if (Array.isArray(activeTabs)) {
+    activeTabs.forEach(t => syncEditorBackdrop(t.id));
+  }
 }
-
-if (btnThemeToggle) {
- btnThemeToggle.addEventListener('click', () => {
- const cur = FrpStore.getTheme();
- const next = cur === 'dark'? 'light': 'dark';
- FrpStore.setTheme(next);
- updateThemeBtn();
- });
-}
+window.addEventListener('frpoku:themeChanged', updateThemeBtn);
+updateThemeBtn();
 
 // Canlı Tema Senkronizasyonu
 window.addEventListener('storage', (e) => {

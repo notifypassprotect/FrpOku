@@ -681,41 +681,71 @@
     },
 
     // ── 11. DENETİM GÜNLÜĞÜ (Audit Logs Cloud Sync) ───────────────
+    // Loglar ayrı `audit_logs` tablosuna yazılır — F5/cookie temizlemeden etkilenmez.
     async loadAuditLogs() {
+      if (USE_SERVER_BRIDGE) {
+        // Server bridge varsa /api/admin/audit-logs endpoint'inden çekiyoruz
+        return null; // getLogs() zaten serverLogs'u alıyor
+      }
       const sb = getClient();
       if (!sb) return null;
       try {
-        const { data, error } = await sb.from('user_settings').select('*').eq('id', 'system_audit_logs').single();
-        if (error || !data || !data.preferences || !Array.isArray(data.preferences.logs)) return null;
-        return data.preferences.logs;
+        const user = window.FrpAuth?.getUser();
+        let query = sb
+          .from('audit_logs')
+          .select('id, occurred_at, user_id, username, full_name, role, action, target, details, ip')
+          .order('occurred_at', { ascending: false })
+          .limit(500);
+        // Admin değilse sadece kendi loglarını görsün
+        if (user && user.role !== 'admin') {
+          query = query.eq('user_id', user.id);
+        }
+        const { data, error } = await query;
+        if (error) return null;
+        return (data || []).map(row => ({
+          id: row.id,
+          timestamp: row.occurred_at,
+          userId: row.user_id,
+          username: row.username,
+          fullName: row.full_name,
+          role: row.role,
+          action: row.action,
+          target: row.target,
+          details: row.details,
+          ip: row.ip
+        }));
       } catch {
         return null;
       }
     },
 
-    async saveAuditLogs(logs) {
-      const sb = getClient();
-      if (!sb || !Array.isArray(logs)) return false;
-      try {
-        const row = {
-          id: 'system_audit_logs',
-          theme: 'light',
-          preferences: { logs: logs.slice(0, 1000) },
-          updated_at: new Date().toISOString()
-        };
-        await requireSuccess(sb.from('user_settings').upsert(row, { onConflict: 'id' }));
-        return true;
-      } catch {
-        return false;
-      }
+    // @deprecated — Artık kullanılmıyor, audit_logs tablosuna direkt INSERT yapılıyor
+    async saveAuditLogs(_logs) {
+      return false;
     },
 
     async appendAuditLog(entry) {
       if (!entry) return false;
+      if (USE_SERVER_BRIDGE) {
+        // Server bridge modunda /api/audit-log endpoint'i zaten audit_logs tablosuna yazıyor
+        return true;
+      }
+      const sb = getClient();
+      if (!sb) return false;
       try {
-        const current = (await this.loadAuditLogs()) || [];
-        const combined = [entry, ...current.filter(l => l.id !== entry.id)].slice(0, 1000);
-        return await this.saveAuditLogs(combined);
+        const { error } = await sb.from('audit_logs').insert({
+          id: entry.id || ('log_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7)),
+          occurred_at: entry.timestamp || new Date().toISOString(),
+          user_id: entry.userId || 'guest',
+          username: entry.username || 'misafir',
+          full_name: entry.fullName || entry.username || '',
+          role: entry.role || 'user',
+          action: String(entry.action || 'INFO').toUpperCase().slice(0, 80),
+          target: String(entry.target || '').slice(0, 300),
+          details: String(entry.details || '').slice(0, 2000),
+          ip: entry.ip || '127.0.0.1'
+        });
+        return !error;
       } catch {
         return false;
       }

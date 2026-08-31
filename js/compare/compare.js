@@ -48,20 +48,13 @@ const titleFileC = document.getElementById('titleFileC');
 const slotBtnC   = document.getElementById('btnPickerC');
 
 function updateThemeBtn() {
-  const cur = FrpStore.getTheme();
+  const cur = window.FrpThemes ? window.FrpThemes.getGlobalTheme() : (window.FrpStore ? FrpStore.getTheme() : 'light');
   if (btnThemeToggle) {
     btnThemeToggle.textContent = cur === 'dark' ? 'Aydınlık Mod' : 'Koyu Mod';
   }
 }
-
-if (btnThemeToggle) {
-  btnThemeToggle.addEventListener('click', () => {
-    const cur = FrpStore.getTheme();
-    const next = cur === 'dark' ? 'light' : 'dark';
-    FrpStore.setTheme(next);
-    updateThemeBtn();
-  });
-}
+window.addEventListener('frpoku:themeChanged', updateThemeBtn);
+updateThemeBtn();
 
 // Canlı Tema Senkronizasyonu
 window.addEventListener('storage', (e) => {

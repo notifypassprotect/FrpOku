@@ -119,6 +119,19 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
     return { label: cleanLabel, badge: 'badge-blue', group: 'other' };
   }
 
+  // Teknik parantez suffix'lerini temizle: "(Bulut senkronize)", "(LocalStorage)", "(Cloud Sync)" vb.
+  function cleanDetails(details) {
+    if (!details) return '';
+    return String(details)
+      .replace(/\s*\((Bulut\s*[Ss]enkronize|LocalStorage|IndexedDB|Cloud\s*Sync|Offline|Server|Önbellek|Cache|local|cloud|sync)\w*\)\s*$/gi, '')
+      .replace(/\s*\([A-Za-z\s]{3,30}\)\s*$/, (match) => {
+        // Sadece teknik kelimeler içeren parantezleri sil, Türkçe açıklamaları bırak
+        const technical = /^[\s(]*(bulut|cloud|local|sync|storage|offline|cache|server|önbellek|indexeddb)[\s)]*$/i;
+        return technical.test(match) ? '' : match;
+      })
+      .trim();
+  }
+
   function formatTimestamp(isoStr) {
     if (!isoStr) return '-';
     try {
@@ -288,7 +301,7 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
     const tableRows = logs.map(l => {
       const actInfo = getActionInfo(l.action);
       const targetDisplay = l.target || l.reportName || l.fileName || 'Genel Sistem';
-      const detailsDisplay = l.details || `${actInfo.label} işlemi gerçekleştirildi.`;
+      const detailsDisplay = cleanDetails(l.details) || `${actInfo.label} işlemi gerçekleştirildi.`;
       const userDisplay = l.username || (l.role === 'admin' ? 'admin' : 'misafir');
       const timeStr = formatTimestamp(l.timestamp);
 
@@ -513,7 +526,7 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
         const actInfo = getActionInfo(l.action);
         const ipDisplay = (l.ip && l.ip !== '-' && l.ip !== '') ? l.ip : '127.0.0.1';
         const targetDisplay = l.target || l.reportName || l.fileName || 'Genel Sistem';
-        const detailsDisplay = l.details || `${actInfo.label} işlemi gerçekleştirildi.`;
+        const detailsDisplay = cleanDetails(l.details) || `${actInfo.label} işlemi gerçekleştirildi.`;
         const userDisplay = l.username || (l.role === 'admin' ? 'admin' : 'misafir');
 
         return `

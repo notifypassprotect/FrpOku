@@ -227,19 +227,39 @@
 
  const headers = (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function')? window.FrpAuth.getAuthHeaders(): {};
  let pendingUsers = [];
+ let pendingFetchError = null;
  try {
  const res = await fetch('/api/admin/pending-users', { headers });
  const data = await res.json();
- if (data && data.success && Array.isArray(data.users)) pendingUsers = data.users;
- } catch (e) {}
+ if (res.status === 401 || res.status === 403) {
+ pendingFetchError = '🔐 Yetki hatası — Admin oturumunuz süresi dolmuş veya geçersiz. Lütfen çıkış yapıp tekrar giriş yapın.';
+ } else if (!res.ok) {
+ pendingFetchError = `Sunucu hatası (${res.status}): ${data?.reason || 'Onay bekleyenler yüklenemedi.'}`;
+ } else if (data && data.success && Array.isArray(data.users)) {
+ pendingUsers = data.users;
+ }
+ } catch (e) {
+ pendingFetchError = 'Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.';
+ }
 
  const badge = overlay.querySelector('#adminPendingTabBadge');
- if (badge) badge.textContent = pendingUsers.length;
+ if (badge) badge.textContent = pendingFetchError ? '!' : pendingUsers.length;
+
+ if (pendingFetchError) {
+ body.innerHTML = `
+ <div style="text-align:center;padding:2.5rem;">
+ <div style="font-size:2.5rem;margin-bottom:.75rem;">🔐</div>
+ <div style="font-size:.95rem;font-weight:800;color:#ef4444;margin-bottom:.5rem;">Kayıtlar Yüklenemedi</div>
+ <div style="font-size:.82rem;color:var(--text-muted,#64748b);max-width:360px;margin:0 auto 1.25rem;">${escHtml(pendingFetchError)}</div>
+ <button type="button" class="btn btn-sm btn-primary" onclick="this.closest('.admin-modal-wrap').querySelector('#tabAdminPending').click()">Tekrar Dene</button>
+ </div>`;
+ return;
+ }
 
  if (pendingUsers.length === 0) {
  body.innerHTML = `
  <div style="text-align:center;padding:3.5rem 1rem;">
- <div style="font-size:3.5rem;margin-bottom:1rem;animation:pulse 2s infinite;"></div>
+ <div style="font-size:3.5rem;margin-bottom:1rem;animation:pulse 2s infinite;">✨</div>
  <div style="font-size:1.2rem;font-weight:800;margin-bottom:.4rem;color:var(--text-primary,#0f172a);">Onay Bekleyen Kayıt Yok</div>
  <div style="font-size:.85rem;color:var(--text-muted,#64748b);max-width:380px;margin:0 auto;">
  Şu anda sisteme katılmak için onay bekleyen yeni bir kullanıcı başvurusu bulunmuyor.
@@ -357,16 +377,36 @@
  `;
 
  let allUsers = [];
+ let fetchError = null;
  try {
  const res = await fetch('/api/admin/all-users', {
  headers: (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function')? window.FrpAuth.getAuthHeaders(): {}
  });
  const data = await res.json();
- if (data && data.success && Array.isArray(data.users)) allUsers = data.users;
- } catch (e) {}
+ if (res.status === 401 || res.status === 403) {
+ fetchError = '🔐 Yetki hatası — Admin oturumunuz geçersiz. Lütfen çıkış yapıp tekrar giriş yapın.';
+ } else if (!res.ok) {
+ fetchError = `Sunucu hatası (${res.status}): ${data?.reason || 'Kullanıcılar yüklenemedi.'}`;
+ } else if (data && data.success && Array.isArray(data.users)) {
+ allUsers = data.users;
+ }
+ } catch (e) {
+ fetchError = 'Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.';
+ }
 
  const badge = overlay.querySelector('#adminAllTabBadge');
- if (badge) badge.textContent = allUsers.length;
+ if (badge) badge.textContent = fetchError ? '!' : allUsers.length;
+
+ if (fetchError) {
+ body.innerHTML = `
+ <div style="text-align:center;padding:2.5rem;">
+ <div style="font-size:2.5rem;margin-bottom:.75rem;">🔐</div>
+ <div style="font-size:.95rem;font-weight:800;color:#ef4444;margin-bottom:.5rem;">Kullanıcılar Yüklenemedi</div>
+ <div style="font-size:.82rem;color:var(--text-muted,#64748b);max-width:360px;margin:0 auto 1.25rem;">${escHtml(fetchError)}</div>
+ <button type="button" class="btn btn-sm btn-primary" onclick="this.closest('.admin-modal-wrap').querySelector('#tabAdminAll').click()">Tekrar Dene</button>
+ </div>`;
+ return;
+ }
 
  let html = `
  <div style="margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">

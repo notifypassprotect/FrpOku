@@ -61,17 +61,10 @@ window.toast = toast;
 // ── Tema Yönetimi ───────────────────────────────────────────
 function updateThemeBtn() {
   if (!btnThemeToggle) return;
-  const cur = FrpStore.getTheme();
+  const cur = window.FrpThemes ? window.FrpThemes.getGlobalTheme() : (window.FrpStore ? FrpStore.getTheme() : 'light');
   btnThemeToggle.textContent = cur === 'dark' ? 'Aydınlık Mod' : 'Koyu Mod';
 }
-
-if (btnThemeToggle) {
-  btnThemeToggle.addEventListener('click', () => {
-    const cur = FrpStore.getTheme();
-    FrpStore.setTheme(cur === 'dark' ? 'light' : 'dark');
-    updateThemeBtn();
-  });
-}
+window.addEventListener('frpoku:themeChanged', updateThemeBtn);
 updateThemeBtn();
 
 // ── Topbar Dropdown ─────────────────────────────────────────
