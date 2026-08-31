@@ -284,15 +284,29 @@
       const splash = document.getElementById('splashScreen');
       if (splash) {
         const elapsed = Date.now() - splashStartTime;
-        const delay = Math.max(0, 500 - elapsed);
+        const delay = Math.max(0, 400 - elapsed);
         setTimeout(() => {
           splash.classList.add('hidden');
+          splash.style.pointerEvents = 'none';
+          splash.style.opacity = '0';
+          splash.style.visibility = 'hidden';
           setTimeout(() => { if (splash && splash.parentNode) splash.parentNode.removeChild(splash); }, 350);
         }, delay);
       }
     }
   })();
   window.FrpStoreReady = bootstrapReady;
+
+  // Garanti Fail-Safe: Ağ veya sunucu gecikse dahi splash ekranı 1.2 saniyeden fazla kalamaz
+  setTimeout(() => {
+    const splash = document.getElementById('splashScreen');
+    if (splash) {
+      splash.style.pointerEvents = 'none';
+      splash.style.opacity = '0';
+      splash.style.visibility = 'hidden';
+      setTimeout(() => { if (splash && splash.parentNode) splash.parentNode.removeChild(splash); }, 300);
+    }
+  }, 1200);
 
   // ── 4. Rapor CRUD Metotları ──────────────────────────────────
   function getAll() {

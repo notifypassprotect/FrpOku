@@ -51,6 +51,11 @@
  }
 
  function showAuthFullScreenPortal(initialTab = 'login') {
+ const splash = document.getElementById('splashScreen');
+ if (splash) {
+ splash.style.display = 'none';
+ splash.remove();
+ }
  const existing = document.getElementById('authFullScreenPortal');
  if (existing) existing.remove();
 

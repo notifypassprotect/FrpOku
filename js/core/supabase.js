@@ -40,18 +40,33 @@
   }
 
   async function serverRequest(path, options = {}) {
-    const response = await fetch(path, {
-      ...options,
-      headers: serverAuthHeaders(options.headers || {})
-    });
-    const data = await response.json().catch(() => null);
-    if (!response.ok) {
-      const error = new Error(data?.reason || `Sunucu isteği başarısız (${response.status}).`);
-      error.status = response.status;
-      error.code = data?.code || (response.status === 409 ? 'REPORT_CONFLICT' : 'SERVER_REQUEST_FAILED');
-      throw error;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), options.timeout || 7000);
+    try {
+      const response = await fetch(path, {
+        ...options,
+        signal: controller.signal,
+        headers: serverAuthHeaders(options.headers || {})
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        const error = new Error(data?.reason || `Sunucu isteği başarısız (${response.status}).`);
+        error.status = response.status;
+        error.code = data?.code || (response.status === 409 ? 'REPORT_CONFLICT' : 'SERVER_REQUEST_FAILED');
+        throw error;
+      }
+      return data;
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        const error = new Error('Sunucu yanıt süresi aşıldı (Zaman Aşımı).');
+        error.status = 504;
+        error.code = 'TIMEOUT';
+        throw error;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
     }
-    return data;
   }
 
   let lastLoadStatus = { ok: false, kind: 'not_started', status: 0 };
