@@ -426,8 +426,8 @@
   function deleteOne(id) {
     const file = _read().find(f => f.id === id);
     const files = _read().filter(f => f.id !== id);
-    if (window.FrpCloud && typeof window.FrpCloud.deleteReport === 'function') {
-      window.FrpCloud.deleteReport(id).catch(() => {});
+    if (window.FrpCloud && typeof window.FrpCloud.purgeReport === 'function') {
+      window.FrpCloud.purgeReport(id).catch(() => {});
     }
     _write(files);
     _audit('REPORT_DELETE', file ? file.name : id, 'Rapor kalıcı olarak silindi.');
@@ -436,16 +436,16 @@
   function deleteMany(ids) {
     const idSet = new Set(ids);
     const files = _read().filter(f => !idSet.has(f.id));
-    if (window.FrpCloud && typeof window.FrpCloud.deleteReports === 'function') {
-      window.FrpCloud.deleteReports(ids).catch(() => {});
+    if (window.FrpCloud && typeof window.FrpCloud.purgeManyReports === 'function') {
+      window.FrpCloud.purgeManyReports(ids).catch(() => {});
     }
     _write(files);
     _audit('REPORT_BULK_DELETE', `${ids.length} Rapor`, 'Seçili raporlar kalıcı olarak silindi.');
   }
 
   function deleteAll() {
-    if (window.FrpCloud && typeof window.FrpCloud.deleteAllReports === 'function') {
-      window.FrpCloud.deleteAllReports().catch(() => {});
+    if (window.FrpCloud && typeof window.FrpCloud.emptyTrash === 'function') {
+      window.FrpCloud.emptyTrash().catch(() => {});
     }
     _write([]);
     syncToIndexedDB([]);
@@ -833,7 +833,7 @@
       try { localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(list)); } catch {}
       _audit('TAG_CREATE', trimmed, 'Yeni özel etiket havuza eklendi.');
       if (window.FrpCloud && typeof window.FrpCloud.saveSettings === 'function') {
-        window.FrpCloud.saveSettings({ customTags: list }).catch(() => {});
+        window.FrpCloud.saveSettings({ custom_tags: list }).catch(() => {});
       }
     }
     return list;
@@ -845,7 +845,7 @@
     try { localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(list)); } catch {}
     _audit('TAG_DELETE', trimmed, 'Özel etiket havuzdan silindi.');
     if (window.FrpCloud && typeof window.FrpCloud.saveSettings === 'function') {
-      window.FrpCloud.saveSettings({ customTags: list }).catch(() => {});
+      window.FrpCloud.saveSettings({ custom_tags: list }).catch(() => {});
     }
     return list;
   }
