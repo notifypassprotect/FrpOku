@@ -1568,18 +1568,38 @@ tr.pinned-row {
 
 /* SPLASH SCREEN & LOADER */
 .splash-screen {
- position: fixed;
- inset: 0;
- background: var(--bg-app);
- z-index: 999999;
- display: flex;
- align-items: center;
- justify-content: center;
- transition: opacity 0.4s ease, visibility 0.4s;
+  position: fixed;
+  inset: 0;
+  background: var(--bg-app);
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.35s ease, visibility 0.35s ease;
+  animation: splashAutoDismiss 1.1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 .splash-screen.hidden {
- opacity: 0;
- visibility: hidden;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+@keyframes splashAutoDismiss {
+  0%, 75% {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: all;
+  }
+  99% {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
 }
 .splash-content {
  text-align: center;

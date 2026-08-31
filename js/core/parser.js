@@ -633,6 +633,113 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
     }
   }
 
+  // Yeni sorgular ile görsel tasarım modelini gerçek FRP XML DOM'una uygula.
+  // Bu katman yalnızca mevcut alanları güncellemez; editörde eklenen query,
+  // band ve component düğümlerini de doğru parent altına oluşturur.
+  try {
+    const doc = new DOMParser().parseFromString(xml, 'application/xml');
+    if (!doc.querySelector('parsererror') && doc.documentElement) {
+      const root = doc.documentElement;
+      const elements = () => Array.from(doc.getElementsByTagName('*'));
+      const byName = name => elements().find(node => node.getAttribute('Name') === String(name)) || null;
+      const setAttrs = (node, attrs) => Object.entries(attrs).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) node.setAttribute(key, typeof value === 'boolean' ? (value ? 'True' : 'False') : String(value));
+      });
+      const ensureNode = (model, parent) => {
+        if (!model?.name || !model?.type) return null;
+        let node = byName(model.name);
+        if (!node && parent) {
+          node = doc.createElement(model.type);
+          node.setAttribute('Name', model.name);
+          parent.appendChild(node);
+        }
+        return node;
+      };
+
+      let dataPage = elements().find(node => node.nodeName === 'TfrxDataPage') || null;
+      if (!dataPage && (file.queries || []).length > 0) {
+        dataPage = doc.createElement('TfrxDataPage');
+        setAttrs(dataPage, { Name: 'Data', Height: 1000, Left: 0, Top: 0, Width: 1000 });
+        root.insertBefore(dataPage, root.firstChild);
+      }
+      (file.queries || []).forEach(query => {
+        let queryNode = elements().find(node => /^(TfrxFOQuery|TfrxQuery)$/i.test(node.nodeName) &&
+          (node.getAttribute('Name') === query.name || node.getAttribute('UserName') === query.name));
+        if (!queryNode && dataPage) {
+          queryNode = doc.createElement('TfrxFOQuery');
+          dataPage.appendChild(queryNode);
+        }
+        if (queryNode) setAttrs(queryNode, { Name: query.name, UserName: query.name, 'SQL.Text': query.sql || '' });
+      });
+
+      (file.pages || []).forEach(page => {
+        const pageNode = ensureNode(page, root);
+        if (!pageNode) return;
+        setAttrs(pageNode, {
+          Orientation: page.orientation, PaperWidth: page.paperWidth, PaperHeight: page.paperHeight,
+          LeftMargin: page.leftMargin, TopMargin: page.topMargin, RightMargin: page.rightMargin,
+          BottomMargin: page.bottomMargin, ColumnWidth: page.columnWidth
+        });
+        (page.bands || []).forEach(band => {
+          const synthetic = band.type === 'TfrxPageContent';
+          const bandNode = synthetic ? pageNode : ensureNode(band, pageNode);
+          if (!bandNode) return;
+          if (!synthetic) setAttrs(bandNode, {
+            Left: band.left, Top: band.top, Width: band.width, Height: band.height,
+            DataSetName: band.dataSet, Condition: band.condition, Stretched: band.stretched, Vertical: band.vertical
+          });
+          (band.components || []).forEach(component => {
+            const componentNode = ensureNode(component, bandNode);
+            if (!componentNode) return;
+            const textAttr = component.rawAttrs && /\bMemo\.Text\s*=/.test(component.rawAttrs) ? 'Memo.Text' : 'Text';
+            setAttrs(componentNode, {
+              Left: component.left, Top: component.top, Width: component.width, Height: component.height,
+              [textAttr]: component.text, 'Font.Name': component.fontName,
+              'Font.Height': component.fontSize ? -Math.abs(component.fontSize) : component.fontHeight,
+              'Font.Color': component.fontColor, 'Font.Style': component.fontStyle,
+              'Fill.BackColor': component.fillBackColor, 'Frame.Typ': component.frameTyp,
+              'Frame.Color': component.frameColor, 'Frame.Width': component.frameWidth,
+              HAlign: component.hAlign, VAlign: component.vAlign, Rotation: component.rotation,
+              DataSetName: component.dataSet, DataField: component.dataField, DisplayFormat: component.displayFormat,
+              Visible: component.visible, Enabled: component.enabled, OnBeforePrint: component.onBeforePrint,
+              OnAfterPrint: component.onAfterPrint, OnClick: component.onClick, OnPreviewClick: component.onPreviewClick
+            });
+          });
+        });
+      });
+
+      const syncControls = (controls, parent) => (controls || []).forEach(control => {
+        const node = ensureNode(control, parent);
+        if (!node) return;
+        setAttrs(node, {
+          Left: control.left, Top: control.top, Width: control.width, Height: control.height,
+          Caption: control.caption, Text: control.text, 'Font.Name': control.fontName,
+          'Font.Height': control.fontSize ? -Math.abs(control.fontSize) : undefined,
+          'Font.Style': control.fontStyle, 'Font.Color': control.fontColor, Color: control.color,
+          Checked: control.checked, Enabled: control.enabled, Visible: control.visible,
+          ModalResult: control.modalResult, ListField: control.listField, KeyField: control.keyField,
+          ListSource: control.listSource, 'Items.Text': control.items, OnClick: control.onClick,
+          OnChange: control.onChange, OnEnter: control.onEnter, OnExit: control.onExit, OnKeyDown: control.onKeyDown
+        });
+        syncControls(control.children, node);
+      });
+      (file.dialogPages || []).forEach(dialog => {
+        const dialogNode = ensureNode({ ...dialog, type: 'TfrxDialogPage' }, root);
+        if (!dialogNode) return;
+        setAttrs(dialogNode, {
+          Caption: dialog.caption, Left: dialog.left, Top: dialog.top, Width: dialog.width,
+          Height: dialog.height, Position: dialog.position, Color: dialog.color
+        });
+        syncControls(dialog.controls, dialogNode);
+      });
+
+      if (newVersionNumStr) root.setAttribute('ReportOptions.VersionBuild', String(newVersionNumStr));
+      xml = new XMLSerializer().serializeToString(doc);
+    }
+  } catch (error) {
+    console.warn('FRP XML model senkronizasyonu başarısız:', error.message);
+  }
+
   return xml;
 }
 
@@ -641,4 +748,3 @@ window.decodeHtmlEntities       = decodeHtmlEntities;
 window.extractParamsFromSql     = extractParamsFromSql;
 window.encodeFrpAttr            = encodeFrpAttr;
 window.buildUpdatedFrpXml       = buildUpdatedFrpXml;
-

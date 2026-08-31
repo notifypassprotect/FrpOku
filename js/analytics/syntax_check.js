@@ -596,7 +596,7 @@
  isValid: true,
  errors: [],
  warnings: [],
- fileSizeMb: (file.size / (1024 * 1024)).toFixed(2)
+ fileSizeMb: file ? (file.size / (1024 * 1024)).toFixed(2) : '0.00'
  };
 
  if (!file) {
@@ -611,13 +611,28 @@
  return results;
  }
 
- if (file.size > 50 * 1024 * 1024) {
- results.warnings.push(`Dosya boyutu (${results.fileSizeMb} MB) oldukça büyük. Ayrıştırma süresi uzayabilir.`);
+ if (file.size > 25 * 1024 * 1024) {
+ results.isValid = false;
+ results.errors.push(`Dosya boyutu (${results.fileSizeMb} MB) 25 MB sınırını aşıyor.`);
  }
 
  const fileName = (file.name || '').toLowerCase();
  if (!fileName.endsWith('.frp') &&!fileName.endsWith('.fr3') &&!fileName.endsWith('.xml')) {
- results.warnings.push(`Dosya uzantısı '.frp' yerine '${file.name.split('.').pop()}' görünüyor. FastReport standardı olmayabilir.`);
+ results.isValid = false;
+ results.errors.push('Yalnızca .frp veya .fr3 FastReport dosyaları kabul edilir.');
+ }
+
+ const text = typeof rawBytesOrText === 'string' ? rawBytesOrText.trim() : '';
+ if (!text) {
+ results.isValid = false;
+ results.errors.push('Dosya içeriği boş veya metin olarak okunamadı.');
+ return results;
+ }
+
+ const xmlResult = window.FrpFileSafety?.validateFastReportXml(text);
+ if (!xmlResult?.valid) {
+ results.isValid = false;
+ results.errors.push(`Geçersiz FastReport XML içeriği: ${xmlResult?.reason || 'XML doğrulanamadı.'}`);
  }
 
  return results;

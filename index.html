@@ -7,49 +7,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inconsolata:wght@400;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700;800&family=Nunito:wght@400;600;700;800&family=Open+Sans:wght@400;600;700&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&family=Raleway:wght@400;600;700;800&family=Roboto:wght@400;500;700&family=Source+Code+Pro:wght@400;600;700&family=Source+Sans+3:wght@400;600;700&family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=4.3" />
-  <link rel="stylesheet" href="css/list.css?v=4.3" />
-  <link rel="stylesheet" href="css/themes.css?v=4.3" />
-  <script>
-    (function() {
-      const t = localStorage.getItem('frpoku_theme') || 'light';
-      document.documentElement.setAttribute('data-theme', t);
-    })();
-  </script>
+  <link rel="stylesheet" href="css/style.css?v=5.0" />
+  <link rel="stylesheet" href="css/list.css?v=5.0" />
+  <link rel="stylesheet" href="css/themes.css?v=5.0" />
+  <script src="js/core/theme_bootstrap.js?v=5.0"></script>
 </head>
 <body>
-  <!-- SPLASH SCREEN LOADING AREA (PREMIUM GLASS DESIGN) -->
-  <div id="splashScreen" class="splash-screen" style="position:fixed;inset:0;background:radial-gradient(circle at 50% 40%, #1e293b, #090d16);z-index:999999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);transition:opacity .4s cubic-bezier(0.4, 0, 0.2, 1), visibility .4s ease;">
-    <div class="splash-content" style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:1.1rem;animation:fadeIn .35s ease-out;">
-      <div style="position:relative;">
-        <div class="splash-logo" style="width:80px;height:80px;background:linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);border-radius:24px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 45px rgba(59,130,246,.55), 0 12px 28px rgba(0,0,0,.4);animation:pulse 2s infinite ease-in-out;">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-        </div>
-        <div style="position:absolute;inset:-4px;border-radius:28px;border:1.5px solid rgba(255,255,255,.2);animation:spinGlow 8s linear infinite;pointer-events:none;"></div>
-      </div>
-      <div style="font-size:1.8rem;font-weight:900;letter-spacing:-0.5px;color:#f8fafc;font-family:var(--font);text-shadow:0 2px 10px rgba(0,0,0,.3);">FrpOku</div>
-      <div style="font-size:.85rem;font-weight:600;color:#94a3b8;letter-spacing:.3px;">FastReport Rapor & Sorgu Analiz Merkezi</div>
-      <div style="width:220px;height:5px;background:rgba(255,255,255,.08);border-radius:6px;overflow:hidden;margin-top:.4rem;position:relative;border:1px solid rgba(255,255,255,.06);">
-        <div style="position:absolute;top:0;left:0;bottom:0;width:50%;background:linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);border-radius:6px;box-shadow:0 0 12px rgba(139,92,246,.8);animation:splashProgress 1.3s infinite cubic-bezier(0.4, 0, 0.2, 1);"></div>
-      </div>
-    </div>
-  </div>
-  <style>
-    @keyframes splashProgress { 0% { left:-50%; width:45%; } 50% { left:25%; width:65%; } 100% { left:100%; width:45%; } }
-    @keyframes pulse { 0%, 100% { transform:scale(1); box-shadow:0 0 45px rgba(59,130,246,.55); } 50% { transform:scale(1.06); box-shadow:0 0 65px rgba(139,92,246,.7); } }
-    @keyframes spinGlow { 0% { transform:rotate(0deg); opacity:.4; } 50% { opacity:.9; } 100% { transform:rotate(360deg); opacity:.4; } }
-  </style>
-  <script>
-    setTimeout(function() {
-      var s = document.getElementById('splashScreen');
-      if (s) {
-        s.style.pointerEvents = 'none';
-        s.style.opacity = '0';
-        s.style.visibility = 'hidden';
-        setTimeout(function() { if (s && s.parentNode) s.parentNode.removeChild(s); }, 420);
-      }
-    }, 450);
-  </script>
+  <script src="js/list/list_page_bootstrap.js?v=5.1" defer></script>
 
   <!-- DRAG AND DROP OVERLAY -->
   <div id="dragOverlay" class="drag-overlay">
@@ -88,7 +52,7 @@
       <button class="btn btn-sm" id="btnRecentDownloadsModal" style="font-weight:700;" title="Son İndirilen Dosyalar ve İndirme Geçmişi">Son İndirilenler</button>
 
       <!-- Panel (Sadece Sistem Yöneticisi Admin için) -->
-      <button class="btn btn-sm btn-primary" id="btnDashboardPanel" onclick="window.location.href='dashboard.html'" title="İstatistik Paneli" style="display:none;">Panel</button>
+      <button class="btn btn-sm btn-primary" id="btnDashboardPanel" data-list-action="dashboard" title="İstatistik Paneli" style="display:none;">Panel</button>
 
       <!-- Analizler Menüsü (Dropdown) -->
       <div class="topbar-dropdown" id="dropdownAnalytics">
@@ -374,74 +338,62 @@
 <div class="toast-stack" id="toastStack"></div>
 
 <!-- SCRIPTS (MODÜLER MİMARİ) -->
-<script src="js/lib/supabase.js?v=4.3"></script>
+<script src="js/lib/supabase.js?v=5.0"></script>
+<script src="/runtime-config.js"></script>
 <!-- 1. Çekirdek & Ortak Araçlar -->
-<script src="js/core/notify.js?v=4.3"></script>
-<script src="js/core/supabase.js?v=4.3"></script>
-<script src="js/core/auth/audit_logger.js?v=4.3"></script>
-<script src="js/core/auth/auth_portal.js?v=4.3"></script>
-<script src="js/core/auth/auth_admin_modal.js?v=4.3"></script>
-<script src="js/core/auth.js?v=4.3"></script>
-<script src="js/core/dom.js?v=4.3"></script>
-<script src="js/core/formatter.js?v=4.3"></script>
-<script src="js/core/themes.js?v=4.3"></script>
-<script src="js/core/text_helpers.js?v=4.3"></script>
-<script src="js/core/param_helpers.js?v=4.3"></script>
-<script src="js/core/sql_helpers.js?v=4.3"></script>
-<script src="js/core/palette.js?v=4.3"></script>
-<script src="js/core/modal.js?v=4.3"></script>
-<script src="js/core/outline.js?v=4.3"></script>
-<script src="js/core/parser.js?v=4.3"></script>
-<script src="js/core/zip.js?v=4.3"></script>
+<script src="js/core/notify.js?v=5.0"></script>
+<script src="js/core/supabase.js?v=5.0"></script>
+<script src="js/core/auth/audit_logger.js?v=5.0"></script>
+<script src="js/core/auth/auth_portal.js?v=5.0"></script>
+<script src="js/core/auth/auth_admin_modal.js?v=5.0"></script>
+<script src="js/core/auth.js?v=5.0"></script>
+<script src="js/core/dom.js?v=5.0"></script>
+<script src="js/core/file_safety.js?v=5.0"></script>
+<script src="js/core/formatter.js?v=5.0"></script>
+<script src="js/core/themes.js?v=5.0"></script>
+<script src="js/core/text_helpers.js?v=5.0"></script>
+<script src="js/core/param_helpers.js?v=5.0"></script>
+<script src="js/core/sql_helpers.js?v=5.0"></script>
+<script src="js/core/palette.js?v=5.0"></script>
+<script src="js/core/modal.js?v=5.0"></script>
+<script src="js/core/outline.js?v=5.0"></script>
+<script src="js/core/parser.js?v=5.0"></script>
+<script src="js/core/zip.js?v=5.0"></script>
 
 <!-- 2. İleri Analiz Motorları -->
-<script src="js/analytics/complexity.js?v=4.3"></script>
-<script src="js/analytics/dependencies.js?v=4.3"></script>
-<script src="js/analytics/table_usage.js?v=4.3"></script>
-<script src="js/analytics/param_usage.js?v=4.3"></script>
-<script src="js/analytics/syntax_check.js?v=4.3"></script>
+<script src="js/analytics/complexity.js?v=5.0"></script>
+<script src="js/analytics/dependencies.js?v=5.0"></script>
+<script src="js/analytics/table_usage.js?v=5.0"></script>
+<script src="js/analytics/param_usage.js?v=5.0"></script>
+<script src="js/analytics/syntax_check.js?v=5.0"></script>
 
 <!-- 3. Veri Katmanı & Depolama -->
-<script src="js/store/store_tags.js?v=4.3"></script>
-<script src="js/store/store_main.js?v=4.3"></script>
+<script src="js/store/store_tags.js?v=5.0"></script>
+<script src="js/store/store_main.js?v=5.0"></script>
 
 <!-- 4. Sorgu Kütüphanesi & Ayarlar (Modüler) -->
-<script src="js/core/snippet_tools.js?v=4.3"></script>
-<script src="js/core/snippet_modal.js?v=4.3"></script>
-<script src="js/settings/tabs/appearance_tab.js?v=4.3"></script>
-<script src="js/settings/tabs/profile_tab.js?v=4.3"></script>
-<script src="js/settings/tabs/categories_tab.js?v=4.3"></script>
-<script src="js/settings/tabs/columns_tab.js?v=4.3"></script>
-<script src="js/settings/tabs/shortcuts_tab.js?v=4.3"></script>
-<script src="js/settings/tabs/trash_tab.js?v=4.3"></script>
-<script src="js/settings/tabs/storage_tab.js?v=4.3"></script>
-<script src="js/settings/tabs/audit_tab.js?v=4.3"></script>
-<script src="js/settings/settings_modal.js?v=4.3"></script>
+<script src="js/core/snippet_tools.js?v=5.0"></script>
+<script src="js/core/snippet_modal.js?v=5.0"></script>
+<script src="js/settings/tabs/appearance_tab.js?v=5.0"></script>
+<script src="js/settings/tabs/profile_tab.js?v=5.0"></script>
+<script src="js/settings/tabs/categories_tab.js?v=5.0"></script>
+<script src="js/settings/tabs/columns_tab.js?v=5.0"></script>
+<script src="js/settings/tabs/shortcuts_tab.js?v=5.0"></script>
+<script src="js/settings/tabs/trash_tab.js?v=5.0"></script>
+<script src="js/settings/tabs/storage_tab.js?v=5.0"></script>
+<script src="js/settings/tabs/audit_tab.js?v=5.0"></script>
+<script src="js/settings/settings_modal.js?v=5.0"></script>
 
 <!-- 5. Liste Sayfası Modülleri (Modüler) -->
-<script src="js/list/code_search_tools.js?v=4.3"></script>
-<script src="js/list/list_actions.js?v=4.3"></script>
-<script src="js/list/list_ui_helpers.js?v=4.3"></script>
-<script src="js/list/list_modals.js?v=4.3"></script>
-<script src="js/list/renderers/table_renderer.js?v=4.3"></script>
-<script src="js/list/renderers/cards_renderer.js?v=4.3"></script>
-<script src="js/list/renderers/timeline_renderer.js?v=4.3"></script>
-<script src="js/list/list.js?v=4.3"></script>
-
-<script>
-  document.addEventListener('keydown', e => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f' && !['TEXTAREA', 'INPUT'].includes(e.target.tagName)) {
-      e.preventDefault();
-      document.getElementById('searchInput')?.focus();
-    }
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'e') {
-      e.preventDefault();
-      if (typeof window.exportReportListExcel === 'function') {
-        window.exportReportListExcel();
-      }
-    }
-  });
-</script>
+<script src="js/list/code_search_tools.js?v=5.0"></script>
+<script src="js/list/list_actions.js?v=5.0"></script>
+<script src="js/list/list_ui_helpers.js?v=5.0"></script>
+<script src="js/list/list_modals.js?v=5.0"></script>
+<script src="js/list/renderers/table_renderer.js?v=5.0"></script>
+<script src="js/list/renderers/cards_renderer.js?v=5.0"></script>
+<script src="js/list/renderers/timeline_renderer.js?v=5.0"></script>
+<script src="js/list/list_events.js?v=5.0"></script>
+<script src="js/list/list.js?v=5.0"></script>
 
 </body>
 </html>

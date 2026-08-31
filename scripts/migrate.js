@@ -4,10 +4,10 @@ const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 
 const url = process.env.SUPABASE_URL;
-const key = process.env.SUPABASE_KEY;
+const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!url || !key) {
-  console.error('HATA: SUPABASE_URL veya SUPABASE_KEY .env dosyasında bulunamadı.');
+  console.error('HATA: SUPABASE_URL veya SUPABASE_SERVICE_ROLE_KEY .env dosyasında bulunamadı.');
   process.exit(1);
 }
 
@@ -38,6 +38,11 @@ async function migrate() {
   for (const report of reports) {
     const id = report.id || report.fileId || String(Date.now());
     const name = report.name || report.fileName || 'İsimsiz Rapor';
+    const userId = report.user_id || report.userId;
+    if (!userId) {
+      console.error('Aktarılamadı:', name, 'rapor sahibi user_id bilgisi eksik. Önce kullanıcıyı oluşturup rapora userId ekleyin.');
+      continue;
+    }
     const fileSize = report.size || 0;
     const category = report.category || '';
     const tags = Array.isArray(report.tags) ? report.tags : [];
@@ -52,6 +57,7 @@ async function migrate() {
     const row = {
       id,
       name,
+      user_id: String(userId),
       file_size: fileSize,
       category,
       tags,

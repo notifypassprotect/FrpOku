@@ -139,7 +139,7 @@ window.FrpListModals = window.FrpListModals || {};
                       ${escHtml(r.fileName)}
                     </div>
                   </div>
-                  <button type="button" class="btn btn-sm btn-primary" style="padding:.2rem .65rem;font-size:.74rem;white-space:nowrap;" onclick="window.openDetail('${r.fileId}')">Detayda Aç →</button>
+                  <button type="button" class="btn btn-sm btn-primary" style="padding:.2rem .65rem;font-size:.74rem;white-space:nowrap;" data-list-action="open-detail" data-id="${encodeInlineArg(r.fileId)}">Detayda Aç →</button>
                 </div>
                 <div style="margin-top:.4rem;padding-top:.35rem;border-top:1px dashed var(--border-light);">
                   <span style="font-size:.72rem;color:var(--text-muted);font-weight:600;">Kullanan Sorgular:</span>
@@ -320,7 +320,7 @@ window.FrpListModals = window.FrpListModals || {};
                       ${escHtml(r.fileName)}
                     </div>
                   </div>
-                  <button type="button" class="btn btn-sm btn-primary" style="padding:.2rem .65rem;font-size:.74rem;white-space:nowrap;" onclick="window.openDetail('${r.fileId}')">Detayda Aç →</button>
+                  <button type="button" class="btn btn-sm btn-primary" style="padding:.2rem .65rem;font-size:.74rem;white-space:nowrap;" data-list-action="open-detail" data-id="${encodeInlineArg(r.fileId)}">Detayda Aç →</button>
                 </div>
                 <div style="margin-top:.4rem;padding-top:.35rem;border-top:1px dashed var(--border-light);">
                   <span style="font-size:.72rem;color:var(--text-muted);font-weight:600;">Bağlı SQL Sorguları:</span>
@@ -415,7 +415,7 @@ window.FrpListModals = window.FrpListModals || {};
                   ${escHtml(item.queryName)} · ${item.complexity.details?.totalJoins || 0} JOIN · ${item.complexity.details?.subqCount || 0} Subquery · ${item.complexity.details?.lines || 0} Satır
                 </div>
               </div>
-              <button class="btn btn-sm btn-primary" onclick="window.openDetail('${item.fileId}')" style="font-size:.75rem;padding:.3rem .7rem;">İncele →</button>
+              <button class="btn btn-sm btn-primary" data-list-action="open-detail" data-id="${encodeInlineArg(item.fileId)}" style="font-size:.75rem;padding:.3rem .7rem;">İncele →</button>
             </div>
           `).join('')}
         </div>
@@ -482,7 +482,7 @@ window.FrpListModals = window.FrpListModals || {};
           const repName = f.meta?.reportName || f.name;
           const timeStr = f.recentTs ? new Date(f.recentTs).toLocaleString('tr-TR') : 'Bilinmiyor';
           return `
-            <div style="background:var(--bg-surface);border:1px solid var(--border-light);border-radius:10px;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:background .15s;" onclick="window.openDetail('${f.id}')">
+            <div style="background:var(--bg-surface);border:1px solid var(--border-light);border-radius:10px;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:background .15s;" data-list-action="open-detail" data-id="${encodeInlineArg(f.id)}">
               <div style="min-width:0;flex:1;">
                 <div style="font-weight:700;font-size:.88rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(repName)}</div>
                 <div style="font-size:.72rem;color:var(--text-muted);margin-top:.15rem;">Dosya: ${escHtml(f.name)} · Son İnceleme: ${timeStr}</div>

@@ -15,23 +15,16 @@ let currentMatchIdx = -1;
 const btnThemeToggle = document.getElementById('btnThemeToggle');
 
 function updateThemeBtn() {
- const cur = FrpStore.getTheme();
- if (btnThemeToggle) {
- btnThemeToggle.textContent = cur === 'dark'? 'Aydınlık Mod': 'Koyu Mod';
- }
- if (Array.isArray(activeTabs)) {
- activeTabs.forEach(t => syncEditorBackdrop(t.id));
- }
+  const cur = window.FrpThemes ? window.FrpThemes.getGlobalTheme() : (window.FrpStore ? FrpStore.getTheme() : 'light');
+  if (btnThemeToggle) {
+    btnThemeToggle.textContent = cur === 'dark' ? 'Aydınlık Mod' : 'Koyu Mod';
+  }
+  if (Array.isArray(activeTabs)) {
+    activeTabs.forEach(t => syncEditorBackdrop(t.id));
+  }
 }
-
-if (btnThemeToggle) {
- btnThemeToggle.addEventListener('click', () => {
- const cur = FrpStore.getTheme();
- const next = cur === 'dark'? 'light': 'dark';
- FrpStore.setTheme(next);
- updateThemeBtn();
- });
-}
+window.addEventListener('frpoku:themeChanged', updateThemeBtn);
+updateThemeBtn();
 
 // Canlı Tema Senkronizasyonu
 window.addEventListener('storage', (e) => {
@@ -204,7 +197,7 @@ function renderSidebar(file) {
  const tagsList = tags.map(t => `
  <span class="tag-pill">
  ${esc(t)}
- <span class="tag-pill-remove" onclick="removeTagFromDetail('${esc(t)}')">×</span>
+ <span class="tag-pill-remove" data-detail-action="remove-tag" data-value="${encodeInlineArg(t)}">×</span>
  </span>
  `).join('');
 
@@ -217,7 +210,7 @@ function renderSidebar(file) {
  <div class="meta-label">GUID</div>
  <div class="meta-value" style="font-family:var(--mono);font-size:.68rem;display:flex;align-items:center;justify-content:space-between;gap:.3rem;">
  <span style="overflow:hidden;text-overflow:ellipsis;" title="${esc(meta.guid || '—')}">${esc(meta.guid || '—')}</span>
- ${meta.guid? `<button class="btn btn-sm" style="padding:.1rem.35rem;font-size:.65rem;" onclick="copyGuidText('${esc(meta.guid)}')">Kopyala</button>`: ''}
+ ${meta.guid? `<button class="btn btn-sm" style="padding:.1rem.35rem;font-size:.65rem;" data-detail-action="copy-guid" data-value="${encodeInlineArg(meta.guid)}">Kopyala</button>`: ''}
  </div>
  </div>
  ${metaRow('Dosya Boyutu', file.sizeBytes > 1024? Math.round(file.sizeBytes / 1024) + ' KB': file.sizeBytes + ' B')}
@@ -279,11 +272,11 @@ function renderSidebar(file) {
  <div class="meta-label">Dışa Aktar & Araçlar</div>
  <div class="export-btns">
  ${queries.map((q, i) => `
- <button class="btn-export" onclick="exportSqlQueryModal(${i})">
+ <button class="btn-export" data-detail-action="export-sql" data-index="${i}">
  ${esc(q.name)} Sorgusunu İndir (.sql /.txt)
  </button>`).join('')}
- <button class="btn-export" onclick="exportReportJson()">Rapor JSON İndir</button>
- <button class="btn-export" onclick="exportHtmlDoc()">HTML Dokümantasyon</button>
+ <button class="btn-export" data-detail-action="export-json">Rapor JSON İndir</button>
+ <button class="btn-export" data-detail-action="export-html">HTML Dokümantasyon</button>
  </div>
  </div>
 
@@ -548,28 +541,28 @@ function addTab(cfg) {
  <div class="topbar-dropdown" style="display:inline-flex;padding-bottom:0;margin-bottom:0;">
  <button class="btn-copy topbar-dropdown-toggle" style="background:linear-gradient(135deg, #3b82f6, #6366f1);color:#fff;border:none;font-weight:700;" title="SQL Biçimlendirme Seçenekleri">Formatla</button>
  <div class="topbar-dropdown-menu" style="left:0;right:auto;min-width:220px;z-index:9999;">
- <button class="topbar-dropdown-item" onclick="formatSqlInTab('${esc(cfg.id)}', 'expanded')">
+ <button class="topbar-dropdown-item" data-detail-action="format-sql" data-tab="${encodeInlineArg(cfg.id)}" data-mode="expanded">
  <span>Standart Format (Geniş)</span>
  </button>
- <button class="topbar-dropdown-item" onclick="formatSqlInTab('${esc(cfg.id)}', 'compact')">
+ <button class="topbar-dropdown-item" data-detail-action="format-sql" data-tab="${encodeInlineArg(cfg.id)}" data-mode="compact">
  <span>Kompakt Format</span>
  </button>
- <button class="topbar-dropdown-item" onclick="minifySqlInTab('${esc(cfg.id)}')">
+ <button class="topbar-dropdown-item" data-detail-action="minify-sql" data-tab="${encodeInlineArg(cfg.id)}">
  <span>Tek Satır (Minify)</span>
  </button>
  </div>
  </div>
- <button class="btn-copy" id="${esc(cfg.id)}_casetogglebtn" onclick="changeSqlCaseInTab('${esc(cfg.id)}')" title="SQL Anahtar Kelimelerini BÜYÜK / KÜÇÜK Harfe Dönüştür">BÜYÜK Harf</button>
- <button class="btn-copy" onclick="openComplexityModal(${cfg.queryIndex})" title="SQL Karmaşıklık Puanı & Analiz">Karmaşıklık</button>
- <button class="btn-copy" onclick="addToSnippetLibrary(${cfg.queryIndex})">Kütüphaneye Ekle</button>
- <button class="btn-copy" onclick="openParamInjector(${cfg.queryIndex})">SQL Testi</button>
+ <button class="btn-copy" id="${esc(cfg.id)}_casetogglebtn" data-detail-action="change-case" data-tab="${encodeInlineArg(cfg.id)}" title="SQL Anahtar Kelimelerini BÜYÜK / KÜÇÜK Harfe Dönüştür">BÜYÜK Harf</button>
+ <button class="btn-copy" data-detail-action="complexity" data-index="${cfg.queryIndex}" title="SQL Karmaşıklık Puanı & Analiz">Karmaşıklık</button>
+ <button class="btn-copy" data-detail-action="snippet" data-index="${cfg.queryIndex}">Kütüphaneye Ekle</button>
+ <button class="btn-copy" data-detail-action="param" data-index="${cfg.queryIndex}">SQL Testi</button>
  `: ''}
  ${cfg.type === 'pascal'? `
- <button class="btn-copy" id="btnCheckPascalSyntax" onclick="checkPascalSyntaxInTab()" title="PascalScript Sözdizimi Kontrolü">Sözdizimi Kontrol</button>
+ <button class="btn-copy" id="btnCheckPascalSyntax" data-detail-action="check-pascal" title="PascalScript Sözdizimi Kontrolü">Sözdizimi Kontrol</button>
  `: ''}
- <button class="btn-copy" id="${esc(cfg.id)}_lasteditbtn" onclick="openLastEditDiffModal('${esc(cfg.id)}')" title="Son yapılan değişikliklerin farkını gör">Son Değişiklik</button>
- <button class="btn-copy btn-edit-toggle" id="${esc(cfg.id)}_editbtn" onclick="toggleEditMode('${esc(cfg.id)}')">Düzenle</button>
- <button class="btn-copy" id="${esc(cfg.id)}_copy" onclick="copyTabCode('${esc(cfg.id)}', this)">Kopyala</button>
+ <button class="btn-copy" id="${esc(cfg.id)}_lasteditbtn" data-detail-action="last-edit" data-tab="${encodeInlineArg(cfg.id)}" title="Son yapılan değişikliklerin farkını gör">Son Değişiklik</button>
+ <button class="btn-copy btn-edit-toggle" id="${esc(cfg.id)}_editbtn" data-detail-action="toggle-edit" data-tab="${encodeInlineArg(cfg.id)}">Düzenle</button>
+ <button class="btn-copy" id="${esc(cfg.id)}_copy" data-detail-action="copy-tab" data-tab="${encodeInlineArg(cfg.id)}">Kopyala</button>
  </div>
  </div>
 
@@ -585,9 +578,9 @@ function addTab(cfg) {
  <span id="${cfg.id}_cursor_pos" style="font-size:.74rem;background:var(--bg-raised);padding:.15rem.55rem;border-radius:4px;border:1px solid var(--border-light);color:var(--text-primary);font-family:var(--mono);font-weight:600;">Satır: 1, Sütun: 1</span>
  <span style="font-size:.72rem;color:var(--text-muted);">Anlık sözdizimi doğrulaması aktif</span>
  <div style="display:flex;gap:.4rem;margin-left:auto;">
- <button class="btn btn-sm btn-primary" onclick="saveEditMode('${esc(cfg.id)}')">Kaydet</button>
- <button class="btn btn-sm" onclick="saveAndDownloadEditMode('${esc(cfg.id)}')">Kaydet & İndir</button>
- <button class="btn btn-sm" onclick="cancelEditMode('${esc(cfg.id)}')">İptal</button>
+ <button class="btn btn-sm btn-primary" data-detail-action="save-edit" data-tab="${encodeInlineArg(cfg.id)}">Kaydet</button>
+ <button class="btn btn-sm" data-detail-action="save-download" data-tab="${encodeInlineArg(cfg.id)}">Kaydet & İndir</button>
+ <button class="btn btn-sm" data-detail-action="cancel-edit" data-tab="${encodeInlineArg(cfg.id)}">İptal</button>
  </div>
  </div>
 
@@ -736,7 +729,7 @@ function updateSyntaxErrorNotice(tabId, existingErrors) {
  <div style="display:flex;gap:.35rem;flex-wrap:wrap;flex:1;">
  ${errors.slice(0, 6).map(e => `
  <span style="font-family:var(--mono);font-size:.74rem;background:rgba(239,68,68,.15);color:var(--red);padding:.15rem.5rem;border-radius:6px;border:1px solid rgba(239,68,68,.3);cursor:pointer;"
- onclick="jumpToEditorLine('${tabId}', ${e.line}, '${esc(e.token || '')}')"
+ data-detail-action="jump-editor" data-tab="${encodeInlineArg(tabId)}" data-line="${e.line}" data-token="${encodeInlineArg(e.token || '')}"
  title="${esc(e.message)} — Satıra sıçramak için tıklayın">
  Satır ${e.line}: <strong>${esc(e.token)}</strong> (${esc(e.suggestion)})
  </span>
@@ -744,7 +737,7 @@ function updateSyntaxErrorNotice(tabId, existingErrors) {
  </div>
  </div>
  <button type="button" class="btn btn-sm" style="background:rgba(239,68,68,0.18);color:var(--red);border:1px solid rgba(239,68,68,0.4);font-size:.74rem;font-weight:700;padding:.2rem.6rem;border-radius:6px;cursor:pointer;"
- onclick="openAllSyntaxErrorsModal('${tabId}')"
+ data-detail-action="all-syntax" data-tab="${encodeInlineArg(tabId)}"
  title="Tüm ${errors.length} hatayı detaylı liste olarak aç">
  Tümünü Listele (${errors.length})
  </button>
@@ -766,7 +759,7 @@ function openAllSyntaxErrorsModal(tabId) {
 
  const errItemsHtml = errors.map((e, idx) => `
  <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:.6rem.8rem;margin-bottom:.5rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem;cursor:pointer;"
- onclick="jumpToEditorLine('${tabId}', ${e.line}, '${esc(e.token || '')}'); const m = document.querySelector('.modal-overlay'); if (m) m.remove();"
+ data-detail-action="jump-editor" data-tab="${encodeInlineArg(tabId)}" data-line="${e.line}" data-token="${encodeInlineArg(e.token || '')}" data-close-modal="true"
  title="Satır ${e.line}'e git">
  <div style="flex:1;">
  <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.2rem;">
@@ -1114,14 +1107,14 @@ function cancelEditMode(tabId) {
  if (tabId === 'tab_pascal') refreshPascalSyntaxButtonState();
 }
 
-function saveEditMode(tabId) {
+async function saveEditMode(tabId, options = {}) {
  const editArea = document.getElementById(tabId + '_editarea');
  const viewScroll = document.getElementById(tabId + '_viewscroll');
- if (!editArea ||!currentFile) return;
+ if (!editArea ||!currentFile) return null;
 
  const newCode = editArea.value;
  const tabCfg = activeTabs.find(t => t.id === tabId);
- if (!tabCfg) return;
+ if (!tabCfg) return null;
 
  const curUser = window.FrpAuth? window.FrpAuth.getUser(): null;
  const isOwner = curUser && currentFile.userId === curUser.id;
@@ -1137,11 +1130,12 @@ function saveEditMode(tabId) {
  } else if (tabCfg.type === 'pascal') {
  FrpStore.updateCode(cloned.id, { pascalScript: newCode });
  }
+ currentFile = FrpStore.getById(cloned.id) || cloned;
  showToast('Ortak havuzdaki rapor kişisel alanınıza kopyalanarak kaydedildi! ', 'success');
- setTimeout(() => {
- window.location.href = `detail.html?id=${encodeURIComponent(cloned.id)}`;
- }, 700);
- return;
+ if (options.navigateToClone !== false) {
+ setTimeout(() => { window.location.href = `detail.html?id=${encodeURIComponent(currentFile.id)}`; }, 700);
+ }
+ return currentFile;
  }
  }
 
@@ -1182,10 +1176,13 @@ function saveEditMode(tabId) {
  updateLastEditBtnState(tabId);
  cancelEditMode(tabId);
  if (tabId === 'tab_pascal') refreshPascalSyntaxButtonState();
+ return currentFile;
 }
 
 async function saveAndDownloadEditMode(tabId) {
- await saveEditMode(tabId);
+ const savedFile = await saveEditMode(tabId, { navigateToClone: false });
+ if (!savedFile) return;
+ currentFile = savedFile;
  const tabCfg = activeTabs.find(t => t.id === tabId);
  if (!tabCfg ||!currentFile) return;
  await exportFrpOrSqlWithVersion(tabId, tabCfg.queryIndex);
@@ -1279,26 +1276,29 @@ window.saveEditMode = saveEditMode;
 window.saveAndDownloadEditMode = saveAndDownloadEditMode;
 window.copyTabCode = copyTabCode;
 
+let _lastActiveTabId = null;
+
 function activateTab(id) {
- activeTabs.forEach(t => {
- const btn = document.getElementById(t.id + '_btn');
- const panel = document.getElementById(t.id + '_panel');
- const isTarget = t.id === id;
- if (btn) btn.classList.toggle('active', isTarget);
- if (panel) panel.classList.toggle('active', isTarget);
- });
- updateLastEditBtnState(id);
- if (id === 'tab_pascal') refreshPascalSyntaxButtonState();
- if (id === 'tab_designer') {
- const wrap = document.getElementById('tab_designer_designer_wrap');
- if (wrap && window.FastReportDesigner &&!wrap.hasChildNodes() && currentFile) {
- window.FastReportDesigner.render(currentFile, wrap);
- }
- }
- performCodeSearch();
- if (typeof onTabActivated === 'function') {
- onTabActivated(id);
- }
+  _lastActiveTabId = id;
+  activeTabs.forEach(t => {
+    const btn = document.getElementById(t.id + '_btn');
+    const panel = document.getElementById(t.id + '_panel');
+    const isTarget = t.id === id;
+    if (btn) btn.classList.toggle('active', isTarget);
+    if (panel) panel.classList.toggle('active', isTarget);
+  });
+  updateLastEditBtnState(id);
+  if (id === 'tab_pascal') refreshPascalSyntaxButtonState();
+  if (id === 'tab_designer') {
+    const wrap = document.getElementById('tab_designer_designer_wrap');
+    if (wrap && window.FastReportDesigner && !wrap.hasChildNodes() && currentFile) {
+      window.FastReportDesigner.render(currentFile, wrap);
+    }
+  }
+  performCodeSearch();
+  if (typeof onTabActivated === 'function') {
+    onTabActivated(id);
+  }
 }
 
 function renderViewer(file) {
@@ -1385,7 +1385,8 @@ function renderViewer(file) {
  tabBar.appendChild(addQueryBtn);
 
  if (activeTabs.length > 0) {
- activateTab(activeTabs[0].id);
+ const targetTab = (_lastActiveTabId && activeTabs.find(t => t.id === _lastActiveTabId)) || activeTabs[0];
+ activateTab(targetTab.id);
  activeTabs.forEach(t => updateLastEditBtnState(t.id));
  refreshPascalSyntaxButtonState();
  }
@@ -1420,7 +1421,7 @@ function showError(msg) {
  <div class="sidebar-empty-icon" style="font-size:2rem;margin-bottom:.5rem;">⚠️</div>
  <div class="sidebar-empty-title" style="font-size:.85rem;font-weight:700;color:var(--red);line-height:1.4;">${esc(msg)}</div>
  <div style="margin-top:.8rem;">
- <button class="btn btn-sm btn-primary" onclick="window.location.href='index.html'">← Ana Sayfaya Dön</button>
+ <button class="btn btn-sm btn-primary" data-detail-action="open-index">← Ana Sayfaya Dön</button>
  </div>
  </div>`;
  }
@@ -1440,8 +1441,8 @@ async function init() {
  let file = FrpStore.getById(id);
 
  // Eğer LocalStorage boşsa veya rapor tekil bulunamadıysa IndexedDB yedeğinden çekmeyi dene
- if (!file && FrpStore.restoreFromIndexedDB) {
- const restored = await FrpStore.restoreFromIndexedDB();
+ if (!file && FrpStore.hydrateFromIndexedDB) {
+ const restored = await FrpStore.hydrateFromIndexedDB();
  if (restored && restored.length > 0) {
  file = FrpStore.getById(id);
  }
@@ -1953,14 +1954,14 @@ function openComplexityModal(qIdx) {
  <div style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.25);border-radius:8px;padding:.6rem.75rem;">
  <div style="font-size:.7rem;font-weight:700;color:var(--red);margin-bottom:.3rem;display:flex;align-items:center;justify-content:space-between;">
  <span>❌ Mevcut / Riskli Kod:</span>
- <button type="button" class="btn btn-sm" style="font-size:.65rem;padding:.1rem.35rem;" onclick="navigator.clipboard.writeText(decodeURIComponent('${encodeURIComponent(rec.before || '')}')); showToast('Kopyalandı', 'success');"></button>
+ <button type="button" class="btn btn-sm" style="font-size:.65rem;padding:.1rem.35rem;" data-detail-action="copy-text" data-value="${encodeInlineArg(rec.before || '')}"></button>
  </div>
  <pre style="margin:0;font-family:var(--mono);font-size:.73rem;color:var(--text-primary);white-space:pre-wrap;line-height:1.4;max-height:140px;overflow-y:auto;">${esc(rec.before || '')}</pre>
  </div>
  <div style="background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.25);border-radius:8px;padding:.6rem.75rem;">
  <div style="font-size:.7rem;font-weight:700;color:var(--green);margin-bottom:.3rem;display:flex;align-items:center;justify-content:space-between;">
  <span>✅ Önerilen Optimize Kod:</span>
- <button type="button" class="btn btn-sm" style="font-size:.65rem;padding:.1rem.35rem;" onclick="navigator.clipboard.writeText(decodeURIComponent('${encodeURIComponent(rec.after || '')}')); showToast('Kopyalandı', 'success');"></button>
+ <button type="button" class="btn btn-sm" style="font-size:.65rem;padding:.1rem.35rem;" data-detail-action="copy-text" data-value="${encodeInlineArg(rec.after || '')}"></button>
  </div>
  <pre style="margin:0;font-family:var(--mono);font-size:.73rem;color:var(--text-primary);white-space:pre-wrap;line-height:1.4;max-height:140px;overflow-y:auto;">${esc(rec.after || '')}</pre>
  </div>
@@ -2346,7 +2347,7 @@ function checkPascalSyntaxInTab() {
 
  const errHtml = res.errors.map(e => `
  <div style="color:var(--red);margin-bottom:.35rem;cursor:pointer;background:rgba(220,38,38,0.08);padding:.45rem.75rem;border-radius:6px;border:1px solid rgba(220,38,38,0.2);"
- onclick="scrollToPascalLine(${e.line}); const m = document.querySelector('.modal-overlay'); if (m) m.remove();"
+ data-detail-action="scroll-pascal" data-line="${e.line}" data-close-modal="true"
  title="Tıklayarak Satır ${e.line}'e sıçrayın">
  ❌ ${esc(typeof e === 'object'? e.text: e)}
  <span style="float:right;font-size:.7rem;text-decoration:underline;font-weight:700;">[Satır ${e.line || 1}'e Git ➔]</span>
@@ -2355,7 +2356,7 @@ function checkPascalSyntaxInTab() {
 
  const warnHtml = res.warnings.map(w => `
  <div style="color:var(--orange);margin-bottom:.35rem;cursor:pointer;background:rgba(245,158,11,0.08);padding:.45rem.75rem;border-radius:6px;border:1px solid rgba(245,158,11,0.2);"
- onclick="scrollToPascalLine(${w.line}); const m = document.querySelector('.modal-overlay'); if (m) m.remove();"
+ data-detail-action="scroll-pascal" data-line="${w.line}" data-close-modal="true"
  title="Tıklayarak Satır ${w.line}'e sıçrayın">
  ⚠️ ${esc(typeof w === 'object'? w.text: w)}
  <span style="float:right;font-size:.7rem;text-decoration:underline;font-weight:700;">[Satır ${w.line || 1}'e Git ➔]</span>
@@ -2935,7 +2936,8 @@ function addSnippetAsNewQueryToReport(title, sql) {
 
  // Kaydet
  if (window.FrpStore && typeof window.FrpStore.updateReport === 'function') {
- window.FrpStore.updateReport(currentFile.id, currentFile);
+ const savedFile = window.FrpStore.updateReport(currentFile.id, currentFile);
+ if (savedFile) currentFile = savedFile;
  }
 
  // Arayüzü yeniden çiz ve yeni eklenen sekmeye geç
@@ -3287,5 +3289,3 @@ if (document.readyState === 'loading') {
  setupMobileDetailTabs();
  setupDownloadHistoryDetail();
 }
-
-

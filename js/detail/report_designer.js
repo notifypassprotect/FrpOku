@@ -31,12 +31,13 @@
  if (val === 'clMoneyGreen' || val === '12639424') return { r: 21, g: 128, b: 61, a: 1, isNone: false, hex: '#15803d', rgb: 'rgb(21, 128, 61)', label: 'clMoneyGreen (Nane Yeşili)' };
 
  // Hex string (#RRGGBB veya $00BBGGRR)
- if (typeof val === 'string' && val.startsWith('#')) {
- const clean = val.slice(1).padEnd(6, '0');
+ if (typeof val === 'string' && /^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(val)) {
+ const rawHex = val.slice(1);
+ const clean = rawHex.length === 3? rawHex.split('').map(ch => ch + ch).join(''): rawHex;
  const r = parseInt(clean.substring(0, 2), 16) || 0;
  const g = parseInt(clean.substring(2, 4), 16) || 0;
  const b = parseInt(clean.substring(4, 6), 16) || 0;
- return { r, g, b, a: 1, isNone: false, hex: val, rgb: `rgb(${r}, ${g}, ${b})`, label: `rgb(${r}, ${g}, ${b})` };
+ return { r, g, b, a: 1, isNone: false, hex: `#${clean}`, rgb: `rgb(${r}, ${g}, ${b})`, label: `rgb(${r}, ${g}, ${b})` };
  }
 
  if (typeof val === 'string' && (val.startsWith('$') || val.startsWith('0x'))) {
@@ -53,7 +54,7 @@
  }
 
  const num = parseInt(val, 10);
- if (isNaN(num)) return { r: 0, g: 0, b: 0, a: 1, isNone: false, hex: '#000000', rgb: String(val), label: String(val) };
+ if (isNaN(num)) return { r: 0, g: 0, b: 0, a: 1, isNone: false, hex: '#000000', rgb: '#000000', label: 'Geçersiz renk' };
 
  // Delphi Integer BGR formatındadır: Red = num & 0xFF, Green = (num >> 8) & 0xFF, Blue = (num >> 16) & 0xFF
  const r = num & 0xFF;
@@ -165,13 +166,19 @@
  DMPDetailData: { label: 'DMPDetailData', icon: '▶', class: 'fr-band-detaildata' }
  };
 
- function esc(str) {
+function esc(str) {
  if (!str) return '';
  return String(str)
 .replace(/&/g, '&amp;')
 .replace(/</g, '&lt;')
 .replace(/>/g, '&gt;')
-.replace(/"/g, '&quot;');
+.replace(/"/g, '&quot;')
+.replace(/'/g, '&#39;');
+}
+
+ function safeFontFamily(value, fallback = 'Arial') {
+ const font = String(value || '').trim();
+ return /^[\p{L}\p{N} ._-]{1,80}$/u.test(font)? font: fallback;
  }
 
  // Delphi Date to formatted string (Delphi float date 45954 -> DD.MM.YYYY)
@@ -450,7 +457,7 @@
  <div style="padding-left:.6rem;display:flex;flex-direction:column;gap:.25rem;border-left:2px solid #3b82f6;margin-left:.25rem;">
  ${fields.length > 0? fields.map(f => `
  <div class="fr-datatree-field-row"
- onclick="window.copyDataTreeField && window.copyDataTreeField('${esc(q.name)}', '${esc(f)}')"
+ data-detail-action="copy-data-tree" data-query="${encodeInlineArg(q.name)}" data-field="${encodeInlineArg(f)}"
  style="display:flex;align-items:center;justify-content:space-between;gap:.4rem;color:var(--text-secondary);font-size:.76rem;font-family:var(--mono);cursor:pointer;padding:2px 4px;border-radius:4px;transition:background 0.1s;"
  title="İfadeyi kopyalamak için tıklayın: [${esc(q.name)}.&quot;${esc(f)}&quot;]">
  <div style="display:flex;align-items:center;gap:.4rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
@@ -593,7 +600,7 @@
 
  // Event Durumu (Sol üstte kırmızı ok/üçgen - Image 3)
  const hasEvent = Boolean(comp.onBeforePrint || comp.onClick || comp.onAfterPrint || comp.onPreviewClick || comp.onKeyDown || (comp.rawAttrs && /\bOn[A-Z]\w+=/i.test(comp.rawAttrs)));
- const eventTitle = hasEvent? ` [Olay/Event: ${comp.onBeforePrint || comp.onClick || 'Tanımlı'}]`: '';
+ const eventTitle = hasEvent? ` [Olay/Event: ${esc(comp.onBeforePrint || comp.onClick || 'Tanımlı')}]`: '';
 
  // 1. Barkod Bileşeni (TfrxBarCodeView)
  if (comp.type === 'TfrxBarCodeView') {
@@ -862,7 +869,7 @@
  border-right:${frameCss.borderRight};
  border-top:${frameCss.borderTop};
  border-bottom:${frameCss.borderBottom};
- font-family:${comp.fontName || 'Arial'}, sans-serif;
+ font-family:${safeFontFamily(comp.fontName)}, sans-serif;
  font-size:${comp.fontSize || 10}px;
  font-weight:${isBold? '700': '400'};
  font-style:${isItalic? 'italic': 'normal'};
@@ -934,7 +941,7 @@
  // ── PARAMETRE DİALOG FORMU HTML OLUŞTURUCU (Images 1, 2, 4, 5) ──
  function renderDialogControlItem(ctrl, cIdx, parentOffsetLeft = 0, parentOffsetTop = 0) {
  const isSelected = selectedItem && selectedItem.name === ctrl.name;
- const fontName = ctrl.fontName || 'Segoe UI';
+ const fontName = safeFontFamily(ctrl.fontName, 'Segoe UI');
  const fontSize = ctrl.fontSize || 11;
  const isBold = ctrl.fontStyle === '1' || String(ctrl.fontStyle).includes('fsBold');
 
@@ -943,7 +950,7 @@
 
  // Event Kontrolü (DialogPage kontrollerinde kırmızı ok/üçgen - Image 3 & 4)
  const hasEvent = Boolean(ctrl.onClick || ctrl.onBeforePrint || ctrl.onChange || ctrl.onEnter || ctrl.onExit || ctrl.onKeyDown || (ctrl.rawAttrs && /\bOn[A-Z]\w+=/i.test(ctrl.rawAttrs)));
- const eventTitle = hasEvent? ` [Olay/Event: ${ctrl.onClick || ctrl.onBeforePrint || ctrl.onChange || 'Tanımlı'}]`: '';
+ const eventTitle = hasEvent? ` [Olay/Event: ${esc(ctrl.onClick || ctrl.onBeforePrint || ctrl.onChange || 'Tanımlı')}]`: '';
 
  // 1. GroupBox Kontrolü (TfrxGroupBoxControl)
  if (ctrl.type === 'TfrxGroupBoxControl') {
@@ -1012,7 +1019,7 @@
  const tabHeadersHtml = tabs.map((tab, tIdx) => `
  <button type="button" class="fr-tab-btn ${tIdx === 0? 'active': ''}"
  data-pc-idx="${cIdx}" data-tab-idx="${tIdx}"
- onclick="window.switchDialogTab && window.switchDialogTab(this, '${cIdx}', ${tIdx})"
+ data-detail-action="switch-dialog-tab" data-control-index="${cIdx}" data-tab-index="${tIdx}"
  title="${esc(tab.caption || tab.name)}">
  ${esc(tab.caption || tab.name)}
  </button>
@@ -2082,7 +2089,8 @@
  file.dialogPages = allPages.filter(p => p.type === 'dialog').map(p => p.data);
  
  if (window.FrpStore && typeof window.FrpStore.saveFile === 'function') {
- window.FrpStore.saveFile(file);
+ const savedFile = window.FrpStore.saveFile(file);
+ if (savedFile) Object.assign(file, savedFile);
  }
 
  if (window.FrpAudit) {

@@ -4,13 +4,17 @@
   "description": "FastReport FRP Okuyucu ve SQL Dogrulayici",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test",
+    "check": "node --check server.js && node --check lib/input_validation.js && node --check lib/mailer.js && node --check lib/passwords.js && node --check lib/rate_limiter.js && node --check lib/report_access.js && node --check lib/session_auth.js && node --check lib/staging_access.js"
+  },
+  "engines": {
+    "node": ">=22"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.3",
     "dotenv": "^17.4.2",
     "express": "^4.19.2",
-    "nodemailer": "^9.0.5",
-    "puppeteer": "^25.5.0"
+    "nodemailer": "^9.0.5"
   }
 }

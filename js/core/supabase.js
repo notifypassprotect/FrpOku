@@ -6,15 +6,19 @@
 (function () {
   'use strict';
 
+  const USE_SERVER_BRIDGE = window.location.protocol !== 'file:';
+
+  const runtimeConfig = window.FRP_RUNTIME_CONFIG || {};
   const SUPABASE_CONFIG = {
-    url: 'https://wxlmbpognkjlwyksmosd.supabase.co',
-    key: 'sb_publishable_ASaLwO7-3T7nRqneM0GW6g_8cgCNzQJ'
+    url: runtimeConfig.supabaseUrl || '',
+    key: runtimeConfig.supabaseAnonKey || ''
   };
 
   let client = null;
 
   function getClient() {
     if (client) return client;
+    if (!SUPABASE_CONFIG.url || !SUPABASE_CONFIG.key) return null;
     if (window.supabase && typeof window.supabase.createClient === 'function') {
       try {
         client = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.key);
@@ -27,6 +31,61 @@
     return client;
   }
   getClient();
+
+  function serverAuthHeaders(extra = {}) {
+    if (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') {
+      return window.FrpAuth.getAuthHeaders(extra);
+    }
+    return { 'Content-Type': 'application/json', ...extra };
+  }
+
+  async function serverRequest(path, options = {}) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), options.timeout || 7000);
+    try {
+      const response = await fetch(path, {
+        ...options,
+        signal: controller.signal,
+        headers: serverAuthHeaders(options.headers || {})
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        const error = new Error(data?.reason || `Sunucu isteği başarısız (${response.status}).`);
+        error.status = response.status;
+        error.code = data?.code || (response.status === 409 ? 'REPORT_CONFLICT' : 'SERVER_REQUEST_FAILED');
+        throw error;
+      }
+      return data;
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        const error = new Error('Sunucu yanıt süresi aşıldı (Zaman Aşımı).');
+        error.status = 504;
+        error.code = 'TIMEOUT';
+        throw error;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  let lastLoadStatus = { ok: false, kind: 'not_started', status: 0 };
+
+  function classifyLoadError(error) {
+    const status = Number(error?.status || 0);
+    return {
+      ok: false,
+      kind: status === 401 || status === 403 ? 'auth' : 'network',
+      status,
+      message: String(error?.message || 'Bulut bağlantısı kurulamadı.')
+    };
+  }
+
+  async function requireSuccess(query) {
+    const result = await query;
+    if (result?.error) throw result.error;
+    return result?.data;
+  }
 
   // Rapor nesnesini DB şemasına dönüştür
   function formatReportRow(report, isDeleted = false) {
@@ -114,6 +173,7 @@
     r.ownerDepartment = row.owner_department || r.ownerDepartment || r.owner_department || '';
     r.sharedAt = row.shared_at || r.sharedAt || r.shared_at || null;
     r.deletedAt = row.deleted_at || r.deletedAt || null;
+    r.version = Math.max(0, Number(row.version || r.version) || 1);
     r.meta = r.meta || { reportName: r.name };
     r.queries = Array.isArray(r.queries) ? r.queries : [];
     r.datasets = Array.isArray(r.datasets) ? r.datasets : [];
@@ -124,9 +184,22 @@
 
   const FrpCloud = {
     getClient,
+    getLastLoadStatus: () => ({ ...lastLoadStatus }),
 
     // ── 1. AKTİF RAPORLAR (is_deleted = false) ─────────────────────
     async loadActiveReports() {
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest('/api/store/load');
+          if (!Array.isArray(data)) throw new Error('Sunucu geçersiz rapor yanıtı döndürdü.');
+          lastLoadStatus = { ok: true, kind: 'success', status: 200, count: data.length };
+          return data;
+        } catch (error) {
+          lastLoadStatus = classifyLoadError(error);
+          console.warn('Sunucu raporları çekilemedi:', error.message);
+          return null;
+        }
+      }
       const sb = getClient();
       if (!sb) return null;
       try {
@@ -153,8 +226,11 @@
           from += step;
         }
 
-        return allRows.map(parseReportFromRow);
+        const reports = allRows.map(parseReportFromRow);
+        lastLoadStatus = { ok: true, kind: 'success', status: 200, count: reports.length };
+        return reports;
       } catch (e) {
+        lastLoadStatus = classifyLoadError(e);
         console.warn('Supabase load error:', e);
         return null;
       }
@@ -162,6 +238,14 @@
 
     // ── 2. ÇÖP KUTUSUNDAKİ RAPORLAR (is_deleted = true) ─────────────
     async loadTrashReports() {
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest('/api/store/trash');
+          return Array.isArray(data) ? data : null;
+        } catch (error) {
+          return null;
+        }
+      }
       const sb = getClient();
       if (!sb) return null;
       try {
@@ -200,29 +284,26 @@
 
     // ── 3. RAPOR KAYDET / GÜNCELLE ──────────────────────────────────
     async saveReport(report) {
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest(`/api/reports/${encodeURIComponent(report.id)}`, {
+            method: 'PUT',
+            body: JSON.stringify(report)
+          });
+          return data?.report || false;
+        } catch (error) {
+          if (error?.status === 409) throw error;
+          console.warn('Rapor kaydedilemedi:', error.message);
+          return false;
+        }
+      }
       const sb = getClient();
       if (!sb || !report) return false;
       try {
         const row = formatReportRow(report, false);
-        const { error } = await sb.from('reports').upsert(row, { onConflict: 'id' });
-        return !error;
-      } catch {
-        return false;
-      }
-    },
-
-    // ── 4. ÇOKLU RAPOR KAYDET (Batch) ───────────────────────────────
-    async saveReports(reports) {
-      const sb = getClient();
-      if (!sb || !Array.isArray(reports) || reports.length === 0) return false;
-      try {
-        const rows = reports.map(r => formatReportRow(r, false)).filter(Boolean);
-        const BATCH_SIZE = 50;
-        for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-          const chunk = rows.slice(i, i + BATCH_SIZE);
-          await sb.from('reports').upsert(chunk, { onConflict: 'id' });
-        }
-        return true;
+        const { data, error } = await sb.from('reports').upsert(row, { onConflict: 'id' }).select('*').limit(1);
+        if (error) throw error;
+        return data?.[0] ? parseReportFromRow(data[0]) : false;
       } catch {
         return false;
       }
@@ -230,6 +311,18 @@
 
     // ── 5. ÇÖP KUTUSUNA TAŞI (Soft Delete) ─────────────────────────
     async moveToTrash(id, reportObj) {
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest(`/api/reports/${encodeURIComponent(id)}/trash`, {
+            method: 'PATCH',
+            body: JSON.stringify({ deleted: true, version: reportObj?.version })
+          });
+          return data?.report || false;
+        } catch (error) {
+          if (error?.status === 409) throw error;
+          return false;
+        }
+      }
       const sb = getClient();
       if (!sb || !id) return false;
       try {
@@ -237,9 +330,9 @@
         if (reportObj) {
           const row = formatReportRow(reportObj, true);
           row.deleted_at = now;
-          await sb.from('reports').upsert(row, { onConflict: 'id' });
+          await requireSuccess(sb.from('reports').upsert(row, { onConflict: 'id' }));
         } else {
-          await sb.from('reports').update({ is_deleted: true, deleted_at: now }).eq('id', String(id));
+          await requireSuccess(sb.from('reports').update({ is_deleted: true, deleted_at: now }).eq('id', String(id)));
         }
         return true;
       } catch {
@@ -248,12 +341,17 @@
     },
 
     async moveManyToTrash(ids) {
+      if (USE_SERVER_BRIDGE) {
+        if (!Array.isArray(ids) || ids.length === 0) return false;
+        const results = await Promise.all(ids.map(id => this.moveToTrash(id)));
+        return results.every(Boolean);
+      }
       const sb = getClient();
       if (!sb || !Array.isArray(ids) || ids.length === 0) return false;
       try {
         const now = new Date().toISOString();
         const strIds = ids.map(String);
-        await sb.from('reports').update({ is_deleted: true, deleted_at: now }).in('id', strIds);
+        await requireSuccess(sb.from('reports').update({ is_deleted: true, deleted_at: now }).in('id', strIds));
         return true;
       } catch {
         return false;
@@ -261,11 +359,23 @@
     },
 
     // ── 6. ÇÖP KUTUSUNDAN GERİ YÜKLE (Restore) ─────────────────────
-    async restoreFromTrash(id) {
+    async restoreFromTrash(id, reportObj) {
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest(`/api/reports/${encodeURIComponent(id)}/trash`, {
+            method: 'PATCH',
+            body: JSON.stringify({ deleted: false, version: reportObj?.version })
+          });
+          return data?.report || false;
+        } catch (error) {
+          if (error?.status === 409) throw error;
+          return false;
+        }
+      }
       const sb = getClient();
       if (!sb || !id) return false;
       try {
-        await sb.from('reports').update({ is_deleted: false, deleted_at: null }).eq('id', String(id));
+        await requireSuccess(sb.from('reports').update({ is_deleted: false, deleted_at: null }).eq('id', String(id)));
         return true;
       } catch {
         return false;
@@ -273,11 +383,16 @@
     },
 
     async restoreManyFromTrash(ids) {
+      if (USE_SERVER_BRIDGE) {
+        if (!Array.isArray(ids) || ids.length === 0) return false;
+        const results = await Promise.all(ids.map(id => this.restoreFromTrash(id)));
+        return results.every(Boolean);
+      }
       const sb = getClient();
       if (!sb || !Array.isArray(ids) || ids.length === 0) return false;
       try {
         const strIds = ids.map(String);
-        await sb.from('reports').update({ is_deleted: false, deleted_at: null }).in('id', strIds);
+        await requireSuccess(sb.from('reports').update({ is_deleted: false, deleted_at: null }).in('id', strIds));
         return true;
       } catch {
         return false;
@@ -290,16 +405,17 @@
       if (!reportId) return false;
       try {
         if (USE_SERVER_BRIDGE) {
-          fetch('/api/reports/toggle-pool', {
+          const data = await serverRequest('/api/reports/toggle-pool', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ reportId, makePublic, ownerInfo })
-          }).catch(() => {});
+          });
+          return Boolean(data?.success);
         }
 
         if (sb) {
           // Row'un data JSON alanını çekip güncelle
-          const { data: row } = await sb.from('reports').select('data').eq('id', String(reportId)).single();
+          const { data: row, error: rowError } = await sb.from('reports').select('data').eq('id', String(reportId)).single();
+          if (rowError) throw rowError;
           if (row && row.data) {
             const updatedData = { ...row.data, isPublic: !!makePublic, is_public: !!makePublic };
             if (ownerInfo) {
@@ -308,10 +424,10 @@
               updatedData.ownerDepartment = ownerInfo.department || updatedData.ownerDepartment || '';
             }
             if (makePublic) updatedData.sharedAt = new Date().toISOString();
-            await sb.from('reports').update({
+            await requireSuccess(sb.from('reports').update({
               data: updatedData,
               updated_at: new Date().toISOString()
-            }).eq('id', String(reportId));
+            }).eq('id', String(reportId)));
           }
         }
         return true;
@@ -326,16 +442,17 @@
       if (!Array.isArray(reportIds) || reportIds.length === 0) return false;
       try {
         if (USE_SERVER_BRIDGE) {
-          fetch('/api/reports/bulk-toggle-pool', {
+          const data = await serverRequest('/api/reports/bulk-toggle-pool', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ reportIds, makePublic, ownerInfo })
-          }).catch(() => {});
+          });
+          return Boolean(data?.success);
         }
 
         if (sb) {
           const strIds = reportIds.map(String);
-          const { data: rows } = await sb.from('reports').select('id, data').in('id', strIds);
+          const { data: rows, error: rowsError } = await sb.from('reports').select('id, data').in('id', strIds);
+          if (rowsError) throw rowsError;
           if (Array.isArray(rows)) {
             const nowIso = new Date().toISOString();
             for (const r of rows) {
@@ -346,7 +463,7 @@
                 updatedData.ownerDepartment = ownerInfo.department || updatedData.ownerDepartment || '';
               }
               if (makePublic) updatedData.sharedAt = nowIso;
-              await sb.from('reports').update({ data: updatedData, updated_at: nowIso }).eq('id', r.id);
+              await requireSuccess(sb.from('reports').update({ data: updatedData, updated_at: nowIso }).eq('id', r.id));
             }
           }
         }
@@ -359,33 +476,82 @@
 
     // ── 8. KALICI SİL (Purge from Database) ─────────────────────────
     async purgeReport(id) {
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest(`/api/reports/${encodeURIComponent(id)}`, { method: 'DELETE' });
+          return Boolean(data?.success);
+        } catch {
+          return false;
+        }
+      }
       const sb = getClient();
       if (!sb || !id) return false;
       try {
-        await sb.from('reports').delete().eq('id', String(id));
+        await requireSuccess(sb.from('reports').delete().eq('id', String(id)));
         return true;
       } catch {
         return false;
       }
     },
 
+    async deleteReport(id) {
+      return this.purgeReport(id);
+    },
+
     async purgeManyReports(ids) {
+      if (USE_SERVER_BRIDGE) {
+        if (!Array.isArray(ids) || ids.length === 0) return false;
+        const results = await Promise.all(ids.map(id => this.purgeReport(id)));
+        return results.every(Boolean);
+      }
       const sb = getClient();
       if (!sb || !Array.isArray(ids) || ids.length === 0) return false;
       try {
         const strIds = ids.map(String);
-        await sb.from('reports').delete().in('id', strIds);
+        await requireSuccess(sb.from('reports').delete().in('id', strIds));
         return true;
+      } catch {
+        return false;
+      }
+    },
+
+    async deleteReports(ids) {
+      return this.purgeManyReports(ids);
+    },
+
+    async deleteAllReports() {
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest('/api/reports', { method: 'DELETE' });
+          return Boolean(data?.success);
+        } catch {
+          return false;
+        }
+      }
+      const sb = getClient();
+      const user = window.FrpAuth?.getUser();
+      if (!sb || !user?.id) return false;
+      try {
+        const { error } = await sb.from('reports').delete().eq('user_id', String(user.id));
+        return !error;
       } catch {
         return false;
       }
     },
 
     async emptyTrash() {
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest('/api/reports/trash/all', { method: 'DELETE' });
+          return Boolean(data?.success);
+        } catch {
+          return false;
+        }
+      }
       const sb = getClient();
       if (!sb) return false;
       try {
-        await sb.from('reports').delete().eq('is_deleted', true);
+        await requireSuccess(sb.from('reports').delete().eq('is_deleted', true));
         return true;
       } catch {
         return false;
@@ -394,6 +560,14 @@
 
     // ── 8. KATEGORİLER (Categories CRUD) ────────────────────────────
     async loadCategories() {
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest('/api/categories');
+          return Array.isArray(data?.categories) ? data.categories : null;
+        } catch {
+          return null;
+        }
+      }
       const sb = getClient();
       if (!sb) return null;
       try {
@@ -406,10 +580,22 @@
     },
 
     async saveCategory(categoryObj) {
+      if (!categoryObj) return false;
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest('/api/categories', {
+            method: 'POST',
+            body: JSON.stringify(categoryObj)
+          });
+          return Boolean(data?.success);
+        } catch {
+          return false;
+        }
+      }
       const sb = getClient();
-      if (!sb || !categoryObj) return false;
+      if (!sb) return false;
       try {
-        await sb.from('categories').upsert(categoryObj, { onConflict: 'id' });
+        await requireSuccess(sb.from('categories').upsert(categoryObj, { onConflict: 'id' }));
         return true;
       } catch {
         return false;
@@ -417,10 +603,21 @@
     },
 
     async deleteCategory(id) {
+      if (!id) return false;
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest(`/api/categories/${encodeURIComponent(id)}`, {
+            method: 'DELETE'
+          });
+          return Boolean(data?.success);
+        } catch {
+          return false;
+        }
+      }
       const sb = getClient();
-      if (!sb || !id) return false;
+      if (!sb) return false;
       try {
-        await sb.from('categories').delete().eq('id', String(id));
+        await requireSuccess(sb.from('categories').delete().eq('id', String(id)));
         return true;
       } catch {
         return false;
@@ -429,6 +626,14 @@
 
     // ── 9. SORGU KÜTÜPHANESİ (Snippets CRUD) ───────────────────────
     async loadSnippets() {
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest('/api/snippets');
+          return Array.isArray(data?.snippets) ? data.snippets : null;
+        } catch {
+          return null;
+        }
+      }
       const sb = getClient();
       if (!sb) return null;
       try {
@@ -448,8 +653,20 @@
     },
 
     async saveSnippet(snippet) {
+      if (!snippet) return false;
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest('/api/snippets', {
+            method: 'POST',
+            body: JSON.stringify(snippet)
+          });
+          return Boolean(data?.success);
+        } catch {
+          return false;
+        }
+      }
       const sb = getClient();
-      if (!sb || !snippet) return false;
+      if (!sb) return false;
       try {
         const row = {
           id: String(snippet.id || Date.now()),
@@ -459,7 +676,7 @@
           category: String(snippet.category || 'Genel'),
           updated_at: new Date().toISOString()
         };
-        await sb.from('snippets').upsert(row, { onConflict: 'id' });
+        await requireSuccess(sb.from('snippets').upsert(row, { onConflict: 'id' }));
         return true;
       } catch {
         return false;
@@ -467,10 +684,21 @@
     },
 
     async deleteSnippet(id) {
+      if (!id) return false;
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest(`/api/snippets/${encodeURIComponent(id)}`, {
+            method: 'DELETE'
+          });
+          return Boolean(data?.success);
+        } catch {
+          return false;
+        }
+      }
       const sb = getClient();
-      if (!sb || !id) return false;
+      if (!sb) return false;
       try {
-        await sb.from('snippets').delete().eq('id', String(id));
+        await requireSuccess(sb.from('snippets').delete().eq('id', String(id)));
         return true;
       } catch {
         return false;
@@ -479,10 +707,20 @@
 
     // ── 10. KULLANICI AYARLARI (Settings Sync) ─────────────────────
     async loadSettings() {
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest('/api/settings');
+          return data?.settings || null;
+        } catch {
+          return null;
+        }
+      }
       const sb = getClient();
       if (!sb) return null;
       try {
-        const { data, error } = await sb.from('user_settings').select('*').eq('id', 'default_user').single();
+        const user = window.FrpAuth?.getUser();
+        if (!user?.id) return null;
+        const { data, error } = await sb.from('user_settings').select('*').eq('id', String(user.id)).single();
         if (error || !data) return null;
         return data;
       } catch {
@@ -491,60 +729,100 @@
     },
 
     async saveSettings(settings) {
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest('/api/settings', { method: 'PATCH', body: JSON.stringify(settings) });
+          return Boolean(data?.success);
+        } catch {
+          return false;
+        }
+      }
       const sb = getClient();
       if (!sb || !settings) return false;
       try {
+        const user = window.FrpAuth?.getUser();
+        if (!user?.id) return false;
         const row = {
-          id: 'default_user',
+          id: String(user.id),
           theme: settings.theme || 'light',
           preferences: settings.preferences || {},
           recent_reports: settings.recent_reports || [],
-          custom_tags: settings.custom_tags || [],
+          custom_tags: settings.custom_tags ?? settings.customTags ?? [],
           updated_at: new Date().toISOString()
         };
-        await sb.from('user_settings').upsert(row, { onConflict: 'id' });
-        return true;
+        const { error } = await sb.from('user_settings').upsert(row, { onConflict: 'id' });
+        return !error;
       } catch {
         return false;
       }
     },
 
     // ── 11. DENETİM GÜNLÜĞÜ (Audit Logs Cloud Sync) ───────────────
+    // Loglar ayrı `audit_logs` tablosuna yazılır — F5/cookie temizlemeden etkilenmez.
     async loadAuditLogs() {
+      if (USE_SERVER_BRIDGE) {
+        // Server bridge varsa /api/admin/audit-logs endpoint'inden çekiyoruz
+        return null; // getLogs() zaten serverLogs'u alıyor
+      }
       const sb = getClient();
       if (!sb) return null;
       try {
-        const { data, error } = await sb.from('user_settings').select('*').eq('id', 'system_audit_logs').single();
-        if (error || !data || !data.preferences || !Array.isArray(data.preferences.logs)) return null;
-        return data.preferences.logs;
+        const user = window.FrpAuth?.getUser();
+        let query = sb
+          .from('audit_logs')
+          .select('id, occurred_at, user_id, username, full_name, role, action, target, details, ip')
+          .order('occurred_at', { ascending: false })
+          .limit(500);
+        // Admin değilse sadece kendi loglarını görsün
+        if (user && user.role !== 'admin') {
+          query = query.eq('user_id', user.id);
+        }
+        const { data, error } = await query;
+        if (error) return null;
+        return (data || []).map(row => ({
+          id: row.id,
+          timestamp: row.occurred_at,
+          userId: row.user_id,
+          username: row.username,
+          fullName: row.full_name,
+          role: row.role,
+          action: row.action,
+          target: row.target,
+          details: row.details,
+          ip: row.ip
+        }));
       } catch {
         return null;
       }
     },
 
-    async saveAuditLogs(logs) {
-      const sb = getClient();
-      if (!sb || !Array.isArray(logs)) return false;
-      try {
-        const row = {
-          id: 'system_audit_logs',
-          theme: 'light',
-          preferences: { logs: logs.slice(0, 1000) },
-          updated_at: new Date().toISOString()
-        };
-        await sb.from('user_settings').upsert(row, { onConflict: 'id' });
-        return true;
-      } catch {
-        return false;
-      }
+    // @deprecated — Artık kullanılmıyor, audit_logs tablosuna direkt INSERT yapılıyor
+    async saveAuditLogs(_logs) {
+      return false;
     },
 
     async appendAuditLog(entry) {
       if (!entry) return false;
+      if (USE_SERVER_BRIDGE) {
+        // Server bridge modunda /api/audit-log endpoint'i zaten audit_logs tablosuna yazıyor
+        return true;
+      }
+      const sb = getClient();
+      if (!sb) return false;
       try {
-        const current = (await this.loadAuditLogs()) || [];
-        const combined = [entry, ...current.filter(l => l.id !== entry.id)].slice(0, 1000);
-        return await this.saveAuditLogs(combined);
+        const { error } = await sb.from('audit_logs').insert({
+          id: entry.id || ('log_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7)),
+          occurred_at: entry.timestamp || new Date().toISOString(),
+          user_id: entry.userId || 'guest',
+          username: entry.username || 'misafir',
+          full_name: entry.fullName || entry.username || '',
+          role: entry.role || 'user',
+          action: String(entry.action || 'INFO').toUpperCase().slice(0, 80),
+          target: String(entry.target || '').slice(0, 300),
+          details: String(entry.details || '').slice(0, 2000),
+          ip: entry.ip || '127.0.0.1'
+        });
+        return !error;
       } catch {
         return false;
       }

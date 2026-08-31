@@ -7,7 +7,7 @@ window.FrpDetailSidebar = window.FrpDetailSidebar || {};
 (function () {
   'use strict';
 
-  const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
   function makeEditableMetaRow(label, field, currentValue, fileId) {
     const safeVal = esc(currentValue || '');
@@ -65,7 +65,7 @@ window.FrpDetailSidebar = window.FrpDetailSidebar || {};
       function saveEdit() {
         const newVal = input.value.trim();
         FrpStore.updateMeta(fileId, { [field]: newVal });
-        deactivateMetaEdit(rowEl, esc(newVal));
+        deactivateMetaEdit(rowEl, newVal);
         if (typeof showToast === 'function') {
           showToast(`${field === 'reportName' ? 'Rapor adı' : field === 'author' ? 'Yazar' : 'Açıklama'} güncellendi.`, 'success');
         }
@@ -103,7 +103,7 @@ window.FrpDetailSidebar = window.FrpDetailSidebar || {};
     const tagsList = tags.map(t => `
       <span class="tag-pill">
         ${esc(t)}
-        <span class="tag-pill-remove" onclick="removeTagFromDetail('${esc(t)}')">×</span>
+        <span class="tag-pill-remove" data-detail-action="remove-tag" data-value="${encodeInlineArg(t)}">×</span>
       </span>
     `).join('');
 

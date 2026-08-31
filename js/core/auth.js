@@ -12,48 +12,15 @@
  const AUTH_STORAGE_KEY = 'frpoku_auth_session';
  const REMEMBER_KEY = 'frpoku_remember_flag';
  const SAVED_IDENTIFIER_KEY = 'frpoku_saved_identifier';
- const SUPABASE_REST_URL = 'https://wxlmbpognkjlwyksmosd.supabase.co';
- const SUPABASE_ANON_KEY = 'sb_publishable_ASaLwO7-3T7nRqneM0GW6g_8cgCNzQJ';
 
  let currentUser = null;
  let adminPollingInterval = null;
-
- async function hashPassword(plainText) {
- if (!plainText) return '';
- try {
- const msgBuffer = new TextEncoder().encode(plainText);
- const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
- const hashArray = Array.from(new Uint8Array(hashBuffer));
- return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
- } catch {
- let hash = 0;
- for (let i = 0; i < plainText.length; i++) {
- const char = plainText.charCodeAt(i);
- hash = ((hash << 5) - hash) + char;
- hash |= 0;
- }
- return 'fb_' + Math.abs(hash);
- }
- }
-
- async function fetchUsersFromRest(queryString = '') {
- const res = await fetch(`${SUPABASE_REST_URL}/rest/v1/app_users${queryString}`, {
- headers: {
- 'apikey': SUPABASE_ANON_KEY,
- 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
- 'Content-Type': 'application/json'
- }
- });
- if (!res.ok) throw new Error('HTTP ' + res.status);
- return await res.json();
- }
 
  async function register({ fullName, username, email, phone, department, password }) {
  const cleanUser = (username || '').trim().toLowerCase();
  const cleanEmail = (email || '').trim().toLowerCase();
  const cleanName = (fullName || '').trim().replace(/\s+/g, ' ');
 
- try {
  try {
  const res = await fetch('/api/auth/register', {
  method: 'POST',
@@ -73,46 +40,8 @@
  } else if (data && data.reason) {
  return { success: false, reason: data.reason };
  }
- } catch (backendErr) {}
-
- const passwordHash = await hashPassword(password);
- const newUserId = 'usr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
-
- const newRecord = {
- id: newUserId,
- username: cleanUser,
- email: cleanEmail,
- phone: phone || null,
- full_name: cleanName,
- department: (department || 'Bilgi İşlem').trim(),
- password_hash: passwordHash,
- role: 'user',
- avatar: '',
- is_active: false,
- created_at: new Date().toISOString(),
- last_login: null
- };
-
- const res = await fetch(`${SUPABASE_REST_URL}/rest/v1/app_users`, {
- method: 'POST',
- headers: {
- 'apikey': SUPABASE_ANON_KEY,
- 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
- 'Content-Type': 'application/json',
- 'Prefer': 'return=representation'
- },
- body: JSON.stringify(newRecord)
- });
-
- if (!res.ok) throw new Error('Kayıt oluşturulamadı');
-
- return {
- success: true,
- pendingApproval: true,
- message: 'Kayıt başvurunuz başarıyla alındı. Yönetici onayından sonra aktif edilecektir.'
- };
  } catch (err) {
- return { success: false, reason: 'Kayıt sırasında hata: ' + err.message };
+ return { success: false, reason: 'Kayıt servisine ulaşılamadı. Lütfen daha sonra tekrar deneyin.' };
  }
  }
 
@@ -120,7 +49,6 @@
  const ident = (identifier || '').trim();
  if (!ident ||!password) return { success: false, reason: 'Lütfen tüm alanları doldurun.' };
 
- try {
  try {
  const res = await fetch('/api/auth/login', {
  method: 'POST',
@@ -146,32 +74,8 @@
  } else if (data && data.reason) {
  return { success: false, reason: data.reason };
  }
- } catch (backendErr) {}
-
- const cleanIdent = ident.toLowerCase();
- const users = await fetchUsersFromRest(`?or=(username.eq.${encodeURIComponent(cleanIdent)},email.eq.${encodeURIComponent(cleanIdent)})&limit=1`);
- if (!users || users.length === 0) {
- return { success: false, reason: '❌ Kullanıcı hesabı bulunamadı.' };
- }
-
- const user = users[0];
- const pHash = await hashPassword(password);
- if (user.password_hash!== pHash && user.password_hash!== password) {
- return { success: false, reason: ' Şifreniz hatalı!' };
- }
-
- if (user.is_active === false) {
- return {
- success: false,
- pendingApproval: true,
- reason: '⏳ Hesabınız henüz sistem yöneticisi tarafından onaylanmamıştır.'
- };
- }
-
- setSession(user, rememberMe);
- return { success: true, user };
  } catch (err) {
- return { success: false, reason: 'Giriş hatası: ' + err.message };
+ return { success: false, reason: 'Giriş servisine ulaşılamadı. Lütfen daha sonra tekrar deneyin.' };
  }
  }
 
@@ -250,9 +154,11 @@
  const headers = { 'Content-Type': 'application/json',...extra };
  if (user) {
  try {
- const token = user.token || localStorage.getItem('frpoku_auth_token') || btoa(unescape(encodeURIComponent(JSON.stringify(user))));
+ const token = user.token || localStorage.getItem('frpoku_auth_token');
+ if (token) {
  headers['Authorization'] = `Bearer ${token}`;
  headers['X-Admin-Auth'] = token;
+ }
  } catch (e) {}
  }
  return headers;

@@ -48,20 +48,13 @@ const titleFileC = document.getElementById('titleFileC');
 const slotBtnC   = document.getElementById('btnPickerC');
 
 function updateThemeBtn() {
-  const cur = FrpStore.getTheme();
+  const cur = window.FrpThemes ? window.FrpThemes.getGlobalTheme() : (window.FrpStore ? FrpStore.getTheme() : 'light');
   if (btnThemeToggle) {
     btnThemeToggle.textContent = cur === 'dark' ? 'Aydınlık Mod' : 'Koyu Mod';
   }
 }
-
-if (btnThemeToggle) {
-  btnThemeToggle.addEventListener('click', () => {
-    const cur = FrpStore.getTheme();
-    const next = cur === 'dark' ? 'light' : 'dark';
-    FrpStore.setTheme(next);
-    updateThemeBtn();
-  });
-}
+window.addEventListener('frpoku:themeChanged', updateThemeBtn);
+updateThemeBtn();
 
 // Canlı Tema Senkronizasyonu
 window.addEventListener('storage', (e) => {
@@ -110,6 +103,23 @@ function copyLineText(encodedText) {
 }
 window.copyLineText = copyLineText;
 
+document.addEventListener('click', event => {
+  const target = event.target.closest('[data-compare-action]');
+  if (!target) return;
+  const action = target.dataset.compareAction;
+  if (action === 'picker') {
+    document.getElementById(`btnPicker${target.dataset.pane || ''}`)?.click();
+  } else if (action === 'open-index') {
+    window.location.href = 'index.html';
+  } else if (action === 'unfold') {
+    unfoldAll();
+  } else if (action === 'transfer') {
+    transferLine(target.dataset.pane, Number(target.dataset.row));
+  } else if (action === 'copy') {
+    copyLineText(target.dataset.text || '');
+  }
+});
+
 function undoTransfer() {
   if (compareUndoStack.length === 0) {
     toastCompare('Geri alınacak aktarım bulunmuyor.', 'warning');
@@ -148,21 +158,18 @@ function transferLine(fromPane, lineIdx) {
       oldCode: targetFile.pascalScript || ''
     });
 
-    const linesA = String(fileA.pascalScript || '').split('\n');
-    const linesB = String(fileB.pascalScript || '').split('\n');
+    const textA = String(fileA.pascalScript || '');
+    const textB = String(fileB.pascalScript || '');
+    const alignedDiff = DiffEngine.computeLineDiff(textA, textB);
+    const transferred = DiffEngine.applyLineTransfer(alignedDiff, fromPane, lineIdx, textA, textB);
+    if (transferred === null) return;
 
     if (fromPane === 'A') {
-      const srcText = linesA[lineIdx] !== undefined ? linesA[lineIdx] : '';
-      if (lineIdx < linesB.length) linesB[lineIdx] = srcText;
-      else linesB.push(srcText);
-      FrpStore.updateCode(fileB.id, { pascalScript: linesB.join('\n') });
+      FrpStore.updateCode(fileB.id, { pascalScript: transferred });
       fileB = FrpStore.getById(fileB.id);
       toastCompare('Satır Rapor 2\'ye aktarıldı ➔ (Geri Al: Ctrl+Z)', 'success');
     } else {
-      const srcText = linesB[lineIdx] !== undefined ? linesB[lineIdx] : '';
-      if (lineIdx < linesA.length) linesA[lineIdx] = srcText;
-      else linesA.push(srcText);
-      FrpStore.updateCode(fileA.id, { pascalScript: linesA.join('\n') });
+      FrpStore.updateCode(fileA.id, { pascalScript: transferred });
       fileA = FrpStore.getById(fileA.id);
       toastCompare('Satır Rapor 1\'e aktarıldı ⬅ (Geri Al: Ctrl+Z)', 'success');
     }
@@ -185,24 +192,19 @@ function transferLine(fromPane, lineIdx) {
     const sqlA = qIdxA >= 0 ? fileA.queries[qIdxA].sql : '';
     const sqlB = qIdxB >= 0 ? fileB.queries[qIdxB].sql : '';
 
-    const linesA = sqlA.split('\n');
-    const linesB = sqlB.split('\n');
+    const alignedDiff = DiffEngine.computeLineDiff(sqlA, sqlB);
+    const transferred = DiffEngine.applyLineTransfer(alignedDiff, fromPane, lineIdx, sqlA, sqlB);
+    if (transferred === null) return;
 
     if (fromPane === 'A') {
-      const srcText = linesA[lineIdx] !== undefined ? linesA[lineIdx] : '';
-      if (lineIdx < linesB.length) linesB[lineIdx] = srcText;
-      else linesB.push(srcText);
       if (qIdxB >= 0) {
-        FrpStore.updateCode(fileB.id, { queryIndex: qIdxB, sql: linesB.join('\n') });
+        FrpStore.updateCode(fileB.id, { queryIndex: qIdxB, sql: transferred });
         fileB = FrpStore.getById(fileB.id);
         toastCompare('SQL Satırı Rapor 2\'ye aktarıldı ➔ (Geri Al: Ctrl+Z)', 'success');
       }
     } else {
-      const srcText = linesB[lineIdx] !== undefined ? linesB[lineIdx] : '';
-      if (lineIdx < linesA.length) linesA[lineIdx] = srcText;
-      else linesA.push(srcText);
       if (qIdxA >= 0) {
-        FrpStore.updateCode(fileA.id, { queryIndex: qIdxA, sql: linesA.join('\n') });
+        FrpStore.updateCode(fileA.id, { queryIndex: qIdxA, sql: transferred });
         fileA = FrpStore.getById(fileA.id);
         toastCompare('SQL Satırı Rapor 1\'e aktarıldı ⬅ (Geri Al: Ctrl+Z)', 'success');
       }
@@ -332,7 +334,7 @@ document.getElementById('btnBack')?.addEventListener('click', () => {
 });
 
 function esc(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 function countLines(text) {
@@ -557,7 +559,7 @@ function initSelectors() {
         <div style="font-size:3.5rem;">⚠️</div>
         <div style="font-size:1.1rem;font-weight:800;">Karşılaştırma için en az 2 rapor gerekli.</div>
         <div style="font-size:.88rem;color:var(--text-muted);">Sistemde <strong>${files.length}</strong> rapor yüklü. En az 2 rapor yükleyin.</div>
-        <button class="btn btn-primary" onclick="window.location.href='index.html'">← Ana Sayfaya Dön</button>
+        <button class="btn btn-primary" data-compare-action="open-index">← Ana Sayfaya Dön</button>
       </div>`;
     return;
   }
@@ -696,7 +698,10 @@ function formatDiffText(rawText, isPascal) {
   return esc(rawText);
 }
 
-function renderDiff() {
+let diffRenderRequest = 0;
+
+async function renderDiff() {
+  const requestId = ++diffRenderRequest;
   labelPaneA.textContent = fileA ? (fileA.meta.reportName || fileA.name) : 'Rapor 1';
   labelPaneB.textContent = fileB ? (fileB.meta.reportName || fileB.name) : 'Rapor 2';
   if (labelPaneC) {
@@ -704,6 +709,7 @@ function renderDiff() {
   }
 
   if (activeTab === 'meta') {
+    if (window.DiffWorkerClient) window.DiffWorkerClient.cancel();
     renderMetaDiff();
     return;
   }
@@ -727,9 +733,23 @@ function renderDiff() {
     textC = qC ? qC.sql : '';
   }
 
-  const { linesA, linesB } = DiffEngine.computeLineDiff(textA, textB);
   const threeWay = isThreeWayEnabled();
-  const diffAC = threeWay ? DiffEngine.computeLineDiff(textA, textC) : null;
+  diffSummaryBar.textContent = 'Karşılaştırma hazırlanıyor…';
+  let alignedDiff;
+  try {
+    alignedDiff = window.DiffWorkerClient
+      ? await window.DiffWorkerClient.compute({ mode: threeWay ? 'three' : 'two', textA, textB, textC })
+      : (threeWay ? DiffEngine.computeThreeWayDiff(textA, textB, textC) : DiffEngine.computeLineDiff(textA, textB));
+  } catch (error) {
+    if (error?.name === 'AbortError') return;
+    if (requestId !== diffRenderRequest) return;
+    diffSummaryBar.textContent = error?.message || 'Karşılaştırma tamamlanamadı.';
+    toastCompare(diffSummaryBar.textContent, 'error');
+    return;
+  }
+  if (requestId !== diffRenderRequest) return;
+  const { linesA, linesB } = alignedDiff;
+  const linesC = threeWay ? alignedDiff.linesC : null;
 
   renderMinimap(linesA, linesB);
 
@@ -783,7 +803,7 @@ function renderDiff() {
     const lB = linesB[i];
 
     // Fold unchanged logic
-    if (isFoldUnchanged && lA.type === 'same' && lB.type === 'same') {
+    if (isFoldUnchanged && !threeWay && lA.type === 'same' && lB.type === 'same') {
       let sameCount = 0;
       let startIdx = i;
       while (i < linesA.length && linesA[i].type === 'same' && linesB[i].type === 'same') {
@@ -792,8 +812,8 @@ function renderDiff() {
       }
       if (sameCount > 4) {
         const foldLabel = `... ${sameCount} aynı satır gizlendi (Tümünü göster) ...`;
-        renderedA.push(`<div class="diff-row same folded-row" onclick="unfoldAll()"><span class="diff-num">...</span><span class="diff-content">${foldLabel}</span></div>`);
-        renderedB.push(`<div class="diff-row same folded-row" onclick="unfoldAll()"><span class="diff-num">...</span><span class="diff-content">${foldLabel}</span></div>`);
+        renderedA.push(`<div class="diff-row same folded-row" data-compare-action="unfold"><span class="diff-num">...</span><span class="diff-content">${foldLabel}</span></div>`);
+        renderedB.push(`<div class="diff-row same folded-row" data-compare-action="unfold"><span class="diff-num">...</span><span class="diff-content">${foldLabel}</span></div>`);
         continue;
       } else {
         // Rollback i to render individually if less than 5
@@ -801,8 +821,13 @@ function renderDiff() {
       }
     }
 
-    const actionsA = (lA.type === 'del' || lA.type === 'add') && lA.text ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('A', ${i})" title="Sağ panele aktar">Aktar</button><button class="btn-inline-action" onclick="copyLineText('${encodeURIComponent(lA.text)}')" title="Kopyala">Kopyala</button></span>` : '';
-    const actionsB = (lB.type === 'add' || lB.type === 'del') && lB.text ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('B', ${i})" title="Sol panele aktar">Aktar</button><button class="btn-inline-action" onclick="copyLineText('${encodeURIComponent(lB.text)}')" title="Kopyala">Kopyala</button></span>` : '';
+    const transferRowIndex = lA.pairRowIndex ?? lB.pairRowIndex ?? i;
+    const actionsA = lA.type === 'empty' && lB.text && transferRowIndex !== null
+      ? `<span class="diff-row-actions"><button class="btn-inline-action" data-compare-action="transfer" data-pane="A" data-row="${transferRowIndex}" title="Bu farkı sağ panelden sil">Sağdan sil</button></span>`
+      : (lA.type === 'del' || lA.type === 'add') && lA.text && transferRowIndex !== null ? `<span class="diff-row-actions"><button class="btn-inline-action" data-compare-action="transfer" data-pane="A" data-row="${transferRowIndex}" title="Sağ panele aktar">Aktar</button><button class="btn-inline-action" data-compare-action="copy" data-text="${encodeInlineArg(lA.text)}" title="Kopyala">Kopyala</button></span>` : '';
+    const actionsB = lB.type === 'empty' && lA.text && transferRowIndex !== null
+      ? `<span class="diff-row-actions"><button class="btn-inline-action" data-compare-action="transfer" data-pane="B" data-row="${transferRowIndex}" title="Bu farkı sol panelden sil">Soldan sil</button></span>`
+      : (lB.type === 'add' || lB.type === 'del') && lB.text && transferRowIndex !== null ? `<span class="diff-row-actions"><button class="btn-inline-action" data-compare-action="transfer" data-pane="B" data-row="${transferRowIndex}" title="Sol panele aktar">Aktar</button><button class="btn-inline-action" data-compare-action="copy" data-text="${encodeInlineArg(lB.text)}" title="Kopyala">Kopyala</button></span>` : '';
 
     if (lA.type === 'del' && lB.type === 'add' && lA.pairedText !== undefined) {
       const { wordsA, wordsB } = DiffEngine.computeWordDiff(lA.text, lB.text);
@@ -826,10 +851,10 @@ function renderDiff() {
   tablePaneA.innerHTML = renderedA.join('');
   tablePaneB.innerHTML = renderedB.join('');
 
-  if (threeWay && diffAC && tablePaneC) {
+  if (threeWay && linesC && tablePaneC) {
     const renderedC = [];
-    for (let j = 0; j < diffAC.linesB.length; j++) {
-      const lC = diffAC.linesB[j];
+    for (let j = 0; j < linesC.length; j++) {
+      const lC = linesC[j];
       const contentC = lC.type !== 'empty' ? formatDiffText(lC.text, isPascal) : '';
       renderedC.push(`<div class="diff-row ${lC.type}" id="rowC_${j}"><span class="diff-num">${lC.num !== null ? lC.num : ''}</span><span class="diff-content">${contentC}</span></div>`);
     }

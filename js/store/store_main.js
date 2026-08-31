@@ -14,12 +14,11 @@
   const RECENT_KEY = 'frpoku_recent';
   const PREFS_KEY = 'frpoku_preferences';
   const PROFILE_KEY = 'frpoku_user_profile';
+  const TRASH_KEY = 'frpoku_trash';
 
   const DB_NAME = 'FrpOkuDB';
   const DB_STORE = 'files';
   const DB_TRASH_STORE = 'trash';
-  const USE_SERVER_BRIDGE = window.location.protocol !== 'file:';
-
   let dbPromise = null;
   let _memoryStore = null;
   let _trashStore = [];
@@ -86,6 +85,14 @@
     }
   }
 
+  async function hydrateFromIndexedDB() {
+    const restored = await restoreFromIndexedDB();
+    if (!Array.isArray(restored)) return [];
+    _memoryStore = restored;
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(restored)); } catch {}
+    return restored;
+  }
+
   // ── 2. Bellek ve Yerel Okuma/Yazma ───────────────────────────
   function _read() {
     if (_memoryStore !== null) return _memoryStore;
@@ -108,31 +115,82 @@
     } catch (e) {}
   }
 
-  function _write(files) {
+  function _reportsOwnedBySession(files) {
+    const user = window.FrpAuth && typeof window.FrpAuth.getUser === 'function' ? window.FrpAuth.getUser() : null;
+    if (!user) return [];
+    return files.filter(file => !file.userId && !file.user_id || String(file.userId || file.user_id) === String(user.id));
+  }
+
+  let _persistedReportHashes = new Map();
+  const _reportSyncChains = new Map();
+
+  function _reportHash(report) {
+    try { return JSON.stringify(report); } catch { return ''; }
+  }
+
+  function _rememberPersisted(files) {
+    _persistedReportHashes = new Map((files || []).map(report => [String(report.id), _reportHash(report)]));
+  }
+
+  function _persistLocal(files) {
     _memoryStore = files;
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify(files));
       syncToIndexedDB(files);
-
-      if (window.FrpCloud && typeof window.FrpCloud.saveReports === 'function') {
-        window.FrpCloud.saveReports(files).catch(err => console.warn('Supabase sync warning:', err));
-      }
-
-      if (USE_SERVER_BRIDGE) {
-        fetch('/api/store/save', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(files)
-        }).catch(() => {});
-      }
       return true;
     } catch (e) {
       syncToIndexedDB(files);
-      if (window.FrpCloud && typeof window.FrpCloud.saveReports === 'function') {
-        window.FrpCloud.saveReports(files).catch(() => {});
-      }
       return true;
     }
+  }
+
+  function _applySavedVersion(id, version) {
+    const current = _memoryStore.find(report => String(report.id) === String(id));
+    if (!current || !version) return;
+    current.version = version;
+    _persistLocal(_memoryStore);
+    _persistedReportHashes.set(String(id), _reportHash(current));
+  }
+
+  function _notifySyncIssue(message) {
+    if (typeof window.showToast === 'function') window.showToast(message, 'error');
+    else if (typeof window.toast === 'function') window.toast(message, 'error', 6000);
+  }
+
+  function _queueReportSync(id) {
+    if (!window.FrpCloud || typeof window.FrpCloud.saveReport !== 'function') return;
+    const key = String(id);
+    const previous = _reportSyncChains.get(key) || Promise.resolve();
+    const next = previous.catch(() => {}).then(async () => {
+      const latest = _memoryStore.find(report => String(report.id) === key);
+      if (!latest) return;
+      try {
+        const saved = await window.FrpCloud.saveReport(latest);
+        if (!saved) throw new Error('Bulut kaydı doğrulanamadı.');
+        _applySavedVersion(key, saved.version);
+      } catch (error) {
+        console.warn('Rapor senkronizasyonu başarısız:', error);
+        const eventName = error?.status === 409 ? 'frp:sync-conflict' : 'frp:sync-error';
+        _notifySyncIssue(error?.status === 409
+          ? 'Bu rapor başka bir oturumda değiştirildi. Yenileyip tekrar deneyin.'
+          : 'Bulut kaydı başarısız oldu; yerel kopyanız korundu.');
+        window.dispatchEvent(new CustomEvent(eventName, { detail: { id: key, message: error?.message || 'Rapor kaydedilemedi.' } }));
+      }
+    }).finally(() => {
+      if (_reportSyncChains.get(key) === next) _reportSyncChains.delete(key);
+    });
+    _reportSyncChains.set(key, next);
+  }
+
+  function _write(files, { syncCloud = true } = {}) {
+    const ownedFiles = _reportsOwnedBySession(files);
+    const changedIds = syncCloud ? ownedFiles
+      .filter(report => _persistedReportHashes.get(String(report.id)) !== _reportHash(report))
+      .map(report => String(report.id)) : [];
+    _persistLocal(files);
+    _rememberPersisted(files);
+    changedIds.forEach(_queueReportSync);
+    return true;
   }
 
   function _uuid() {
@@ -156,6 +214,10 @@
           if (Array.isArray(cloudFiles)) {
             loadedFiles = cloudFiles;
             isCloudLoaded = true;
+            window.FRP_CLOUD_STATUS = { ok: true, kind: 'success', count: cloudFiles.length };
+          } else if (typeof window.FrpCloud.getLastLoadStatus === 'function') {
+            window.FRP_CLOUD_STATUS = window.FrpCloud.getLastLoadStatus();
+            window.dispatchEvent(new CustomEvent('frp:cloud-load-error', { detail: window.FRP_CLOUD_STATUS }));
           }
         } catch (e) {
           console.warn('Supabase load error:', e);
@@ -167,8 +229,7 @@
         try {
           const trashCloud = await window.FrpCloud.loadTrashReports();
           if (Array.isArray(trashCloud)) {
-            _trashStore = trashCloud;
-            syncTrashToIndexedDB(_trashStore);
+            _writeTrash(trashCloud);
           }
         } catch (e) {}
       }
@@ -188,6 +249,11 @@
               localStorage.setItem(SNIPPET_KEY, JSON.stringify(cloudSnippets));
             }
           }
+          if (typeof window.FrpCloud.loadSettings === 'function') {
+            const cloudSettings = await window.FrpCloud.loadSettings();
+            const cloudTags = cloudSettings?.custom_tags ?? cloudSettings?.customTags;
+            if (Array.isArray(cloudTags)) localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(cloudTags));
+          }
         } catch (e) {}
       }
 
@@ -205,22 +271,42 @@
       _memoryStore = loadedFiles;
       try { localStorage.setItem(STORE_KEY, JSON.stringify(loadedFiles)); } catch (e) {}
       syncToIndexedDB(loadedFiles);
+      _rememberPersisted(loadedFiles);
     } catch (err) {
       console.warn('Bootstrap error:', err);
     } finally {
       if (typeof window.refreshAll === 'function') window.refreshAll();
+      if (window.FRP_CLOUD_STATUS && window.FRP_CLOUD_STATUS.ok === false) {
+        _notifySyncIssue(window.FRP_CLOUD_STATUS.kind === 'auth'
+          ? 'Bulut oturumu doğrulanamadı; son yerel kopya gösteriliyor.'
+          : 'Buluta ulaşılamadı; son başarılı yerel kopya korundu.');
+      }
       const splash = document.getElementById('splashScreen');
       if (splash) {
         const elapsed = Date.now() - splashStartTime;
-        const delay = Math.max(0, 500 - elapsed);
+        const delay = Math.max(0, 400 - elapsed);
         setTimeout(() => {
           splash.classList.add('hidden');
+          splash.style.pointerEvents = 'none';
+          splash.style.opacity = '0';
+          splash.style.visibility = 'hidden';
           setTimeout(() => { if (splash && splash.parentNode) splash.parentNode.removeChild(splash); }, 350);
         }, delay);
       }
     }
   })();
   window.FrpStoreReady = bootstrapReady;
+
+  // Garanti Fail-Safe: Ağ veya sunucu gecikse dahi splash ekranı 1.2 saniyeden fazla kalamaz
+  setTimeout(() => {
+    const splash = document.getElementById('splashScreen');
+    if (splash) {
+      splash.style.pointerEvents = 'none';
+      splash.style.opacity = '0';
+      splash.style.visibility = 'hidden';
+      setTimeout(() => { if (splash && splash.parentNode) splash.parentNode.removeChild(splash); }, 300);
+    }
+  }, 1200);
 
   // ── 4. Rapor CRUD Metotları ──────────────────────────────────
   function getAll() {
@@ -278,6 +364,7 @@
       ownerUsername:   existingIdx >= 0 ? (files[existingIdx].ownerUsername || ownerUsername) : ownerUsername,
       ownerDepartment: existingIdx >= 0 ? (files[existingIdx].ownerDepartment || ownerDepartment) : ownerDepartment,
       sharedAt:        existingIdx >= 0 ? (files[existingIdx].sharedAt || null) : null,
+      version:         existingIdx >= 0 ? (Number(files[existingIdx].version) || 1) : 0,
       tags:            mergedTags
     };
 
@@ -332,6 +419,7 @@
         ownerUsername:   existingIdx >= 0 ? (files[existingIdx].ownerUsername || ownerUsername) : ownerUsername,
         ownerDepartment: existingIdx >= 0 ? (files[existingIdx].ownerDepartment || ownerDepartment) : ownerDepartment,
         sharedAt:        existingIdx >= 0 ? (files[existingIdx].sharedAt || null) : null,
+        version:         existingIdx >= 0 ? (Number(files[existingIdx].version) || 1) : 0,
         tags:            mergedTags
       };
 
@@ -352,8 +440,8 @@
   function deleteOne(id) {
     const file = _read().find(f => f.id === id);
     const files = _read().filter(f => f.id !== id);
-    if (window.FrpCloud && typeof window.FrpCloud.deleteReport === 'function') {
-      window.FrpCloud.deleteReport(id).catch(() => {});
+    if (window.FrpCloud && typeof window.FrpCloud.purgeReport === 'function') {
+      window.FrpCloud.purgeReport(id).catch(() => {});
     }
     _write(files);
     _audit('REPORT_DELETE', file ? file.name : id, 'Rapor kalıcı olarak silindi.');
@@ -362,16 +450,16 @@
   function deleteMany(ids) {
     const idSet = new Set(ids);
     const files = _read().filter(f => !idSet.has(f.id));
-    if (window.FrpCloud && typeof window.FrpCloud.deleteReports === 'function') {
-      window.FrpCloud.deleteReports(ids).catch(() => {});
+    if (window.FrpCloud && typeof window.FrpCloud.purgeManyReports === 'function') {
+      window.FrpCloud.purgeManyReports(ids).catch(() => {});
     }
     _write(files);
     _audit('REPORT_BULK_DELETE', `${ids.length} Rapor`, 'Seçili raporlar kalıcı olarak silindi.');
   }
 
   function deleteAll() {
-    if (window.FrpCloud && typeof window.FrpCloud.deleteAllReports === 'function') {
-      window.FrpCloud.deleteAllReports().catch(() => {});
+    if (window.FrpCloud && typeof window.FrpCloud.emptyTrash === 'function') {
+      window.FrpCloud.emptyTrash().catch(() => {});
     }
     _write([]);
     syncToIndexedDB([]);
@@ -379,8 +467,6 @@
   }
 
   // ── 5. Çöp Kutusu (Soft Delete) Metotları ─────────────────────
-  const TRASH_KEY = 'frpoku_trash';
-
   function _readTrash() {
     if (_trashStore && _trashStore.length > 0) return _trashStore;
     try {
@@ -418,6 +504,8 @@
 
     const fileToTrash = files[idx];
     fileToTrash.deletedAt = new Date().toISOString();
+    fileToTrash.isDeleted = true;
+    fileToTrash.is_deleted = true;
 
     files.splice(idx, 1);
     _write(files);
@@ -429,7 +517,11 @@
     _audit('TRASH_MOVE', fileToTrash.name || id, 'Rapor çöp kutusuna taşındı.');
 
     if (window.FrpCloud && typeof window.FrpCloud.moveToTrash === 'function') {
-      await window.FrpCloud.moveToTrash(id, fileToTrash);
+      const saved = await window.FrpCloud.moveToTrash(id, fileToTrash);
+      if (saved?.version) {
+        fileToTrash.version = saved.version;
+        _writeTrash(trash);
+      }
     }
     return true;
   }
@@ -444,6 +536,8 @@
     let trash = _readTrash();
     toTrash.forEach(f => {
       f.deletedAt = now;
+      f.isDeleted = true;
+      f.is_deleted = true;
       trash = trash.filter(t => t.id !== f.id);
       trash.unshift(f);
     });
@@ -453,8 +547,10 @@
 
     _audit('TRASH_BULK_MOVE', `${toTrash.length} Rapor`, 'Seçili raporlar çöp kutusuna taşındı.');
 
-    if (window.FrpCloud && typeof window.FrpCloud.moveManyToTrash === 'function') {
-      await window.FrpCloud.moveManyToTrash(ids);
+    if (window.FrpCloud && typeof window.FrpCloud.moveToTrash === 'function') {
+      const savedReports = await Promise.all(toTrash.map(report => window.FrpCloud.moveToTrash(report.id, report)));
+      savedReports.forEach((saved, index) => { if (saved?.version) toTrash[index].version = saved.version; });
+      _writeTrash(trash);
     }
     return true;
   }
@@ -466,6 +562,8 @@
 
     const restoredFile = trash[idx];
     delete restoredFile.deletedAt;
+    restoredFile.isDeleted = false;
+    restoredFile.is_deleted = false;
 
     trash.splice(idx, 1);
     _writeTrash(trash);
@@ -476,9 +574,6 @@
 
     _audit('TRASH_RESTORE', restoredFile.name || id, 'Rapor çöp kutusundan geri yüklendi.');
 
-    if (window.FrpCloud && typeof window.FrpCloud.restoreFromTrash === 'function') {
-      await window.FrpCloud.restoreFromTrash(id);
-    }
     return true;
   }
 
@@ -492,15 +587,14 @@
     const files = _read();
     toRestore.forEach(f => {
       delete f.deletedAt;
+      f.isDeleted = false;
+      f.is_deleted = false;
       files.unshift(f);
     });
     _write(files);
 
     _audit('TRASH_BULK_RESTORE', `${toRestore.length} Rapor`, 'Seçili raporlar çöp kutusundan geri yüklendi.');
 
-    if (window.FrpCloud && typeof window.FrpCloud.restoreManyFromTrash === 'function') {
-      await window.FrpCloud.restoreManyFromTrash(ids);
-    }
     return true;
   }
 
@@ -599,6 +693,30 @@
     _write(files);
     _audit('REPORT_CODE_UPDATE', file.name || id, 'SQL veya Pascal kodu güncellendi.');
     return true;
+  }
+
+  function updateReport(id, reportPatch) {
+    if (!reportPatch || typeof reportPatch !== 'object') return null;
+    const files = _read();
+    const idx = files.findIndex(f => f.id === id);
+    if (idx < 0) return null;
+    const existing = files[idx];
+    const updated = {
+      ...existing,
+      ...reportPatch,
+      id: existing.id,
+      userId: existing.userId || existing.user_id,
+      user_id: existing.user_id || existing.userId
+    };
+    if (window.buildUpdatedFrpXml) updated.rawXml = window.buildUpdatedFrpXml(updated);
+    files[idx] = updated;
+    _write(files);
+    _audit('REPORT_UPDATE', updated.name || id, 'Rapor içeriği ve XML yapısı güncellendi.');
+    return updated;
+  }
+
+  function saveFile(file) {
+    return file?.id ? updateReport(file.id, file) : null;
   }
 
   function updateFileName(id, newName) {
@@ -729,7 +847,7 @@
       try { localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(list)); } catch {}
       _audit('TAG_CREATE', trimmed, 'Yeni özel etiket havuza eklendi.');
       if (window.FrpCloud && typeof window.FrpCloud.saveSettings === 'function') {
-        window.FrpCloud.saveSettings({ customTags: list }).catch(() => {});
+        window.FrpCloud.saveSettings({ custom_tags: list }).catch(() => {});
       }
     }
     return list;
@@ -741,7 +859,7 @@
     try { localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(list)); } catch {}
     _audit('TAG_DELETE', trimmed, 'Özel etiket havuzdan silindi.');
     if (window.FrpCloud && typeof window.FrpCloud.saveSettings === 'function') {
-      window.FrpCloud.saveSettings({ customTags: list }).catch(() => {});
+      window.FrpCloud.saveSettings({ custom_tags: list }).catch(() => {});
     }
     return list;
   }
@@ -768,16 +886,8 @@
     const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
     if (!curUser) return list;
 
-    // Kullanıcının kendi raporları veya yerel/sahipsiz raporlar
-    const myFiles = list.filter(f => {
-      if (f.userId === curUser.id) return true;
-      if (curUser.username && (f.ownerUsername === curUser.username || f.ownerName === curUser.username)) return true;
-      if (!f.userId || f.userId === 'public' || f.userId === 'default' || f.userId === 'local') return true;
-      if (curUser.role === 'admin') return true; // Admin tüm raporları görebilir
-      return false;
-    });
-
-    return myFiles.length > 0 ? myFiles : list;
+    if (curUser.role === 'admin') return list;
+    return list.filter(f => String(f.userId || f.user_id || '') === String(curUser.id));
   }
 
   function getPoolReports() {
@@ -807,14 +917,6 @@
     }
 
     _write(files);
-
-    if (window.FrpCloud && typeof window.FrpCloud.togglePoolStatus === 'function') {
-      window.FrpCloud.togglePoolStatus(id, makePublic, curUser ? {
-        fullName: curUser.full_name || curUser.username,
-        username: curUser.username,
-        department: curUser.department
-      } : null).catch(() => {});
-    }
 
     if (window.FrpAudit) {
       window.FrpAudit.logAction({
@@ -853,14 +955,6 @@
 
     if (count > 0) {
       _write(files);
-      if (window.FrpCloud && typeof window.FrpCloud.bulkTogglePoolStatus === 'function') {
-        window.FrpCloud.bulkTogglePoolStatus(ids, makePublic, curUser ? {
-          fullName: curUser.full_name || curUser.username,
-          username: curUser.username,
-          department: curUser.department
-        } : null).catch(() => {});
-      }
-
       if (window.FrpAudit) {
         window.FrpAudit.logAction({
           action: makePublic ? 'POOL_ADD_BULK' : 'POOL_REMOVE_BULK',
@@ -889,6 +983,7 @@
     clonedRecord.ownerDepartment = curUser ? (curUser.department || 'Bilgi İşlem') : '';
     clonedRecord.isPublic = false;
     clonedRecord.is_public = false;
+    clonedRecord.version = 0;
 
     if (window.FrpAudit) {
       window.FrpAudit.logAction({
@@ -1365,7 +1460,7 @@
 
   function exportAllSqlsCsv() {
     const files = _read();
-    const csvEsc = s => '"' + String(s || '').replace(/"/g, '""') + '"';
+    const csvEsc = s => window.FrpFileSafety ? window.FrpFileSafety.safeCsvCell(s) : '"' + String(s || '').replace(/"/g, '""') + '"';
     const rows = [['Rapor Adı', 'Dosya Adı', 'Sorgu Adı', 'Satır Sayısı', 'Parametre Sayısı', 'SQL Metni']];
     files.forEach(file => {
       const reportName = file.meta?.reportName || file.name;
@@ -1463,21 +1558,30 @@
     try {
       const data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
       let importedCount = 0;
+      const imported = { reports: 0, categories: 0, customTags: 0, snippets: 0, preferences: 0, trash: 0 };
 
       // Format 1: Tam Yedek Paketi
       if (data && typeof data === 'object' && !Array.isArray(data) && Array.isArray(data.reports || data.files)) {
         const reportList = data.reports || data.files || [];
         if (data.categories && Array.isArray(data.categories)) {
           try { localStorage.setItem(CATEGORIES_KEY, JSON.stringify(data.categories)); } catch (e) {}
+          imported.categories = data.categories.length;
         }
         if (data.customTags && Array.isArray(data.customTags)) {
           try { localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(data.customTags)); } catch (e) {}
+          imported.customTags = data.customTags.length;
         }
         if (data.snippets && Array.isArray(data.snippets)) {
-          try { localStorage.setItem(SNIPPETS_KEY, JSON.stringify(data.snippets)); } catch (e) {}
+          try { localStorage.setItem(SNIPPET_KEY, JSON.stringify(data.snippets)); } catch (e) {}
+          imported.snippets = data.snippets.length;
         }
         if (data.preferences) {
           setPreferences(data.preferences);
+          imported.preferences = 1;
+        }
+        if (Array.isArray(data.trash)) {
+          _writeTrash(data.trash);
+          imported.trash = data.trash.length;
         }
         const existing = _read();
         const existingIds = new Set(existing.map(f => f.id));
@@ -1485,6 +1589,7 @@
         const combined = [...existing, ...newReports];
         _write(combined);
         importedCount = newReports.length;
+        imported.reports = importedCount;
       }
       // Format 2: Doğrudan Rapor Listesi Dizisi
       else if (Array.isArray(data)) {
@@ -1493,11 +1598,12 @@
         const newReports = data.filter(r => r && r.id && !existingIds.has(r.id));
         const combined = [...existing, ...newReports];
         _write(combined);
-        importedCount = newReports.length || data.length;
+        importedCount = newReports.length;
+        imported.reports = importedCount;
       }
 
       _audit('BACKUP_IMPORT', 'Yedek İçe Aktarma', `${importedCount} adet rapor sisteme aktarıldı.`);
-      return { success: true, count: importedCount };
+      return { success: true, count: importedCount, imported };
     } catch (e) {
       console.error('Backup import error:', e);
       return { success: false, reason: e.message };
@@ -1514,7 +1620,7 @@
   // ── Public Store API (Köprü ve Delegasyon) ─────────────────────
   const FrpStore = {
     getAll, getById, add, addMany, deleteOne, deleteMany, deleteAll,
-    updateNote, updateMeta, updateCode, updateFileName, restoreFromIndexedDB,
+    updateNote, updateMeta, updateCode, updateReport, saveFile, updateFileName, restoreFromIndexedDB, hydrateFromIndexedDB,
     exportBackup, importBackup,
     toggleFavorite, togglePin, setFavoriteMany, toggleFavoriteMany, addTag, removeTag, getAllTags, getCustomTags, addCustomTag, deleteCustomTag,
     setCategory, getCategories, getCategoryObjects, addCategory, updateCategory, deleteCategory,
@@ -1552,6 +1658,7 @@
           _memoryStore = cloudFiles;
           try { localStorage.setItem(STORE_KEY, JSON.stringify(cloudFiles)); } catch (e) {}
           syncToIndexedDB(cloudFiles);
+          _rememberPersisted(cloudFiles);
           if (typeof window.refreshAll === 'function') window.refreshAll();
           return cloudFiles;
         }

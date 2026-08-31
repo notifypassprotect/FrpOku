@@ -4,28 +4,56 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
+const { isValidEmail, isValidText, isValidUsername, normalizeEmail, normalizePhone, normalizeText, normalizeUsername } = require('./lib/input_validation');
+const { createMailer } = require('./lib/mailer');
+const { PASSWORD_MAX_LENGTH, hashPassword, verifyPassword: verifyPasswordHash } = require('./lib/passwords');
+const { createRateLimiter } = require('./lib/rate_limiter');
+const { buildOwnedReportRow, canManageReport, canReadReport, nextReportVersion, reportId, reportRowToClient } = require('./lib/report_access');
+const { createSessionAuth } = require('./lib/session_auth');
+const { createStagingAccessMiddleware } = require('./lib/staging_access');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const APP_ENV = process.env.NODE_ENV || 'development';
+const IS_DEPLOYED_ENVIRONMENT = APP_ENV === 'production' || APP_ENV === 'staging';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
+const SUPABASE_SERVER_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || (!IS_DEPLOYED_ENVIRONMENT ? process.env.SUPABASE_KEY : '') || '';
+const BROWSER_SUPABASE_ENABLED = ['1', 'true', 'yes', 'on'].includes(String(process.env.ENABLE_BROWSER_SUPABASE || '').toLowerCase());
+
+function validateEnvironment() {
+  const missing = [];
+  const requireValue = key => {
+    if (!String(process.env[key] || '').trim()) missing.push(key);
+  };
+
+  if (IS_DEPLOYED_ENVIRONMENT) {
+    ['SESSION_SECRET', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'].forEach(requireValue);
+  }
+  if (APP_ENV === 'staging') {
+    ['APP_BASE_URL', 'STAGING_ACCESS_USER', 'STAGING_ACCESS_PASSWORD', 'BOOTSTRAP_ADMIN_USERNAME', 'BOOTSTRAP_ADMIN_PASSWORD', 'BOOTSTRAP_ADMIN_EMAIL'].forEach(requireValue);
+  }
+  if (BROWSER_SUPABASE_ENABLED) requireValue('SUPABASE_ANON_KEY');
+  if (['1', 'true', 'yes', 'on'].includes(String(process.env.MAIL_ENABLED || '').toLowerCase())) {
+    ['APP_BASE_URL', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'].forEach(requireValue);
+  }
+  if (missing.length > 0) {
+    throw new Error(`Eksik zorunlu ortam değişkenleri: ${[...new Set(missing)].join(', ')}`);
+  }
+}
+
+validateEnvironment();
 
 let supabase = null;
-if (SUPABASE_URL && SUPABASE_KEY) {
-  supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+if (SUPABASE_URL && SUPABASE_SERVER_KEY) {
+  supabase = createClient(SUPABASE_URL, SUPABASE_SERVER_KEY);
 }
+
+const mailer = createMailer();
 
 // ── Kullanıcı Veri Yönetimi & Yerel Yedekleme ─────────────────
 const usersJsonPath = path.join(__dirname, 'data', 'users.json');
-const auditLogsJsonPath = path.join(__dirname, 'data', 'audit_logs.json');
-
-function hashPassword(plainText) {
-  if (!plainText) return '';
-  return crypto.createHash('sha256').update(plainText).digest('hex');
-}
-
-const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}$/;
 
 // Yerel kullanıcı dosyasını oku / yaz
 function getLocalUsers() {
@@ -49,61 +77,60 @@ function saveLocalUsers(users) {
   }
 }
 
-// ── Denetim Günlüğü (Audit Log) Yönetimi ────────────────────────
-function getLocalAuditLogs() {
-  try {
-    if (fs.existsSync(auditLogsJsonPath)) {
-      return JSON.parse(fs.readFileSync(auditLogsJsonPath, 'utf8')) || [];
-    }
-  } catch (e) {
-    console.warn('Audit logs okuma hatası:', e.message);
+async function loadUserById(userId) {
+  if (!userId) return null;
+  if (supabase) {
+    const { data, error } = await supabase
+      .from('app_users')
+      .select('*')
+      .eq('id', String(userId))
+      .limit(1);
+    if (error) throw error;
+    return data && data[0] ? data[0] : null;
   }
-  return [];
+  return getLocalUsers().find(user => String(user.id) === String(userId)) || null;
 }
 
-function saveLocalAuditLogs(logs) {
-  try {
-    const dataDir = path.dirname(auditLogsJsonPath);
-    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-    fs.writeFileSync(auditLogsJsonPath, JSON.stringify(logs.slice(0, 1000), null, 2), 'utf8');
-  } catch (e) {
-    console.warn('Audit logs yazma hatası:', e.message);
+async function updateUserById(userId, updates) {
+  if (supabase) {
+    const { data, error } = await supabase
+      .from('app_users')
+      .update(updates)
+      .eq('id', String(userId))
+      .select('id, username, email, full_name, phone, department, role, is_active, avatar, created_at, last_login')
+      .limit(1);
+    if (error) throw error;
+    return data && data[0] ? data[0] : null;
   }
+
+  const users = getLocalUsers();
+  const index = users.findIndex(user => String(user.id) === String(userId));
+  if (index === -1) return null;
+  users[index] = { ...users[index], ...updates };
+  saveLocalUsers(users);
+  const safeUser = { ...users[index] };
+  delete safeUser.password_hash;
+  return safeUser;
 }
 
-function recordAuditLog({ userId = 'system', username = 'system', role = 'system', action = 'GENERAL', target = '-', details = '-', ip = '127.0.0.1' } = {}) {
-  try {
-    const cleanIp = (ip || '127.0.0.1').replace(/^::ffff:/, '');
-    const entry = {
-      id: 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-      userId,
-      username,
-      role,
-      action,
-      target,
-      details,
-      timestamp: new Date().toISOString(),
-      ip: cleanIp
-    };
-    const logs = getLocalAuditLogs();
-    logs.unshift(entry);
-    saveLocalAuditLogs(logs);
-    return entry;
-  } catch (e) {
-    console.warn('recordAuditLog hatası:', e.message);
-    return null;
-  }
-}
-
-// Varsayılan Admin Kullanıcısını Güvenceye Al
+// Staging/ilk kurulum admini yalnızca ortam değişkenlerinden oluşturulur.
 async function ensureAdminUser() {
-  const defaultAdmin = {
+  const bootstrapUsername = (process.env.BOOTSTRAP_ADMIN_USERNAME || '').trim().toLowerCase();
+  const bootstrapPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD || '';
+  const bootstrapEmail = (process.env.BOOTSTRAP_ADMIN_EMAIL || '').trim().toLowerCase();
+
+  if (!bootstrapUsername || !bootstrapPassword) return false;
+  if (bootstrapPassword.length < 12) {
+    throw new Error('BOOTSTRAP_ADMIN_PASSWORD en az 12 karakter olmalıdır.');
+  }
+
+  const bootstrapAdmin = {
     id: 'usr_admin_root',
-    username: 'admin',
-    password_hash: hashPassword('admin123'),
-    email: 'admin@frpoku.com',
+    username: bootstrapUsername,
+    password_hash: await hashPassword(bootstrapPassword),
+    email: bootstrapEmail,
     full_name: 'Sistem Yöneticisi (Admin)',
-    phone: '05000000000',
+    phone: '',
     department: 'Bilgi İşlem ve Yönetim',
     role: 'admin',
     is_active: true,
@@ -113,27 +140,27 @@ async function ensureAdminUser() {
   };
 
   if (supabase) {
-    try {
-      const { data: admins } = await supabase
-        .from('app_users')
-        .select('id, role')
-        .eq('role', 'admin')
-        .limit(1);
+    const { data: admins, error: adminQueryError } = await supabase
+      .from('app_users')
+      .select('id, role')
+      .eq('role', 'admin')
+      .limit(1);
+    if (adminQueryError) throw adminQueryError;
 
-      if (!admins || admins.length === 0) {
-        console.log('Admin kullanıcısı bulunamadı, varsayılan admin oluşturuluyor...');
-        await supabase.from('app_users').upsert([defaultAdmin], { onConflict: 'username' });
-      }
-    } catch (e) {
-      console.warn('Supabase admin denetimi hatası:', e.message);
+    if (!admins || admins.length === 0) {
+      console.log('Admin kullanıcısı bulunamadı, ortam değişkenlerinden bootstrap admin oluşturuluyor...');
+      const { error } = await supabase.from('app_users').upsert([bootstrapAdmin], { onConflict: 'username' });
+      if (error) throw error;
     }
+    return true;
   }
 
   const localUsers = getLocalUsers();
-  if (!localUsers.some(u => u.role === 'admin' || u.username === 'admin')) {
-    localUsers.unshift(defaultAdmin);
+  if (!localUsers.some(u => u.role === 'admin' || u.username === bootstrapUsername)) {
+    localUsers.unshift(bootstrapAdmin);
     saveLocalUsers(localUsers);
   }
+  return true;
 }
 
 // ── DENETİM GÜNLÜĞÜ (AUDIT LOGS) DEPOLAMA ────────────────────
@@ -166,7 +193,7 @@ function saveAuditLogs(logs) {
   }
 }
 
-function recordAuditLog({ userId, username, fullName, role, action, target, details, ip }) {
+async function recordAuditLog({ userId, username, fullName, role, action, target, details, ip }) {
   try {
     const logEntry = {
       id: 'log_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
@@ -180,69 +207,56 @@ function recordAuditLog({ userId, username, fullName, role, action, target, deta
       details: details || '',
       ip: (ip || '127.0.0.1').replace(/^::ffff:/, '')
     };
-    const logs = getAuditLogs();
-    logs.unshift(logEntry);
-    saveAuditLogs(logs);
-
     if (supabase) {
-      supabase.from('user_settings')
-        .select('preferences')
-        .eq('id', 'system_audit_logs')
-        .single()
-        .then(({ data }) => {
-          const currentLogs = (data && data.preferences && Array.isArray(data.preferences.logs)) ? data.preferences.logs : [];
-          const updated = [logEntry, ...currentLogs.filter(l => l.id !== logEntry.id)].slice(0, 1000);
-          return supabase.from('user_settings').upsert({
-            id: 'system_audit_logs',
-            theme: 'light',
-            preferences: { logs: updated },
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'id' });
-        })
-        .catch(() => {});
+      const { error } = await supabase.from('audit_logs').insert({
+        id: logEntry.id,
+        occurred_at: logEntry.timestamp,
+        user_id: logEntry.userId,
+        username: logEntry.username,
+        full_name: logEntry.fullName,
+        role: logEntry.role,
+        action: logEntry.action,
+        target: logEntry.target,
+        details: logEntry.details,
+        ip: logEntry.ip
+      });
+      if (error) throw error;
+    } else {
+      const logs = getAuditLogs();
+      logs.unshift(logEntry);
+      saveAuditLogs(logs);
     }
 
     return logEntry;
   } catch (e) {
-    console.warn('Audit log yazılamadı:', e.message);
+    console.warn('Audit log yazılamadı:', safeLogStr(e.message));
     return null;
   }
 }
 
 app.disable('x-powered-by');
+app.set('trust proxy', IS_DEPLOYED_ENVIRONMENT ? 1 : false);
 
 // ── GÜVENLİ OTURUM & HMAC TOKEN YÖNETİMİ ────────────────────
-const SESSION_SECRET = process.env.SESSION_SECRET || 'frpoku_sec_token_' + (process.env.SUPABASE_KEY ? crypto.createHash('sha256').update(process.env.SUPABASE_KEY).digest('hex') : 'default_local_secret_salt_2026');
+const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(48).toString('hex');
 
-function signToken(payload) {
-  const dataStr = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  const signature = crypto.createHmac('sha256', SESSION_SECRET).update(dataStr).digest('base64url');
-  return `${dataStr}.${signature}`;
-}
-
-function verifyToken(token) {
-  if (!token || typeof token !== 'string') return null;
-  const parts = token.split('.');
-  if (parts.length !== 2) return null;
-  const [dataStr, signature] = parts;
-  const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(dataStr).digest('base64url');
-  try {
-    const sigBuf = Buffer.from(signature, 'utf8');
-    const expBuf = Buffer.from(expectedSig, 'utf8');
-    if (sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf)) {
-      const json = JSON.parse(Buffer.from(dataStr, 'base64url').toString('utf8'));
-      if (json.exp && Date.now() > json.exp) return null;
-      return json;
-    }
-  } catch (e) {
-    return null;
-  }
-  return null;
-}
+const { signToken, requireAuth, requireAdmin } = createSessionAuth({
+  secret: SESSION_SECRET,
+  userLoader: loadUserById
+});
 
 function safeLogStr(str) {
   if (typeof str !== 'string') return String(str || '');
   return str.replace(/[\r\n\x00-\x1f\x7f]/g, '').slice(0, 150);
+}
+
+function boundedSetting(value, maxLength, fallback = '') {
+  const text = String(value ?? fallback).trim();
+  return text.slice(0, maxLength) || fallback;
+}
+
+function plainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 // ── PENTESTING & GÜVENLİK HEADERLARI (Security Hardening & Mozilla Observatory A+) ─────
@@ -298,136 +312,131 @@ app.use((req, res, next) => {
   next();
 });
 
-// ── RATE LIMITER (Brute-Force & DoS Koruması) ─────────────────
-const rateLimitMap = new Map();
-function createRateLimiter({ windowMs = 60000, max = 30, message = 'Çok fazla istek gönderildi. Lütfen bir süre sonra tekrar deneyiniz.' } = {}) {
-  return (req, res, next) => {
-    const ip = req.ip || req.connection?.remoteAddress || '127.0.0.1';
-    const now = Date.now();
-    const record = rateLimitMap.get(ip) || { count: 0, resetTime: now + windowMs };
-    if (now > record.resetTime) {
-      record.count = 1;
-      record.resetTime = now + windowMs;
-    } else {
-      record.count++;
-    }
-    rateLimitMap.set(ip, record);
-    if (record.count > max) {
-      return res.status(429).json({
-        success: false,
-        reason: `${message}`,
-        retryAfterSec: Math.ceil((record.resetTime - now) / 1000)
-      });
-    }
-    next();
-  };
-}
-
 const authRateLimiter = createRateLimiter({ windowMs: 60000, max: 25, message: 'Giriş/Kayıt deneme sınırı aşıldı. Lütfen 1 dakika bekleyiniz.' });
 const adminRateLimiter = createRateLimiter({ windowMs: 60000, max: 60, message: 'Yönetim istek sınırı aşıldı.' });
+const apiWriteRateLimiter = createRateLimiter({ windowMs: 60000, max: 120, message: 'Yazma işlemi sınırı aşıldı. Lütfen kısa bir süre bekleyiniz.' });
 
-// ── ADMİN YETKİ DENETİMİ (RBAC Middleware) ────────────────────
-function requireAdmin(req, res, next) {
-  const authHeader = req.headers['authorization'] || req.headers['x-admin-auth'];
-  const adminKey = req.headers['x-admin-key'] || req.body?.adminKey;
+const requestBodyLimit = process.env.REQUEST_BODY_LIMIT || '15mb';
+app.use(express.json({ limit: requestBodyLimit, strict: true }));
+app.use(express.urlencoded({ extended: true, limit: '1mb', parameterLimit: 1000 }));
+app.use(createStagingAccessMiddleware());
 
-  let requestingUser = null;
-
-  if (authHeader) {
-    const raw = String(authHeader).replace(/^Bearer\s+/i, '').trim();
-    // 1. Kriptografik İmzalı Token Doğrulaması (HMAC-SHA256)
-    const tokenPayload = verifyToken(raw);
-    if (tokenPayload && (tokenPayload.role === 'admin' || tokenPayload.username === 'admin')) {
-      requestingUser = tokenPayload;
-    }
-
-    // 2. Base64 JSON veya Düz JSON Kullanıcı Oturumu Doğrulaması
-    if (!requestingUser && raw) {
-      try {
-        let decodedStr = Buffer.from(raw, 'base64').toString('utf8');
-        if (!decodedStr.startsWith('{')) {
-          decodedStr = decodeURIComponent(escape(decodedStr));
-        }
-        const u = JSON.parse(decodedStr);
-        if (u && (u.role === 'admin' || u.username === 'admin')) {
-          requestingUser = u;
-        }
-      } catch (e) {
-        try {
-          const u = JSON.parse(raw);
-          if (u && (u.role === 'admin' || u.username === 'admin')) {
-            requestingUser = u;
-          }
-        } catch (e2) {}
-      }
-    }
-  }
-
-  // 3. Özel Sistem Admin Secret Anahtarı Doğrulaması
-  if (!requestingUser && (adminKey === 'admin123' || (process.env.ADMIN_SECRET && adminKey === process.env.ADMIN_SECRET))) {
-    requestingUser = { role: 'admin', username: 'admin' };
-  }
-
-  // Yetkisiz çağrıları 403 Forbidden ile engelle
-  if (!requestingUser) {
-    return res.status(403).json({
-      success: false,
-      reason: 'Yetkisiz Erişim (403 Forbidden): Bu yönetim işlemini gerçekleştirmek için geçerli Sistem Yöneticisi (Admin) oturumu gereklidir.'
-    });
-  }
-
-  req.adminUser = requestingUser;
-  next();
+// Yalnızca tarayıcıya gerekli dosyaları yayınla; sunucu, test, migration ve
+// deployment dosyaları statik olarak erişilebilir değildir.
+app.use('/css', express.static(path.join(__dirname, 'css')));
+app.use('/js', express.static(path.join(__dirname, 'js')));
+function setNoStoreHeaders(res) {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
 }
+function sendScriptSafePage(res, page) {
+  setNoStoreHeaders(res);
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; " +
+    "script-src 'self' https://cdn.jsdelivr.net; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+    "font-src 'self' https://fonts.gstatic.com data:; " +
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co; " +
+    "img-src 'self' data: blob: https:; " +
+    "worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self';"
+  );
+  res.sendFile(path.join(__dirname, page));
+}
+function sendNoncePage(res, page) {
+  const nonce = crypto.randomBytes(18).toString('base64');
+  const filePath = path.join(__dirname, page);
+  fs.readFile(filePath, 'utf8', (error, source) => {
+    if (error) return res.status(500).send('Sayfa yüklenemedi.');
+    setNoStoreHeaders(res);
+    res.setHeader(
+      'Content-Security-Policy',
+      "default-src 'self'; " +
+      `script-src 'self' 'nonce-${nonce}' https://cdn.jsdelivr.net; ` +
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+      "font-src 'self' https://fonts.gstatic.com data:; " +
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co; " +
+      "img-src 'self' data: blob: https:; " +
+      "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self';"
+    );
+    const html = source.replace(/<script(?![^>]*\bsrc=)([^>]*)>/gi, `<script nonce="${nonce}"$1>`);
+    res.type('html').send(html);
+  });
+}
+app.get('/', (req, res) => sendScriptSafePage(res, 'index.html'));
+app.get('/index.html', (req, res) => sendScriptSafePage(res, 'index.html'));
+app.get('/compare.html', (req, res) => sendScriptSafePage(res, 'compare.html'));
+app.get('/detail.html', (req, res) => sendScriptSafePage(res, 'detail.html'));
+app.get('/dashboard.html', (req, res) => sendNoncePage(res, 'dashboard.html'));
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-app.use(express.static(path.join(__dirname)));
+app.get('/api/health', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({
+    status: 'ok',
+    service: 'frpoku',
+    environment: APP_ENV,
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get('/runtime-config.js', (req, res) => {
+  res.type('application/javascript');
+  res.setHeader('Cache-Control', 'no-store');
+  const publicConfig = {
+    supabaseUrl: SUPABASE_URL || '',
+    supabaseAnonKey: BROWSER_SUPABASE_ENABLED ? SUPABASE_ANON_KEY : '',
+    environment: APP_ENV
+  };
+  res.send(`window.FRP_RUNTIME_CONFIG = ${JSON.stringify(publicConfig)};`);
+});
 
 // Config endpoint for client-side Supabase connection
 app.get('/api/config', (req, res) => {
   res.json({
     supabaseUrl: SUPABASE_URL || '',
-    supabaseKey: SUPABASE_KEY || ''
+    supabaseAnonKey: BROWSER_SUPABASE_ENABLED ? SUPABASE_ANON_KEY : ''
   });
 });
 
 // ── 1. YENİ KULLANICI KAYDI (Admin Onayına Gönderme) ─────────
 app.post('/api/auth/register', authRateLimiter, async (req, res) => {
   const { fullName, username, email, phone, department, password } = req.body;
-  const cleanEmail = (email || '').trim().toLowerCase();
-  const cleanUser = (username || '').trim().toLowerCase();
-  const cleanName = (fullName || '').trim();
-  const cleanPhone = (phone || '').trim();
+  const cleanEmail = normalizeEmail(email);
+  const cleanUser = normalizeUsername(username);
+  const cleanName = normalizeText(fullName);
+  const cleanPhone = normalizePhone(phone);
+  const cleanDepartment = normalizeText(department || 'Bilgi İşlem');
 
   if (!cleanName || !cleanUser || !cleanEmail || !password) {
     return res.status(400).json({ success: false, reason: 'Lütfen zorunlu alanları (Ad Soyad, Kullanıcı Adı, E-Posta, Şifre) eksiksiz doldurunuz.' });
   }
 
-  if (!EMAIL_REGEX.test(cleanEmail)) {
+  if (!isValidEmail(cleanEmail)) {
     return res.status(400).json({ success: false, reason: 'Lütfen geçerli bir e-posta formatı giriniz (Örn: ad.soyad@kurum.com).' });
   }
 
-  if (password.length < 3) {
-    return res.status(400).json({ success: false, reason: 'Şifreniz en az 3 karakter olmalıdır.' });
+  if (!isValidUsername(cleanUser)) {
+    return res.status(400).json({ success: false, reason: 'Kullanıcı adı 3-50 karakter olmalı; yalnızca küçük harf, rakam, nokta, alt çizgi ve tire içermelidir.' });
+  }
+
+  if (!isValidText(cleanName, { min: 2, max: 120 }) || !isValidText(cleanDepartment, { min: 1, max: 120 })) {
+    return res.status(400).json({ success: false, reason: 'Ad soyad veya bölüm alanı izin verilen uzunlukta değildir.' });
+  }
+
+  if (password.length < 10 || password.length > PASSWORD_MAX_LENGTH) {
+    return res.status(400).json({ success: false, reason: `Şifreniz 10-${PASSWORD_MAX_LENGTH} karakter arasında olmalıdır.` });
   }
 
   try {
-    // 1. Mükerrer Kontrolü (Supabase & Local)
     if (supabase) {
-      const { data: existingUsers } = await supabase
-        .from('app_users')
-        .select('id, username, email')
-        .or(`email.ilike.${cleanEmail},username.ilike.${cleanUser}`)
-        .limit(2);
+      const usernameResult = await supabase.from('app_users').select('id').eq('username', cleanUser).limit(1);
+      if (usernameResult.error) throw usernameResult.error;
+      if (usernameResult.data?.length) return res.status(400).json({ success: false, reason: `'${cleanUser}' kullanıcı adı zaten kullanımda.` });
 
-      if (existingUsers && existingUsers.length > 0) {
-        const matchEmail = existingUsers.some(u => (u.email || '').toLowerCase() === cleanEmail);
-        if (matchEmail) {
-          return res.status(400).json({ success: false, reason: `'${cleanEmail}' e-posta adresi zaten kayıtlıdır.` });
-        }
-        return res.status(400).json({ success: false, reason: `'${cleanUser}' kullanıcı adı zaten kullanımda.` });
-      }
+      const emailResult = await supabase.from('app_users').select('id').eq('email', cleanEmail).limit(1);
+      if (emailResult.error) throw emailResult.error;
+      if (emailResult.data?.length) return res.status(400).json({ success: false, reason: `'${cleanEmail}' e-posta adresi zaten kayıtlıdır.` });
     } else {
       const localUsers = getLocalUsers();
       if (localUsers.some(u => (u.username || '').toLowerCase() === cleanUser)) {
@@ -442,11 +451,11 @@ app.post('/api/auth/register', authRateLimiter, async (req, res) => {
     const newRecord = {
       id: newUserId,
       username: cleanUser,
-      password_hash: hashPassword(password),
+      password_hash: await hashPassword(password),
       email: cleanEmail,
       full_name: cleanName,
       phone: cleanPhone,
-      department: (department || 'Bilgi İşlem').trim(),
+      department: cleanDepartment,
       role: 'user',
       is_active: false, // Yönetici onayı bekliyor (false = pending)
       avatar: 'U',
@@ -456,15 +465,12 @@ app.post('/api/auth/register', authRateLimiter, async (req, res) => {
 
     if (supabase) {
       const { error: insertErr } = await supabase.from('app_users').insert([newRecord]);
-      if (insertErr) {
-        console.warn('Supabase insert error, yerel yedeğe yazılıyor:', insertErr.message);
-      }
+      if (insertErr) throw insertErr;
+    } else {
+      const localUsers = getLocalUsers();
+      localUsers.unshift(newRecord);
+      saveLocalUsers(localUsers);
     }
-
-    // Yerel yedeğe de ekle
-    const localUsers = getLocalUsers();
-    localUsers.unshift(newRecord);
-    saveLocalUsers(localUsers);
 
     console.log(`Yeni Kullanıcı Kaydı Alındı (Admin Onayı Bekliyor): ${cleanUser} (${cleanName})`);
 
@@ -481,44 +487,40 @@ app.post('/api/auth/register', authRateLimiter, async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('Kayıt hatası:', err.message);
-    res.status(500).json({ success: false, reason: 'Kayıt sırasında hata oluştu: ' + err.message });
+    console.error('Kayıt hatası:', safeLogStr(err.message));
+    res.status(503).json({ success: false, reason: 'Kayıt servisi geçici olarak kullanılamıyor.' });
   }
 });
 
 // ── 2. KULLANICI GİRİŞİ (Login) ──────────────────────────────
 app.post('/api/auth/login', authRateLimiter, async (req, res) => {
   const { identifier, password } = req.body;
-  const ident = (identifier || '').trim();
-  if (!ident || !password) {
+  const ident = String(identifier || '').trim();
+  if (!ident || !password || ident.length > 254 || String(password).length > PASSWORD_MAX_LENGTH) {
     return res.status(400).json({ success: false, reason: 'Lütfen kullanıcı bilgilerinizi ve şifrenizi giriniz.' });
   }
 
   const cleanIdent = ident.toLowerCase();
   const phoneDigits = ident.replace(/\D/g, '');
-  const pHash = hashPassword(password);
-
   let user = null;
 
   try {
     if (supabase) {
       let query = supabase.from('app_users').select('*');
-      if (cleanIdent.includes('@')) {
-        query = query.ilike('email', cleanIdent);
+      if (isValidEmail(cleanIdent)) {
+        query = query.eq('email', cleanIdent);
       } else if (phoneDigits.length >= 10) {
-        query = query.or(`phone.eq.${phoneDigits},username.ilike.${cleanIdent}`);
+        query = query.eq('phone', phoneDigits);
       } else {
-        query = query.ilike('username', cleanIdent);
+        query = query.eq('username', cleanIdent);
       }
 
       const { data: users, error } = await query.limit(1);
-      if (!error && users && users.length > 0) {
-        user = users[0];
-      }
+      if (error) throw error;
+      if (users?.length) user = users[0];
     }
 
-    // Fallback: Yerel kayıtlar
-    if (!user) {
+    if (!supabase) {
       const localUsers = getLocalUsers();
       user = localUsers.find(u => 
         (u.username || '').toLowerCase() === cleanIdent ||
@@ -528,12 +530,30 @@ app.post('/api/auth/login', authRateLimiter, async (req, res) => {
     }
 
     if (!user) {
-      return res.status(404).json({ success: false, reason: 'Girdiğiniz bilgilere ait bir kullanıcı hesabı bulunamadı.' });
+      return res.status(401).json({ success: false, reason: 'Kullanıcı bilgileriniz veya şifreniz hatalı.' });
     }
 
-    // Şifre denetimi (Hash veya düz metin eski uyumluluğu)
-    if (user.password_hash !== pHash && user.password_hash !== password) {
-      return res.status(400).json({ success: false, reason: 'Şifreniz hatalı! Lütfen şifrenizi kontrol edip tekrar deneyin.' });
+    const passwordCheck = await verifyPasswordHash(password, user.password_hash);
+    if (!passwordCheck.valid) {
+      return res.status(401).json({ success: false, reason: 'Kullanıcı bilgileriniz veya şifreniz hatalı.' });
+    }
+
+    // Başarılı girişte eski SHA-256 kaydını otomatik olarak scrypt'e yükselt.
+    if (passwordCheck.needsRehash) {
+      const upgradedHash = await hashPassword(password);
+      user.password_hash = upgradedHash;
+      if (supabase) {
+        const { error: upgradeError } = await supabase.from('app_users').update({ password_hash: upgradedHash }).eq('id', user.id);
+        if (upgradeError) console.warn('Parola hash yükseltme uyarısı:', upgradeError.message);
+      }
+      if (!supabase) {
+        const upgradeUsers = getLocalUsers();
+        const upgradeIndex = upgradeUsers.findIndex(u => u.id === user.id);
+        if (upgradeIndex !== -1) {
+          upgradeUsers[upgradeIndex].password_hash = upgradedHash;
+          saveLocalUsers(upgradeUsers);
+        }
+      }
     }
 
     // Onay ve Aktiflik Durumu Denetimi
@@ -550,17 +570,15 @@ app.post('/api/auth/login', authRateLimiter, async (req, res) => {
     user.last_login = nowIso;
 
     if (supabase) {
-      try {
-        await supabase.from('app_users').update({ last_login: nowIso }).eq('id', user.id);
-      } catch (e) {
-        console.warn('Last login update warning:', e.message);
+      const { error: lastLoginError } = await supabase.from('app_users').update({ last_login: nowIso }).eq('id', user.id);
+      if (lastLoginError) console.warn('Last login update warning:', safeLogStr(lastLoginError.message));
+    } else {
+      const localUsers = getLocalUsers();
+      const locIdx = localUsers.findIndex(u => u.id === user.id);
+      if (locIdx !== -1) {
+        localUsers[locIdx].last_login = nowIso;
+        saveLocalUsers(localUsers);
       }
-    }
-    const localUsers = getLocalUsers();
-    const locIdx = localUsers.findIndex(u => u.id === user.id);
-    if (locIdx !== -1) {
-      localUsers[locIdx].last_login = nowIso;
-      saveLocalUsers(localUsers);
     }
 
     const safeUser = { ...user };
@@ -580,44 +598,30 @@ app.post('/api/auth/login', authRateLimiter, async (req, res) => {
       user: safeUser
     });
   } catch (err) {
-    console.error('Giriş hatası:', err.message);
-    res.status(500).json({ success: false, reason: 'Giriş sırasında hata oluştu: ' + err.message });
+    console.error('Giriş hatası:', safeLogStr(err.message));
+    res.status(503).json({ success: false, reason: 'Giriş servisi geçici olarak kullanılamıyor.' });
   }
 });
 
 // ── 3. ADMİN: ONAY BEKLEYEN KULLANICILARI LİSTELE ──────────────
 app.get('/api/admin/pending-users', adminRateLimiter, requireAdmin, async (req, res) => {
   try {
-    const userMap = new Map();
-
-    // 1. Yerel veritabanındaki bekleyenler
-    const localUsers = getLocalUsers();
-    localUsers.forEach(u => {
-      if (u.is_active === false) {
-        const safe = { ...u };
-        delete safe.password_hash;
-        userMap.set(u.id || u.username, safe);
-      }
-    });
-
-    // 2. Supabase bekleyenler
+    let pendingList = [];
     if (supabase) {
-      try {
-        const { data, error } = await supabase
-          .from('app_users')
-          .select('id, username, email, full_name, phone, department, role, is_active, created_at, avatar')
-          .eq('is_active', false)
-          .order('created_at', { ascending: false });
-
-        if (!error && Array.isArray(data)) {
-          data.forEach(u => userMap.set(u.id || u.username, u));
-        }
-      } catch (sbErr) {
-        console.warn('Supabase pending-users error:', sbErr.message);
-      }
+      const { data, error } = await supabase
+        .from('app_users')
+        .select('id, username, email, full_name, phone, department, role, is_active, created_at, avatar')
+        .eq('is_active', false)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      pendingList = data || [];
+    } else {
+      pendingList = getLocalUsers().filter(user => user.is_active === false).map(user => {
+        const safe = { ...user };
+        delete safe.password_hash;
+        return safe;
+      }).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
     }
-
-    const pendingList = Array.from(userMap.values()).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 
     res.json({
       success: true,
@@ -625,40 +629,29 @@ app.get('/api/admin/pending-users', adminRateLimiter, requireAdmin, async (req, 
       users: pendingList
     });
   } catch (err) {
-    res.status(500).json({ success: false, reason: 'Onay bekleyen kullanıcılar alınamadı: ' + err.message });
+    console.warn('Onay bekleyen kullanıcı listesi hatası:', safeLogStr(err.message));
+    res.status(503).json({ success: false, reason: 'Onay bekleyen kullanıcılar geçici olarak alınamıyor.' });
   }
 });
 
 // ── 4. ADMİN: TÜM KULLANICILARI LİSTELE ───────────────────────
 app.get('/api/admin/all-users', adminRateLimiter, requireAdmin, async (req, res) => {
   try {
-    const userMap = new Map();
-
-    // 1. Yerel kullanıcılar
-    const localUsers = getLocalUsers();
-    localUsers.forEach(u => {
-      const safe = { ...u };
-      delete safe.password_hash;
-      userMap.set(u.id || u.username, safe);
-    });
-
-    // 2. Supabase kullanıcıları
+    let allUsers = [];
     if (supabase) {
-      try {
-        const { data, error } = await supabase
-          .from('app_users')
-          .select('id, username, email, full_name, phone, department, role, is_active, created_at, last_login, avatar')
-          .order('created_at', { ascending: false });
-
-        if (!error && Array.isArray(data)) {
-          data.forEach(u => userMap.set(u.id || u.username, u));
-        }
-      } catch (sbErr) {
-        console.warn('Supabase all-users error:', sbErr.message);
-      }
+      const { data, error } = await supabase
+        .from('app_users')
+        .select('id, username, email, full_name, phone, department, role, is_active, created_at, last_login, avatar')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      allUsers = data || [];
+    } else {
+      allUsers = getLocalUsers().map(user => {
+        const safe = { ...user };
+        delete safe.password_hash;
+        return safe;
+      }).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
     }
-
-    const allUsers = Array.from(userMap.values()).sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 
     res.json({
       success: true,
@@ -666,7 +659,8 @@ app.get('/api/admin/all-users', adminRateLimiter, requireAdmin, async (req, res)
       users: allUsers
     });
   } catch (err) {
-    res.status(500).json({ success: false, reason: 'Kullanıcı listesi alınamadı: ' + err.message });
+    console.warn('Kullanıcı listesi hatası:', safeLogStr(err.message));
+    res.status(503).json({ success: false, reason: 'Kullanıcı listesi geçici olarak alınamıyor.' });
   }
 });
 
@@ -678,48 +672,81 @@ app.post('/api/admin/approve-user', adminRateLimiter, requireAdmin, async (req, 
   }
 
   try {
-    const updates = { is_active: true };
+    const approvedUser = await updateUserById(userId, { is_active: true });
+    if (!approvedUser) return res.status(404).json({ success: false, reason: 'Onaylanacak kullanıcı bulunamadı.' });
+    const targetUsername = approvedUser.username || String(userId);
 
-    // 1. Yerel kaydı mutlaka güncelle
-    const localUsers = getLocalUsers();
-    const idx = localUsers.findIndex(u => u.id === userId || u.username === userId);
-    let targetUsername = userId;
-    if (idx !== -1) {
-      localUsers[idx] = { ...localUsers[idx], ...updates };
-      targetUsername = localUsers[idx].username || userId;
-      saveLocalUsers(localUsers);
-    }
-
-    // 2. Supabase varsa güvenle güncelle
-    if (supabase) {
-      try {
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId);
-        if (isUuid) {
-          await supabase.from('app_users').update(updates).eq('id', userId);
-        } else {
-          await supabase.from('app_users').update(updates).eq('username', targetUsername);
-        }
-      } catch (sbErr) {
-        console.warn('Supabase approve-user warning:', sbErr.message);
-      }
-    }
-
-    recordAuditLog({
+    await recordAuditLog({
+      userId: req.adminUser.id,
+      username: req.adminUser.username,
+      role: 'admin',
       action: 'USER_APPROVE',
       target: targetUsername,
-      details: `@${targetUsername} kullanıcısının kaydı onaylandı ve hesabı aktifleştirildi.`
+      details: `@${targetUsername} kullanıcısının kaydı onaylandı ve hesabı aktifleştirildi.`,
+      ip: req.ip
     });
 
     console.log('Kullanıcı Başarıyla Onaylandı:', safeLogStr(targetUsername));
 
+    // Mail hatası hesap onayını geri almaz; durum ayrıca audit kaydına yazılır.
+    const mailResult = await mailer.sendAccountApproved({
+      to: approvedUser.email,
+      fullName: approvedUser.full_name,
+      username: approvedUser.username
+    });
+
+    await recordAuditLog({
+      userId: req.adminUser.id,
+      username: req.adminUser.username,
+      role: 'admin',
+      action: mailResult.sent ? 'MAIL_ACCOUNT_APPROVED' : 'MAIL_ACCOUNT_APPROVED_SKIPPED',
+      target: approvedUser.email || '-',
+      details: `Hesap onay e-postası durumu: ${mailResult.status}`,
+      ip: req.ip
+    });
+
     res.json({
       success: true,
-      message: 'Kullanıcı hesabı başarıyla onaylandı ve aktifleştirildi.'
+      message: 'Kullanıcı hesabı başarıyla onaylandı ve aktifleştirildi.',
+      notification: {
+        email: {
+          sent: mailResult.sent,
+          status: mailResult.status
+        }
+      }
     });
   } catch (err) {
     console.error('Onaylama hatası:', safeLogStr(err.message));
-    res.status(500).json({ success: false, reason: 'Kullanıcı onaylanamadı: ' + err.message });
+    res.status(503).json({ success: false, reason: 'Kullanıcı geçici olarak onaylanamadı.' });
   }
+});
+
+app.get('/api/admin/mail/status', adminRateLimiter, requireAdmin, (req, res) => {
+  res.json({ success: true, mail: mailer.getStatus() });
+});
+
+app.post('/api/admin/mail/test', adminRateLimiter, requireAdmin, async (req, res) => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  if (!isValidEmail(email)) {
+    return res.status(400).json({ success: false, reason: 'Geçerli bir test e-posta adresi gereklidir.' });
+  }
+
+  const result = await mailer.sendTestEmail({ to: email });
+  await recordAuditLog({
+    userId: req.adminUser.id,
+    username: req.adminUser.username,
+    role: req.adminUser.role,
+    action: result.sent ? 'MAIL_TEST_SENT' : 'MAIL_TEST_FAILED',
+    target: email,
+    details: `SMTP test e-postası durumu: ${result.status}`,
+    ip: req.ip
+  });
+
+  res.status(result.sent ? 200 : 503).json({
+    success: result.sent,
+    mail: { sent: result.sent, status: result.status },
+    reason: result.sent ? undefined : 'Test e-postası gönderilemedi. Mail yapılandırmasını kontrol edin.'
+  });
 });
 
 // ── 6. ADMİN: KULLANICIYI REDDET VEYA SİL ────────────────────
@@ -728,54 +755,41 @@ app.post('/api/admin/reject-user', adminRateLimiter, requireAdmin, async (req, r
   if (!userId) {
     return res.status(400).json({ success: false, reason: 'Kullanıcı kimliği (userId) belirtilmedi.' });
   }
+  if (String(userId) === String(req.adminUser.id)) {
+    return res.status(400).json({ success: false, reason: 'Kendi yönetici hesabınızı reddedemez veya silemezsiniz.' });
+  }
 
   try {
-    const localUsers = getLocalUsers();
-    const userObj = localUsers.find(u => u.id === userId || u.username === userId);
-    const targetUsername = userObj ? userObj.username : userId;
+    const userObj = await loadUserById(userId);
+    if (!userObj) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
+    const targetUsername = userObj.username || String(userId);
 
     if (deletePermanently) {
-      const filtered = localUsers.filter(u => u.id !== userId && u.username !== userId);
-      saveLocalUsers(filtered);
-
       if (supabase) {
-        try {
-          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId);
-          if (isUuid) {
-            await supabase.from('app_users').delete().eq('id', userId);
-          } else {
-            await supabase.from('app_users').delete().eq('username', targetUsername);
-          }
-        } catch (sbErr) {
-          console.warn('Supabase reject-user delete warning:', sbErr.message);
-        }
+        const reportDelete = await supabase.from('reports').delete().eq('user_id', String(userId));
+        if (reportDelete.error) throw reportDelete.error;
+        const userDelete = await supabase.from('app_users').delete().eq('id', String(userId));
+        if (userDelete.error) throw userDelete.error;
+      } else {
+        saveLocalUsers(getLocalUsers().filter(user => String(user.id) !== String(userId)));
+        writeLocalReports(readLocalReports().filter(report => String(report.user_id) !== String(userId)));
       }
       console.log('Kullanıcı Kaydı Silindi / Reddedildi:', safeLogStr(targetUsername));
     } else {
-      const updates = { is_active: false };
-      const idx = localUsers.findIndex(u => u.id === userId || u.username === userId);
-      if (idx !== -1) {
-        localUsers[idx] = { ...localUsers[idx], ...updates };
-        saveLocalUsers(localUsers);
-      }
-      if (supabase) {
-        try {
-          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId);
-          if (isUuid) {
-            await supabase.from('app_users').update(updates).eq('id', userId);
-          } else {
-            await supabase.from('app_users').update(updates).eq('username', targetUsername);
-          }
-        } catch (sbErr) {
-          console.warn('Supabase reject-user update warning:', sbErr.message);
-        }
-      }
+      const rejectedUser = await updateUserById(userId, { is_active: false });
+      if (!rejectedUser) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
     }
 
-    recordAuditLog({
+    await recordAuditLog({
+      userId: req.adminUser.id,
+      username: req.adminUser.username,
+      role: 'admin',
       action: 'USER_REJECT',
       target: targetUsername,
-      details: `@${targetUsername} kullanıcısının başvuru kaydı reddedildi.`
+      details: deletePermanently
+        ? `@${targetUsername} kullanıcısının başvuru kaydı reddedildi ve silindi.`
+        : `@${targetUsername} kullanıcısının başvuru kaydı reddedildi.`,
+      ip: req.ip
     });
 
     res.json({
@@ -783,7 +797,8 @@ app.post('/api/admin/reject-user', adminRateLimiter, requireAdmin, async (req, r
       message: deletePermanently ? 'Kayıt başvurusu reddedildi ve silindi.' : 'Kayıt başvurusu reddedildi.'
     });
   } catch (err) {
-    res.status(500).json({ success: false, reason: 'İşlem başarısız: ' + err.message });
+    console.warn('Kullanıcı reddetme hatası:', safeLogStr(err.message));
+    res.status(503).json({ success: false, reason: 'Kullanıcı işlemi geçici olarak tamamlanamadı.' });
   }
 });
 
@@ -791,34 +806,18 @@ app.post('/api/admin/reject-user', adminRateLimiter, requireAdmin, async (req, r
 app.post('/api/admin/toggle-status', adminRateLimiter, requireAdmin, async (req, res) => {
   const { userId, isActive } = req.body;
   if (!userId) return res.status(400).json({ success: false, reason: 'Kullanıcı ID gerekli.' });
+  if (String(userId) === String(req.adminUser.id) && !isActive) {
+    return res.status(400).json({ success: false, reason: 'Kendi yönetici hesabınızı donduramazsınız.' });
+  }
 
   try {
-    const updates = { is_active: !!isActive };
-    const localUsers = getLocalUsers();
-    const idx = localUsers.findIndex(u => u.id === userId || u.username === userId);
-    let targetUsername = userId;
-    if (idx !== -1) {
-      localUsers[idx] = { ...localUsers[idx], ...updates };
-      targetUsername = localUsers[idx].username || userId;
-      saveLocalUsers(localUsers);
-    }
-
-    if (supabase) {
-      try {
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId);
-        if (isUuid) {
-          await supabase.from('app_users').update(updates).eq('id', userId);
-        } else {
-          await supabase.from('app_users').update(updates).eq('username', targetUsername);
-        }
-      } catch (sbErr) {
-        console.warn('Supabase toggle-status warning:', sbErr.message);
-      }
-    }
-
+    const updatedUser = await updateUserById(userId, { is_active: Boolean(isActive) });
+    if (!updatedUser) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
+    await recordAuditLog({ userId: req.adminUser.id, username: req.adminUser.username, role: 'admin', action: 'USER_STATUS_CHANGE', target: updatedUser.username, details: `Hesap durumu: ${isActive ? 'aktif' : 'donduruldu'}`, ip: req.ip });
     res.json({ success: true, is_active: !!isActive });
   } catch (err) {
-    res.status(500).json({ success: false, reason: err.message });
+    console.warn('Kullanıcı durumu güncelleme hatası:', safeLogStr(err.message));
+    res.status(503).json({ success: false, reason: 'Kullanıcı durumu geçici olarak güncellenemedi.' });
   }
 });
 
@@ -826,258 +825,274 @@ app.post('/api/admin/toggle-status', adminRateLimiter, requireAdmin, async (req,
 app.post('/api/admin/toggle-admin', adminRateLimiter, requireAdmin, async (req, res) => {
   const { userId, makeAdmin } = req.body;
   if (!userId) return res.status(400).json({ success: false, reason: 'Kullanıcı ID gerekli.' });
+  if (String(userId) === String(req.adminUser.id) && !makeAdmin) {
+    return res.status(400).json({ success: false, reason: 'Kendi yönetici yetkinizi kaldıramazsınız.' });
+  }
 
   try {
     const newRole = makeAdmin ? 'admin' : 'user';
     const newAvatar = makeAdmin ? 'A' : 'U';
-    const updates = { role: newRole, avatar: newAvatar };
-
-    const localUsers = getLocalUsers();
-    const idx = localUsers.findIndex(u => u.id === userId || u.username === userId);
-    let targetUsername = userId;
-    if (idx !== -1) {
-      localUsers[idx] = { ...localUsers[idx], ...updates };
-      targetUsername = localUsers[idx].username || userId;
-      saveLocalUsers(localUsers);
-    }
-
-    if (supabase) {
-      try {
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId);
-        if (isUuid) {
-          await supabase.from('app_users').update(updates).eq('id', userId);
-        } else {
-          await supabase.from('app_users').update(updates).eq('username', targetUsername);
-        }
-      } catch (sbErr) {
-        console.warn('Supabase toggle-admin warning:', sbErr.message);
-      }
-    }
-
+    const updatedUser = await updateUserById(userId, { role: newRole, avatar: newAvatar });
+    if (!updatedUser) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
+    await recordAuditLog({ userId: req.adminUser.id, username: req.adminUser.username, role: 'admin', action: 'USER_ROLE_CHANGE', target: updatedUser.username, details: `Yeni rol: ${newRole}`, ip: req.ip });
     res.json({ success: true, role: newRole });
   } catch (err) {
-    res.status(500).json({ success: false, reason: err.message });
+    console.warn('Kullanıcı rolü güncelleme hatası:', safeLogStr(err.message));
+    res.status(503).json({ success: false, reason: 'Kullanıcı rolü geçici olarak güncellenemedi.' });
   }
 });
 
 // ── 9. ADMİN: DOĞRUDAN ŞİFRE SIFIRLAMA ────────────────────────
-app.post('/api/admin/reset-password', adminRateLimiter, requireAdmin, async (req, res) => {
+async function handleAdminPasswordReset(req, res) {
   const { userId, newPassword } = req.body;
-  if (!userId || !newPassword || newPassword.length < 3) {
-    return res.status(400).json({ success: false, reason: 'Lütfen en az 3 karakterden oluşan geçerli bir yeni şifre giriniz.' });
+  if (!userId || !newPassword || newPassword.length < 10 || newPassword.length > PASSWORD_MAX_LENGTH) {
+    return res.status(400).json({ success: false, reason: `Lütfen 10-${PASSWORD_MAX_LENGTH} karakter arasında geçerli bir yeni şifre giriniz.` });
   }
 
   try {
-    const passwordHash = hashPassword(newPassword);
-    if (supabase) {
-      await supabase.from('app_users').update({ password_hash: passwordHash }).eq('id', userId);
-    }
-    const localUsers = getLocalUsers();
-    const idx = localUsers.findIndex(u => u.id === userId);
-    if (idx !== -1) {
-      localUsers[idx].password_hash = passwordHash;
-      saveLocalUsers(localUsers);
-    }
-
+    const passwordHash = await hashPassword(newPassword);
+    const updatedUser = await updateUserById(userId, { password_hash: passwordHash });
+    if (!updatedUser) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
+    await recordAuditLog({ userId: req.adminUser.id, username: req.adminUser.username, role: 'admin', action: 'USER_PASSWORD_RESET', target: updatedUser.username, details: 'Yönetici tarafından parola sıfırlandı.', ip: req.ip });
     res.json({ success: true, message: 'Kullanıcı şifresi başarıyla güncellendi.' });
   } catch (err) {
-    res.status(500).json({ success: false, reason: err.message });
+    console.warn('Yönetici parola sıfırlama hatası:', safeLogStr(err.message));
+    res.status(503).json({ success: false, reason: 'Kullanıcı şifresi geçici olarak güncellenemedi.' });
   }
-});
-app.post('/api/admin/reset-user-password', adminRateLimiter, requireAdmin, (req, res, next) => {
-  const handler = app._router.stack.find(r => r.route && r.route.path === '/api/admin/reset-password');
-  if (handler) {
-    // call the same reset-password logic
-    const { userId, newPassword } = req.body;
-    if (!userId || !newPassword || newPassword.length < 3) {
-      return res.status(400).json({ success: false, reason: 'Lütfen en az 3 karakterden oluşan geçerli bir yeni şifre giriniz.' });
-    }
-    try {
-      const passwordHash = hashPassword(newPassword);
-      if (supabase) {
-        supabase.from('app_users').update({ password_hash: passwordHash }).eq('id', userId).catch(() => {});
-      }
-      const localUsers = getLocalUsers();
-      const idx = localUsers.findIndex(u => u.id === userId);
-      if (idx !== -1) {
-        localUsers[idx].password_hash = passwordHash;
-        saveLocalUsers(localUsers);
-      }
-      return res.json({ success: true, message: 'Kullanıcı şifresi başarıyla güncellendi.' });
-    } catch (err) {
-      return res.status(500).json({ success: false, reason: err.message });
-    }
-  }
-  next();
-});
+}
+
+app.post('/api/admin/reset-password', adminRateLimiter, requireAdmin, handleAdminPasswordReset);
+app.post('/api/admin/reset-user-password', adminRateLimiter, requireAdmin, handleAdminPasswordReset);
 
 // ── 9.5. ADMİN: KULLANICI ADI GÜNCELLEME ──────────────────────
-app.post('/api/admin/update-username', adminRateLimiter, requireAdmin, async (req, res) => {
+async function handleAdminUsernameChange(req, res) {
   const { userId, newUsername } = req.body;
-  const cleanUser = (newUsername || '').trim().toLowerCase();
-  if (!userId || !cleanUser) {
-    return res.status(400).json({ success: false, reason: 'Kullanıcı ID ve yeni kullanıcı adı gereklidir.' });
+  const cleanUser = normalizeUsername(newUsername);
+  if (!userId || !isValidUsername(cleanUser)) {
+    return res.status(400).json({ success: false, reason: 'Kullanıcı ID ve 3-50 karakterlik geçerli bir kullanıcı adı gereklidir.' });
   }
 
   try {
-    // Mükerrer kontrolü
-    const localUsers = getLocalUsers();
-    if (localUsers.some(u => u.id !== userId && (u.username || '').toLowerCase() === cleanUser)) {
-      return res.status(400).json({ success: false, reason: `'${cleanUser}' kullanıcı adı zaten kullanımda.` });
-    }
-
+    let oldUsername = '';
     if (supabase) {
-      const { data: existing } = await supabase.from('app_users').select('id').ilike('username', cleanUser).neq('id', userId).limit(1);
-      if (existing && existing.length > 0) {
-        return res.status(400).json({ success: false, reason: `'${cleanUser}' kullanıcı adı zaten kullanımda.` });
-      }
-      await supabase.from('app_users').update({ username: cleanUser }).eq('id', userId);
-    }
+      const current = await supabase.from('app_users').select('id,username').eq('id', userId).limit(1);
+      if (current.error) throw current.error;
+      if (!current.data?.length) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
+      oldUsername = current.data[0].username || '';
 
-    const idx = localUsers.findIndex(u => u.id === userId);
-    if (idx !== -1) {
+      const existing = await supabase.from('app_users').select('id').eq('username', cleanUser).neq('id', userId).limit(1);
+      if (existing.error) throw existing.error;
+      if (existing.data?.length) return res.status(409).json({ success: false, reason: `'${cleanUser}' kullanıcı adı zaten kullanımda.` });
+
+      const update = await supabase.from('app_users').update({ username: cleanUser }).eq('id', userId);
+      if (update.error) throw update.error;
+    } else {
+      const localUsers = getLocalUsers();
+      if (localUsers.some(u => u.id !== userId && normalizeUsername(u.username) === cleanUser)) {
+        return res.status(409).json({ success: false, reason: `'${cleanUser}' kullanıcı adı zaten kullanımda.` });
+      }
+      const idx = localUsers.findIndex(u => u.id === userId);
+      if (idx === -1) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
+      oldUsername = localUsers[idx].username || '';
       localUsers[idx].username = cleanUser;
       saveLocalUsers(localUsers);
     }
 
+    await recordAuditLog({
+      userId: req.adminUser.id,
+      username: req.adminUser.username,
+      role: 'admin',
+      action: 'USER_UPDATE',
+      target: `@${cleanUser}`,
+      details: `Kullanıcı adı değiştirildi: @${oldUsername} ➔ @${cleanUser}`,
+      ip: req.ip
+    });
     res.json({ success: true, message: 'Kullanıcı adı güncellendi.', username: cleanUser });
   } catch (err) {
-    res.status(500).json({ success: false, reason: err.message });
+    console.warn('Kullanıcı adı güncelleme hatası:', safeLogStr(err.message));
+    res.status(503).json({ success: false, reason: 'Kullanıcı adı geçici olarak güncellenemedi.' });
   }
-});
+}
+
+app.post('/api/admin/update-username', adminRateLimiter, requireAdmin, handleAdminUsernameChange);
 
 // ── 10. KULLANICI PROFİL VE ŞİFRE GÜNCELLEME (Self) ───────────
-app.post('/api/auth/change-password', async (req, res) => {
-  const { userId, oldPassword, newPassword } = req.body;
-  if (!userId || !oldPassword || !newPassword) {
+app.post('/api/auth/change-password', authRateLimiter, requireAuth, async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  const userId = req.authUser.id;
+  if (!oldPassword || !newPassword) {
     return res.status(400).json({ success: false, reason: 'Lütfen mevcut ve yeni şifrenizi giriniz.' });
   }
 
-  if (newPassword.length < 3) {
-    return res.status(400).json({ success: false, reason: 'Yeni şifre en az 3 karakter olmalıdır.' });
+  if (newPassword.length < 10 || newPassword.length > PASSWORD_MAX_LENGTH) {
+    return res.status(400).json({ success: false, reason: `Yeni şifre 10-${PASSWORD_MAX_LENGTH} karakter arasında olmalıdır.` });
   }
 
   try {
-    let user = null;
-    if (supabase) {
-      const { data: users } = await supabase.from('app_users').select('*').eq('id', userId).limit(1);
-      if (users && users.length > 0) user = users[0];
-    }
-    if (!user) {
-      user = getLocalUsers().find(u => u.id === userId);
-    }
-
+    const user = await loadUserById(userId);
     if (!user) return res.status(404).json({ success: false, reason: 'Kullanıcı hesabı bulunamadı.' });
 
-    const oldHash = hashPassword(oldPassword);
-    if (user.password_hash !== oldHash && user.password_hash !== oldPassword) {
+    const oldPasswordCheck = await verifyPasswordHash(oldPassword, user.password_hash);
+    if (!oldPasswordCheck.valid) {
       return res.status(400).json({ success: false, reason: 'Mevcut şifrenizi hatalı girdiniz!' });
     }
 
-    const newHash = hashPassword(newPassword);
+    const newHash = await hashPassword(newPassword);
     if (supabase) {
-      await supabase.from('app_users').update({ password_hash: newHash }).eq('id', userId);
-    }
-    const localUsers = getLocalUsers();
-    const idx = localUsers.findIndex(u => u.id === userId);
-    if (idx !== -1) {
-      localUsers[idx].password_hash = newHash;
-      saveLocalUsers(localUsers);
+      const { error } = await supabase.from('app_users').update({ password_hash: newHash }).eq('id', userId);
+      if (error) throw error;
+    } else {
+      const localUsers = getLocalUsers();
+      const idx = localUsers.findIndex(u => u.id === userId);
+      if (idx !== -1) {
+        localUsers[idx].password_hash = newHash;
+        saveLocalUsers(localUsers);
+      }
     }
 
     res.json({ success: true, message: 'Şifreniz başarıyla değiştirildi.' });
   } catch (err) {
-    res.status(500).json({ success: false, reason: 'Şifre güncellenemedi: ' + err.message });
+    console.warn('Şifre güncelleme hatası:', safeLogStr(err.message));
+    res.status(503).json({ success: false, reason: 'Şifre geçici olarak güncellenemedi.' });
   }
 });
 
-app.post('/api/auth/update-profile', async (req, res) => {
-  const { userId, fullName, phone, department, email, username } = req.body;
-  if (!userId) return res.status(400).json({ success: false, reason: 'Kullanıcı kimliği bulunamadı.' });
+app.post('/api/auth/update-profile', authRateLimiter, requireAuth, async (req, res) => {
+  const { fullName, phone, department, email, username } = req.body;
+  const userId = req.authUser.id;
 
   try {
     const updates = {};
-    if (fullName) updates.full_name = fullName.trim();
-    if (phone !== undefined) updates.phone = (phone || '').trim();
-    if (department !== undefined) updates.department = (department || '').trim();
-    if (email) updates.email = email.trim().toLowerCase();
-    if (username) updates.username = username.trim().toLowerCase();
+    if (fullName !== undefined) {
+      if (!isValidText(fullName, { min: 2, max: 120 })) return res.status(400).json({ success: false, reason: 'Ad soyad 2-120 karakter arasında olmalıdır.' });
+      updates.full_name = normalizeText(fullName);
+    }
+    if (phone !== undefined) updates.phone = normalizePhone(phone);
+    if (department !== undefined) {
+      if (!isValidText(department, { min: 1, max: 120 })) return res.status(400).json({ success: false, reason: 'Bölüm 1-120 karakter arasında olmalıdır.' });
+      updates.department = normalizeText(department);
+    }
+    if (email !== undefined) {
+      const cleanEmail = normalizeEmail(email);
+      if (!isValidEmail(cleanEmail)) return res.status(400).json({ success: false, reason: 'Geçerli bir e-posta adresi giriniz.' });
+      updates.email = cleanEmail;
+    }
+    if (username !== undefined) {
+      const cleanUsername = normalizeUsername(username);
+      if (!isValidUsername(cleanUsername)) return res.status(400).json({ success: false, reason: 'Geçerli bir kullanıcı adı giriniz.' });
+      updates.username = cleanUsername;
+    }
+    if (Object.keys(updates).length === 0) return res.status(400).json({ success: false, reason: 'Güncellenecek profil alanı bulunamadı.' });
 
     if (supabase) {
-      await supabase.from('app_users').update(updates).eq('id', userId);
-    }
-    const localUsers = getLocalUsers();
-    const idx = localUsers.findIndex(u => u.id === userId);
-    if (idx !== -1) {
+      if (updates.email) {
+        const result = await supabase.from('app_users').select('id').eq('email', updates.email).neq('id', userId).limit(1);
+        if (result.error) throw result.error;
+        if (result.data?.length) return res.status(409).json({ success: false, reason: 'Bu e-posta adresi zaten kullanımda.' });
+      }
+      if (updates.username) {
+        const result = await supabase.from('app_users').select('id').eq('username', updates.username).neq('id', userId).limit(1);
+        if (result.error) throw result.error;
+        if (result.data?.length) return res.status(409).json({ success: false, reason: 'Bu kullanıcı adı zaten kullanımda.' });
+      }
+      const { error } = await supabase.from('app_users').update(updates).eq('id', userId);
+      if (error) throw error;
+    } else {
+      const localUsers = getLocalUsers();
+      if (updates.email && localUsers.some(user => user.id !== userId && normalizeEmail(user.email) === updates.email)) {
+        return res.status(409).json({ success: false, reason: 'Bu e-posta adresi zaten kullanımda.' });
+      }
+      if (updates.username && localUsers.some(user => user.id !== userId && normalizeUsername(user.username) === updates.username)) {
+        return res.status(409).json({ success: false, reason: 'Bu kullanıcı adı zaten kullanımda.' });
+      }
+      const idx = localUsers.findIndex(u => u.id === userId);
+      if (idx === -1) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
       localUsers[idx] = { ...localUsers[idx], ...updates };
       saveLocalUsers(localUsers);
     }
 
     res.json({ success: true, user: updates });
   } catch (err) {
-    res.status(500).json({ success: false, reason: err.message });
+    console.warn('Profil güncelleme hatası:', safeLogStr(err.message));
+    res.status(503).json({ success: false, reason: 'Profil geçici olarak güncellenemedi.' });
   }
 });
 
 // ── 10.5. KULLANICI ŞİFRE DOĞRULAMA (Kritik İşlem Güvenlik Onayı) ──
-app.post('/api/auth/verify-password', async (req, res) => {
-  const { userId, password } = req.body;
-  if (!password) return res.status(400).json({ success: false, verified: false, reason: 'Şifre girilmedi.' });
+app.post('/api/auth/verify-password', authRateLimiter, requireAuth, async (req, res) => {
+  const { password } = req.body;
+  const userId = req.authUser.id;
+  if (!password || String(password).length > PASSWORD_MAX_LENGTH) return res.status(400).json({ success: false, verified: false, reason: 'Geçerli bir şifre giriniz.' });
 
   try {
-    let user = null;
-    if (supabase) {
-      const { data: users } = await supabase.from('app_users').select('*').or(`id.eq.${userId},username.eq.${userId}`).limit(1);
-      if (users && users.length > 0) user = users[0];
-    }
+    const user = await loadUserById(userId);
     if (!user) {
-      const localUsers = getLocalUsers();
-      user = localUsers.find(u => u.id === userId || u.username === userId);
-    }
-    if (!user) {
-      // Default admin fallback
-      if (password === 'admin123' || password === 'admin') {
-        return res.json({ success: true, verified: true });
-      }
       return res.status(404).json({ success: false, verified: false, reason: 'Kullanıcı bulunamadı.' });
     }
 
-    const pHash = hashPassword(password);
-    const verified = (user.password_hash === pHash || user.password_hash === password || (user.username === 'admin' && password === 'admin123'));
-    res.json({ success: true, verified });
+    const verified = (await verifyPasswordHash(password, user.password_hash)).valid;
+    res.status(verified ? 200 : 401).json({ success: verified, verified, reason: verified ? undefined : 'Girdiğiniz şifre hatalı.' });
   } catch (err) {
-    res.status(500).json({ success: false, verified: false, reason: err.message });
+    res.status(503).json({ success: false, verified: false, reason: 'Şifre doğrulama servisi geçici olarak kullanılamıyor.' });
   }
 });
 
 // ── 10.6. DENETİM GÜNLÜĞÜ VE İSTEMCİ BİLGİ SERVİSLERİ ────────
 app.get('/api/client-ip', (req, res) => {
-  const rawIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || '127.0.0.1';
+  const rawIp = req.ip || req.socket?.remoteAddress || '127.0.0.1';
   const ip = rawIp === '::1' || rawIp === '::ffff:127.0.0.1' ? '127.0.0.1' : rawIp;
   res.json({ success: true, ip });
 });
 
-app.post('/api/audit-log', (req, res) => {
-  const { action, target, details, userId, username, fullName, role, ip: clientIp } = req.body;
-  const rawIp = clientIp || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || '127.0.0.1';
+app.post('/api/audit-log', apiWriteRateLimiter, requireAuth, async (req, res) => {
+  const { action, target, details } = req.body;
+  const cleanAction = String(action || '').trim().toUpperCase().slice(0, 80);
+  if (!/^[A-Z0-9_:-]{2,80}$/.test(cleanAction)) return res.status(400).json({ success: false, reason: 'Geçersiz audit işlem kodu.' });
+  const rawIp = req.ip || req.socket?.remoteAddress || '127.0.0.1';
   const ip = rawIp === '::1' || rawIp === '::ffff:127.0.0.1' ? '127.0.0.1' : rawIp;
-  const entry = recordAuditLog({
-    userId,
-    username,
-    fullName,
-    role,
-    action,
-    target,
-    details,
+  const entry = await recordAuditLog({
+    userId: req.authUser.id,
+    username: req.authUser.username,
+    fullName: req.authUser.full_name,
+    role: req.authUser.role,
+    action: cleanAction,
+    target: String(target || '').slice(0, 300),
+    details: String(details || '').slice(0, 2000),
     ip
   });
+  if (!entry) return res.status(503).json({ success: false, reason: 'Denetim kaydı geçici olarak yazılamadı.' });
   res.json({ success: true, log: entry });
 });
 
-app.get('/api/admin/audit-logs', requireAdmin, (req, res) => {
-  const q = (req.query.q || '').trim().toLowerCase();
-  const limit = parseInt(req.query.limit, 10) || 500;
-  let logs = getAuditLogs();
+app.get('/api/admin/audit-logs', adminRateLimiter, requireAdmin, async (req, res) => {
+  const q = String(req.query.q || '').trim().toLowerCase().slice(0, 200);
+  const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit, 10) || 500));
+  let logs;
+  if (supabase) {
+    const { data, error } = await supabase
+      .from('audit_logs')
+      .select('id, occurred_at, user_id, username, full_name, role, action, target, details, ip')
+      .order('occurred_at', { ascending: false })
+      .limit(q ? 1000 : limit);
+    if (error) {
+      console.warn('Audit log listesi alınamadı:', safeLogStr(error.message));
+      return res.status(503).json({ success: false, reason: 'Denetim kayıtları geçici olarak alınamıyor.' });
+    }
+    logs = (data || []).map(row => ({
+      id: row.id,
+      timestamp: row.occurred_at,
+      userId: row.user_id,
+      username: row.username,
+      fullName: row.full_name,
+      role: row.role,
+      action: row.action,
+      target: row.target,
+      details: row.details,
+      ip: row.ip
+    }));
+  } else {
+    logs = getAuditLogs();
+  }
   if (q) {
     logs = logs.filter(l =>
       (l.username || '').toLowerCase().includes(q) ||
@@ -1091,85 +1106,40 @@ app.get('/api/admin/audit-logs', requireAdmin, (req, res) => {
 });
 
 // ── 11. ADMİN: KULLANICI ADI DEĞİŞTİRME ───────────────────────
-app.post('/api/admin/change-username', adminRateLimiter, requireAdmin, async (req, res) => {
-  const { userId, newUsername } = req.body;
-  const cleanUser = (newUsername || '').trim().toLowerCase();
-
-  if (!userId || !cleanUser) {
-    return res.status(400).json({ success: false, reason: 'Kullanıcı ID ve yeni kullanıcı adı gereklidir.' });
-  }
-
-  try {
-    const localUsers = getLocalUsers();
-    if (localUsers.some(u => u.id !== userId && (u.username || '').toLowerCase() === cleanUser)) {
-      return res.status(400).json({ success: false, reason: `'@${cleanUser}' kullanıcı adı zaten başka bir kullanıcı tarafından kullanılıyor.` });
-    }
-
-    if (supabase) {
-      const { data: exist } = await supabase.from('app_users').select('id').eq('username', cleanUser).neq('id', userId).limit(1);
-      if (exist && exist.length > 0) {
-        return res.status(400).json({ success: false, reason: `'@${cleanUser}' kullanıcı adı zaten kullanımda.` });
-      }
-      await supabase.from('app_users').update({ username: cleanUser }).eq('id', userId);
-    }
-
-    const idx = localUsers.findIndex(u => u.id === userId);
-    let oldUsername = '';
-    if (idx !== -1) {
-      oldUsername = localUsers[idx].username;
-      localUsers[idx].username = cleanUser;
-      saveLocalUsers(localUsers);
-    }
-
-    recordAuditLog({
-      userId: req.adminUser?.id || 'admin',
-      username: req.adminUser?.username || 'admin',
-      role: 'admin',
-      action: 'USER_UPDATE',
-      target: `@${cleanUser}`,
-      details: `Kullanıcı adı değiştirildi: @${oldUsername} ➔ @${cleanUser}`,
-      ip: req.ip
-    });
-
-    res.json({ success: true, username: cleanUser });
-  } catch (err) {
-    res.status(500).json({ success: false, reason: err.message });
-  }
-});
+app.post('/api/admin/change-username', adminRateLimiter, requireAdmin, handleAdminUsernameChange);
 
 // ── 12. E-POSTA DEĞİŞTİRME ────────────────────────────────────
-app.post('/api/auth/change-email', async (req, res) => {
-  const { userId, newEmail } = req.body;
-  const cleanEmail = (newEmail || '').trim().toLowerCase();
+app.post('/api/auth/change-email', authRateLimiter, requireAuth, async (req, res) => {
+  const { newEmail } = req.body;
+  const userId = req.authUser.id;
+  const cleanEmail = normalizeEmail(newEmail);
 
-  if (!userId || !cleanEmail || !EMAIL_REGEX.test(cleanEmail)) {
+  if (!isValidEmail(cleanEmail)) {
     return res.status(400).json({ success: false, reason: 'Geçerli bir e-posta adresi giriniz.' });
   }
 
   try {
-    const localUsers = getLocalUsers();
-    if (localUsers.some(u => u.id !== userId && (u.email || '').toLowerCase() === cleanEmail)) {
-      return res.status(400).json({ success: false, reason: `'${cleanEmail}' e-posta adresi zaten kullanımda.` });
-    }
-
     if (supabase) {
-      const { data: exist } = await supabase.from('app_users').select('id').eq('email', cleanEmail).neq('id', userId).limit(1);
-      if (exist && exist.length > 0) {
-        return res.status(400).json({ success: false, reason: `'${cleanEmail}' e-posta adresi zaten kullanımda.` });
+      const existing = await supabase.from('app_users').select('id').eq('email', cleanEmail).neq('id', userId).limit(1);
+      if (existing.error) throw existing.error;
+      if (existing.data?.length) return res.status(409).json({ success: false, reason: `'${cleanEmail}' e-posta adresi zaten kullanımda.` });
+      const update = await supabase.from('app_users').update({ email: cleanEmail }).eq('id', userId);
+      if (update.error) throw update.error;
+    } else {
+      const localUsers = getLocalUsers();
+      if (localUsers.some(u => u.id !== userId && normalizeEmail(u.email) === cleanEmail)) {
+        return res.status(409).json({ success: false, reason: `'${cleanEmail}' e-posta adresi zaten kullanımda.` });
       }
-      await supabase.from('app_users').update({ email: cleanEmail }).eq('id', userId);
-    }
-
-    const idx = localUsers.findIndex(u => u.id === userId);
-    if (idx !== -1) {
+      const idx = localUsers.findIndex(u => u.id === userId);
+      if (idx === -1) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
       localUsers[idx].email = cleanEmail;
       saveLocalUsers(localUsers);
     }
 
-    recordAuditLog({
+    await recordAuditLog({
       userId,
-      username: localUsers[idx]?.username || 'user',
-      role: localUsers[idx]?.role || 'user',
+      username: req.authUser.username,
+      role: req.authUser.role,
       action: 'EMAIL_CHANGE',
       target: cleanEmail,
       details: `E-posta adresi güncellendi: ${cleanEmail}`,
@@ -1178,357 +1148,519 @@ app.post('/api/auth/change-email', async (req, res) => {
 
     res.json({ success: true, email: cleanEmail });
   } catch (err) {
-    res.status(500).json({ success: false, reason: err.message });
-  }
-});
-
-// ── 13. KRİTİK İŞLEM ÖNCESİ ŞİFRE DOĞRULAMA ──────────────────
-app.post('/api/auth/verify-password', async (req, res) => {
-  const { userId, password } = req.body;
-  if (!userId || !password) {
-    return res.status(400).json({ success: false, reason: 'Kullanıcı ve şifre gereklidir.' });
-  }
-
-  try {
-    let user = null;
-    if (supabase) {
-      const { data } = await supabase.from('app_users').select('password_hash').eq('id', userId).limit(1);
-      if (data && data.length > 0) user = data[0];
-    }
-    if (!user) {
-      user = getLocalUsers().find(u => u.id === userId);
-    }
-
-    if (!user) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
-
-    const pHash = hashPassword(password);
-    const isValid = user.password_hash === pHash || user.password_hash === password;
-
-    if (!isValid) {
-      return res.status(401).json({ success: false, reason: 'Girdiğiniz şifre hatalı!' });
-    }
-
-    res.json({ success: true, verified: true });
-  } catch (err) {
-    res.status(500).json({ success: false, reason: err.message });
-  }
-});
-
-// ── 14. DENETİM GÜNLÜĞÜ (AUDIT LOGS) ──────────────────────────
-// ── 14. DENETİM GÜNLÜĞÜ (AUDIT LOGS) & İSTEMCİ IP ───────────────
-app.get('/api/client-ip', (req, res) => {
-  const rawIp = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 
-                req.socket?.remoteAddress || 
-                req.ip || 
-                '127.0.0.1';
-  const cleanIp = rawIp.replace(/^::ffff:/, '');
-  res.json({ success: true, ip: cleanIp || '127.0.0.1' });
-});
-
-app.get('/api/admin/audit-logs', adminRateLimiter, requireAdmin, (req, res) => {
-  try {
-    const { q, action, limit = 300 } = req.query;
-    let logs = getLocalAuditLogs();
-
-    if (action) {
-      logs = logs.filter(l => (l.action || '').toUpperCase() === String(action).toUpperCase());
-    }
-
-    if (q) {
-      const query = String(q).toLowerCase();
-      logs = logs.filter(l => 
-        (l.username || '').toLowerCase().includes(query) ||
-        (l.details || '').toLowerCase().includes(query) ||
-        (l.target || '').toLowerCase().includes(query) ||
-        (l.action || '').toLowerCase().includes(query) ||
-        (l.ip || '').includes(query)
-      );
-    }
-
-    const lim = Math.min(1000, parseInt(limit, 10) || 300);
-    res.json({
-      success: true,
-      total: logs.length,
-      logs: logs.slice(0, lim)
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, reason: err.message });
-  }
-});
-
-app.post('/api/audit-log', (req, res) => {
-  try {
-    const rawIp = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 
-                  req.socket?.remoteAddress || 
-                  req.ip || 
-                  '127.0.0.1';
-    const cleanIp = rawIp.replace(/^::ffff:/, '');
-
-    const { userId, username, fullName, role, action, target, details } = req.body || {};
-    const log = recordAuditLog({
-      userId,
-      username,
-      fullName,
-      role,
-      action,
-      target,
-      details,
-      ip: cleanIp
-    });
-    res.json({ success: true, log });
-  } catch (err) {
-    res.status(500).json({ success: false, reason: err.message });
+    console.warn('E-posta güncelleme hatası:', safeLogStr(err.message));
+    res.status(503).json({ success: false, reason: 'E-posta adresi geçici olarak güncellenemedi.' });
   }
 });
 
 // ── RAPOR DEPOLAMA VE YÖNETİM ENDPOINTLERİ ──────────────────
-// Load all reports from Supabase (with fallback to local store.json)
-app.get('/api/store/load', async (req, res) => {
-  const storePath = path.join(__dirname, 'data', 'store.json');
+const REPORT_STORE_PATH = path.join(__dirname, 'data', 'store.json');
+const REPORT_STORE_TEMP_PATH = path.join(__dirname, 'data', 'store.json.tmp');
 
-  if (supabase) {
-    try {
-      let allRows = [];
-      let from = 0;
-      const step = 1000;
-
-      while (true) {
-        const { data, error } = await supabase
-          .from('reports')
-          .select('*')
-          .order('updated_at', { ascending: false })
-          .range(from, from + step - 1);
-
-        if (error) {
-          console.warn('Supabase okuma hatası:', error.message);
-          break;
-        }
-        if (!data || data.length === 0) break;
-
-        allRows.push(...data);
-        if (data.length < step) break;
-        from += step;
-      }
-
-      if (allRows.length > 0) {
-        const parsedList = allRows.map(row => row.data || row);
-        // Sync local cache
-        try {
-          const dataDir = path.dirname(storePath);
-          if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-          fs.writeFileSync(storePath, JSON.stringify(parsedList, null, 2), 'utf8');
-        } catch {}
-        return res.json(parsedList);
-      }
-    } catch (e) {
-      console.warn('Supabase okuma hatası, yerel dosyaya dönülüyor:', e.message);
-    }
-  }
-
-  // Fallback to local store.json
-  if (!fs.existsSync(storePath)) return res.json([]);
+function readLocalReports() {
+  if (!fs.existsSync(REPORT_STORE_PATH)) return [];
   try {
-    const localData = fs.readFileSync(storePath, 'utf8');
-    res.json(JSON.parse(localData));
+    const parsed = JSON.parse(fs.readFileSync(REPORT_STORE_PATH, 'utf8'));
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    res.json([]);
+    return [];
   }
-});
+}
 
-// Save / sync reports
-app.post('/api/store/save', async (req, res) => {
-  const storePath = path.join(__dirname, 'data', 'store.json');
-  const tempPath = path.join(__dirname, 'data', 'store.json.tmp');
-  const reports = req.body;
+function writeLocalReports(reports) {
+  const dataDir = path.dirname(REPORT_STORE_PATH);
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+  fs.writeFileSync(REPORT_STORE_TEMP_PATH, JSON.stringify(reports, null, 2), 'utf8');
+  fs.renameSync(REPORT_STORE_TEMP_PATH, REPORT_STORE_PATH);
+}
 
-  // 1. Save local backup first
-  try {
-    const dataDir = path.dirname(storePath);
-    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-    fs.writeFileSync(tempPath, JSON.stringify(reports, null, 2), 'utf8');
-    fs.renameSync(tempPath, storePath);
-  } catch (err) {
-    try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch {}
-  }
-
-  // 2. Sync to Supabase in parallel
-  if (supabase && Array.isArray(reports)) {
-    try {
-      const rows = reports.map(report => {
-        const id = String(report.id || report.fileId || Date.now());
-        const name = String(report.name || report.fileName || 'İsimsiz Rapor');
-        const userId = String(report.userId || report.user_id || 'public');
-        const fileSize = Number(report.sizeBytes || report.size || report.file_size || 0);
-        const category = String(report.category || '');
-        const tags = Array.isArray(report.tags) ? report.tags : [];
-        const userNote = String(report.userNote || report.user_note || '');
-        const isFavorite = !!(report.isFavorite || report.favorite || report.is_favorite);
-        const isPinned = !!(report.isPinned || report.pinned || report.is_pinned);
-        const isDeleted = !!(report.isDeleted || report.is_deleted);
-        const isPublic = !!(report.isPublic || report.is_public || report.inPool || report.in_pool);
-        const ownerName = String(report.ownerName || report.owner_name || report.uploadedBy || '');
-        const ownerUsername = String(report.ownerUsername || report.owner_username || '');
-        const ownerDepartment = String(report.ownerDepartment || report.owner_department || '');
-        const sharedAt = isPublic ? (report.sharedAt || report.shared_at || new Date().toISOString()) : null;
-
-        const sqlCount = Array.isArray(report.queries) ? report.queries.length : Number(report.stats?.sqlCount || report.sql_count || 0);
-        const memoCount = Array.isArray(report.memos) ? report.memos.length : Number(report.stats?.memoCount || report.memo_count || 0);
-        const datasetCount = Array.isArray(report.datasets) ? report.datasets.length : Number(report.dataset_count || 0);
-        const pageCount = Array.isArray(report.pages) ? report.pages.length : Number(report.stats?.pageCount || report.page_count || 1);
-        const hasScript = !!(report.pascalScript && report.pascalScript.trim().length > 0);
-
-        const safeReportData = {
-          ...report,
-          userId,
-          isPublic,
-          is_public: isPublic,
-          ownerName,
-          owner_name: ownerName,
-          ownerUsername,
-          owner_username: ownerUsername,
-          ownerDepartment,
-          owner_department: ownerDepartment,
-          sharedAt,
-          shared_at: sharedAt
-        };
-
-        return {
-          id,
-          name,
-          user_id: userId,
-          file_size: fileSize,
-          category,
-          tags,
-          user_note: userNote,
-          is_favorite: isFavorite,
-          is_pinned: isPinned,
-          is_deleted: isDeleted,
-          sql_count: sqlCount,
-          memo_count: memoCount,
-          dataset_count: datasetCount,
-          page_count: pageCount,
-          has_script: hasScript,
-          data: safeReportData,
-          updated_at: new Date().toISOString()
-        };
-      });
-
-      if (rows.length > 0) {
-        // Chunk upserts in batches of 50 for max safety & stability
-        const BATCH_SIZE = 50;
-        for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-          const chunk = rows.slice(i, i + BATCH_SIZE);
-          await supabase.from('reports').upsert(chunk, { onConflict: 'id' });
-        }
-      }
-    } catch (e) {
-      console.warn('Supabase sync warning:', e.message);
-    }
-  }
-
-  res.json({ success: true });
-});
-
-// Single report delete from Supabase
-app.delete('/api/reports/:id', async (req, res) => {
-  const { id } = req.params;
+async function getReportRecord(id) {
   if (supabase) {
+    const { data, error } = await supabase.from('reports').select('*').eq('id', String(id)).limit(1);
+    if (error) throw error;
+    return data && data[0] ? data[0] : null;
+  }
+  return readLocalReports().find(report => reportId(report) === String(id)) || null;
+}
+
+async function loadVisibleReports(user, isDeleted) {
+  if (supabase) {
+    let rows = [];
+    let from = 0;
+    const step = 1000;
+
+    while (true) {
+      let query = supabase.from('reports').select('*').eq('is_deleted', isDeleted);
+      if (user.role !== 'admin') {
+        query = isDeleted ? query.eq('user_id', user.id) : query.or(`user_id.eq.${user.id},is_public.eq.true`);
+      }
+      const { data, error } = await query.order('updated_at', { ascending: false }).range(from, from + step - 1);
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+      rows.push(...data);
+      if (data.length < step) break;
+      from += step;
+    }
+    return rows.map(reportRowToClient);
+  }
+
+  return readLocalReports()
+    .filter(report => Boolean(report.isDeleted || report.is_deleted) === isDeleted && canReadReport(user, report))
+    .sort((left, right) => new Date(right.loadedAt || right.updated_at || 0) - new Date(left.loadedAt || left.updated_at || 0));
+}
+
+app.get('/api/store/load', requireAuth, async (req, res) => {
+  try {
+    res.json(await loadVisibleReports(req.authUser, false));
+  } catch (error) {
+    console.warn('Raporlar yüklenemedi:', safeLogStr(error.message));
+    res.status(503).json({ success: false, reason: 'Rapor verileri geçici olarak yüklenemiyor.' });
+  }
+});
+
+app.get('/api/store/trash', requireAuth, async (req, res) => {
+  try {
+    res.json(await loadVisibleReports(req.authUser, true));
+  } catch (error) {
+    console.warn('Çöp kutusu yüklenemedi:', safeLogStr(error.message));
+    res.status(503).json({ success: false, reason: 'Çöp kutusu geçici olarak yüklenemiyor.' });
+  }
+});
+
+app.put('/api/reports/:id', apiWriteRateLimiter, requireAuth, async (req, res) => {
+  const id = String(req.params.id || '');
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body) || String(req.body.id || '') !== id) {
+    return res.status(400).json({ success: false, reason: 'Rapor kimliği istek adresiyle eşleşmelidir.' });
+  }
+
+  try {
+    const existing = await getReportRecord(id);
+    if (existing && !canManageReport(req.authUser, existing)) {
+      return res.status(403).json({ success: false, reason: 'Başka bir kullanıcıya ait rapor güncellenemez.' });
+    }
+
+    const currentVersion = existing ? Math.max(1, Number(existing.version) || 1) : 0;
+    let nextVersion;
     try {
-      await supabase.from('reports').delete().eq('id', id);
-    } catch (e) {
-      console.warn('Supabase delete error:', e.message);
+      nextVersion = nextReportVersion(existing, req.body.version);
+    } catch (versionError) {
+      return res.status(409).json({
+        success: false,
+        code: versionError.code,
+        reason: 'Rapor başka bir oturumda güncellendi. Yenileyip değişikliklerinizi tekrar uygulayın.',
+        currentVersion: versionError.currentVersion
+      });
     }
-  }
-  res.json({ success: true });
-});
+    const row = buildOwnedReportRow(req.body, req.authUser);
+    row.version = nextVersion;
+    row.data = { ...row.data, version: nextVersion };
 
-// ── ORTAK HAVUZ ENDPOINTLERİ ────────────────────────────────
-app.post('/api/reports/toggle-pool', async (req, res) => {
-  const { reportId, makePublic, ownerInfo } = req.body;
-  if (!reportId) return res.status(400).json({ success: false, reason: 'Rapor ID gerekli.' });
-
-  try {
-    const storePath = path.join(__dirname, 'data', 'store.json');
-    let localData = [];
-    if (fs.existsSync(storePath)) {
-      try { localData = JSON.parse(fs.readFileSync(storePath, 'utf8')) || []; } catch {}
-    }
-
-    const idx = localData.findIndex(r => String(r.id || r.fileId) === String(reportId));
-    if (idx !== -1) {
-      localData[idx].isPublic = !!makePublic;
-      localData[idx].is_public = !!makePublic;
-      if (ownerInfo) {
-        localData[idx].ownerName = ownerInfo.fullName || ownerInfo.name || localData[idx].ownerName || '';
-        localData[idx].ownerUsername = ownerInfo.username || localData[idx].ownerUsername || '';
-        localData[idx].ownerDepartment = ownerInfo.department || localData[idx].ownerDepartment || '';
-      }
-      if (makePublic) {
-        localData[idx].sharedAt = new Date().toISOString();
-      }
-      fs.writeFileSync(storePath, JSON.stringify(localData, null, 2), 'utf8');
-    }
-
-    if (supabase && idx !== -1) {
-      await supabase.from('reports').update({
-        data: localData[idx],
-        updated_at: new Date().toISOString()
-      }).eq('id', String(reportId));
-    }
-
-    res.json({ success: true, isPublic: !!makePublic });
-  } catch (err) {
-    res.status(500).json({ success: false, reason: err.message });
-  }
-});
-
-app.post('/api/reports/bulk-toggle-pool', async (req, res) => {
-  const { reportIds, makePublic, ownerInfo } = req.body;
-  if (!Array.isArray(reportIds) || reportIds.length === 0) {
-    return res.status(400).json({ success: false, reason: 'Rapor ID listesi gerekli.' });
-  }
-
-  try {
-    const storePath = path.join(__dirname, 'data', 'store.json');
-    let localData = [];
-    if (fs.existsSync(storePath)) {
-      try { localData = JSON.parse(fs.readFileSync(storePath, 'utf8')) || []; } catch {}
-    }
-
-    const idSet = new Set(reportIds.map(String));
-    const nowIso = new Date().toISOString();
-
-    localData.forEach(r => {
-      if (idSet.has(String(r.id || r.fileId))) {
-        r.isPublic = !!makePublic;
-        r.is_public = !!makePublic;
-        if (ownerInfo) {
-          r.ownerName = ownerInfo.fullName || ownerInfo.name || r.ownerName || '';
-          r.ownerUsername = ownerInfo.username || r.ownerUsername || '';
-          r.ownerDepartment = ownerInfo.department || r.ownerDepartment || '';
+    let saved;
+    if (supabase) {
+      if (!existing) {
+        const result = await supabase.from('reports').insert(row).select('*').limit(1);
+        if (result.error) {
+          if (result.error.code === '23505') {
+            return res.status(409).json({ success: false, code: 'REPORT_CONFLICT', reason: 'Rapor aynı anda başka bir oturumda oluşturuldu.' });
+          }
+          throw result.error;
         }
-        if (makePublic) r.sharedAt = nowIso;
+        saved = result.data?.[0];
+      } else {
+        const result = await supabase.from('reports').update(row).eq('id', id).eq('version', currentVersion).select('*').limit(1);
+        if (result.error) throw result.error;
+        if (!result.data?.length) {
+          return res.status(409).json({ success: false, code: 'REPORT_CONFLICT', reason: 'Rapor aynı anda başka bir oturumda güncellendi.' });
+        }
+        saved = result.data[0];
       }
-    });
+    } else {
+      const reports = readLocalReports();
+      const index = reports.findIndex(report => reportId(report) === id);
+      const clientReport = reportRowToClient(row);
+      if (index === -1) reports.push(clientReport);
+      else reports[index] = clientReport;
+      writeLocalReports(reports);
+      saved = row;
+    }
 
-    fs.writeFileSync(storePath, JSON.stringify(localData, null, 2), 'utf8');
+    res.json({ success: true, report: reportRowToClient(saved) });
+  } catch (error) {
+    console.warn('Rapor kaydedilemedi:', safeLogStr(error.message));
+    res.status(503).json({ success: false, reason: 'Rapor geçici olarak kaydedilemedi.' });
+  }
+});
+
+app.get('/api/settings', requireAuth, async (req, res) => {
+  if (!supabase) return res.json({ success: true, settings: null });
+  try {
+    const { data, error } = await supabase.from('user_settings').select('*').eq('id', String(req.authUser.id)).limit(1);
+    if (error) throw error;
+    const settings = data && data[0] ? data[0] : null;
+    res.json({ success: true, settings: settings ? { ...settings, customTags: settings.custom_tags || [] } : null });
+  } catch (error) {
+    console.warn('Kullanıcı ayarları yüklenemedi:', safeLogStr(error.message));
+    res.status(503).json({ success: false, reason: 'Kullanıcı ayarları yüklenemedi.' });
+  }
+});
+
+app.patch('/api/settings', apiWriteRateLimiter, requireAuth, async (req, res) => {
+  if (!supabase) return res.status(503).json({ success: false, reason: 'Ayar senkronizasyonu kullanılamıyor.' });
+  try {
+    const currentResult = await supabase.from('user_settings').select('*').eq('id', String(req.authUser.id)).limit(1);
+    if (currentResult.error) throw currentResult.error;
+    const current = currentResult.data?.[0] || {};
+    const customTagsInput = req.body?.custom_tags ?? req.body?.customTags;
+    const row = {
+      id: String(req.authUser.id),
+      theme: boundedSetting(req.body?.theme ?? current.theme, 50, 'light'),
+      preferences: plainObject(req.body?.preferences) ? req.body.preferences : (current.preferences || {}),
+      recent_reports: Array.isArray(req.body?.recent_reports) ? req.body.recent_reports.slice(0, 100) : (current.recent_reports || []),
+      custom_tags: Array.isArray(customTagsInput) ? customTagsInput.slice(0, 100).map(tag => boundedSetting(tag, 100)).filter(Boolean) : (current.custom_tags || []),
+      updated_at: new Date().toISOString()
+    };
+    const { error } = await supabase.from('user_settings').upsert(row, { onConflict: 'id' });
+    if (error) throw error;
+    res.json({ success: true, settings: { ...row, customTags: row.custom_tags } });
+  } catch (error) {
+    console.warn('Kullanıcı ayarları kaydedilemedi:', safeLogStr(error.message));
+    res.status(503).json({ success: false, reason: 'Kullanıcı ayarları kaydedilemedi.' });
+  }
+});
+
+app.post('/api/store/save', apiWriteRateLimiter, requireAuth, async (req, res) => {
+  res.status(410).json({
+    success: false,
+    code: 'SNAPSHOT_SYNC_REMOVED',
+    reason: 'Toplu arşiv yazımı kaldırıldı. Raporları tekil endpoint üzerinden kaydedin.'
+  });
+});
+
+app.delete('/api/reports', apiWriteRateLimiter, requireAuth, async (req, res) => {
+  try {
+    if (supabase) {
+      const { error } = await supabase.from('reports').delete().eq('user_id', String(req.authUser.id));
+      if (error) throw error;
+    } else {
+      writeLocalReports(readLocalReports().filter(report => String(report.userId || report.user_id) !== String(req.authUser.id)));
+    }
+    res.json({ success: true });
+  } catch {
+    res.status(503).json({ success: false, reason: 'Kullanıcı raporları silinemedi.' });
+  }
+});
+
+app.delete('/api/reports/trash/all', apiWriteRateLimiter, requireAuth, async (req, res) => {
+  try {
+    if (supabase) {
+      const { error } = await supabase.from('reports').delete().eq('user_id', String(req.authUser.id)).eq('is_deleted', true);
+      if (error) throw error;
+    } else {
+      writeLocalReports(readLocalReports().filter(report =>
+        String(report.userId || report.user_id) !== String(req.authUser.id) || !Boolean(report.isDeleted || report.is_deleted)
+      ));
+    }
+    res.json({ success: true });
+  } catch {
+    res.status(503).json({ success: false, reason: 'Çöp kutusu boşaltılamadı.' });
+  }
+});
+
+app.delete('/api/reports/:id', apiWriteRateLimiter, requireAuth, async (req, res) => {
+  try {
+    const report = await getReportRecord(req.params.id);
+    if (!report) return res.status(404).json({ success: false, reason: 'Rapor bulunamadı.' });
+    if (!canManageReport(req.authUser, report)) {
+      return res.status(403).json({ success: false, reason: 'Bu raporu silme yetkiniz yok.' });
+    }
 
     if (supabase) {
-      const updatedRows = localData.filter(r => idSet.has(String(r.id || r.fileId)));
-      for (const r of updatedRows) {
-        await supabase.from('reports').update({
-          data: r,
-          updated_at: nowIso
-        }).eq('id', String(r.id || r.fileId));
-      }
+      const { error } = await supabase.from('reports').delete().eq('id', String(req.params.id));
+      if (error) throw error;
+    } else {
+      writeLocalReports(readLocalReports().filter(item => reportId(item) !== String(req.params.id)));
     }
-
-    res.json({ success: true, count: reportIds.length, isPublic: !!makePublic });
-  } catch (err) {
-    res.status(500).json({ success: false, reason: err.message });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(503).json({ success: false, reason: 'Rapor silinemedi.' });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`FrpOku Supabase Bulut Sunucusu http://localhost:${PORT} üzerinde çalışıyor.`);
+app.patch('/api/reports/:id/trash', apiWriteRateLimiter, requireAuth, async (req, res) => {
+  try {
+    const report = await getReportRecord(req.params.id);
+    if (!report) return res.status(404).json({ success: false, reason: 'Rapor bulunamadı.' });
+    if (!canManageReport(req.authUser, report)) {
+      return res.status(403).json({ success: false, reason: 'Bu raporu değiştirme yetkiniz yok.' });
+    }
+
+    const isDeleted = req.body?.deleted !== false;
+    const deletedAt = isDeleted ? new Date().toISOString() : null;
+    let nextVersion;
+    try {
+      nextVersion = nextReportVersion(report, req.body?.version);
+    } catch (versionError) {
+      return res.status(409).json({ success: false, code: versionError.code, reason: 'Rapor başka bir oturumda güncellendi.', currentVersion: versionError.currentVersion });
+    }
+    let savedReport;
+    if (supabase) {
+      const current = reportRowToClient(report);
+      const data = { ...current, isDeleted, is_deleted: isDeleted, deletedAt, deleted_at: deletedAt, version: nextVersion };
+      const result = await supabase.from('reports')
+        .update({ is_deleted: isDeleted, deleted_at: deletedAt, data, version: nextVersion, updated_at: new Date().toISOString() })
+        .eq('id', String(req.params.id)).eq('version', nextVersion - 1).select('*').limit(1);
+      if (result.error) throw result.error;
+      if (!result.data?.length) return res.status(409).json({ success: false, code: 'REPORT_CONFLICT', reason: 'Rapor aynı anda başka bir oturumda güncellendi.' });
+      savedReport = reportRowToClient(result.data[0]);
+    } else {
+      const reports = readLocalReports();
+      const index = reports.findIndex(item => reportId(item) === String(req.params.id));
+      reports[index] = { ...reports[index], isDeleted, is_deleted: isDeleted, deletedAt, deleted_at: deletedAt, version: nextVersion };
+      writeLocalReports(reports);
+      savedReport = reports[index];
+    }
+    res.json({ success: true, isDeleted, report: savedReport });
+  } catch (error) {
+    res.status(503).json({ success: false, reason: 'Rapor durumu güncellenemedi.' });
+  }
+});
+
+app.post('/api/reports/toggle-pool', apiWriteRateLimiter, requireAuth, async (req, res) => {
+  const reportIdValue = String(req.body?.reportId || '');
+  if (!reportIdValue) return res.status(400).json({ success: false, reason: 'Rapor ID gerekli.' });
+
+  try {
+    const report = await getReportRecord(reportIdValue);
+    if (!report) return res.status(404).json({ success: false, reason: 'Rapor bulunamadı.' });
+    if (!canManageReport(req.authUser, report)) {
+      return res.status(403).json({ success: false, reason: 'Bu raporu havuzda değiştirme yetkiniz yok.' });
+    }
+
+    const isPublic = Boolean(req.body.makePublic);
+    const sharedAt = isPublic ? new Date().toISOString() : null;
+    if (supabase) {
+      const current = reportRowToClient(report);
+      const data = { ...current, isPublic, is_public: isPublic, sharedAt, shared_at: sharedAt };
+      const { error } = await supabase.from('reports').update({ is_public: isPublic, shared_at: sharedAt, data, updated_at: new Date().toISOString() }).eq('id', reportIdValue);
+      if (error) throw error;
+    } else {
+      const reports = readLocalReports();
+      const index = reports.findIndex(item => reportId(item) === reportIdValue);
+      reports[index] = { ...reports[index], isPublic, is_public: isPublic, sharedAt, shared_at: sharedAt };
+      writeLocalReports(reports);
+    }
+    res.json({ success: true, isPublic });
+  } catch (error) {
+    res.status(503).json({ success: false, reason: 'Ortak havuz durumu güncellenemedi.' });
+  }
+});
+
+app.post('/api/reports/bulk-toggle-pool', apiWriteRateLimiter, requireAuth, async (req, res) => {
+  const reportIds = Array.isArray(req.body?.reportIds) ? [...new Set(req.body.reportIds.map(String))] : [];
+  if (reportIds.length === 0 || reportIds.length > 100) {
+    return res.status(400).json({ success: false, reason: '1-100 arasında rapor ID değeri gereklidir.' });
+  }
+
+  try {
+    const reports = [];
+    for (const id of reportIds) {
+      const report = await getReportRecord(id);
+      if (!report) return res.status(404).json({ success: false, reason: 'Raporlardan biri bulunamadı.' });
+      if (!canManageReport(req.authUser, report)) {
+        return res.status(403).json({ success: false, reason: 'Raporlardan biri için yönetim yetkiniz yok.' });
+      }
+      reports.push(report);
+    }
+
+    const isPublic = Boolean(req.body.makePublic);
+    const sharedAt = isPublic ? new Date().toISOString() : null;
+    if (supabase) {
+      for (const report of reports) {
+        const current = reportRowToClient(report);
+        const data = { ...current, isPublic, is_public: isPublic, sharedAt, shared_at: sharedAt };
+        const { error } = await supabase.from('reports').update({ is_public: isPublic, shared_at: sharedAt, data, updated_at: new Date().toISOString() }).eq('id', String(report.id));
+        if (error) throw error;
+      }
+    } else {
+      const localReports = readLocalReports();
+      const idSet = new Set(reportIds);
+      localReports.forEach((report, index) => {
+        if (idSet.has(reportId(report))) localReports[index] = { ...report, isPublic, is_public: isPublic, sharedAt, shared_at: sharedAt };
+      });
+      writeLocalReports(localReports);
+    }
+    res.json({ success: true, count: reportIds.length, isPublic });
+  } catch (error) {
+    res.status(503).json({ success: false, reason: 'Ortak havuz durumu güncellenemedi.' });
+  }
+});
+
+// ── KATEGORİ YÖNETİMİ (CATEGORIES CRUD API) ──────────────────
+const CATEGORIES_STORE_PATH = path.join(__dirname, 'data', 'categories.json');
+
+function readLocalCategories() {
+  try {
+    if (!fs.existsSync(CATEGORIES_STORE_PATH)) return [];
+    return JSON.parse(fs.readFileSync(CATEGORIES_STORE_PATH, 'utf8'));
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalCategories(cats) {
+  try {
+    const dataDir = path.join(__dirname, 'data');
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    fs.writeFileSync(CATEGORIES_STORE_PATH, JSON.stringify(cats, null, 2), 'utf8');
+  } catch {}
+}
+
+app.get('/api/categories', requireAuth, async (req, res) => {
+  try {
+    if (supabase) {
+      const { data, error } = await supabase.from('categories').select('*').order('created_at', { ascending: true });
+      if (error) throw error;
+      return res.json({ success: true, categories: data || [] });
+    }
+    res.json({ success: true, categories: readLocalCategories() });
+  } catch (error) {
+    res.status(503).json({ success: false, reason: 'Kategoriler alınamadı.' });
+  }
+});
+
+app.post('/api/categories', apiWriteRateLimiter, requireAuth, async (req, res) => {
+  const cat = req.body;
+  if (!cat || !cat.id) return res.status(400).json({ success: false, reason: 'Kategori ID gereklidir.' });
+  const row = {
+    id: String(cat.id).slice(0, 100),
+    name: String(cat.name || 'Genel').slice(0, 150),
+    color: String(cat.color || '#3b82f6').slice(0, 50),
+    icon: String(cat.icon || 'folder').slice(0, 50),
+    created_at: cat.created_at || new Date().toISOString()
+  };
+  try {
+    if (supabase) {
+      const { error } = await supabase.from('categories').upsert(row, { onConflict: 'id' });
+      if (error) throw error;
+    } else {
+      const cats = readLocalCategories();
+      const idx = cats.findIndex(c => c.id === row.id);
+      if (idx >= 0) cats[idx] = row; else cats.push(row);
+      writeLocalCategories(cats);
+    }
+    res.json({ success: true, category: row });
+  } catch (error) {
+    res.status(503).json({ success: false, reason: 'Kategori kaydedilemedi.' });
+  }
+});
+
+app.delete('/api/categories/:id', apiWriteRateLimiter, requireAuth, async (req, res) => {
+  const catId = String(req.params.id);
+  try {
+    if (supabase) {
+      const { error } = await supabase.from('categories').delete().eq('id', catId);
+      if (error) throw error;
+    } else {
+      writeLocalCategories(readLocalCategories().filter(c => c.id !== catId));
+    }
+    res.json({ success: true });
+  } catch (error) {
+    res.status(503).json({ success: false, reason: 'Kategori silinemedi.' });
+  }
+});
+
+// ── SORGU KÜTÜPHANESİ (SNIPPETS CRUD API) ────────────────────
+const SNIPPETS_STORE_PATH = path.join(__dirname, 'data', 'snippets.json');
+
+function readLocalSnippets() {
+  try {
+    if (!fs.existsSync(SNIPPETS_STORE_PATH)) return [];
+    return JSON.parse(fs.readFileSync(SNIPPETS_STORE_PATH, 'utf8'));
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalSnippets(snippets) {
+  try {
+    const dataDir = path.join(__dirname, 'data');
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    fs.writeFileSync(SNIPPETS_STORE_PATH, JSON.stringify(snippets, null, 2), 'utf8');
+  } catch {}
+}
+
+app.get('/api/snippets', requireAuth, async (req, res) => {
+  try {
+    if (supabase) {
+      const { data, error } = await supabase.from('snippets').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      const formatted = (data || []).map(s => ({
+        id: s.id,
+        title: s.title,
+        sql: s.sql,
+        reportName: s.report_name,
+        category: s.category,
+        createdAt: s.created_at
+      }));
+      return res.json({ success: true, snippets: formatted });
+    }
+    res.json({ success: true, snippets: readLocalSnippets() });
+  } catch (error) {
+    res.status(503).json({ success: false, reason: 'Sorgular alınamadı.' });
+  }
+});
+
+app.post('/api/snippets', apiWriteRateLimiter, requireAuth, async (req, res) => {
+  const snippet = req.body;
+  if (!snippet) return res.status(400).json({ success: false, reason: 'Sorgu verisi gereklidir.' });
+  const row = {
+    id: String(snippet.id || Date.now()),
+    title: String(snippet.title || 'SQL Sorgusu').slice(0, 200),
+    sql: String(snippet.sql || ''),
+    report_name: String(snippet.reportName || snippet.report_name || '—').slice(0, 300),
+    category: String(snippet.category || 'Genel').slice(0, 100),
+    created_at: snippet.createdAt || snippet.created_at || new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+  try {
+    if (supabase) {
+      const { error } = await supabase.from('snippets').upsert(row, { onConflict: 'id' });
+      if (error) throw error;
+    } else {
+      const snippets = readLocalSnippets();
+      const idx = snippets.findIndex(s => s.id === row.id);
+      if (idx >= 0) snippets[idx] = row; else snippets.unshift(row);
+      writeLocalSnippets(snippets);
+    }
+    res.json({ success: true, snippet: row });
+  } catch (error) {
+    res.status(503).json({ success: false, reason: 'Sorgu kaydedilemedi.' });
+  }
+});
+
+app.delete('/api/snippets/:id', apiWriteRateLimiter, requireAuth, async (req, res) => {
+  const snipId = String(req.params.id);
+  try {
+    if (supabase) {
+      const { error } = await supabase.from('snippets').delete().eq('id', snipId);
+      if (error) throw error;
+    } else {
+      writeLocalSnippets(readLocalSnippets().filter(s => s.id !== snipId));
+    }
+    res.json({ success: true });
+  } catch (error) {
+    res.status(503).json({ success: false, reason: 'Sorgu silinemedi.' });
+  }
+});
+
+async function startServer() {
+  await ensureAdminUser();
+  app.listen(PORT, () => {
+    console.log(`FrpOku Supabase Bulut Sunucusu http://localhost:${PORT} üzerinde çalışıyor.`);
+  });
+}
+
+startServer().catch(error => {
+  console.error('Sunucu başlatılamadı:', safeLogStr(error.message));
+  process.exit(1);
 });

@@ -154,11 +154,12 @@
     }
   });
 
-  // Global Theme Toggle Click Handler
+  // Global Theme Toggle Click Handler (Tek elden yönetim)
   document.addEventListener('click', (e) => {
     const btn = e.target.closest('#btnThemeToggle');
     if (btn) {
       e.preventDefault();
+      e.stopPropagation();
       const cur = getGlobalTheme();
       const next = cur === 'dark' ? 'light' : 'dark';
       setTheme(next);
@@ -178,4 +179,23 @@
 
   // Sayfa yüklendiğinde otomatik uygula
   initCodeTheme();
+
+  function syncThemeButtons() {
+    const isDark = getGlobalTheme() === 'dark';
+    document.querySelectorAll('#btnThemeToggle').forEach(btn => {
+      btn.textContent = isDark ? 'Aydınlık Mod' : 'Koyu Mod';
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', syncThemeButtons);
+  } else {
+    syncThemeButtons();
+  }
+
+  // Dinamik olarak eklenen butonlar için buton metnini senkronize et
+  const _themeObserver = new MutationObserver(() => {
+    syncThemeButtons();
+  });
+  _themeObserver.observe(document.body || document.documentElement, { childList: true, subtree: true });
 })();

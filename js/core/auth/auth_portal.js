@@ -51,6 +51,11 @@
  }
 
  function showAuthFullScreenPortal(initialTab = 'login') {
+ const splash = document.getElementById('splashScreen');
+ if (splash) {
+ splash.style.display = 'none';
+ splash.remove();
+ }
  const existing = document.getElementById('authFullScreenPortal');
  if (existing) existing.remove();
 
@@ -302,7 +307,7 @@
  alertBox.style.border = '1px solid #bbf7d0';
  alertBox.style.color = '#15803d';
  }
- alertBox.innerHTML = msg;
+ alertBox.textContent = String(msg || '');
  };
  const hideAlert = () => { alertBox.style.display = 'none'; };
 
