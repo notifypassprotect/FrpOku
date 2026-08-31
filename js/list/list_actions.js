@@ -270,7 +270,7 @@ async function showDownloadHistoryModal() {
               </div>
             </div>
             ${item.reportId && item.reportId !== 'bulk' ? `
-              <button type="button" class="btn btn-sm btn-ghost" onclick="window.downloadSingleReport && window.downloadSingleReport(decodeURIComponent('${encodeInlineArg(item.reportId)}'))" title="Tekrar İndir" style="font-size:.72rem;padding:.25rem .55rem;">
+              <button type="button" class="btn btn-sm btn-ghost" data-list-action="download" data-id="${encodeInlineArg(item.reportId)}" title="Tekrar İndir" style="font-size:.72rem;padding:.25rem .55rem;">
                 İndir
               </button>
             ` : ''}

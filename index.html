@@ -10,12 +10,7 @@
   <link rel="stylesheet" href="css/style.css?v=4.3" />
   <link rel="stylesheet" href="css/list.css?v=4.3" />
   <link rel="stylesheet" href="css/themes.css?v=4.3" />
-  <script>
-    (function() {
-      const t = localStorage.getItem('frpoku_theme') || 'light';
-      document.documentElement.setAttribute('data-theme', t);
-    })();
-  </script>
+  <script src="js/core/theme_bootstrap.js?v=4.4"></script>
 </head>
 <body>
   <!-- SPLASH SCREEN LOADING AREA (PREMIUM GLASS DESIGN) -->
@@ -39,17 +34,7 @@
     @keyframes pulse { 0%, 100% { transform:scale(1); box-shadow:0 0 45px rgba(59,130,246,.55); } 50% { transform:scale(1.06); box-shadow:0 0 65px rgba(139,92,246,.7); } }
     @keyframes spinGlow { 0% { transform:rotate(0deg); opacity:.4; } 50% { opacity:.9; } 100% { transform:rotate(360deg); opacity:.4; } }
   </style>
-  <script>
-    setTimeout(function() {
-      var s = document.getElementById('splashScreen');
-      if (s) {
-        s.style.pointerEvents = 'none';
-        s.style.opacity = '0';
-        s.style.visibility = 'hidden';
-        setTimeout(function() { if (s && s.parentNode) s.parentNode.removeChild(s); }, 420);
-      }
-    }, 450);
-  </script>
+  <script src="js/list/list_page_bootstrap.js?v=4.4" defer></script>
 
   <!-- DRAG AND DROP OVERLAY -->
   <div id="dragOverlay" class="drag-overlay">
@@ -88,7 +73,7 @@
       <button class="btn btn-sm" id="btnRecentDownloadsModal" style="font-weight:700;" title="Son İndirilen Dosyalar ve İndirme Geçmişi">Son İndirilenler</button>
 
       <!-- Panel (Sadece Sistem Yöneticisi Admin için) -->
-      <button class="btn btn-sm btn-primary" id="btnDashboardPanel" onclick="window.location.href='dashboard.html'" title="İstatistik Paneli" style="display:none;">Panel</button>
+      <button class="btn btn-sm btn-primary" id="btnDashboardPanel" data-list-action="dashboard" title="İstatistik Paneli" style="display:none;">Panel</button>
 
       <!-- Analizler Menüsü (Dropdown) -->
       <div class="topbar-dropdown" id="dropdownAnalytics">
@@ -428,22 +413,8 @@
 <script src="js/list/renderers/table_renderer.js?v=4.3"></script>
 <script src="js/list/renderers/cards_renderer.js?v=4.3"></script>
 <script src="js/list/renderers/timeline_renderer.js?v=4.3"></script>
+<script src="js/list/list_events.js?v=4.4"></script>
 <script src="js/list/list.js?v=4.3"></script>
-
-<script>
-  document.addEventListener('keydown', e => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f' && !['TEXTAREA', 'INPUT'].includes(e.target.tagName)) {
-      e.preventDefault();
-      document.getElementById('searchInput')?.focus();
-    }
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'e') {
-      e.preventDefault();
-      if (typeof window.exportReportListExcel === 'function') {
-        window.exportReportListExcel();
-      }
-    }
-  });
-</script>
 
 </body>
 </html>

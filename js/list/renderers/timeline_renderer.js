@@ -39,7 +39,7 @@ window.FrpListRenderers.renderTimeline = function(files, container) {
           const poolBadge = isPublic ? `<span class="badge badge-pool" style="font-size:.68rem;padding:.1rem .35rem;" title="Ortak Havuzda Paylaşıldı">Havuzda</span>` : '';
 
           return `
-            <div class="timeline-item" onclick="openDetail(decodeURIComponent('${encodedId}'))" style="cursor:pointer;">
+            <div class="timeline-item" data-list-action="open-detail" data-id="${encodedId}" style="cursor:pointer;">
               <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;">
                 <div style="display:flex;align-items:center;gap:.4rem;">
                   <strong style="font-size:.9rem;color:var(--text-primary);">${escHtml(reportName)}</strong>

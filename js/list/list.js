@@ -495,12 +495,12 @@ function renderTable() {
     const guidVal = (file.meta && file.meta.guid) ? file.meta.guid : '';
     const shortGuid = guidVal ? (guidVal.length > 16 ? guidVal.slice(0, 7) + '...' + guidVal.slice(-5) : guidVal) : '';
     const guidColHtml = guidVal
-      ? `<span class="guid-chip" onclick="event.stopPropagation();copyGuidText(decodeURIComponent('${encodeInlineArg(guidVal)}'))" title="GUID: ${escHtml(guidVal)} (Kopyalamak için tıklayın)"><span style="opacity:0.6;display:inline-flex;align-items:center;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span><span>${escHtml(shortGuid)}</span></span>`
+      ? `<span class="guid-chip" data-list-action="copy-guid" data-value="${encodeInlineArg(guidVal)}" title="GUID: ${escHtml(guidVal)} (Kopyalamak için tıklayın)"><span style="opacity:0.6;display:inline-flex;align-items:center;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></span><span>${escHtml(shortGuid)}</span></span>`
       : `<span style="color:var(--text-muted);font-size:.75rem;">—</span>`;
       
     const catHtml = file.category
-      ? `<span class="badge badge-purple" onclick="event.stopPropagation();openCategoryModalFor(decodeURIComponent('${encodedId}'))" style="cursor:pointer;">${escHtml(file.category)}</span>`
-      : `<button class="btn btn-sm" onclick="event.stopPropagation();openCategoryModalFor(decodeURIComponent('${encodedId}'))" style="padding:1px 6px;font-size:.72rem;">+ Kategori</button>`;
+      ? `<span class="badge badge-purple" data-list-action="category" data-id="${encodedId}" style="cursor:pointer;">${escHtml(file.category)}</span>`
+      : `<button class="btn btn-sm" data-list-action="category" data-id="${encodedId}" style="padding:1px 6px;font-size:.72rem;">+ Kategori</button>`;
 
     const helperData = { reportName, size, date, hasNote, tagsHtml, guidColHtml, catHtml };
     let colsHtml = '';
@@ -511,13 +511,13 @@ function renderTable() {
     });
 
     return `
-      <tr class="${isSelected ? 'selected' : ''} ${file.isPinned ? 'pinned-row' : ''}" data-id="${escHtml(file.id)}" onclick="handleItemClick(event, decodeURIComponent('${encodedId}'))" style="cursor:pointer;">
-        <td onclick="event.stopPropagation();"><input type="checkbox" class="row-checkbox" data-id="${escHtml(file.id)}" ${isSelected ? 'checked' : ''} onchange="toggleSelect(event, decodeURIComponent('${encodedId}'))" /></td>
-        <td style="white-space:nowrap;text-align:center;display:flex;align-items:center;justify-content:center;gap:4px;" onclick="event.stopPropagation();">
-          <button class="star-btn ${file.isFavorite ? 'active' : ''}" onclick="toggleFav(event, decodeURIComponent('${encodedId}'))" title="Favori" style="background:none;border:none;cursor:pointer;padding:2px;display:inline-flex;align-items:center;color:${file.isFavorite ? '#f59e0b' : 'inherit'};opacity:${file.isFavorite ? '1' : '0.4'};">
+      <tr class="${isSelected ? 'selected' : ''} ${file.isPinned ? 'pinned-row' : ''}" data-list-action="row" data-id="${encodedId}" style="cursor:pointer;">
+        <td data-list-action="stop"><input type="checkbox" class="row-checkbox" data-id="${encodedId}" data-list-change="select" ${isSelected ? 'checked' : ''} /></td>
+        <td style="white-space:nowrap;text-align:center;display:flex;align-items:center;justify-content:center;gap:4px;" data-list-action="stop">
+          <button class="star-btn ${file.isFavorite ? 'active' : ''}" data-list-action="toggle-fav" data-id="${encodedId}" title="Favori" style="background:none;border:none;cursor:pointer;padding:2px;display:inline-flex;align-items:center;color:${file.isFavorite ? '#f59e0b' : 'inherit'};opacity:${file.isFavorite ? '1' : '0.4'};">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="${file.isFavorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
           </button>
-          <button class="pin-btn ${file.isPinned ? 'active' : ''}" onclick="togglePin(event, decodeURIComponent('${encodedId}'))" title="Üste Sabitle" style="background:none;border:none;cursor:pointer;padding:2px;display:inline-flex;align-items:center;opacity:${file.isPinned ? '1' : '0.35'};color:${file.isPinned ? 'var(--accent)' : 'inherit'};">
+          <button class="pin-btn ${file.isPinned ? 'active' : ''}" data-list-action="toggle-pin" data-id="${encodedId}" title="Üste Sabitle" style="background:none;border:none;cursor:pointer;padding:2px;display:inline-flex;align-items:center;opacity:${file.isPinned ? '1' : '0.35'};color:${file.isPinned ? 'var(--accent)' : 'inherit'};">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="${file.isPinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 2h6l1 7h-8z"/></svg>
           </button>
         </td>

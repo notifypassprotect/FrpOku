@@ -325,8 +325,7 @@ app.use(createStagingAccessMiddleware());
 // deployment dosyaları statik olarak erişilebilir değildir.
 app.use('/css', express.static(path.join(__dirname, 'css')));
 app.use('/js', express.static(path.join(__dirname, 'js')));
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-app.get('/compare.html', (req, res) => {
+function sendScriptSafePage(res, page) {
   res.setHeader(
     'Content-Security-Policy',
     "default-src 'self'; " +
@@ -337,9 +336,12 @@ app.get('/compare.html', (req, res) => {
     "img-src 'self' data: blob: https:; " +
     "worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self';"
   );
-  res.sendFile(path.join(__dirname, 'compare.html'));
-});
-['index.html', 'detail.html', 'dashboard.html'].forEach(page => {
+  res.sendFile(path.join(__dirname, page));
+}
+app.get('/', (req, res) => sendScriptSafePage(res, 'index.html'));
+app.get('/index.html', (req, res) => sendScriptSafePage(res, 'index.html'));
+app.get('/compare.html', (req, res) => sendScriptSafePage(res, 'compare.html'));
+['detail.html', 'dashboard.html'].forEach(page => {
   app.get(`/${page}`, (req, res) => res.sendFile(path.join(__dirname, page)));
 });
 
