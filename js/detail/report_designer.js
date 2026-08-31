@@ -457,7 +457,7 @@ function esc(str) {
  <div style="padding-left:.6rem;display:flex;flex-direction:column;gap:.25rem;border-left:2px solid #3b82f6;margin-left:.25rem;">
  ${fields.length > 0? fields.map(f => `
  <div class="fr-datatree-field-row"
- onclick="window.copyDataTreeField && window.copyDataTreeField(decodeURIComponent('${encodeInlineArg(q.name)}'), decodeURIComponent('${encodeInlineArg(f)}'))"
+ data-detail-action="copy-data-tree" data-query="${encodeInlineArg(q.name)}" data-field="${encodeInlineArg(f)}"
  style="display:flex;align-items:center;justify-content:space-between;gap:.4rem;color:var(--text-secondary);font-size:.76rem;font-family:var(--mono);cursor:pointer;padding:2px 4px;border-radius:4px;transition:background 0.1s;"
  title="İfadeyi kopyalamak için tıklayın: [${esc(q.name)}.&quot;${esc(f)}&quot;]">
  <div style="display:flex;align-items:center;gap:.4rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
@@ -1019,7 +1019,7 @@ function esc(str) {
  const tabHeadersHtml = tabs.map((tab, tIdx) => `
  <button type="button" class="fr-tab-btn ${tIdx === 0? 'active': ''}"
  data-pc-idx="${cIdx}" data-tab-idx="${tIdx}"
- onclick="window.switchDialogTab && window.switchDialogTab(this, '${cIdx}', ${tIdx})"
+ data-detail-action="switch-dialog-tab" data-control-index="${cIdx}" data-tab-index="${tIdx}"
  title="${esc(tab.caption || tab.name)}">
  ${esc(tab.caption || tab.name)}
  </button>

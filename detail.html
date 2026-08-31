@@ -12,12 +12,7 @@
  <link rel="stylesheet" href="css/compare.css?v=4.3" />
  <link rel="stylesheet" href="css/themes.css?v=4.3" />
  <link rel="stylesheet" href="css/designer.css?v=4.3" />
- <script>
- (function() {
- const t = localStorage.getItem('frpoku_theme') || 'light';
- document.documentElement.setAttribute('data-theme', t);
- })();
- </script>
+ <script src="js/core/theme_bootstrap.js?v=4.4"></script>
 
  <style>
 .detail-topbar-left { display:flex; align-items:center; gap:.75rem; }
@@ -437,7 +432,7 @@
  <div style="font-size:3rem;margin-bottom:1rem;">⚠️</div>
  <div id="errorMsg" style="font-size:1rem;font-weight:600;color:var(--text-secondary);"></div>
  <div style="margin-top:1rem;">
- <button class="btn btn-primary btn-sm" onclick="window.location.href='index.html'">← Listeye Dön</button>
+ <button class="btn btn-primary btn-sm" data-detail-action="open-index">← Listeye Dön</button>
  </div>
  </div>
  </div>
@@ -509,6 +504,7 @@
 <script src="js/detail/detail_sidebar.js?v=4.3"></script>
 <script src="js/detail/detail_editor.js?v=4.3"></script>
 <script src="js/detail/app.js?v=4.3"></script>
+<script src="js/detail/detail_events.js?v=4.4"></script>
 
 </body>
 </html>

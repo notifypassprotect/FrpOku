@@ -103,7 +103,7 @@ window.FrpDetailSidebar = window.FrpDetailSidebar || {};
     const tagsList = tags.map(t => `
       <span class="tag-pill">
         ${esc(t)}
-        <span class="tag-pill-remove" onclick="removeTagFromDetail(decodeURIComponent('${encodeInlineArg(t)}'))">×</span>
+        <span class="tag-pill-remove" data-detail-action="remove-tag" data-value="${encodeInlineArg(t)}">×</span>
       </span>
     `).join('');
 

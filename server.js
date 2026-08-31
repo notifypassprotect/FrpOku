@@ -338,12 +338,30 @@ function sendScriptSafePage(res, page) {
   );
   res.sendFile(path.join(__dirname, page));
 }
+function sendNoncePage(res, page) {
+  const nonce = crypto.randomBytes(18).toString('base64');
+  const filePath = path.join(__dirname, page);
+  fs.readFile(filePath, 'utf8', (error, source) => {
+    if (error) return res.status(500).send('Sayfa yüklenemedi.');
+    res.setHeader(
+      'Content-Security-Policy',
+      "default-src 'self'; " +
+      `script-src 'self' 'nonce-${nonce}' https://cdn.jsdelivr.net; ` +
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+      "font-src 'self' https://fonts.gstatic.com data:; " +
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co; " +
+      "img-src 'self' data: blob: https:; " +
+      "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self';"
+    );
+    const html = source.replace(/<script(?![^>]*\bsrc=)([^>]*)>/gi, `<script nonce="${nonce}"$1>`);
+    res.type('html').send(html);
+  });
+}
 app.get('/', (req, res) => sendScriptSafePage(res, 'index.html'));
 app.get('/index.html', (req, res) => sendScriptSafePage(res, 'index.html'));
 app.get('/compare.html', (req, res) => sendScriptSafePage(res, 'compare.html'));
-['detail.html', 'dashboard.html'].forEach(page => {
-  app.get(`/${page}`, (req, res) => res.sendFile(path.join(__dirname, page)));
-});
+app.get('/detail.html', (req, res) => sendScriptSafePage(res, 'detail.html'));
+app.get('/dashboard.html', (req, res) => sendNoncePage(res, 'dashboard.html'));
 
 app.get('/api/health', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');

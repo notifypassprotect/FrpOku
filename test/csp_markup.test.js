@@ -16,8 +16,11 @@ test('CSP ile korunan liste ve karşılaştırma kaynaklarında inline event bul
   const files = [
     path.join(root, 'index.html'),
     path.join(root, 'compare.html'),
+    path.join(root, 'detail.html'),
+    path.join(root, 'dashboard.html'),
     ...javascriptFiles(path.join(root, 'js', 'list')),
-    ...javascriptFiles(path.join(root, 'js', 'compare'))
+    ...javascriptFiles(path.join(root, 'js', 'compare')),
+    ...javascriptFiles(path.join(root, 'js', 'detail'))
   ];
   const inlineEvent = /\s+on(?:click|change|input|keydown|keyup|submit|load|error)\s*=/i;
   for (const file of files) {
@@ -25,9 +28,9 @@ test('CSP ile korunan liste ve karşılaştırma kaynaklarında inline event bul
   }
 });
 
-test('liste ve karşılaştırma HTML dosyalarında inline script bulunmaz', () => {
+test('nonce gerektirmeyen sayfalarda inline script bulunmaz', () => {
   const inlineScript = /<script(?![^>]*\bsrc=)/i;
-  for (const fileName of ['index.html', 'compare.html']) {
+  for (const fileName of ['index.html', 'compare.html', 'detail.html']) {
     assert.doesNotMatch(fs.readFileSync(path.join(root, fileName), 'utf8'), inlineScript, fileName);
   }
 });

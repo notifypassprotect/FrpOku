@@ -254,7 +254,7 @@ function renderSidebar(file) {
   const tagsList = tags.map(t => `
     <span class="tag-pill">
       ${esc(t)}
-      <span class="tag-pill-remove" onclick="removeTagFromDetail('${esc(t)}')">×</span>
+      <span class="tag-pill-remove" data-detail-action="remove-tag" data-value="${encodeInlineArg(t)}">×</span>
     </span>
   `).join('');
 
@@ -267,7 +267,7 @@ function renderSidebar(file) {
         <div class="meta-label">GUID</div>
         <div class="meta-value" style="font-family:var(--mono);font-size:.68rem;display:flex;align-items:center;justify-content:space-between;gap:.3rem;">
           <span style="overflow:hidden;text-overflow:ellipsis;" title="${esc(meta.guid || '—')}">${esc(meta.guid || '—')}</span>
-          ${meta.guid ? `<button class="btn btn-sm" style="padding:.1rem .35rem;font-size:.65rem;display:inline-flex;align-items:center;" onclick="copyGuidText('${esc(meta.guid)}')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>` : ''}
+          ${meta.guid ? `<button class="btn btn-sm" style="padding:.1rem .35rem;font-size:.65rem;display:inline-flex;align-items:center;" data-detail-action="copy-guid" data-value="${encodeInlineArg(meta.guid)}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>` : ''}
         </div>
       </div>
       ${metaRow('Dosya Boyutu', file.sizeBytes > 1024 ? Math.round(file.sizeBytes / 1024) + ' KB' : file.sizeBytes + ' B')}
@@ -329,11 +329,11 @@ function renderSidebar(file) {
       <div class="meta-label">Dışa Aktar & Araçlar</div>
       <div class="export-btns">
         ${queries.map((q, i) => `
-          <button class="btn-export" onclick="exportSqlQueryModal(${i})">
+          <button class="btn-export" data-detail-action="export-sql" data-index="${i}">
             ${esc(q.name)} Sorgusunu İndir (.sql / .txt)
           </button>`).join('')}
-        <button class="btn-export" onclick="exportReportJson()">Rapor JSON İndir</button>
-        <button class="btn-export" onclick="exportHtmlDoc()">HTML Dokümantasyon</button>
+        <button class="btn-export" data-detail-action="export-json">Rapor JSON İndir</button>
+        <button class="btn-export" data-detail-action="export-html">HTML Dokümantasyon</button>
       </div>
     </div>
 
@@ -455,5 +455,4 @@ function removeTagFromDetail(tag) {
   renderSidebar(currentFile);
   showToast(`'${tag}' etiketi çıkarıldı.`, 'info');
 }
-
 
