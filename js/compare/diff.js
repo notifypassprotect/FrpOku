@@ -79,6 +79,63 @@ const DiffEngine = (() => {
     return targetLines.join('\n');
   }
 
+  function computeThreeWayDiff(textA, textB, textC) {
+    const diffAB = computeLineDiff(textA, textB);
+    const diffAC = computeLineDiff(textA, textC);
+    const baseLines = String(textA || '').split('\n');
+
+    const indexPair = diff => {
+      const baseRows = new Map();
+      const inserts = new Map();
+      let slot = 0;
+      for (let i = 0; i < diff.linesA.length; i++) {
+        const base = diff.linesA[i];
+        const variant = diff.linesB[i];
+        if (base.aIndex === null || base.aIndex === undefined) {
+          if (!inserts.has(slot)) inserts.set(slot, []);
+          inserts.get(slot).push({ variant, pairRowIndex: i });
+        } else {
+          baseRows.set(base.aIndex, { base, variant, pairRowIndex: i });
+          slot = base.aIndex + 1;
+        }
+      }
+      return { baseRows, inserts };
+    };
+
+    const ab = indexPair(diffAB);
+    const ac = indexPair(diffAC);
+    const linesA = [];
+    const linesB = [];
+    const linesC = [];
+    const empty = extra => ({ num: null, aIndex: null, text: '', type: 'empty', ...extra });
+
+    for (let slot = 0; slot <= baseLines.length; slot++) {
+      const insertsB = ab.inserts.get(slot) || [];
+      const insertsC = ac.inserts.get(slot) || [];
+      const insertCount = Math.max(insertsB.length, insertsC.length);
+      for (let i = 0; i < insertCount; i++) {
+        const b = insertsB[i];
+        const c = insertsC[i];
+        linesA.push(empty({ pairRowIndex: b?.pairRowIndex ?? null }));
+        linesB.push(b ? { ...b.variant, pairRowIndex: b.pairRowIndex } : empty({ pairRowIndex: null }));
+        linesC.push(c ? { ...c.variant, pairRowIndex: c.pairRowIndex } : empty({ pairRowIndex: null }));
+      }
+
+      if (slot === baseLines.length) break;
+      const b = ab.baseRows.get(slot);
+      const c = ac.baseRows.get(slot);
+      const unchanged = b?.variant.type === 'same' && c?.variant.type === 'same';
+      linesA.push({
+        num: slot + 1, aIndex: slot, text: baseLines[slot], type: unchanged ? 'same' : 'del',
+        pairRowIndex: b?.pairRowIndex ?? null
+      });
+      linesB.push(b ? { ...b.variant, pairRowIndex: b.pairRowIndex } : empty({ aIndex: slot, pairRowIndex: null }));
+      linesC.push(c ? { ...c.variant, pairRowIndex: c.pairRowIndex } : empty({ aIndex: slot, pairRowIndex: null }));
+    }
+
+    return { linesA, linesB, linesC, diffAB, diffAC };
+  }
+
   function getDiffOps(a, b) {
     const m = a.length;
     const n = b.length;
@@ -152,7 +209,7 @@ const DiffEngine = (() => {
     return { wordsA: res1.reverse(), wordsB: res2.reverse() };
   }
 
-  return { computeLineDiff, computeWordDiff, applyLineTransfer };
+  return { computeLineDiff, computeThreeWayDiff, computeWordDiff, applyLineTransfer };
 })();
 
 if (typeof window !== 'undefined') window.DiffEngine = DiffEngine;

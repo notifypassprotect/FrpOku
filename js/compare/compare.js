@@ -719,9 +719,12 @@ function renderDiff() {
     textC = qC ? qC.sql : '';
   }
 
-  const { linesA, linesB } = DiffEngine.computeLineDiff(textA, textB);
   const threeWay = isThreeWayEnabled();
-  const diffAC = threeWay ? DiffEngine.computeLineDiff(textA, textC) : null;
+  const alignedDiff = threeWay
+    ? DiffEngine.computeThreeWayDiff(textA, textB, textC)
+    : DiffEngine.computeLineDiff(textA, textB);
+  const { linesA, linesB } = alignedDiff;
+  const linesC = threeWay ? alignedDiff.linesC : null;
 
   renderMinimap(linesA, linesB);
 
@@ -775,7 +778,7 @@ function renderDiff() {
     const lB = linesB[i];
 
     // Fold unchanged logic
-    if (isFoldUnchanged && lA.type === 'same' && lB.type === 'same') {
+    if (isFoldUnchanged && !threeWay && lA.type === 'same' && lB.type === 'same') {
       let sameCount = 0;
       let startIdx = i;
       while (i < linesA.length && linesA[i].type === 'same' && linesB[i].type === 'same') {
@@ -793,12 +796,13 @@ function renderDiff() {
       }
     }
 
-    const actionsA = lA.type === 'empty' && lB.text
-      ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('A', ${i})" title="Bu farkı sağ panelden sil">Sağdan sil</button></span>`
-      : (lA.type === 'del' || lA.type === 'add') && lA.text ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('A', ${i})" title="Sağ panele aktar">Aktar</button><button class="btn-inline-action" onclick="copyLineText('${encodeInlineArg(lA.text)}')" title="Kopyala">Kopyala</button></span>` : '';
-    const actionsB = lB.type === 'empty' && lA.text
-      ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('B', ${i})" title="Bu farkı sol panelden sil">Soldan sil</button></span>`
-      : (lB.type === 'add' || lB.type === 'del') && lB.text ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('B', ${i})" title="Sol panele aktar">Aktar</button><button class="btn-inline-action" onclick="copyLineText('${encodeInlineArg(lB.text)}')" title="Kopyala">Kopyala</button></span>` : '';
+    const transferRowIndex = lA.pairRowIndex ?? lB.pairRowIndex ?? i;
+    const actionsA = lA.type === 'empty' && lB.text && transferRowIndex !== null
+      ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('A', ${transferRowIndex})" title="Bu farkı sağ panelden sil">Sağdan sil</button></span>`
+      : (lA.type === 'del' || lA.type === 'add') && lA.text && transferRowIndex !== null ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('A', ${transferRowIndex})" title="Sağ panele aktar">Aktar</button><button class="btn-inline-action" onclick="copyLineText('${encodeInlineArg(lA.text)}')" title="Kopyala">Kopyala</button></span>` : '';
+    const actionsB = lB.type === 'empty' && lA.text && transferRowIndex !== null
+      ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('B', ${transferRowIndex})" title="Bu farkı sol panelden sil">Soldan sil</button></span>`
+      : (lB.type === 'add' || lB.type === 'del') && lB.text && transferRowIndex !== null ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('B', ${transferRowIndex})" title="Sol panele aktar">Aktar</button><button class="btn-inline-action" onclick="copyLineText('${encodeInlineArg(lB.text)}')" title="Kopyala">Kopyala</button></span>` : '';
 
     if (lA.type === 'del' && lB.type === 'add' && lA.pairedText !== undefined) {
       const { wordsA, wordsB } = DiffEngine.computeWordDiff(lA.text, lB.text);
@@ -822,10 +826,10 @@ function renderDiff() {
   tablePaneA.innerHTML = renderedA.join('');
   tablePaneB.innerHTML = renderedB.join('');
 
-  if (threeWay && diffAC && tablePaneC) {
+  if (threeWay && linesC && tablePaneC) {
     const renderedC = [];
-    for (let j = 0; j < diffAC.linesB.length; j++) {
-      const lC = diffAC.linesB[j];
+    for (let j = 0; j < linesC.length; j++) {
+      const lC = linesC[j];
       const contentC = lC.type !== 'empty' ? formatDiffText(lC.text, isPascal) : '';
       renderedC.push(`<div class="diff-row ${lC.type}" id="rowC_${j}"><span class="diff-num">${lC.num !== null ? lC.num : ''}</span><span class="diff-content">${contentC}</span></div>`);
     }

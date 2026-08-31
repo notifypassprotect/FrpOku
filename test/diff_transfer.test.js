@@ -24,3 +24,18 @@ test('boş tarafı aktarmak hedefteki fazla satırı siler', () => {
   const rowIndex = diff.linesA.findIndex(row => row.type === 'empty');
   assert.equal(DiffEngine.applyLineTransfer(diff, 'A', rowIndex, textA, textB), textA);
 });
+
+test('üçlü karşılaştırma B ve C satırlarını ortak A tabanında hizalar', () => {
+  const diff = DiffEngine.computeThreeWayDiff('a\nb\nc', 'a\nx\nb\nc', 'a\nb\ny\nc');
+  assert.equal(diff.linesA.length, diff.linesB.length);
+  assert.equal(diff.linesA.length, diff.linesC.length);
+
+  const xRow = diff.linesB.findIndex(row => row.text === 'x');
+  const yRow = diff.linesC.findIndex(row => row.text === 'y');
+  assert.equal(diff.linesA[xRow].type, 'empty');
+  assert.equal(diff.linesC[xRow].type, 'empty');
+  assert.equal(diff.linesA[yRow].type, 'empty');
+  assert.equal(diff.linesB[yRow].type, 'empty');
+  assert.ok(xRow < diff.linesA.findIndex(row => row.aIndex === 1));
+  assert.ok(yRow < diff.linesA.findIndex(row => row.aIndex === 2));
+});
