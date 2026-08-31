@@ -137,39 +137,72 @@ const DiffEngine = (() => {
   }
 
   function getDiffOps(a, b) {
-    const m = a.length;
-    const n = b.length;
+    const n = a.length;
+    const m = b.length;
+    const max = n + m;
+    const offset = max + 1;
+    let frontier = new Int32Array(2 * max + 3);
+    frontier.fill(-1);
+    frontier[offset + 1] = 0;
+    const trace = [];
 
-    // LCS Dinamik Programlama Tablosu
-    const dp = Array.from({ length: m + 1 }, () => new Int32Array(n + 1));
-
-    for (let i = 0; i < m; i++) {
-      for (let j = 0; j < n; j++) {
-        if (a[i] === b[j]) {
-          dp[i + 1][j + 1] = dp[i][j] + 1;
+    for (let distance = 0; distance <= max; distance++) {
+      for (let diagonal = -distance; diagonal <= distance; diagonal += 2) {
+        const index = offset + diagonal;
+        let x;
+        if (diagonal === -distance || (diagonal !== distance && frontier[index - 1] < frontier[index + 1])) {
+          x = frontier[index + 1];
         } else {
-          dp[i + 1][j + 1] = Math.max(dp[i + 1][j], dp[i][j + 1]);
+          x = frontier[index - 1] + 1;
+        }
+        let y = x - diagonal;
+        while (x < n && y < m && a[x] === b[y]) { x++; y++; }
+        frontier[index] = x;
+        if (x >= n && y >= m) {
+          trace.push(new Int32Array(frontier));
+          return backtrackMyers(trace, a, b, offset);
         }
       }
+      trace.push(new Int32Array(frontier));
     }
+    return [];
+  }
 
-    let i = m, j = n;
-    const rawOps = [];
+  function backtrackMyers(trace, a, b, offset) {
+    let x = a.length;
+    let y = b.length;
+    const operations = [];
 
-    while (i > 0 || j > 0) {
-      if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
-        rawOps.push({ type: 'same', numA: i, numB: j, textA: a[i - 1], textB: b[j - 1] });
-        i--; j--;
-      } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-        rawOps.push({ type: 'add', numB: j, textB: b[j - 1] });
-        j--;
-      } else if (i > 0 && (j === 0 || dp[i][j - 1] < dp[i - 1][j])) {
-        rawOps.push({ type: 'del', numA: i, textA: a[i - 1] });
-        i--;
+    for (let distance = trace.length - 1; distance > 0; distance--) {
+      const previous = trace[distance - 1];
+      const diagonal = x - y;
+      const index = offset + diagonal;
+      const previousDiagonal = diagonal === -distance ||
+        (diagonal !== distance && previous[index - 1] < previous[index + 1])
+        ? diagonal + 1 : diagonal - 1;
+      const previousX = previous[offset + previousDiagonal];
+      const previousY = previousX - previousDiagonal;
+
+      while (x > previousX && y > previousY) {
+        operations.push({ type: 'same', numA: x, numB: y, textA: a[x - 1], textB: b[y - 1] });
+        x--; y--;
       }
+      if (x === previousX) {
+        operations.push({ type: 'add', numB: previousY + 1, textB: b[previousY] });
+      } else {
+        operations.push({ type: 'del', numA: previousX + 1, textA: a[previousX] });
+      }
+      x = previousX;
+      y = previousY;
     }
 
-    return rawOps.reverse();
+    while (x > 0 && y > 0) {
+      operations.push({ type: 'same', numA: x, numB: y, textA: a[x - 1], textB: b[y - 1] });
+      x--; y--;
+    }
+    while (x > 0) { operations.push({ type: 'del', numA: x, textA: a[x - 1] }); x--; }
+    while (y > 0) { operations.push({ type: 'add', numB: y, textB: b[y - 1] }); y--; }
+    return operations.reverse();
   }
 
   /**
@@ -178,35 +211,18 @@ const DiffEngine = (() => {
   function computeWordDiff(text1, text2) {
     const tokens1 = (text1 || '').match(/\w+|\s+|[^\w\s]+/g) || [];
     const tokens2 = (text2 || '').match(/\w+|\s+|[^\w\s]+/g) || [];
-
-    const m = tokens1.length, n = tokens2.length;
-    const dp = Array.from({ length: m + 1 }, () => new Int32Array(n + 1));
-
-    for (let i = 0; i < m; i++) {
-      for (let j = 0; j < n; j++) {
-        if (tokens1[i] === tokens2[j]) dp[i + 1][j + 1] = dp[i][j] + 1;
-        else dp[i + 1][j + 1] = Math.max(dp[i + 1][j], dp[i][j + 1]);
-      }
-    }
-
-    let i = m, j = n;
     const res1 = [], res2 = [];
-
-    while (i > 0 || j > 0) {
-      if (i > 0 && j > 0 && tokens1[i - 1] === tokens2[j - 1]) {
-        res1.push({ text: tokens1[i - 1], type: 'same' });
-        res2.push({ text: tokens2[j - 1], type: 'same' });
-        i--; j--;
-      } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-        res2.push({ text: tokens2[j - 1], type: 'add' });
-        j--;
-      } else if (i > 0 && (j === 0 || dp[i][j - 1] < dp[i - 1][j])) {
-        res1.push({ text: tokens1[i - 1], type: 'del' });
-        i--;
+    for (const operation of getDiffOps(tokens1, tokens2)) {
+      if (operation.type === 'same') {
+        res1.push({ text: operation.textA, type: 'same' });
+        res2.push({ text: operation.textB, type: 'same' });
+      } else if (operation.type === 'del') {
+        res1.push({ text: operation.textA, type: 'del' });
+      } else {
+        res2.push({ text: operation.textB, type: 'add' });
       }
     }
-
-    return { wordsA: res1.reverse(), wordsB: res2.reverse() };
+    return { wordsA: res1, wordsB: res2 };
   }
 
   return { computeLineDiff, computeThreeWayDiff, computeWordDiff, applyLineTransfer };

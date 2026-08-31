@@ -1,6 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const DiffEngine = require('../js/compare/diff');
+global.DiffEngine = DiffEngine;
+const DiffWorkerClient = require('../js/compare/diff_worker_client');
 
 test('diff satırları gerçek A/B indekslerini taşır', () => {
   const diff = DiffEngine.computeLineDiff('a\nb\nc', 'a\nx\nb\nc');
@@ -38,4 +40,16 @@ test('üçlü karşılaştırma B ve C satırlarını ortak A tabanında hizalar
   assert.equal(diff.linesB[yRow].type, 'empty');
   assert.ok(xRow < diff.linesA.findIndex(row => row.aIndex === 1));
   assert.ok(yRow < diff.linesA.findIndex(row => row.aIndex === 2));
+});
+
+test('küçük karşılaştırma Worker olmadan aynı motoru kullanır', async () => {
+  const diff = await DiffWorkerClient.compute({ textA: 'a\nb', textB: 'a\nx\nb' });
+  assert.equal(diff.linesB.find(row => row.type === 'add').text, 'x');
+});
+
+test('karşılaştırma toplam boyut sınırını aşınca kontrollü hata verir', async () => {
+  await assert.rejects(
+    DiffWorkerClient.compute({ textA: 'x'.repeat(DiffWorkerClient.MAX_INPUT_CHARS + 1), textB: '' }),
+    error => error.code === 'DIFF_INPUT_TOO_LARGE'
+  );
 });

@@ -688,7 +688,10 @@ function formatDiffText(rawText, isPascal) {
   return esc(rawText);
 }
 
-function renderDiff() {
+let diffRenderRequest = 0;
+
+async function renderDiff() {
+  const requestId = ++diffRenderRequest;
   labelPaneA.textContent = fileA ? (fileA.meta.reportName || fileA.name) : 'Rapor 1';
   labelPaneB.textContent = fileB ? (fileB.meta.reportName || fileB.name) : 'Rapor 2';
   if (labelPaneC) {
@@ -696,6 +699,7 @@ function renderDiff() {
   }
 
   if (activeTab === 'meta') {
+    if (window.DiffWorkerClient) window.DiffWorkerClient.cancel();
     renderMetaDiff();
     return;
   }
@@ -720,9 +724,20 @@ function renderDiff() {
   }
 
   const threeWay = isThreeWayEnabled();
-  const alignedDiff = threeWay
-    ? DiffEngine.computeThreeWayDiff(textA, textB, textC)
-    : DiffEngine.computeLineDiff(textA, textB);
+  diffSummaryBar.textContent = 'Karşılaştırma hazırlanıyor…';
+  let alignedDiff;
+  try {
+    alignedDiff = window.DiffWorkerClient
+      ? await window.DiffWorkerClient.compute({ mode: threeWay ? 'three' : 'two', textA, textB, textC })
+      : (threeWay ? DiffEngine.computeThreeWayDiff(textA, textB, textC) : DiffEngine.computeLineDiff(textA, textB));
+  } catch (error) {
+    if (error?.name === 'AbortError') return;
+    if (requestId !== diffRenderRequest) return;
+    diffSummaryBar.textContent = error?.message || 'Karşılaştırma tamamlanamadı.';
+    toastCompare(diffSummaryBar.textContent, 'error');
+    return;
+  }
+  if (requestId !== diffRenderRequest) return;
   const { linesA, linesB } = alignedDiff;
   const linesC = threeWay ? alignedDiff.linesC : null;
 
