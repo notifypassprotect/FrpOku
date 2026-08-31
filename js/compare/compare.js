@@ -110,6 +110,23 @@ function copyLineText(encodedText) {
 }
 window.copyLineText = copyLineText;
 
+document.addEventListener('click', event => {
+  const target = event.target.closest('[data-compare-action]');
+  if (!target) return;
+  const action = target.dataset.compareAction;
+  if (action === 'picker') {
+    document.getElementById(`btnPicker${target.dataset.pane || ''}`)?.click();
+  } else if (action === 'open-index') {
+    window.location.href = 'index.html';
+  } else if (action === 'unfold') {
+    unfoldAll();
+  } else if (action === 'transfer') {
+    transferLine(target.dataset.pane, Number(target.dataset.row));
+  } else if (action === 'copy') {
+    copyLineText(target.dataset.text || '');
+  }
+});
+
 function undoTransfer() {
   if (compareUndoStack.length === 0) {
     toastCompare('Geri alınacak aktarım bulunmuyor.', 'warning');
@@ -549,7 +566,7 @@ function initSelectors() {
         <div style="font-size:3.5rem;">⚠️</div>
         <div style="font-size:1.1rem;font-weight:800;">Karşılaştırma için en az 2 rapor gerekli.</div>
         <div style="font-size:.88rem;color:var(--text-muted);">Sistemde <strong>${files.length}</strong> rapor yüklü. En az 2 rapor yükleyin.</div>
-        <button class="btn btn-primary" onclick="window.location.href='index.html'">← Ana Sayfaya Dön</button>
+        <button class="btn btn-primary" data-compare-action="open-index">← Ana Sayfaya Dön</button>
       </div>`;
     return;
   }
@@ -802,8 +819,8 @@ async function renderDiff() {
       }
       if (sameCount > 4) {
         const foldLabel = `... ${sameCount} aynı satır gizlendi (Tümünü göster) ...`;
-        renderedA.push(`<div class="diff-row same folded-row" onclick="unfoldAll()"><span class="diff-num">...</span><span class="diff-content">${foldLabel}</span></div>`);
-        renderedB.push(`<div class="diff-row same folded-row" onclick="unfoldAll()"><span class="diff-num">...</span><span class="diff-content">${foldLabel}</span></div>`);
+        renderedA.push(`<div class="diff-row same folded-row" data-compare-action="unfold"><span class="diff-num">...</span><span class="diff-content">${foldLabel}</span></div>`);
+        renderedB.push(`<div class="diff-row same folded-row" data-compare-action="unfold"><span class="diff-num">...</span><span class="diff-content">${foldLabel}</span></div>`);
         continue;
       } else {
         // Rollback i to render individually if less than 5
@@ -813,11 +830,11 @@ async function renderDiff() {
 
     const transferRowIndex = lA.pairRowIndex ?? lB.pairRowIndex ?? i;
     const actionsA = lA.type === 'empty' && lB.text && transferRowIndex !== null
-      ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('A', ${transferRowIndex})" title="Bu farkı sağ panelden sil">Sağdan sil</button></span>`
-      : (lA.type === 'del' || lA.type === 'add') && lA.text && transferRowIndex !== null ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('A', ${transferRowIndex})" title="Sağ panele aktar">Aktar</button><button class="btn-inline-action" onclick="copyLineText('${encodeInlineArg(lA.text)}')" title="Kopyala">Kopyala</button></span>` : '';
+      ? `<span class="diff-row-actions"><button class="btn-inline-action" data-compare-action="transfer" data-pane="A" data-row="${transferRowIndex}" title="Bu farkı sağ panelden sil">Sağdan sil</button></span>`
+      : (lA.type === 'del' || lA.type === 'add') && lA.text && transferRowIndex !== null ? `<span class="diff-row-actions"><button class="btn-inline-action" data-compare-action="transfer" data-pane="A" data-row="${transferRowIndex}" title="Sağ panele aktar">Aktar</button><button class="btn-inline-action" data-compare-action="copy" data-text="${encodeInlineArg(lA.text)}" title="Kopyala">Kopyala</button></span>` : '';
     const actionsB = lB.type === 'empty' && lA.text && transferRowIndex !== null
-      ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('B', ${transferRowIndex})" title="Bu farkı sol panelden sil">Soldan sil</button></span>`
-      : (lB.type === 'add' || lB.type === 'del') && lB.text && transferRowIndex !== null ? `<span class="diff-row-actions"><button class="btn-inline-action" onclick="transferLine('B', ${transferRowIndex})" title="Sol panele aktar">Aktar</button><button class="btn-inline-action" onclick="copyLineText('${encodeInlineArg(lB.text)}')" title="Kopyala">Kopyala</button></span>` : '';
+      ? `<span class="diff-row-actions"><button class="btn-inline-action" data-compare-action="transfer" data-pane="B" data-row="${transferRowIndex}" title="Bu farkı sol panelden sil">Soldan sil</button></span>`
+      : (lB.type === 'add' || lB.type === 'del') && lB.text && transferRowIndex !== null ? `<span class="diff-row-actions"><button class="btn-inline-action" data-compare-action="transfer" data-pane="B" data-row="${transferRowIndex}" title="Sol panele aktar">Aktar</button><button class="btn-inline-action" data-compare-action="copy" data-text="${encodeInlineArg(lB.text)}" title="Kopyala">Kopyala</button></span>` : '';
 
     if (lA.type === 'del' && lB.type === 'add' && lA.pairedText !== undefined) {
       const { wordsA, wordsB } = DiffEngine.computeWordDiff(lA.text, lB.text);

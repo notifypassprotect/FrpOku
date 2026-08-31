@@ -326,7 +326,20 @@ app.use(createStagingAccessMiddleware());
 app.use('/css', express.static(path.join(__dirname, 'css')));
 app.use('/js', express.static(path.join(__dirname, 'js')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-['index.html', 'detail.html', 'compare.html', 'dashboard.html'].forEach(page => {
+app.get('/compare.html', (req, res) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; " +
+    "script-src 'self' https://cdn.jsdelivr.net; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+    "font-src 'self' https://fonts.gstatic.com data:; " +
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co; " +
+    "img-src 'self' data: blob: https:; " +
+    "worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self';"
+  );
+  res.sendFile(path.join(__dirname, 'compare.html'));
+});
+['index.html', 'detail.html', 'dashboard.html'].forEach(page => {
   app.get(`/${page}`, (req, res) => res.sendFile(path.join(__dirname, page)));
 });
 

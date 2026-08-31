@@ -11,12 +11,7 @@
   <link rel="stylesheet" href="css/list.css?v=4.3" />
   <link rel="stylesheet" href="css/compare.css?v=4.3" />
   <link rel="stylesheet" href="css/themes.css?v=4.3" />
-  <script>
-    (function() {
-      const t = localStorage.getItem('frpoku_theme') || 'light';
-      document.documentElement.setAttribute('data-theme', t);
-    })();
-  </script>
+  <script src="js/core/theme_bootstrap.js?v=4.4"></script>
 </head>
 <body>
 <div class="cmp-shell">
@@ -142,7 +137,7 @@
           <span id="labelPaneA" class="diff-pane-title">Rapor 1</span>
           <div style="display:flex;align-items:center;gap:.4rem;">
             <span class="badge badge-blue" id="badgePaneA" style="font-size:.68rem;">Baz</span>
-            <button class="btn btn-sm btn-ghost cmp-pane-change" onclick="document.getElementById('btnPickerA').click()" title="Raporu Değiştir" style="font-size:.72rem;padding:2px 8px;">Değiştir</button>
+            <button class="btn btn-sm btn-ghost cmp-pane-change" data-compare-action="picker" data-pane="A" title="Raporu Değiştir" style="font-size:.72rem;padding:2px 8px;">Değiştir</button>
           </div>
         </div>
         <div class="diff-scroll" id="scrollPaneA">
@@ -156,7 +151,7 @@
           <span id="labelPaneB" class="diff-pane-title">Rapor 2</span>
           <div style="display:flex;align-items:center;gap:.4rem;">
             <span class="badge badge-green" id="badgePaneB" style="font-size:.68rem;">Karşılaştırılan</span>
-            <button class="btn btn-sm btn-ghost cmp-pane-change" onclick="document.getElementById('btnPickerB').click()" title="Raporu Değiştir" style="font-size:.72rem;padding:2px 8px;">Değiştir</button>
+            <button class="btn btn-sm btn-ghost cmp-pane-change" data-compare-action="picker" data-pane="B" title="Raporu Değiştir" style="font-size:.72rem;padding:2px 8px;">Değiştir</button>
           </div>
         </div>
         <div class="diff-scroll" id="scrollPaneB">
@@ -170,7 +165,7 @@
           <span id="labelPaneC" class="diff-pane-title">Rapor 3</span>
           <div style="display:flex;align-items:center;gap:.4rem;">
             <span class="badge badge-orange" id="badgePaneC" style="font-size:.68rem;">3. Panel</span>
-            <button class="btn btn-sm btn-ghost cmp-pane-change" onclick="document.getElementById('btnPickerC').click()" title="Raporu Değiştir" style="font-size:.72rem;padding:2px 8px;">Değiştir</button>
+            <button class="btn btn-sm btn-ghost cmp-pane-change" data-compare-action="picker" data-pane="C" title="Raporu Değiştir" style="font-size:.72rem;padding:2px 8px;">Değiştir</button>
           </div>
         </div>
         <div class="diff-scroll" id="scrollPaneC">
