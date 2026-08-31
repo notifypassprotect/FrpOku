@@ -325,7 +325,13 @@ app.use(createStagingAccessMiddleware());
 // deployment dosyaları statik olarak erişilebilir değildir.
 app.use('/css', express.static(path.join(__dirname, 'css')));
 app.use('/js', express.static(path.join(__dirname, 'js')));
+function setNoStoreHeaders(res) {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+}
 function sendScriptSafePage(res, page) {
+  setNoStoreHeaders(res);
   res.setHeader(
     'Content-Security-Policy',
     "default-src 'self'; " +
@@ -343,6 +349,7 @@ function sendNoncePage(res, page) {
   const filePath = path.join(__dirname, page);
   fs.readFile(filePath, 'utf8', (error, source) => {
     if (error) return res.status(500).send('Sayfa yüklenemedi.');
+    setNoStoreHeaders(res);
     res.setHeader(
       'Content-Security-Policy',
       "default-src 'self'; " +

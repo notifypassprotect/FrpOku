@@ -13,28 +13,7 @@
   <script src="js/core/theme_bootstrap.js?v=5.0"></script>
 </head>
 <body>
-  <!-- SPLASH SCREEN LOADING AREA (PREMIUM GLASS DESIGN) -->
-  <div id="splashScreen" class="splash-screen" style="position:fixed;inset:0;background:radial-gradient(circle at 50% 40%, #1e293b, #090d16);z-index:999999;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);">
-    <div class="splash-content" style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:1.1rem;animation:fadeIn .35s ease-out;">
-      <div style="position:relative;">
-        <div class="splash-logo" style="width:80px;height:80px;background:linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);border-radius:24px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 45px rgba(59,130,246,.55), 0 12px 28px rgba(0,0,0,.4);animation:pulse 2s infinite ease-in-out;">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-        </div>
-        <div style="position:absolute;inset:-4px;border-radius:28px;border:1.5px solid rgba(255,255,255,.2);animation:spinGlow 8s linear infinite;pointer-events:none;"></div>
-      </div>
-      <div style="font-size:1.8rem;font-weight:900;letter-spacing:-0.5px;color:#f8fafc;font-family:var(--font);text-shadow:0 2px 10px rgba(0,0,0,.3);">FrpOku</div>
-      <div style="font-size:.85rem;font-weight:600;color:#94a3b8;letter-spacing:.3px;">FastReport Rapor & Sorgu Analiz Merkezi</div>
-      <div style="width:220px;height:5px;background:rgba(255,255,255,.08);border-radius:6px;overflow:hidden;margin-top:.4rem;position:relative;border:1px solid rgba(255,255,255,.06);">
-        <div style="position:absolute;top:0;left:0;bottom:0;width:50%;background:linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);border-radius:6px;box-shadow:0 0 12px rgba(139,92,246,.8);animation:splashProgress 1.3s infinite cubic-bezier(0.4, 0, 0.2, 1);"></div>
-      </div>
-    </div>
-  </div>
-  <style>
-    @keyframes splashProgress { 0% { left:-50%; width:45%; } 50% { left:25%; width:65%; } 100% { left:100%; width:45%; } }
-    @keyframes pulse { 0%, 100% { transform:scale(1); box-shadow:0 0 45px rgba(59,130,246,.55); } 50% { transform:scale(1.06); box-shadow:0 0 65px rgba(139,92,246,.7); } }
-    @keyframes spinGlow { 0% { transform:rotate(0deg); opacity:.4; } 50% { opacity:.9; } 100% { transform:rotate(360deg); opacity:.4; } }
-  </style>
-  <script src="js/list/list_page_bootstrap.js?v=4.4" defer></script>
+  <script src="js/list/list_page_bootstrap.js?v=5.1" defer></script>
 
   <!-- DRAG AND DROP OVERLAY -->
   <div id="dragOverlay" class="drag-overlay">

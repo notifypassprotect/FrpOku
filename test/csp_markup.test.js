@@ -34,3 +34,21 @@ test('nonce gerektirmeyen sayfalarda inline script bulunmaz', () => {
     assert.doesNotMatch(fs.readFileSync(path.join(root, fileName), 'utf8'), inlineScript, fileName);
   }
 });
+
+test('liste sayfası render engelleyici splash overlay içermez', () => {
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  assert.doesNotMatch(html, /id=["']splashScreen["']/i);
+  assert.match(html, /js\/list\/list_page_bootstrap\.js\?v=5\.1/);
+});
+
+test('HTML sayfalarındaki yerel script ve stil dosyaları mevcuttur', () => {
+  for (const fileName of ['index.html', 'compare.html', 'detail.html', 'dashboard.html']) {
+    const html = fs.readFileSync(path.join(root, fileName), 'utf8');
+    const resources = [...html.matchAll(/<(?:script|link)\b[^>]*(?:src|href)=["']([^"']+)["']/gi)]
+      .map(match => match[1].split('?')[0])
+      .filter(resource => !/^(?:https?:)?\/\//i.test(resource) && resource !== '/runtime-config.js');
+    for (const resource of resources) {
+      assert.ok(fs.existsSync(path.join(root, resource.replace(/^\//, ''))), `${fileName}: ${resource}`);
+    }
+  }
+});
