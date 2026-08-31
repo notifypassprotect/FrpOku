@@ -40,10 +40,10 @@ window.FrpSettingsTabs.profile = {
 
     const cores = typeof navigator !== 'undefined' && navigator.hardwareConcurrency ? `${navigator.hardwareConcurrency} Mantıksal CPU Çekirdeği` : 'Çok Çekirdekli CPU';
     
-    let storageFormatted = '1.4 MB';
+    let storageFormatted = '0 KB';
     try {
-      const totalBytes = new Blob([localStorage.getItem('frpoku_store_v2') || '']).size;
-      storageFormatted = (totalBytes / 1024).toFixed(1) + ' KB';
+      const totalBytes = new Blob([localStorage.getItem('frpoku_files') || localStorage.getItem('frpoku_store_v2') || '']).size;
+      storageFormatted = totalBytes > 1048576 ? (totalBytes / 1048576).toFixed(1) + ' MB' : (totalBytes / 1024).toFixed(1) + ' KB';
     } catch {}
 
     const host = typeof window !== 'undefined' && window.location ? window.location.host : 'localhost';

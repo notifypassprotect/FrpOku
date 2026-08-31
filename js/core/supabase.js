@@ -545,6 +545,14 @@
 
     // ── 8. KATEGORİLER (Categories CRUD) ────────────────────────────
     async loadCategories() {
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest('/api/categories');
+          return Array.isArray(data?.categories) ? data.categories : null;
+        } catch {
+          return null;
+        }
+      }
       const sb = getClient();
       if (!sb) return null;
       try {
@@ -557,8 +565,20 @@
     },
 
     async saveCategory(categoryObj) {
+      if (!categoryObj) return false;
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest('/api/categories', {
+            method: 'POST',
+            body: JSON.stringify(categoryObj)
+          });
+          return Boolean(data?.success);
+        } catch {
+          return false;
+        }
+      }
       const sb = getClient();
-      if (!sb || !categoryObj) return false;
+      if (!sb) return false;
       try {
         await requireSuccess(sb.from('categories').upsert(categoryObj, { onConflict: 'id' }));
         return true;
@@ -568,8 +588,19 @@
     },
 
     async deleteCategory(id) {
+      if (!id) return false;
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest(`/api/categories/${encodeURIComponent(id)}`, {
+            method: 'DELETE'
+          });
+          return Boolean(data?.success);
+        } catch {
+          return false;
+        }
+      }
       const sb = getClient();
-      if (!sb || !id) return false;
+      if (!sb) return false;
       try {
         await requireSuccess(sb.from('categories').delete().eq('id', String(id)));
         return true;
@@ -580,6 +611,14 @@
 
     // ── 9. SORGU KÜTÜPHANESİ (Snippets CRUD) ───────────────────────
     async loadSnippets() {
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest('/api/snippets');
+          return Array.isArray(data?.snippets) ? data.snippets : null;
+        } catch {
+          return null;
+        }
+      }
       const sb = getClient();
       if (!sb) return null;
       try {
@@ -599,8 +638,20 @@
     },
 
     async saveSnippet(snippet) {
+      if (!snippet) return false;
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest('/api/snippets', {
+            method: 'POST',
+            body: JSON.stringify(snippet)
+          });
+          return Boolean(data?.success);
+        } catch {
+          return false;
+        }
+      }
       const sb = getClient();
-      if (!sb || !snippet) return false;
+      if (!sb) return false;
       try {
         const row = {
           id: String(snippet.id || Date.now()),
@@ -618,8 +669,19 @@
     },
 
     async deleteSnippet(id) {
+      if (!id) return false;
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const data = await serverRequest(`/api/snippets/${encodeURIComponent(id)}`, {
+            method: 'DELETE'
+          });
+          return Boolean(data?.success);
+        } catch {
+          return false;
+        }
+      }
       const sb = getClient();
-      if (!sb || !id) return false;
+      if (!sb) return false;
       try {
         await requireSuccess(sb.from('snippets').delete().eq('id', String(id)));
         return true;

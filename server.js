@@ -1488,6 +1488,164 @@ app.post('/api/reports/bulk-toggle-pool', apiWriteRateLimiter, requireAuth, asyn
   }
 });
 
+// ── KATEGORİ YÖNETİMİ (CATEGORIES CRUD API) ──────────────────
+const CATEGORIES_STORE_PATH = path.join(__dirname, 'data', 'categories.json');
+
+function readLocalCategories() {
+  try {
+    if (!fs.existsSync(CATEGORIES_STORE_PATH)) return [];
+    return JSON.parse(fs.readFileSync(CATEGORIES_STORE_PATH, 'utf8'));
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalCategories(cats) {
+  try {
+    const dataDir = path.join(__dirname, 'data');
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    fs.writeFileSync(CATEGORIES_STORE_PATH, JSON.stringify(cats, null, 2), 'utf8');
+  } catch {}
+}
+
+app.get('/api/categories', requireAuth, async (req, res) => {
+  try {
+    if (supabase) {
+      const { data, error } = await supabase.from('categories').select('*').order('created_at', { ascending: true });
+      if (error) throw error;
+      return res.json({ success: true, categories: data || [] });
+    }
+    res.json({ success: true, categories: readLocalCategories() });
+  } catch (error) {
+    res.status(503).json({ success: false, reason: 'Kategoriler alınamadı.' });
+  }
+});
+
+app.post('/api/categories', apiWriteRateLimiter, requireAuth, async (req, res) => {
+  const cat = req.body;
+  if (!cat || !cat.id) return res.status(400).json({ success: false, reason: 'Kategori ID gereklidir.' });
+  const row = {
+    id: String(cat.id).slice(0, 100),
+    name: String(cat.name || 'Genel').slice(0, 150),
+    color: String(cat.color || '#3b82f6').slice(0, 50),
+    icon: String(cat.icon || 'folder').slice(0, 50),
+    created_at: cat.created_at || new Date().toISOString()
+  };
+  try {
+    if (supabase) {
+      const { error } = await supabase.from('categories').upsert(row, { onConflict: 'id' });
+      if (error) throw error;
+    } else {
+      const cats = readLocalCategories();
+      const idx = cats.findIndex(c => c.id === row.id);
+      if (idx >= 0) cats[idx] = row; else cats.push(row);
+      writeLocalCategories(cats);
+    }
+    res.json({ success: true, category: row });
+  } catch (error) {
+    res.status(503).json({ success: false, reason: 'Kategori kaydedilemedi.' });
+  }
+});
+
+app.delete('/api/categories/:id', apiWriteRateLimiter, requireAuth, async (req, res) => {
+  const catId = String(req.params.id);
+  try {
+    if (supabase) {
+      const { error } = await supabase.from('categories').delete().eq('id', catId);
+      if (error) throw error;
+    } else {
+      writeLocalCategories(readLocalCategories().filter(c => c.id !== catId));
+    }
+    res.json({ success: true });
+  } catch (error) {
+    res.status(503).json({ success: false, reason: 'Kategori silinemedi.' });
+  }
+});
+
+// ── SORGU KÜTÜPHANESİ (SNIPPETS CRUD API) ────────────────────
+const SNIPPETS_STORE_PATH = path.join(__dirname, 'data', 'snippets.json');
+
+function readLocalSnippets() {
+  try {
+    if (!fs.existsSync(SNIPPETS_STORE_PATH)) return [];
+    return JSON.parse(fs.readFileSync(SNIPPETS_STORE_PATH, 'utf8'));
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalSnippets(snippets) {
+  try {
+    const dataDir = path.join(__dirname, 'data');
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    fs.writeFileSync(SNIPPETS_STORE_PATH, JSON.stringify(snippets, null, 2), 'utf8');
+  } catch {}
+}
+
+app.get('/api/snippets', requireAuth, async (req, res) => {
+  try {
+    if (supabase) {
+      const { data, error } = await supabase.from('snippets').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      const formatted = (data || []).map(s => ({
+        id: s.id,
+        title: s.title,
+        sql: s.sql,
+        reportName: s.report_name,
+        category: s.category,
+        createdAt: s.created_at
+      }));
+      return res.json({ success: true, snippets: formatted });
+    }
+    res.json({ success: true, snippets: readLocalSnippets() });
+  } catch (error) {
+    res.status(503).json({ success: false, reason: 'Sorgular alınamadı.' });
+  }
+});
+
+app.post('/api/snippets', apiWriteRateLimiter, requireAuth, async (req, res) => {
+  const snippet = req.body;
+  if (!snippet) return res.status(400).json({ success: false, reason: 'Sorgu verisi gereklidir.' });
+  const row = {
+    id: String(snippet.id || Date.now()),
+    title: String(snippet.title || 'SQL Sorgusu').slice(0, 200),
+    sql: String(snippet.sql || ''),
+    report_name: String(snippet.reportName || snippet.report_name || '—').slice(0, 300),
+    category: String(snippet.category || 'Genel').slice(0, 100),
+    created_at: snippet.createdAt || snippet.created_at || new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+  try {
+    if (supabase) {
+      const { error } = await supabase.from('snippets').upsert(row, { onConflict: 'id' });
+      if (error) throw error;
+    } else {
+      const snippets = readLocalSnippets();
+      const idx = snippets.findIndex(s => s.id === row.id);
+      if (idx >= 0) snippets[idx] = row; else snippets.unshift(row);
+      writeLocalSnippets(snippets);
+    }
+    res.json({ success: true, snippet: row });
+  } catch (error) {
+    res.status(503).json({ success: false, reason: 'Sorgu kaydedilemedi.' });
+  }
+});
+
+app.delete('/api/snippets/:id', apiWriteRateLimiter, requireAuth, async (req, res) => {
+  const snipId = String(req.params.id);
+  try {
+    if (supabase) {
+      const { error } = await supabase.from('snippets').delete().eq('id', snipId);
+      if (error) throw error;
+    } else {
+      writeLocalSnippets(readLocalSnippets().filter(s => s.id !== snipId));
+    }
+    res.json({ success: true });
+  } catch (error) {
+    res.status(503).json({ success: false, reason: 'Sorgu silinemedi.' });
+  }
+});
+
 async function startServer() {
   await ensureAdminUser();
   app.listen(PORT, () => {

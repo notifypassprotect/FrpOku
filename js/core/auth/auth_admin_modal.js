@@ -455,17 +455,18 @@
  html += `</div>`;
  body.innerHTML = html;
 
- // Arama filtresi
- const searchInp = body.querySelector('#adminUserSearchInput');
- if (searchInp) {
- searchInp.addEventListener('input', (e) => {
- const q = e.target.value.toLowerCase().trim();
- body.querySelectorAll('.admin-user-card').forEach(card => {
- const text = card.textContent.toLowerCase();
- card.style.display = text.includes(q)? 'flex': 'none';
- });
- });
- }
+  // Arama filtresi (Türkçe karakter duyarlı)
+  const searchInp = body.querySelector('#adminUserSearchInput');
+  if (searchInp) {
+    const trNorm = s => String(s || '').toLocaleLowerCase('tr-TR').replace(/i̇/g, 'i').replace(/ı/g, 'i').trim();
+    searchInp.addEventListener('input', (e) => {
+      const q = trNorm(e.target.value);
+      body.querySelectorAll('.admin-user-card').forEach(card => {
+        const text = trNorm(card.textContent);
+        card.style.display = text.includes(q) ? 'flex' : 'none';
+      });
+    });
+  }
 
  body.querySelector('#btnRefreshAllUsers')?.addEventListener('click', renderAllUsersTab);
 

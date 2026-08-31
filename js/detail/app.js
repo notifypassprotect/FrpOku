@@ -1276,26 +1276,29 @@ window.saveEditMode = saveEditMode;
 window.saveAndDownloadEditMode = saveAndDownloadEditMode;
 window.copyTabCode = copyTabCode;
 
+let _lastActiveTabId = null;
+
 function activateTab(id) {
- activeTabs.forEach(t => {
- const btn = document.getElementById(t.id + '_btn');
- const panel = document.getElementById(t.id + '_panel');
- const isTarget = t.id === id;
- if (btn) btn.classList.toggle('active', isTarget);
- if (panel) panel.classList.toggle('active', isTarget);
- });
- updateLastEditBtnState(id);
- if (id === 'tab_pascal') refreshPascalSyntaxButtonState();
- if (id === 'tab_designer') {
- const wrap = document.getElementById('tab_designer_designer_wrap');
- if (wrap && window.FastReportDesigner &&!wrap.hasChildNodes() && currentFile) {
- window.FastReportDesigner.render(currentFile, wrap);
- }
- }
- performCodeSearch();
- if (typeof onTabActivated === 'function') {
- onTabActivated(id);
- }
+  _lastActiveTabId = id;
+  activeTabs.forEach(t => {
+    const btn = document.getElementById(t.id + '_btn');
+    const panel = document.getElementById(t.id + '_panel');
+    const isTarget = t.id === id;
+    if (btn) btn.classList.toggle('active', isTarget);
+    if (panel) panel.classList.toggle('active', isTarget);
+  });
+  updateLastEditBtnState(id);
+  if (id === 'tab_pascal') refreshPascalSyntaxButtonState();
+  if (id === 'tab_designer') {
+    const wrap = document.getElementById('tab_designer_designer_wrap');
+    if (wrap && window.FastReportDesigner && !wrap.hasChildNodes() && currentFile) {
+      window.FastReportDesigner.render(currentFile, wrap);
+    }
+  }
+  performCodeSearch();
+  if (typeof onTabActivated === 'function') {
+    onTabActivated(id);
+  }
 }
 
 function renderViewer(file) {
@@ -1382,7 +1385,8 @@ function renderViewer(file) {
  tabBar.appendChild(addQueryBtn);
 
  if (activeTabs.length > 0) {
- activateTab(activeTabs[0].id);
+ const targetTab = (_lastActiveTabId && activeTabs.find(t => t.id === _lastActiveTabId)) || activeTabs[0];
+ activateTab(targetTab.id);
  activeTabs.forEach(t => updateLastEditBtnState(t.id));
  refreshPascalSyntaxButtonState();
  }
