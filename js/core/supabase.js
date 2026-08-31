@@ -45,8 +45,31 @@
       headers: serverAuthHeaders(options.headers || {})
     });
     const data = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(data?.reason || `Sunucu isteği başarısız (${response.status}).`);
+    if (!response.ok) {
+      const error = new Error(data?.reason || `Sunucu isteği başarısız (${response.status}).`);
+      error.status = response.status;
+      error.code = data?.code || (response.status === 409 ? 'REPORT_CONFLICT' : 'SERVER_REQUEST_FAILED');
+      throw error;
+    }
     return data;
+  }
+
+  let lastLoadStatus = { ok: false, kind: 'not_started', status: 0 };
+
+  function classifyLoadError(error) {
+    const status = Number(error?.status || 0);
+    return {
+      ok: false,
+      kind: status === 401 || status === 403 ? 'auth' : 'network',
+      status,
+      message: String(error?.message || 'Bulut bağlantısı kurulamadı.')
+    };
+  }
+
+  async function requireSuccess(query) {
+    const result = await query;
+    if (result?.error) throw result.error;
+    return result?.data;
   }
 
   // Rapor nesnesini DB şemasına dönüştür
@@ -135,6 +158,7 @@
     r.ownerDepartment = row.owner_department || r.ownerDepartment || r.owner_department || '';
     r.sharedAt = row.shared_at || r.sharedAt || r.shared_at || null;
     r.deletedAt = row.deleted_at || r.deletedAt || null;
+    r.version = Math.max(0, Number(row.version || r.version) || 1);
     r.meta = r.meta || { reportName: r.name };
     r.queries = Array.isArray(r.queries) ? r.queries : [];
     r.datasets = Array.isArray(r.datasets) ? r.datasets : [];
@@ -145,14 +169,18 @@
 
   const FrpCloud = {
     getClient,
+    getLastLoadStatus: () => ({ ...lastLoadStatus }),
 
     // ── 1. AKTİF RAPORLAR (is_deleted = false) ─────────────────────
     async loadActiveReports() {
       if (USE_SERVER_BRIDGE) {
         try {
           const data = await serverRequest('/api/store/load');
-          return Array.isArray(data) ? data : null;
+          if (!Array.isArray(data)) throw new Error('Sunucu geçersiz rapor yanıtı döndürdü.');
+          lastLoadStatus = { ok: true, kind: 'success', status: 200, count: data.length };
+          return data;
         } catch (error) {
+          lastLoadStatus = classifyLoadError(error);
           console.warn('Sunucu raporları çekilemedi:', error.message);
           return null;
         }
@@ -183,8 +211,11 @@
           from += step;
         }
 
-        return allRows.map(parseReportFromRow);
+        const reports = allRows.map(parseReportFromRow);
+        lastLoadStatus = { ok: true, kind: 'success', status: 200, count: reports.length };
+        return reports;
       } catch (e) {
+        lastLoadStatus = classifyLoadError(e);
         console.warn('Supabase load error:', e);
         return null;
       }
@@ -240,9 +271,14 @@
     async saveReport(report) {
       if (USE_SERVER_BRIDGE) {
         try {
-          const data = await serverRequest('/api/store/save', { method: 'POST', body: JSON.stringify([report]) });
-          return Boolean(data?.success);
-        } catch {
+          const data = await serverRequest(`/api/reports/${encodeURIComponent(report.id)}`, {
+            method: 'PUT',
+            body: JSON.stringify(report)
+          });
+          return data?.report || false;
+        } catch (error) {
+          if (error?.status === 409) throw error;
+          console.warn('Rapor kaydedilemedi:', error.message);
           return false;
         }
       }
@@ -250,34 +286,9 @@
       if (!sb || !report) return false;
       try {
         const row = formatReportRow(report, false);
-        const { error } = await sb.from('reports').upsert(row, { onConflict: 'id' });
-        return !error;
-      } catch {
-        return false;
-      }
-    },
-
-    // ── 4. ÇOKLU RAPOR KAYDET (Batch) ───────────────────────────────
-    async saveReports(reports) {
-      if (USE_SERVER_BRIDGE) {
-        if (!Array.isArray(reports) || reports.length === 0) return true;
-        try {
-          const data = await serverRequest('/api/store/save', { method: 'POST', body: JSON.stringify(reports) });
-          return Boolean(data?.success);
-        } catch {
-          return false;
-        }
-      }
-      const sb = getClient();
-      if (!sb || !Array.isArray(reports) || reports.length === 0) return false;
-      try {
-        const rows = reports.map(r => formatReportRow(r, false)).filter(Boolean);
-        const BATCH_SIZE = 50;
-        for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-          const chunk = rows.slice(i, i + BATCH_SIZE);
-          await sb.from('reports').upsert(chunk, { onConflict: 'id' });
-        }
-        return true;
+        const { data, error } = await sb.from('reports').upsert(row, { onConflict: 'id' }).select('*').limit(1);
+        if (error) throw error;
+        return data?.[0] ? parseReportFromRow(data[0]) : false;
       } catch {
         return false;
       }
@@ -287,9 +298,13 @@
     async moveToTrash(id, reportObj) {
       if (USE_SERVER_BRIDGE) {
         try {
-          const data = await serverRequest(`/api/reports/${encodeURIComponent(id)}/trash`, { method: 'PATCH', body: JSON.stringify({ deleted: true }) });
-          return Boolean(data?.success);
-        } catch {
+          const data = await serverRequest(`/api/reports/${encodeURIComponent(id)}/trash`, {
+            method: 'PATCH',
+            body: JSON.stringify({ deleted: true, version: reportObj?.version })
+          });
+          return data?.report || false;
+        } catch (error) {
+          if (error?.status === 409) throw error;
           return false;
         }
       }
@@ -300,9 +315,9 @@
         if (reportObj) {
           const row = formatReportRow(reportObj, true);
           row.deleted_at = now;
-          await sb.from('reports').upsert(row, { onConflict: 'id' });
+          await requireSuccess(sb.from('reports').upsert(row, { onConflict: 'id' }));
         } else {
-          await sb.from('reports').update({ is_deleted: true, deleted_at: now }).eq('id', String(id));
+          await requireSuccess(sb.from('reports').update({ is_deleted: true, deleted_at: now }).eq('id', String(id)));
         }
         return true;
       } catch {
@@ -321,7 +336,7 @@
       try {
         const now = new Date().toISOString();
         const strIds = ids.map(String);
-        await sb.from('reports').update({ is_deleted: true, deleted_at: now }).in('id', strIds);
+        await requireSuccess(sb.from('reports').update({ is_deleted: true, deleted_at: now }).in('id', strIds));
         return true;
       } catch {
         return false;
@@ -329,19 +344,23 @@
     },
 
     // ── 6. ÇÖP KUTUSUNDAN GERİ YÜKLE (Restore) ─────────────────────
-    async restoreFromTrash(id) {
+    async restoreFromTrash(id, reportObj) {
       if (USE_SERVER_BRIDGE) {
         try {
-          const data = await serverRequest(`/api/reports/${encodeURIComponent(id)}/trash`, { method: 'PATCH', body: JSON.stringify({ deleted: false }) });
-          return Boolean(data?.success);
-        } catch {
+          const data = await serverRequest(`/api/reports/${encodeURIComponent(id)}/trash`, {
+            method: 'PATCH',
+            body: JSON.stringify({ deleted: false, version: reportObj?.version })
+          });
+          return data?.report || false;
+        } catch (error) {
+          if (error?.status === 409) throw error;
           return false;
         }
       }
       const sb = getClient();
       if (!sb || !id) return false;
       try {
-        await sb.from('reports').update({ is_deleted: false, deleted_at: null }).eq('id', String(id));
+        await requireSuccess(sb.from('reports').update({ is_deleted: false, deleted_at: null }).eq('id', String(id)));
         return true;
       } catch {
         return false;
@@ -358,7 +377,7 @@
       if (!sb || !Array.isArray(ids) || ids.length === 0) return false;
       try {
         const strIds = ids.map(String);
-        await sb.from('reports').update({ is_deleted: false, deleted_at: null }).in('id', strIds);
+        await requireSuccess(sb.from('reports').update({ is_deleted: false, deleted_at: null }).in('id', strIds));
         return true;
       } catch {
         return false;
@@ -380,7 +399,8 @@
 
         if (sb) {
           // Row'un data JSON alanını çekip güncelle
-          const { data: row } = await sb.from('reports').select('data').eq('id', String(reportId)).single();
+          const { data: row, error: rowError } = await sb.from('reports').select('data').eq('id', String(reportId)).single();
+          if (rowError) throw rowError;
           if (row && row.data) {
             const updatedData = { ...row.data, isPublic: !!makePublic, is_public: !!makePublic };
             if (ownerInfo) {
@@ -389,10 +409,10 @@
               updatedData.ownerDepartment = ownerInfo.department || updatedData.ownerDepartment || '';
             }
             if (makePublic) updatedData.sharedAt = new Date().toISOString();
-            await sb.from('reports').update({
+            await requireSuccess(sb.from('reports').update({
               data: updatedData,
               updated_at: new Date().toISOString()
-            }).eq('id', String(reportId));
+            }).eq('id', String(reportId)));
           }
         }
         return true;
@@ -416,7 +436,8 @@
 
         if (sb) {
           const strIds = reportIds.map(String);
-          const { data: rows } = await sb.from('reports').select('id, data').in('id', strIds);
+          const { data: rows, error: rowsError } = await sb.from('reports').select('id, data').in('id', strIds);
+          if (rowsError) throw rowsError;
           if (Array.isArray(rows)) {
             const nowIso = new Date().toISOString();
             for (const r of rows) {
@@ -427,7 +448,7 @@
                 updatedData.ownerDepartment = ownerInfo.department || updatedData.ownerDepartment || '';
               }
               if (makePublic) updatedData.sharedAt = nowIso;
-              await sb.from('reports').update({ data: updatedData, updated_at: nowIso }).eq('id', r.id);
+              await requireSuccess(sb.from('reports').update({ data: updatedData, updated_at: nowIso }).eq('id', r.id));
             }
           }
         }
@@ -451,7 +472,7 @@
       const sb = getClient();
       if (!sb || !id) return false;
       try {
-        await sb.from('reports').delete().eq('id', String(id));
+        await requireSuccess(sb.from('reports').delete().eq('id', String(id)));
         return true;
       } catch {
         return false;
@@ -472,7 +493,7 @@
       if (!sb || !Array.isArray(ids) || ids.length === 0) return false;
       try {
         const strIds = ids.map(String);
-        await sb.from('reports').delete().in('id', strIds);
+        await requireSuccess(sb.from('reports').delete().in('id', strIds));
         return true;
       } catch {
         return false;
@@ -515,7 +536,7 @@
       const sb = getClient();
       if (!sb) return false;
       try {
-        await sb.from('reports').delete().eq('is_deleted', true);
+        await requireSuccess(sb.from('reports').delete().eq('is_deleted', true));
         return true;
       } catch {
         return false;
@@ -539,7 +560,7 @@
       const sb = getClient();
       if (!sb || !categoryObj) return false;
       try {
-        await sb.from('categories').upsert(categoryObj, { onConflict: 'id' });
+        await requireSuccess(sb.from('categories').upsert(categoryObj, { onConflict: 'id' }));
         return true;
       } catch {
         return false;
@@ -550,7 +571,7 @@
       const sb = getClient();
       if (!sb || !id) return false;
       try {
-        await sb.from('categories').delete().eq('id', String(id));
+        await requireSuccess(sb.from('categories').delete().eq('id', String(id)));
         return true;
       } catch {
         return false;
@@ -589,7 +610,7 @@
           category: String(snippet.category || 'Genel'),
           updated_at: new Date().toISOString()
         };
-        await sb.from('snippets').upsert(row, { onConflict: 'id' });
+        await requireSuccess(sb.from('snippets').upsert(row, { onConflict: 'id' }));
         return true;
       } catch {
         return false;
@@ -600,7 +621,7 @@
       const sb = getClient();
       if (!sb || !id) return false;
       try {
-        await sb.from('snippets').delete().eq('id', String(id));
+        await requireSuccess(sb.from('snippets').delete().eq('id', String(id)));
         return true;
       } catch {
         return false;
@@ -682,7 +703,7 @@
           preferences: { logs: logs.slice(0, 1000) },
           updated_at: new Date().toISOString()
         };
-        await sb.from('user_settings').upsert(row, { onConflict: 'id' });
+        await requireSuccess(sb.from('user_settings').upsert(row, { onConflict: 'id' }));
         return true;
       } catch {
         return false;

@@ -8,7 +8,7 @@ const { isValidEmail, isValidText, isValidUsername, normalizeEmail, normalizePho
 const { createMailer } = require('./lib/mailer');
 const { PASSWORD_MAX_LENGTH, hashPassword, verifyPassword: verifyPasswordHash } = require('./lib/passwords');
 const { createRateLimiter } = require('./lib/rate_limiter');
-const { buildOwnedReportRow, canManageReport, canReadReport, reportId, reportRowToClient } = require('./lib/report_access');
+const { buildOwnedReportRow, canManageReport, canReadReport, nextReportVersion, reportId, reportRowToClient } = require('./lib/report_access');
 const { createSessionAuth } = require('./lib/session_auth');
 const { createStagingAccessMiddleware } = require('./lib/staging_access');
 
@@ -1149,7 +1149,6 @@ app.post('/api/auth/change-email', authRateLimiter, requireAuth, async (req, res
 // ── RAPOR DEPOLAMA VE YÖNETİM ENDPOINTLERİ ──────────────────
 const REPORT_STORE_PATH = path.join(__dirname, 'data', 'store.json');
 const REPORT_STORE_TEMP_PATH = path.join(__dirname, 'data', 'store.json.tmp');
-const MAX_REPORTS_PER_REQUEST = 500;
 
 function readLocalReports() {
   if (!fs.existsSync(REPORT_STORE_PATH)) return [];
@@ -1221,6 +1220,70 @@ app.get('/api/store/trash', requireAuth, async (req, res) => {
   }
 });
 
+app.put('/api/reports/:id', apiWriteRateLimiter, requireAuth, async (req, res) => {
+  const id = String(req.params.id || '');
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body) || String(req.body.id || '') !== id) {
+    return res.status(400).json({ success: false, reason: 'Rapor kimliği istek adresiyle eşleşmelidir.' });
+  }
+
+  try {
+    const existing = await getReportRecord(id);
+    if (existing && !canManageReport(req.authUser, existing)) {
+      return res.status(403).json({ success: false, reason: 'Başka bir kullanıcıya ait rapor güncellenemez.' });
+    }
+
+    const currentVersion = existing ? Math.max(1, Number(existing.version) || 1) : 0;
+    let nextVersion;
+    try {
+      nextVersion = nextReportVersion(existing, req.body.version);
+    } catch (versionError) {
+      return res.status(409).json({
+        success: false,
+        code: versionError.code,
+        reason: 'Rapor başka bir oturumda güncellendi. Yenileyip değişikliklerinizi tekrar uygulayın.',
+        currentVersion: versionError.currentVersion
+      });
+    }
+    const row = buildOwnedReportRow(req.body, req.authUser);
+    row.version = nextVersion;
+    row.data = { ...row.data, version: nextVersion };
+
+    let saved;
+    if (supabase) {
+      if (!existing) {
+        const result = await supabase.from('reports').insert(row).select('*').limit(1);
+        if (result.error) {
+          if (result.error.code === '23505') {
+            return res.status(409).json({ success: false, code: 'REPORT_CONFLICT', reason: 'Rapor aynı anda başka bir oturumda oluşturuldu.' });
+          }
+          throw result.error;
+        }
+        saved = result.data?.[0];
+      } else {
+        const result = await supabase.from('reports').update(row).eq('id', id).eq('version', currentVersion).select('*').limit(1);
+        if (result.error) throw result.error;
+        if (!result.data?.length) {
+          return res.status(409).json({ success: false, code: 'REPORT_CONFLICT', reason: 'Rapor aynı anda başka bir oturumda güncellendi.' });
+        }
+        saved = result.data[0];
+      }
+    } else {
+      const reports = readLocalReports();
+      const index = reports.findIndex(report => reportId(report) === id);
+      const clientReport = reportRowToClient(row);
+      if (index === -1) reports.push(clientReport);
+      else reports[index] = clientReport;
+      writeLocalReports(reports);
+      saved = row;
+    }
+
+    res.json({ success: true, report: reportRowToClient(saved) });
+  } catch (error) {
+    console.warn('Rapor kaydedilemedi:', safeLogStr(error.message));
+    res.status(503).json({ success: false, reason: 'Rapor geçici olarak kaydedilemedi.' });
+  }
+});
+
 app.get('/api/settings', requireAuth, async (req, res) => {
   if (!supabase) return res.json({ success: true, settings: null });
   try {
@@ -1259,52 +1322,11 @@ app.patch('/api/settings', apiWriteRateLimiter, requireAuth, async (req, res) =>
 });
 
 app.post('/api/store/save', apiWriteRateLimiter, requireAuth, async (req, res) => {
-  const reports = req.body;
-  if (!Array.isArray(reports) || reports.length > MAX_REPORTS_PER_REQUEST) {
-    return res.status(400).json({ success: false, reason: `Tek istekte en fazla ${MAX_REPORTS_PER_REQUEST} rapor kaydedilebilir.` });
-  }
-
-  try {
-    const rows = reports.map(report => buildOwnedReportRow(report, req.authUser));
-    const ids = rows.map(row => row.id);
-    if (new Set(ids).size !== ids.length) {
-      return res.status(400).json({ success: false, reason: 'Aynı rapor kimliği birden fazla kez gönderilemez.' });
-    }
-
-    if (supabase) {
-      const existingOwners = new Map();
-      for (let i = 0; i < ids.length; i += 100) {
-        const idChunk = ids.slice(i, i + 100);
-        if (idChunk.length === 0) continue;
-        const { data, error } = await supabase.from('reports').select('id,user_id').in('id', idChunk);
-        if (error) throw error;
-        (data || []).forEach(row => existingOwners.set(String(row.id), String(row.user_id)));
-      }
-      const foreignId = ids.find(id => existingOwners.has(id) && existingOwners.get(id) !== String(req.authUser.id));
-      if (foreignId) {
-        return res.status(403).json({ success: false, reason: 'Başka bir kullanıcıya ait rapor güncellenemez.' });
-      }
-
-      for (let i = 0; i < rows.length; i += 50) {
-        const { error } = await supabase.from('reports').upsert(rows.slice(i, i + 50), { onConflict: 'id' });
-        if (error) throw error;
-      }
-    } else {
-      const existing = readLocalReports();
-      const existingMap = new Map(existing.map(report => [reportId(report), report]));
-      const foreignId = ids.find(id => existingMap.has(id) && String(existingMap.get(id).userId || existingMap.get(id).user_id) !== String(req.authUser.id));
-      if (foreignId) {
-        return res.status(403).json({ success: false, reason: 'Başka bir kullanıcıya ait rapor güncellenemez.' });
-      }
-      rows.forEach(row => existingMap.set(row.id, reportRowToClient(row)));
-      writeLocalReports(Array.from(existingMap.values()));
-    }
-
-    res.json({ success: true, count: rows.length });
-  } catch (error) {
-    console.warn('Rapor senkronizasyonu başarısız:', safeLogStr(error.message));
-    res.status(400).json({ success: false, reason: error.message === 'Geçersiz rapor kimliği.' ? error.message : 'Raporlar kaydedilemedi.' });
-  }
+  res.status(410).json({
+    success: false,
+    code: 'SNAPSHOT_SYNC_REMOVED',
+    reason: 'Toplu arşiv yazımı kaldırıldı. Raporları tekil endpoint üzerinden kaydedin.'
+  });
 });
 
 app.delete('/api/reports', apiWriteRateLimiter, requireAuth, async (req, res) => {
@@ -1367,18 +1389,30 @@ app.patch('/api/reports/:id/trash', apiWriteRateLimiter, requireAuth, async (req
 
     const isDeleted = req.body?.deleted !== false;
     const deletedAt = isDeleted ? new Date().toISOString() : null;
+    let nextVersion;
+    try {
+      nextVersion = nextReportVersion(report, req.body?.version);
+    } catch (versionError) {
+      return res.status(409).json({ success: false, code: versionError.code, reason: 'Rapor başka bir oturumda güncellendi.', currentVersion: versionError.currentVersion });
+    }
+    let savedReport;
     if (supabase) {
       const current = reportRowToClient(report);
-      const data = { ...current, isDeleted, is_deleted: isDeleted, deletedAt, deleted_at: deletedAt };
-      const { error } = await supabase.from('reports').update({ is_deleted: isDeleted, deleted_at: deletedAt, data, updated_at: new Date().toISOString() }).eq('id', String(req.params.id));
-      if (error) throw error;
+      const data = { ...current, isDeleted, is_deleted: isDeleted, deletedAt, deleted_at: deletedAt, version: nextVersion };
+      const result = await supabase.from('reports')
+        .update({ is_deleted: isDeleted, deleted_at: deletedAt, data, version: nextVersion, updated_at: new Date().toISOString() })
+        .eq('id', String(req.params.id)).eq('version', nextVersion - 1).select('*').limit(1);
+      if (result.error) throw result.error;
+      if (!result.data?.length) return res.status(409).json({ success: false, code: 'REPORT_CONFLICT', reason: 'Rapor aynı anda başka bir oturumda güncellendi.' });
+      savedReport = reportRowToClient(result.data[0]);
     } else {
       const reports = readLocalReports();
       const index = reports.findIndex(item => reportId(item) === String(req.params.id));
-      reports[index] = { ...reports[index], isDeleted, is_deleted: isDeleted, deletedAt, deleted_at: deletedAt };
+      reports[index] = { ...reports[index], isDeleted, is_deleted: isDeleted, deletedAt, deleted_at: deletedAt, version: nextVersion };
       writeLocalReports(reports);
+      savedReport = reports[index];
     }
-    res.json({ success: true, isDeleted });
+    res.json({ success: true, isDeleted, report: savedReport });
   } catch (error) {
     res.status(503).json({ success: false, reason: 'Rapor durumu güncellenemedi.' });
   }
