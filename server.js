@@ -32,7 +32,11 @@ function validateEnvironment() {
     ['SESSION_SECRET', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'].forEach(requireValue);
   }
   if (APP_ENV === 'staging') {
-    ['APP_BASE_URL', 'STAGING_ACCESS_USER', 'STAGING_ACCESS_PASSWORD', 'BOOTSTRAP_ADMIN_USERNAME', 'BOOTSTRAP_ADMIN_PASSWORD', 'BOOTSTRAP_ADMIN_EMAIL'].forEach(requireValue);
+    ['APP_BASE_URL', 'BOOTSTRAP_ADMIN_USERNAME', 'BOOTSTRAP_ADMIN_PASSWORD', 'BOOTSTRAP_ADMIN_EMAIL'].forEach(requireValue);
+    // STAGING_ACCESS_USER/PASSWORD yalnızca STAGING_ACCESS_ENABLED=true ise zorunludur
+    if (['1', 'true', 'yes', 'on'].includes(String(process.env.STAGING_ACCESS_ENABLED || '').toLowerCase())) {
+      ['STAGING_ACCESS_USER', 'STAGING_ACCESS_PASSWORD'].forEach(requireValue);
+    }
   }
   if (BROWSER_SUPABASE_ENABLED) requireValue('SUPABASE_ANON_KEY');
   if (['1', 'true', 'yes', 'on'].includes(String(process.env.MAIL_ENABLED || '').toLowerCase())) {
@@ -140,19 +144,23 @@ async function ensureAdminUser() {
   };
 
   if (supabase) {
-    const { data: admins, error: adminQueryError } = await supabase
-      .from('app_users')
-      .select('id, role')
-      .eq('role', 'admin')
-      .limit(1);
-    if (adminQueryError) throw adminQueryError;
+    try {
+      const { data: admins, error: adminQueryError } = await supabase
+        .from('app_users')
+        .select('id, role')
+        .eq('role', 'admin')
+        .limit(1);
+      if (adminQueryError) throw adminQueryError;
 
-    if (!admins || admins.length === 0) {
-      console.log('Admin kullanıcısı bulunamadı, ortam değişkenlerinden bootstrap admin oluşturuluyor...');
-      const { error } = await supabase.from('app_users').upsert([bootstrapAdmin], { onConflict: 'username' });
-      if (error) throw error;
+      if (!admins || admins.length === 0) {
+        console.log('Admin kullanıcısı bulunamadı, ortam değişkenlerinden bootstrap admin oluşturuluyor...');
+        const { error } = await supabase.from('app_users').upsert([bootstrapAdmin], { onConflict: 'username' });
+        if (error) throw error;
+      }
+      return true;
+    } catch (err) {
+      console.warn('Supabase admin doğrulama uyarısı:', safeLogStr(err.message));
     }
-    return true;
   }
 
   const localUsers = getLocalUsers();
@@ -162,6 +170,7 @@ async function ensureAdminUser() {
   }
   return true;
 }
+
 
 // ── DENETİM GÜNLÜĞÜ (AUDIT LOGS) DEPOLAMA ────────────────────
 const LOGS_FILE = path.join(__dirname, 'data', 'audit_logs.json');
@@ -1647,9 +1656,39 @@ app.delete('/api/snippets/:id', apiWriteRateLimiter, requireAuth, async (req, re
 });
 
 async function startServer() {
-  await ensureAdminUser();
-  app.listen(PORT, () => {
-    console.log(`FrpOku Supabase Bulut Sunucusu http://localhost:${PORT} üzerinde çalışıyor.`);
+  try {
+    await ensureAdminUser();
+  } catch (err) {
+    console.warn('Bootstrap admin başlatma uyarısı:', safeLogStr(err.message));
+  }
+
+  const server = app.listen(PORT, () => {
+    const url = `http://localhost:${PORT}`;
+    console.log(`\n======================================================`);
+    console.log(` FrpOku Sunucusu Başarıyla Başlatıldı!`);
+    console.log(` Web Adresi: ${url}`);
+    console.log(`======================================================\n`);
+
+    // Geliştirme ortamında tarayıcıyı otomatik aç
+    if (process.env.AUTO_OPEN_BROWSER !== 'false') {
+      const { exec } = require('child_process');
+      const startCmd = process.platform === 'win32'
+        ? `start "" "${url}"`
+        : process.platform === 'darwin'
+        ? `open "${url}"`
+        : `xdg-open "${url}"`;
+      exec(startCmd, () => {});
+    }
+  });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`\n[HATA] ${PORT} portu zaten başka bir FrpOku penceresi veya uygulama tarafından kullanılıyor!`);
+      console.error(`Lütfen açık olan diğer Node.js / FrpOku pencerelerini kapatıp tekrar deneyin.\n`);
+    } else {
+      console.error('Sunucu başlatılamadı:', safeLogStr(err.message));
+    }
+    process.exit(1);
   });
 }
 
