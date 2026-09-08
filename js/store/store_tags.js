@@ -37,7 +37,7 @@
     const isSypg = /SYPG/i.test(cleanFileName) || /SYPG/i.test(cleanReportName) || /\bSYPG/i.test(textToScan);
     const isIndicator = isSypg || /^(?:HSTN|\d+(?:\.\d+)+)/i.test(cleanFileName) || /^(?:HSTN|\d+(?:\.\d+)+)/i.test(cleanReportName);
 
-    if (isSypg) tags.add('Gören');
+    if (isSypg) tags.add('SYPG');
     if (isIndicator) tags.add('Gösterge');
     if (/BARKOD|BRKD/i.test(textToScan)) tags.add('Barkod');
 

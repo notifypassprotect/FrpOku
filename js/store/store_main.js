@@ -476,24 +476,42 @@
     return { added, updated };
   }
 
-  function deleteOne(id) {
-    const file = _read().find(f => f.id === id);
-    const files = _read().filter(f => f.id !== id);
-    if (window.FrpCloud && typeof window.FrpCloud.purgeReport === 'function') {
-      window.FrpCloud.purgeReport(id).catch(() => {});
-    }
-    _write(files);
+  async function deleteOne(id) {
+    const originalFiles = [..._read()];
+    const file = originalFiles.find(f => f.id === id);
+    const files = originalFiles.filter(f => f.id !== id);
+    _write(files, { syncCloud: false });
     _audit('REPORT_DELETE', file ? file.name : id, 'Rapor kalıcı olarak silindi.');
+
+    if (window.FrpCloud && typeof window.FrpCloud.purgeReport === 'function') {
+      try {
+        const ok = await window.FrpCloud.purgeReport(id);
+        if (!ok) throw new Error('Sunucu silme işlemini reddetti.');
+      } catch (err) {
+        _write(originalFiles, { syncCloud: false });
+        _notifySyncIssue('Rapor silinemedi: Sunucu işlemi reddetti.');
+        throw err;
+      }
+    }
   }
 
-  function deleteMany(ids) {
+  async function deleteMany(ids) {
     const idSet = new Set(ids);
-    const files = _read().filter(f => !idSet.has(f.id));
-    if (window.FrpCloud && typeof window.FrpCloud.purgeManyReports === 'function') {
-      window.FrpCloud.purgeManyReports(ids).catch(() => {});
-    }
-    _write(files);
+    const originalFiles = [..._read()];
+    const files = originalFiles.filter(f => !idSet.has(f.id));
+    _write(files, { syncCloud: false });
     _audit('REPORT_BULK_DELETE', `${ids.length} Rapor`, 'Seçili raporlar kalıcı olarak silindi.');
+
+    if (window.FrpCloud && typeof window.FrpCloud.purgeManyReports === 'function') {
+      try {
+        const ok = await window.FrpCloud.purgeManyReports(ids);
+        if (!ok) throw new Error('Sunucu toplu silme işlemini reddetti.');
+      } catch (err) {
+        _write(originalFiles, { syncCloud: false });
+        _notifySyncIssue('Seçili raporlar silinemedi: Sunucu işlemi reddetti.');
+        throw err;
+      }
+    }
   }
 
   async function deleteAll() {
@@ -602,6 +620,7 @@
     if (window.FrpCloud && typeof window.FrpCloud.moveToTrash === 'function') {
       try {
         const saved = await window.FrpCloud.moveToTrash(id, fileToTrash);
+        if (!saved) throw new Error('Sunucu çöp kutusuna taşıma işlemini reddetti.');
         if (saved?.version) {
           fileToTrash.version = saved.version;
           _writeTrash(trash);
@@ -643,6 +662,7 @@
     if (window.FrpCloud && typeof window.FrpCloud.moveToTrash === 'function') {
       try {
         const savedReports = await Promise.all(toTrash.map(report => window.FrpCloud.moveToTrash(report.id, report)));
+        if (!savedReports || savedReports.some(s => !s)) throw new Error('Sunucu toplu çöp kutusuna taşıma işlemini reddetti.');
         savedReports.forEach((saved, index) => { if (saved?.version) toTrash[index].version = saved.version; });
         _writeTrash(trash);
       } catch (err) {
@@ -681,6 +701,7 @@
     if (window.FrpCloud && typeof window.FrpCloud.saveReport === 'function') {
       try {
         const saved = await window.FrpCloud.saveReport(restoredFile);
+        if (!saved) throw new Error('Sunucu geri yükleme işlemini reddetti.');
         if (saved?.version) {
           restoredFile.version = saved.version;
           _applySavedVersion(id, saved.version);
@@ -719,7 +740,8 @@
 
     if (window.FrpCloud && typeof window.FrpCloud.saveReport === 'function') {
       try {
-        await Promise.all(toRestore.map(report => window.FrpCloud.saveReport(report)));
+        const results = await Promise.all(toRestore.map(report => window.FrpCloud.saveReport(report)));
+        if (!results || results.some(r => !r)) throw new Error('Sunucu toplu geri yükleme işlemini reddetti.');
       } catch (err) {
         _writeTrash(originalTrash);
         _write(originalFiles, { syncCloud: false });
@@ -741,7 +763,8 @@
 
     if (window.FrpCloud && typeof window.FrpCloud.purgeReport === 'function') {
       try {
-        await window.FrpCloud.purgeReport(id);
+        const ok = await window.FrpCloud.purgeReport(id);
+        if (!ok) throw new Error('Sunucu silme işlemini reddetti.');
       } catch (err) {
         _writeTrash(originalTrash);
         _notifySyncIssue('Rapor silinemedi: Sunucu işlemi reddetti.');
@@ -761,7 +784,8 @@
 
     if (window.FrpCloud && typeof window.FrpCloud.purgeManyReports === 'function') {
       try {
-        await window.FrpCloud.purgeManyReports(ids);
+        const ok = await window.FrpCloud.purgeManyReports(ids);
+        if (!ok) throw new Error('Sunucu toplu silme işlemini reddetti.');
       } catch (err) {
         _writeTrash(originalTrash);
         _notifySyncIssue('Seçili raporlar silinemedi: Sunucu işlemi reddetti.');
@@ -778,7 +802,8 @@
 
     if (window.FrpCloud && typeof window.FrpCloud.emptyTrash === 'function') {
       try {
-        await window.FrpCloud.emptyTrash();
+        const ok = await window.FrpCloud.emptyTrash();
+        if (!ok) throw new Error('Sunucu çöp kutusu boşaltma işlemini reddetti.');
       } catch (err) {
         _writeTrash(originalTrash);
         _notifySyncIssue('Çöp kutusu boşaltılamadı: Sunucu işlemi reddetti.');

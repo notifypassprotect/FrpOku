@@ -285,6 +285,15 @@
     initAuthUI();
   }
 
+  window.addEventListener('frp:auth-expired', () => {
+    if (isLoggedIn()) {
+      if (typeof window.toast === 'function') {
+        window.toast('Oturum süreniz doldu, lütfen tekrar giriş yapın.', 'warning');
+      }
+      logout();
+    }
+  });
+
  async function updatePassword({ oldPassword, newPassword }) {
  const user = getSession();
  if (!user ||!user.id) return { success: false, reason: 'Oturum bulunamadı.' };

@@ -1367,13 +1367,21 @@ app.delete('/api/reports', apiWriteRateLimiter, requireAuth, async (req, res) =>
 
 app.delete('/api/reports/trash/all', apiWriteRateLimiter, requireAuth, async (req, res) => {
   try {
+    const isAdmin = req.authUser?.role === 'admin';
     if (supabase) {
-      const { error } = await supabase.from('reports').delete().eq('user_id', String(req.authUser.id)).eq('is_deleted', true);
+      let query = supabase.from('reports').delete().eq('is_deleted', true);
+      if (!isAdmin) {
+        query = query.eq('user_id', String(req.authUser.id));
+      }
+      const { error } = await query;
       if (error) throw error;
     } else {
-      writeLocalReports(readLocalReports().filter(report =>
-        String(report.userId || report.user_id) !== String(req.authUser.id) || !Boolean(report.isDeleted || report.is_deleted)
-      ));
+      writeLocalReports(readLocalReports().filter(report => {
+        const isDel = Boolean(report.isDeleted || report.is_deleted);
+        if (!isDel) return true;
+        if (isAdmin) return false;
+        return String(report.userId || report.user_id) !== String(req.authUser.id);
+      }));
     }
     res.json({ success: true });
   } catch {
@@ -1430,6 +1438,7 @@ app.patch('/api/reports/:id/trash', apiWriteRateLimiter, requireAuth, async (req
     } else {
       const reports = readLocalReports();
       const index = reports.findIndex(item => reportId(item) === String(req.params.id));
+      if (index === -1) return res.status(404).json({ success: false, reason: 'Rapor bulunamadı.' });
       reports[index] = { ...reports[index], isDeleted, is_deleted: isDeleted, deletedAt, deleted_at: deletedAt, version: nextVersion };
       writeLocalReports(reports);
       savedReport = reports[index];
@@ -1461,6 +1470,7 @@ app.post('/api/reports/toggle-pool', apiWriteRateLimiter, requireAuth, async (re
     } else {
       const reports = readLocalReports();
       const index = reports.findIndex(item => reportId(item) === reportIdValue);
+      if (index === -1) return res.status(404).json({ success: false, reason: 'Rapor bulunamadı.' });
       reports[index] = { ...reports[index], isPublic, is_public: isPublic, sharedAt, shared_at: sharedAt };
       writeLocalReports(reports);
     }

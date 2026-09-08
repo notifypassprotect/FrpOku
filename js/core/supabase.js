@@ -50,6 +50,9 @@
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) {
+        if (response.status === 401 && typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('frp:auth-expired', { detail: { path, status: 401 } }));
+        }
         const error = new Error(data?.reason || `Sunucu isteği başarısız (${response.status}).`);
         error.status = response.status;
         error.code = data?.code || (response.status === 409 ? 'REPORT_CONFLICT' : 'SERVER_REQUEST_FAILED');
@@ -292,9 +295,8 @@
           });
           return data?.report || false;
         } catch (error) {
-          if (error?.status === 409) throw error;
           console.warn('Rapor kaydedilemedi:', error.message);
-          return false;
+          throw error;
         }
       }
       const sb = getClient();
@@ -304,24 +306,19 @@
         const { data, error } = await sb.from('reports').upsert(row, { onConflict: 'id' }).select('*').limit(1);
         if (error) throw error;
         return data?.[0] ? parseReportFromRow(data[0]) : false;
-      } catch {
-        return false;
+      } catch (e) {
+        throw e;
       }
     },
 
     // ── 5. ÇÖP KUTUSUNA TAŞI (Soft Delete) ─────────────────────────
     async moveToTrash(id, reportObj) {
       if (USE_SERVER_BRIDGE) {
-        try {
-          const data = await serverRequest(`/api/reports/${encodeURIComponent(id)}/trash`, {
-            method: 'PATCH',
-            body: JSON.stringify({ deleted: true, version: reportObj?.version })
-          });
-          return data?.report || false;
-        } catch (error) {
-          if (error?.status === 409) throw error;
-          return false;
-        }
+        const data = await serverRequest(`/api/reports/${encodeURIComponent(id)}/trash`, {
+          method: 'PATCH',
+          body: JSON.stringify({ deleted: true, version: reportObj?.version })
+        });
+        return data?.report || false;
       }
       const sb = getClient();
       if (!sb || !id) return false;
@@ -335,8 +332,8 @@
           await requireSuccess(sb.from('reports').update({ is_deleted: true, deleted_at: now }).eq('id', String(id)));
         }
         return true;
-      } catch {
-        return false;
+      } catch (e) {
+        throw e;
       }
     },
 
@@ -353,32 +350,27 @@
         const strIds = ids.map(String);
         await requireSuccess(sb.from('reports').update({ is_deleted: true, deleted_at: now }).in('id', strIds));
         return true;
-      } catch {
-        return false;
+      } catch (e) {
+        throw e;
       }
     },
 
     // ── 6. ÇÖP KUTUSUNDAN GERİ YÜKLE (Restore) ─────────────────────
     async restoreFromTrash(id, reportObj) {
       if (USE_SERVER_BRIDGE) {
-        try {
-          const data = await serverRequest(`/api/reports/${encodeURIComponent(id)}/trash`, {
-            method: 'PATCH',
-            body: JSON.stringify({ deleted: false, version: reportObj?.version })
-          });
-          return data?.report || false;
-        } catch (error) {
-          if (error?.status === 409) throw error;
-          return false;
-        }
+        const data = await serverRequest(`/api/reports/${encodeURIComponent(id)}/trash`, {
+          method: 'PATCH',
+          body: JSON.stringify({ deleted: false, version: reportObj?.version })
+        });
+        return data?.report || false;
       }
       const sb = getClient();
       if (!sb || !id) return false;
       try {
         await requireSuccess(sb.from('reports').update({ is_deleted: false, deleted_at: null }).eq('id', String(id)));
         return true;
-      } catch {
-        return false;
+      } catch (e) {
+        throw e;
       }
     },
 
@@ -394,8 +386,8 @@
         const strIds = ids.map(String);
         await requireSuccess(sb.from('reports').update({ is_deleted: false, deleted_at: null }).in('id', strIds));
         return true;
-      } catch {
-        return false;
+      } catch (e) {
+        throw e;
       }
     },
 
@@ -477,20 +469,16 @@
     // ── 8. KALICI SİL (Purge from Database) ─────────────────────────
     async purgeReport(id) {
       if (USE_SERVER_BRIDGE) {
-        try {
-          const data = await serverRequest(`/api/reports/${encodeURIComponent(id)}`, { method: 'DELETE' });
-          return Boolean(data?.success);
-        } catch {
-          return false;
-        }
+        const data = await serverRequest(`/api/reports/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        return Boolean(data?.success);
       }
       const sb = getClient();
       if (!sb || !id) return false;
       try {
         await requireSuccess(sb.from('reports').delete().eq('id', String(id)));
         return true;
-      } catch {
-        return false;
+      } catch (e) {
+        throw e;
       }
     },
 
@@ -510,8 +498,8 @@
         const strIds = ids.map(String);
         await requireSuccess(sb.from('reports').delete().in('id', strIds));
         return true;
-      } catch {
-        return false;
+      } catch (e) {
+        throw e;
       }
     },
 
@@ -521,40 +509,33 @@
 
     async deleteAllReports() {
       if (USE_SERVER_BRIDGE) {
-        try {
-          const data = await serverRequest('/api/reports', { method: 'DELETE' });
-          return Boolean(data?.success);
-        } catch {
-          return false;
-        }
+        const data = await serverRequest('/api/reports', { method: 'DELETE' });
+        return Boolean(data?.success);
       }
       const sb = getClient();
       const user = window.FrpAuth?.getUser();
       if (!sb || !user?.id) return false;
       try {
         const { error } = await sb.from('reports').delete().eq('user_id', String(user.id));
-        return !error;
-      } catch {
-        return false;
+        if (error) throw error;
+        return true;
+      } catch (e) {
+        throw e;
       }
     },
 
     async emptyTrash() {
       if (USE_SERVER_BRIDGE) {
-        try {
-          const data = await serverRequest('/api/reports/trash/all', { method: 'DELETE' });
-          return Boolean(data?.success);
-        } catch {
-          return false;
-        }
+        const data = await serverRequest('/api/reports/trash/all', { method: 'DELETE' });
+        return Boolean(data?.success);
       }
       const sb = getClient();
       if (!sb) return false;
       try {
         await requireSuccess(sb.from('reports').delete().eq('is_deleted', true));
         return true;
-      } catch {
-        return false;
+      } catch (e) {
+        throw e;
       }
     },
 
