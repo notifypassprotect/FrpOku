@@ -149,7 +149,8 @@
       document.documentElement.setAttribute('data-theme', e.newValue);
       const isDark = e.newValue === 'dark';
       document.querySelectorAll('#btnThemeToggle').forEach(btn => {
-        btn.textContent = isDark ? 'Aydınlık Mod' : 'Koyu Mod';
+        const label = isDark ? 'Aydınlık Mod' : 'Koyu Mod';
+        if (btn.textContent !== label) btn.textContent = label;
       });
     }
   });
@@ -183,7 +184,8 @@
   function syncThemeButtons() {
     const isDark = getGlobalTheme() === 'dark';
     document.querySelectorAll('#btnThemeToggle').forEach(btn => {
-      btn.textContent = isDark ? 'Aydınlık Mod' : 'Koyu Mod';
+      const label = isDark ? 'Aydınlık Mod' : 'Koyu Mod';
+      if (btn.textContent !== label) btn.textContent = label;
     });
   }
 
