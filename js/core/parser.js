@@ -637,7 +637,10 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
   // Bu katman yalnızca mevcut alanları güncellemez; editörde eklenen query,
   // band ve component düğümlerini de doğru parent altına oluşturur.
   try {
-    const doc = new DOMParser().parseFromString(xml, 'application/xml');
+    const ParserClass = typeof DOMParser !== 'undefined' ? DOMParser : (typeof global !== 'undefined' ? global.DOMParser : null);
+    const SerializerClass = typeof XMLSerializer !== 'undefined' ? XMLSerializer : (typeof global !== 'undefined' ? global.XMLSerializer : null);
+    if (!ParserClass || !SerializerClass) return xml;
+    const doc = new ParserClass().parseFromString(xml, 'application/xml');
     if (!doc.querySelector('parsererror') && doc.documentElement) {
       const root = doc.documentElement;
       const elements = () => Array.from(doc.getElementsByTagName('*'));
@@ -705,8 +708,42 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
               OnAfterPrint: component.onAfterPrint, OnClick: component.onClick, OnPreviewClick: component.onPreviewClick
             });
           });
+
+          // Tasarımda silinen bileşenleri XML band düğümünden kaldır
+          const activeCompNames = new Set((band.components || []).map(c => c.name).filter(Boolean));
+          Array.from(bandNode.childNodes || []).forEach(child => {
+            if (child.nodeType === 1) {
+              const cName = child.getAttribute('Name');
+              if (cName && !activeCompNames.has(cName) && !/Band|Page|Report/i.test(child.nodeName)) {
+                bandNode.removeChild(child);
+              }
+            }
+          });
+        });
+
+        // Tasarımda silinen bandları XML sayfa düğümünden kaldır
+        const activeBandNames = new Set((page.bands || []).filter(b => b.type !== 'TfrxPageContent').map(b => b.name).filter(Boolean));
+        Array.from(pageNode.childNodes || []).forEach(child => {
+          if (child.nodeType === 1) {
+            const bName = child.getAttribute('Name');
+            if (bName && !activeBandNames.has(bName) && /Band|Header|Footer|Data|Summary|Title|Group/i.test(child.nodeName)) {
+              pageNode.removeChild(child);
+            }
+          }
         });
       });
+
+      if (dataPage) {
+        const activeQueryNames = new Set((file.queries || []).map(q => q.name).filter(Boolean));
+        Array.from(dataPage.childNodes || []).forEach(child => {
+          if (child.nodeType === 1 && /^(TfrxFOQuery|TfrxQuery)$/i.test(child.nodeName)) {
+            const qName = child.getAttribute('Name') || child.getAttribute('UserName');
+            if (qName && !activeQueryNames.has(qName)) {
+              dataPage.removeChild(child);
+            }
+          }
+        });
+      }
 
       const syncControls = (controls, parent) => (controls || []).forEach(control => {
         const node = ensureNode(control, parent);
@@ -734,7 +771,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
       });
 
       if (newVersionNumStr) root.setAttribute('ReportOptions.VersionBuild', String(newVersionNumStr));
-      xml = new XMLSerializer().serializeToString(doc);
+      xml = new SerializerClass().serializeToString(doc);
     }
   } catch (error) {
     console.warn('FRP XML model senkronizasyonu başarısız:', error.message);
@@ -743,8 +780,20 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
   return xml;
 }
 
-window.parseFrp                 = parseFrp;
-window.decodeHtmlEntities       = decodeHtmlEntities;
-window.extractParamsFromSql     = extractParamsFromSql;
-window.encodeFrpAttr            = encodeFrpAttr;
-window.buildUpdatedFrpXml       = buildUpdatedFrpXml;
+if (typeof window !== 'undefined') {
+  window.parseFrp                 = parseFrp;
+  window.decodeHtmlEntities       = decodeHtmlEntities;
+  window.extractParamsFromSql     = extractParamsFromSql;
+  window.encodeFrpAttr            = encodeFrpAttr;
+  window.buildUpdatedFrpXml       = buildUpdatedFrpXml;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    parseFrp,
+    decodeHtmlEntities,
+    extractParamsFromSql,
+    encodeFrpAttr,
+    buildUpdatedFrpXml
+  };
+}

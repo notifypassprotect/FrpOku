@@ -860,7 +860,11 @@ async function handleAdminPasswordReset(req, res) {
 
   try {
     const passwordHash = await hashPassword(newPassword);
-    const updatedUser = await updateUserById(userId, { password_hash: passwordHash });
+    const nowIso = new Date().toISOString();
+    const updatedUser = await updateUserById(userId, {
+      password_hash: passwordHash,
+      password_changed_at: nowIso
+    });
     if (!updatedUser) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
     await recordAuditLog({ userId: req.adminUser.id, username: req.adminUser.username, role: 'admin', action: 'USER_PASSWORD_RESET', target: updatedUser.username, details: 'Yönetici tarafından parola sıfırlandı.', ip: req.ip });
     res.json({ success: true, message: 'Kullanıcı şifresi başarıyla güncellendi.' });
@@ -947,19 +951,21 @@ app.post('/api/auth/change-password', authRateLimiter, requireAuth, async (req, 
     }
 
     const newHash = await hashPassword(newPassword);
-    if (supabase) {
-      const { error } = await supabase.from('app_users').update({ password_hash: newHash }).eq('id', userId);
-      if (error) throw error;
-    } else {
-      const localUsers = getLocalUsers();
-      const idx = localUsers.findIndex(u => u.id === userId);
-      if (idx !== -1) {
-        localUsers[idx].password_hash = newHash;
-        saveLocalUsers(localUsers);
-      }
-    }
+    const nowIso = new Date().toISOString();
+    await updateUserById(userId, {
+      password_hash: newHash,
+      password_changed_at: nowIso
+    });
 
-    res.json({ success: true, message: 'Şifreniz başarıyla değiştirildi.' });
+    const newToken = signToken({
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      department: user.department,
+      iat: Date.now()
+    });
+
+    res.json({ success: true, message: 'Şifreniz başarıyla değiştirildi.', token: newToken });
   } catch (err) {
     console.warn('Şifre güncelleme hatası:', safeLogStr(err.message));
     res.status(503).json({ success: false, reason: 'Şifre geçici olarak güncellenemedi.' });
@@ -1260,7 +1266,7 @@ app.put('/api/reports/:id', apiWriteRateLimiter, requireAuth, async (req, res) =
         currentVersion: versionError.currentVersion
       });
     }
-    const row = buildOwnedReportRow(req.body, req.authUser);
+    const row = buildOwnedReportRow(req.body, req.authUser, { existing });
     row.version = nextVersion;
     row.data = { ...row.data, version: nextVersion };
 
@@ -1564,7 +1570,11 @@ app.post('/api/categories', apiWriteRateLimiter, requireAuth, async (req, res) =
 });
 
 app.delete('/api/categories/:id', apiWriteRateLimiter, requireAuth, async (req, res) => {
-  const catId = String(req.params.id);
+  const catId = String(req.params.id || '').trim();
+  const SYSTEM_CATEGORY_IDS = new Set(['cat_genel', 'cat_fatura', 'cat_muhasebe', 'cat_stok', 'cat_rapor', 'genel', 'default', 'general']);
+  if (SYSTEM_CATEGORY_IDS.has(catId.toLowerCase())) {
+    return res.status(403).json({ success: false, reason: 'Sistem varsayılan kategorileri silinemez.' });
+  }
   try {
     if (supabase) {
       const { error } = await supabase.from('categories').delete().eq('id', catId);

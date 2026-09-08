@@ -118,6 +118,9 @@
  localStorage.removeItem(REMEMBER_KEY);
  localStorage.removeItem('frpoku_auth_token');
  sessionStorage.removeItem(AUTH_STORAGE_KEY);
+ if (window.FrpStore && typeof window.FrpStore.clearSessionCache === 'function') {
+  window.FrpStore.clearSessionCache();
+ }
  updateNavbarUserBadge();
  document.getElementById('btnAdminPendingRegistrations')?.remove();
  if (typeof window.showAuthFullScreenPortal === 'function') {

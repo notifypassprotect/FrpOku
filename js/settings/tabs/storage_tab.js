@@ -144,8 +144,12 @@ window.FrpSettingsTabs.storage = {
           message: 'Şifreniz doğrulandı. Tüm yüklenen raporlar, kategoriler ve veritabanı kalıcı olarak silinecektir! Devam edilsin mi?',
           confirmText: 'Evet, Hepsini Sil',
           isDanger: true,
-          onConfirm: () => {
-            FrpStore.deleteAll();
+          onConfirm: async () => {
+            if (typeof FrpStore.resetAllUserData === 'function') {
+              await FrpStore.resetAllUserData();
+            } else {
+              FrpStore.deleteAll();
+            }
             if (window.FrpAudit) {
               window.FrpAudit.logAction({
                 action: 'DATA_RESET',

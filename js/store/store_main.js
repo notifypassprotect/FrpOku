@@ -118,11 +118,34 @@
   function _reportsOwnedBySession(files) {
     const user = window.FrpAuth && typeof window.FrpAuth.getUser === 'function' ? window.FrpAuth.getUser() : null;
     if (!user) return [];
-    return files.filter(file => !file.userId && !file.user_id || String(file.userId || file.user_id) === String(user.id));
+    return files.filter(file => {
+      if (user.role === 'admin') return true;
+      return !file.userId && !file.user_id || String(file.userId || file.user_id) === String(user.id);
+    });
   }
 
   let _persistedReportHashes = new Map();
   const _reportSyncChains = new Map();
+  const PENDING_SYNC_KEY = 'frpoku_pending_sync';
+  const _pendingSyncIds = new Set();
+  try {
+    const raw = localStorage.getItem(PENDING_SYNC_KEY);
+    if (raw) JSON.parse(raw).forEach(id => _pendingSyncIds.add(String(id)));
+  } catch (e) {}
+
+  function _savePendingSyncIds() {
+    try {
+      localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify([..._pendingSyncIds]));
+    } catch (e) {}
+  }
+
+  function _flushPendingSync() {
+    if (_pendingSyncIds.size === 0) return;
+    [..._pendingSyncIds].forEach(_queueReportSync);
+  }
+  if (typeof window !== 'undefined') {
+    window.addEventListener('online', _flushPendingSync);
+  }
 
   function _reportHash(report) {
     try { return JSON.stringify(report); } catch { return ''; }
@@ -168,12 +191,16 @@
         const saved = await window.FrpCloud.saveReport(latest);
         if (!saved) throw new Error('Bulut kaydı doğrulanamadı.');
         _applySavedVersion(key, saved.version);
+        _pendingSyncIds.delete(key);
+        _savePendingSyncIds();
       } catch (error) {
         console.warn('Rapor senkronizasyonu başarısız:', error);
+        _pendingSyncIds.add(key);
+        _savePendingSyncIds();
         const eventName = error?.status === 409 ? 'frp:sync-conflict' : 'frp:sync-error';
         _notifySyncIssue(error?.status === 409
           ? 'Bu rapor başka bir oturumda değiştirildi. Yenileyip tekrar deneyin.'
-          : 'Bulut kaydı başarısız oldu; yerel kopyanız korundu.');
+          : 'Bulut kaydı başarısız oldu; değişiklik yerel kuyrukta korunuyor.');
         window.dispatchEvent(new CustomEvent(eventName, { detail: { id: key, message: error?.message || 'Rapor kaydedilemedi.' } }));
       }
     }).finally(() => {
@@ -188,7 +215,6 @@
       .filter(report => _persistedReportHashes.get(String(report.id)) !== _reportHash(report))
       .map(report => String(report.id)) : [];
     _persistLocal(files);
-    _rememberPersisted(files);
     changedIds.forEach(_queueReportSync);
     return true;
   }
@@ -212,9 +238,22 @@
         try {
           const cloudFiles = await window.FrpCloud.loadActiveReports();
           if (Array.isArray(cloudFiles)) {
-            loadedFiles = cloudFiles;
+            const localMap = new Map((_read() || []).map(f => [String(f.id), f]));
+            loadedFiles = cloudFiles.map(cf => {
+              const cfId = String(cf.id);
+              if (_pendingSyncIds.has(cfId) && localMap.has(cfId)) {
+                return localMap.get(cfId);
+              }
+              return cf;
+            });
+            localMap.forEach((localFile, lId) => {
+              if (_pendingSyncIds.has(lId) && !loadedFiles.some(f => String(f.id) === lId)) {
+                loadedFiles.push(localFile);
+              }
+            });
             isCloudLoaded = true;
-            window.FRP_CLOUD_STATUS = { ok: true, kind: 'success', count: cloudFiles.length };
+            window.FRP_CLOUD_STATUS = { ok: true, kind: 'success', count: loadedFiles.length };
+            setTimeout(_flushPendingSync, 1000);
           } else if (typeof window.FrpCloud.getLastLoadStatus === 'function') {
             window.FRP_CLOUD_STATUS = window.FrpCloud.getLastLoadStatus();
             window.dispatchEvent(new CustomEvent('frp:cloud-load-error', { detail: window.FRP_CLOUD_STATUS }));
@@ -239,13 +278,13 @@
         try {
           if (typeof window.FrpCloud.loadCategories === 'function') {
             const cloudCats = await window.FrpCloud.loadCategories();
-            if (Array.isArray(cloudCats) && cloudCats.length > 0) {
+            if (Array.isArray(cloudCats)) {
               localStorage.setItem(CATEGORIES_KEY, JSON.stringify(cloudCats));
             }
           }
           if (typeof window.FrpCloud.loadSnippets === 'function') {
             const cloudSnippets = await window.FrpCloud.loadSnippets();
-            if (Array.isArray(cloudSnippets) && cloudSnippets.length > 0) {
+            if (Array.isArray(cloudSnippets)) {
               localStorage.setItem(SNIPPET_KEY, JSON.stringify(cloudSnippets));
             }
           }
@@ -332,15 +371,15 @@
 
   function add(parsedData, fileName, fileSize) {
     const files = _read();
-    const existingIdx = files.findIndex(f => f.name === fileName);
-    const autoTags = window.FrpTags ? window.FrpTags.generateAutoTags(parsedData, fileName) : [];
-    const existingTags = existingIdx >= 0 ? (files[existingIdx].tags || []) : [];
-    const mergedTags = [...new Set([...existingTags, ...autoTags])];
     const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
     const userId = curUser ? curUser.id : 'public';
     const ownerName = curUser ? (curUser.full_name || curUser.username) : 'Anonim';
     const ownerUsername = curUser ? curUser.username : '';
     const ownerDepartment = curUser ? (curUser.department || 'Bilgi İşlem') : '';
+    const existingIdx = files.findIndex(f => f.name === fileName && String(f.userId || f.user_id) === String(userId));
+    const autoTags = window.FrpTags ? window.FrpTags.generateAutoTags(parsedData, fileName) : [];
+    const existingTags = existingIdx >= 0 ? (files[existingIdx].tags || []) : [];
+    const mergedTags = [...new Set([...existingTags, ...autoTags])];
 
     const fileRecord = {
       id:              existingIdx >= 0 ? files[existingIdx].id : _uuid(),
@@ -392,7 +431,7 @@
 
     parsedList.forEach(item => {
       const { parsedData, fileName, fileSize } = item;
-      const existingIdx = files.findIndex(f => f.name === fileName);
+      const existingIdx = files.findIndex(f => f.name === fileName && String(f.userId || f.user_id) === String(userId));
       const autoTags = window.FrpTags ? window.FrpTags.generateAutoTags(parsedData, fileName) : [];
       const existingTags = existingIdx >= 0 ? (files[existingIdx].tags || []) : [];
       const mergedTags = [...new Set([...existingTags, ...autoTags])];
@@ -457,13 +496,54 @@
     _audit('REPORT_BULK_DELETE', `${ids.length} Rapor`, 'Seçili raporlar kalıcı olarak silindi.');
   }
 
-  function deleteAll() {
-    if (window.FrpCloud && typeof window.FrpCloud.emptyTrash === 'function') {
-      window.FrpCloud.emptyTrash().catch(() => {});
+  async function deleteAll() {
+    const files = _read();
+    const owned = _reportsOwnedBySession(files);
+    if (window.FrpCloud && typeof window.FrpCloud.purgeManyReports === 'function' && owned.length > 0) {
+      await window.FrpCloud.purgeManyReports(owned.map(r => r.id)).catch(() => {});
     }
-    _write([]);
+    _write([], { syncCloud: false });
     syncToIndexedDB([]);
-    _audit('REPORT_CLEAR_ALL', 'Tüm Raporlar', 'Tüm rapor arşivi tamamen temizlendi.');
+    _audit('REPORT_CLEAR_ALL', 'Tüm Raporlar', 'Tüm aktif raporlar temizlendi.');
+  }
+
+  async function resetAllUserData() {
+    const files = _read();
+    const owned = _reportsOwnedBySession(files);
+    if (window.FrpCloud) {
+      if (typeof window.FrpCloud.purgeManyReports === 'function' && owned.length > 0) {
+        await window.FrpCloud.purgeManyReports(owned.map(r => r.id)).catch(() => {});
+      }
+      if (typeof window.FrpCloud.emptyTrash === 'function') {
+        await window.FrpCloud.emptyTrash().catch(() => {});
+      }
+    }
+    _write([], { syncCloud: false });
+    _writeTrash([]);
+    syncToIndexedDB([]);
+    syncTrashToIndexedDB([]);
+    try {
+      localStorage.removeItem(CATEGORIES_KEY);
+      localStorage.removeItem(CUSTOM_TAGS_KEY);
+      localStorage.removeItem(SNIPPET_KEY);
+      localStorage.removeItem(RECENT_KEY);
+      localStorage.removeItem(PENDING_SYNC_KEY);
+    } catch (e) {}
+    _audit('DATA_RESET', 'Tüm Veritabanı', 'Kullanıcı onayı ile tüm raporlar, çöp kutusu ve ayarlar sıfırlandı.');
+  }
+
+  function clearSessionCache() {
+    _memoryStore = [];
+    _trashStore = [];
+    _persistedReportHashes.clear();
+    _pendingSyncIds.clear();
+    try {
+      localStorage.removeItem(STORE_KEY);
+      localStorage.removeItem(TRASH_KEY);
+      localStorage.removeItem(PENDING_SYNC_KEY);
+    } catch (e) {}
+    syncToIndexedDB([]);
+    syncTrashToIndexedDB([]);
   }
 
   // ── 5. Çöp Kutusu (Soft Delete) Metotları ─────────────────────
@@ -502,25 +582,35 @@
     const idx = files.findIndex(f => f.id === id);
     if (idx < 0) return false;
 
-    const fileToTrash = files[idx];
+    const originalFiles = [...files];
+    const originalTrash = [..._readTrash()];
+
+    const fileToTrash = { ...files[idx] };
     fileToTrash.deletedAt = new Date().toISOString();
     fileToTrash.isDeleted = true;
     fileToTrash.is_deleted = true;
 
     files.splice(idx, 1);
-    _write(files);
+    _write(files, { syncCloud: false });
 
-    const trash = _readTrash().filter(t => t.id !== id);
+    const trash = originalTrash.filter(t => t.id !== id);
     trash.unshift(fileToTrash);
     _writeTrash(trash);
 
     _audit('TRASH_MOVE', fileToTrash.name || id, 'Rapor çöp kutusuna taşındı.');
 
     if (window.FrpCloud && typeof window.FrpCloud.moveToTrash === 'function') {
-      const saved = await window.FrpCloud.moveToTrash(id, fileToTrash);
-      if (saved?.version) {
-        fileToTrash.version = saved.version;
-        _writeTrash(trash);
+      try {
+        const saved = await window.FrpCloud.moveToTrash(id, fileToTrash);
+        if (saved?.version) {
+          fileToTrash.version = saved.version;
+          _writeTrash(trash);
+        }
+      } catch (err) {
+        _write(originalFiles, { syncCloud: false });
+        _writeTrash(originalTrash);
+        _notifySyncIssue('Rapor çöp kutusuna taşınamadı: Sunucu hatası oluştu.');
+        throw err;
       }
     }
     return true;
@@ -529,11 +619,14 @@
   async function moveManyToTrash(ids) {
     const idSet = new Set(ids);
     const files = _read();
-    const toTrash = files.filter(f => idSet.has(f.id));
+    const originalFiles = [...files];
+    const originalTrash = [..._readTrash()];
+
+    const toTrash = files.filter(f => idSet.has(f.id)).map(f => ({ ...f }));
     const remaining = files.filter(f => !idSet.has(f.id));
 
     const now = new Date().toISOString();
-    let trash = _readTrash();
+    let trash = [...originalTrash];
     toTrash.forEach(f => {
       f.deletedAt = now;
       f.isDeleted = true;
@@ -542,15 +635,22 @@
       trash.unshift(f);
     });
 
-    _write(remaining);
+    _write(remaining, { syncCloud: false });
     _writeTrash(trash);
 
     _audit('TRASH_BULK_MOVE', `${toTrash.length} Rapor`, 'Seçili raporlar çöp kutusuna taşındı.');
 
     if (window.FrpCloud && typeof window.FrpCloud.moveToTrash === 'function') {
-      const savedReports = await Promise.all(toTrash.map(report => window.FrpCloud.moveToTrash(report.id, report)));
-      savedReports.forEach((saved, index) => { if (saved?.version) toTrash[index].version = saved.version; });
-      _writeTrash(trash);
+      try {
+        const savedReports = await Promise.all(toTrash.map(report => window.FrpCloud.moveToTrash(report.id, report)));
+        savedReports.forEach((saved, index) => { if (saved?.version) toTrash[index].version = saved.version; });
+        _writeTrash(trash);
+      } catch (err) {
+        _write(originalFiles, { syncCloud: false });
+        _writeTrash(originalTrash);
+        _notifySyncIssue('Seçili raporlar çöp kutusuna taşınamadı: Sunucu hatası oluştu.');
+        throw err;
+      }
     }
     return true;
   }
@@ -560,46 +660,79 @@
     const idx = trash.findIndex(t => t.id === id);
     if (idx < 0) return false;
 
-    const restoredFile = trash[idx];
+    const originalTrash = [...trash];
+    const originalFiles = [..._read()];
+
+    const restoredFile = { ...trash[idx] };
     delete restoredFile.deletedAt;
+    delete restoredFile.deleted_at;
     restoredFile.isDeleted = false;
     restoredFile.is_deleted = false;
 
     trash.splice(idx, 1);
     _writeTrash(trash);
 
-    const files = _read();
+    const files = [...originalFiles];
     files.unshift(restoredFile);
-    _write(files);
+    _write(files, { syncCloud: false });
 
     _audit('TRASH_RESTORE', restoredFile.name || id, 'Rapor çöp kutusundan geri yüklendi.');
 
+    if (window.FrpCloud && typeof window.FrpCloud.saveReport === 'function') {
+      try {
+        const saved = await window.FrpCloud.saveReport(restoredFile);
+        if (saved?.version) {
+          restoredFile.version = saved.version;
+          _applySavedVersion(id, saved.version);
+        }
+      } catch (err) {
+        _writeTrash(originalTrash);
+        _write(originalFiles, { syncCloud: false });
+        _notifySyncIssue('Rapor geri yüklenemedi: Sunucu işlemi reddetti.');
+        throw err;
+      }
+    }
     return true;
   }
 
   async function restoreManyFromTrash(ids) {
     const idSet = new Set(ids);
     let trash = _readTrash();
-    const toRestore = trash.filter(t => idSet.has(t.id));
+    const originalTrash = [...trash];
+    const originalFiles = [..._read()];
+
+    const toRestore = trash.filter(t => idSet.has(t.id)).map(f => ({ ...f }));
     trash = trash.filter(t => !idSet.has(t.id));
     _writeTrash(trash);
 
-    const files = _read();
+    const files = [...originalFiles];
     toRestore.forEach(f => {
       delete f.deletedAt;
+      delete f.deleted_at;
       f.isDeleted = false;
       f.is_deleted = false;
       files.unshift(f);
     });
-    _write(files);
+    _write(files, { syncCloud: false });
 
     _audit('TRASH_BULK_RESTORE', `${toRestore.length} Rapor`, 'Seçili raporlar çöp kutusundan geri yüklendi.');
 
+    if (window.FrpCloud && typeof window.FrpCloud.saveReport === 'function') {
+      try {
+        await Promise.all(toRestore.map(report => window.FrpCloud.saveReport(report)));
+      } catch (err) {
+        _writeTrash(originalTrash);
+        _write(originalFiles, { syncCloud: false });
+        _notifySyncIssue('Seçili raporlar geri yüklenemedi: Sunucu işlemi reddetti.');
+        throw err;
+      }
+    }
     return true;
   }
 
   async function purgeFromTrash(id) {
     let trash = _readTrash();
+    const originalTrash = [...trash];
     const item = trash.find(t => t.id === id);
     trash = trash.filter(t => t.id !== id);
     _writeTrash(trash);
@@ -607,31 +740,50 @@
     _audit('TRASH_PURGE', item ? item.name : id, 'Rapor çöp kutusundan kalıcı olarak silindi.');
 
     if (window.FrpCloud && typeof window.FrpCloud.purgeReport === 'function') {
-      await window.FrpCloud.purgeReport(id);
+      try {
+        await window.FrpCloud.purgeReport(id);
+      } catch (err) {
+        _writeTrash(originalTrash);
+        _notifySyncIssue('Rapor silinemedi: Sunucu işlemi reddetti.');
+        throw err;
+      }
     }
     return true;
   }
 
   async function purgeManyFromTrash(ids) {
     const idSet = new Set(ids);
-    let trash = _readTrash();
-    trash = trash.filter(t => !idSet.has(t.id));
+    const originalTrash = [..._readTrash()];
+    let trash = originalTrash.filter(t => !idSet.has(t.id));
     _writeTrash(trash);
 
     _audit('TRASH_BULK_PURGE', `${ids.length} Rapor`, 'Seçili raporlar çöpten kalıcı olarak silindi.');
 
     if (window.FrpCloud && typeof window.FrpCloud.purgeManyReports === 'function') {
-      await window.FrpCloud.purgeManyReports(ids);
+      try {
+        await window.FrpCloud.purgeManyReports(ids);
+      } catch (err) {
+        _writeTrash(originalTrash);
+        _notifySyncIssue('Seçili raporlar silinemedi: Sunucu işlemi reddetti.');
+        throw err;
+      }
     }
     return true;
   }
 
   async function emptyTrash() {
+    const originalTrash = [..._readTrash()];
     _writeTrash([]);
     _audit('TRASH_EMPTY', 'Çöp Kutusu', 'Çöp kutusu tamamen boşaltıldı.');
 
     if (window.FrpCloud && typeof window.FrpCloud.emptyTrash === 'function') {
-      await window.FrpCloud.emptyTrash();
+      try {
+        await window.FrpCloud.emptyTrash();
+      } catch (err) {
+        _writeTrash(originalTrash);
+        _notifySyncIssue('Çöp kutusu boşaltılamadı: Sunucu işlemi reddetti.');
+        throw err;
+      }
     }
     return true;
   }
@@ -1619,7 +1771,7 @@
 
   // ── Public Store API (Köprü ve Delegasyon) ─────────────────────
   const FrpStore = {
-    getAll, getById, add, addMany, deleteOne, deleteMany, deleteAll,
+    getAll, getById, add, addMany, deleteOne, deleteMany, deleteAll, resetAllUserData, clearSessionCache,
     updateNote, updateMeta, updateCode, updateReport, saveFile, updateFileName, restoreFromIndexedDB, hydrateFromIndexedDB,
     exportBackup, importBackup,
     toggleFavorite, togglePin, setFavoriteMany, toggleFavoriteMany, addTag, removeTag, getAllTags, getCustomTags, addCustomTag, deleteCustomTag,
