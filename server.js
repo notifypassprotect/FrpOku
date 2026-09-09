@@ -1190,12 +1190,24 @@ function writeLocalReports(reports) {
 }
 
 async function getReportRecord(id) {
+  const strId = String(id || '');
+  let decId = strId;
+  try { decId = decodeURIComponent(strId); } catch {}
+
   if (supabase) {
-    const { data, error } = await supabase.from('reports').select('*').eq('id', String(id)).limit(1);
+    const { data, error } = await supabase.from('reports').select('*').eq('id', strId).limit(1);
     if (error) throw error;
-    return data && data[0] ? data[0] : null;
+    if (data && data[0]) return data[0];
+    if (decId !== strId) {
+      const { data: d2, error: e2 } = await supabase.from('reports').select('*').eq('id', decId).limit(1);
+      if (!e2 && d2 && d2[0]) return d2[0];
+    }
+    return null;
   }
-  return readLocalReports().find(report => reportId(report) === String(id)) || null;
+  return readLocalReports().find(report => {
+    const rId = reportId(report);
+    return rId === strId || rId === decId;
+  }) || null;
 }
 
 async function loadVisibleReports(user, isDeleted) {

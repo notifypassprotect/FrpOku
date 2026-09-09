@@ -314,11 +314,18 @@
     // ── 5. ÇÖP KUTUSUNA TAŞI (Soft Delete) ─────────────────────────
     async moveToTrash(id, reportObj) {
       if (USE_SERVER_BRIDGE) {
-        const data = await serverRequest(`/api/reports/${encodeURIComponent(id)}/trash`, {
-          method: 'PATCH',
-          body: JSON.stringify({ deleted: true, version: reportObj?.version })
-        });
-        return data?.report || false;
+        try {
+          const data = await serverRequest(`/api/reports/${encodeURIComponent(id)}/trash`, {
+            method: 'PATCH',
+            body: JSON.stringify({ deleted: true, version: reportObj?.version, report: reportObj })
+          });
+          return data?.report || true;
+        } catch (err) {
+          if (err?.status === 404) {
+            return true;
+          }
+          throw err;
+        }
       }
       const sb = getClient();
       if (!sb || !id) return false;
@@ -358,11 +365,18 @@
     // ── 6. ÇÖP KUTUSUNDAN GERİ YÜKLE (Restore) ─────────────────────
     async restoreFromTrash(id, reportObj) {
       if (USE_SERVER_BRIDGE) {
-        const data = await serverRequest(`/api/reports/${encodeURIComponent(id)}/trash`, {
-          method: 'PATCH',
-          body: JSON.stringify({ deleted: false, version: reportObj?.version })
-        });
-        return data?.report || false;
+        try {
+          const data = await serverRequest(`/api/reports/${encodeURIComponent(id)}/trash`, {
+            method: 'PATCH',
+            body: JSON.stringify({ deleted: false, version: reportObj?.version, report: reportObj })
+          });
+          return data?.report || true;
+        } catch (err) {
+          if (err?.status === 404) {
+            return true;
+          }
+          throw err;
+        }
       }
       const sb = getClient();
       if (!sb || !id) return false;

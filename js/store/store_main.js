@@ -356,8 +356,13 @@
   }
 
   function getById(id) {
+    if (id == null) return null;
+    const strId = String(id);
+    let decId = strId;
+    try { decId = decodeURIComponent(strId); } catch {}
+
     const list = getAll();
-    const item = list.find(r => r.id === id);
+    const item = list.find(r => r.id === id || String(r.id) === strId || String(r.id) === decId);
     if (!item) return null;
     item.queries  = Array.isArray(item.queries)  ? item.queries  : [];
     item.datasets = Array.isArray(item.datasets) ? item.datasets : [];
@@ -590,18 +595,26 @@
     const list = _readTrash();
     const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
     if (!curUser) return list;
-    return list.filter(t => t.userId === curUser.id || !t.userId || t.userId === 'public' || curUser.role === 'admin');
+    return list.filter(t => {
+      const uId = t.userId || t.user_id;
+      return !uId || uId === 'public' || String(uId) === String(curUser.id) || curUser.role === 'admin';
+    });
   }
 
   async function moveToTrash(id) {
+    const rawId = String(id || '');
+    let decId = rawId;
+    try { decId = decodeURIComponent(rawId); } catch {}
+
     const files = _read();
-    const idx = files.findIndex(f => f.id === id);
+    const idx = files.findIndex(f => f.id === id || String(f.id) === rawId || String(f.id) === decId);
     if (idx < 0) return false;
 
     const originalFiles = [...files];
     const originalTrash = [..._readTrash()];
 
     const fileToTrash = { ...files[idx] };
+    const matchedId = fileToTrash.id;
     fileToTrash.deletedAt = new Date().toISOString();
     fileToTrash.isDeleted = true;
     fileToTrash.is_deleted = true;
@@ -609,15 +622,15 @@
     files.splice(idx, 1);
     _write(files, { syncCloud: false });
 
-    const trash = originalTrash.filter(t => t.id !== id);
+    const trash = originalTrash.filter(t => t.id !== matchedId && t.id !== rawId && t.id !== decId);
     trash.unshift(fileToTrash);
     _writeTrash(trash);
 
-    _audit('TRASH_MOVE', fileToTrash.name || id, 'Rapor çöp kutusuna taşındı.');
+    _audit('TRASH_MOVE', fileToTrash.name || matchedId, 'Rapor çöp kutusuna taşındı.');
 
     if (window.FrpCloud && typeof window.FrpCloud.moveToTrash === 'function') {
       try {
-        const saved = await window.FrpCloud.moveToTrash(id, fileToTrash);
+        const saved = await window.FrpCloud.moveToTrash(matchedId, fileToTrash);
         if (!saved) throw new Error('Sunucu çöp kutusuna taşıma işlemini reddetti.');
         if (saved?.version) {
           fileToTrash.version = saved.version;
@@ -634,13 +647,18 @@
   }
 
   async function moveManyToTrash(ids) {
-    const idSet = new Set(ids);
+    const idSet = new Set((ids || []).map(i => String(i)));
+    (ids || []).forEach(i => {
+      try { idSet.add(decodeURIComponent(String(i))); } catch {}
+    });
+
     const files = _read();
     const originalFiles = [...files];
     const originalTrash = [..._readTrash()];
 
-    const toTrash = files.filter(f => idSet.has(f.id)).map(f => ({ ...f }));
-    const remaining = files.filter(f => !idSet.has(f.id));
+    const toTrash = files.filter(f => idSet.has(String(f.id))).map(f => ({ ...f }));
+    if (toTrash.length === 0) return false;
+    const remaining = files.filter(f => !idSet.has(String(f.id)));
 
     const now = new Date().toISOString();
     let trash = [...originalTrash];
@@ -674,14 +692,19 @@
   }
 
   async function restoreFromTrash(id) {
+    const rawId = String(id || '');
+    let decId = rawId;
+    try { decId = decodeURIComponent(rawId); } catch {}
+
     let trash = _readTrash();
-    const idx = trash.findIndex(t => t.id === id);
+    const idx = trash.findIndex(t => t.id === id || String(t.id) === rawId || String(t.id) === decId);
     if (idx < 0) return false;
 
     const originalTrash = [...trash];
     const originalFiles = [..._read()];
 
     const restoredFile = { ...trash[idx] };
+    const matchedId = restoredFile.id;
     delete restoredFile.deletedAt;
     delete restoredFile.deleted_at;
     restoredFile.isDeleted = false;
@@ -690,19 +713,33 @@
     trash.splice(idx, 1);
     _writeTrash(trash);
 
-    const files = [...originalFiles];
+    const files = originalFiles.filter(item => item.id !== matchedId && item.id !== rawId && item.id !== decId);
     files.unshift(restoredFile);
     _write(files, { syncCloud: false });
 
-    _audit('TRASH_RESTORE', restoredFile.name || id, 'Rapor çöp kutusundan geri yüklendi.');
+    _audit('TRASH_RESTORE', restoredFile.name || matchedId, 'Rapor çöp kutusundan geri yüklendi.');
 
-    if (window.FrpCloud && typeof window.FrpCloud.saveReport === 'function') {
+    if (window.FrpCloud && typeof window.FrpCloud.restoreFromTrash === 'function') {
+      try {
+        const saved = await window.FrpCloud.restoreFromTrash(matchedId, restoredFile);
+        if (!saved) throw new Error('Sunucu geri yükleme işlemini reddetti.');
+        if (saved?.version) {
+          restoredFile.version = saved.version;
+          _write(files, { syncCloud: false });
+        }
+      } catch (err) {
+        _writeTrash(originalTrash);
+        _write(originalFiles, { syncCloud: false });
+        _notifySyncIssue('Rapor geri yüklenemedi: Sunucu işlemi reddetti.');
+        throw err;
+      }
+    } else if (window.FrpCloud && typeof window.FrpCloud.saveReport === 'function') {
       try {
         const saved = await window.FrpCloud.saveReport(restoredFile);
         if (!saved) throw new Error('Sunucu geri yükleme işlemini reddetti.');
         if (saved?.version) {
           restoredFile.version = saved.version;
-          _applySavedVersion(id, saved.version);
+          _applySavedVersion(matchedId, saved.version);
         }
       } catch (err) {
         _writeTrash(originalTrash);
@@ -715,28 +752,44 @@
   }
 
   async function restoreManyFromTrash(ids) {
-    const idSet = new Set(ids);
+    const idSet = new Set((ids || []).map(i => String(i)));
+    (ids || []).forEach(i => {
+      try { idSet.add(decodeURIComponent(String(i))); } catch {}
+    });
+
     let trash = _readTrash();
     const originalTrash = [...trash];
     const originalFiles = [..._read()];
 
-    const toRestore = trash.filter(t => idSet.has(t.id)).map(f => ({ ...f }));
-    trash = trash.filter(t => !idSet.has(t.id));
+    const toRestore = trash.filter(t => idSet.has(String(t.id))).map(f => ({ ...f }));
+    if (toRestore.length === 0) return false;
+    trash = trash.filter(t => !idSet.has(String(t.id)));
     _writeTrash(trash);
 
-    const files = [...originalFiles];
+    let files = [...originalFiles];
     toRestore.forEach(f => {
       delete f.deletedAt;
       delete f.deleted_at;
       f.isDeleted = false;
       f.is_deleted = false;
+      files = files.filter(item => item.id !== f.id);
       files.unshift(f);
     });
     _write(files, { syncCloud: false });
 
     _audit('TRASH_BULK_RESTORE', `${toRestore.length} Rapor`, 'Seçili raporlar çöp kutusundan geri yüklendi.');
 
-    if (window.FrpCloud && typeof window.FrpCloud.saveReport === 'function') {
+    if (window.FrpCloud && typeof window.FrpCloud.restoreFromTrash === 'function') {
+      try {
+        const results = await Promise.all(toRestore.map(report => window.FrpCloud.restoreFromTrash(report.id, report)));
+        if (!results || results.some(r => !r)) throw new Error('Sunucu toplu geri yükleme işlemini reddetti.');
+      } catch (err) {
+        _writeTrash(originalTrash);
+        _write(originalFiles, { syncCloud: false });
+        _notifySyncIssue('Seçili raporlar geri yüklenemedi: Sunucu işlemi reddetti.');
+        throw err;
+      }
+    } else if (window.FrpCloud && typeof window.FrpCloud.saveReport === 'function') {
       try {
         const results = await Promise.all(toRestore.map(report => window.FrpCloud.saveReport(report)));
         if (!results || results.some(r => !r)) throw new Error('Sunucu toplu geri yükleme işlemini reddetti.');

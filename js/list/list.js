@@ -707,18 +707,22 @@ function hideContextMenu() {
 }
 
 function setupContextMenu() {
-  if (!tableBody || !ctxMenu) return;
+  if (!ctxMenu) return;
 
-  tableBody.addEventListener('contextmenu', e => {
-    const row = e.target.closest('tr[data-id]');
-    if (!row) return;
+  const handleContextMenu = e => {
+    const item = e.target.closest('[data-id]');
+    if (!item) return;
+    const rawId = item.dataset.id;
+    if (!rawId) return;
+    let decodedId = rawId;
+    try { decodedId = decodeURIComponent(rawId); } catch {}
+    const file = FrpStore.getById(decodedId) || FrpStore.getById(rawId);
+    if (!file) return;
+
     e.preventDefault();
     e.stopPropagation();
 
-    contextTargetId = row.dataset.id;
-    const file = FrpStore.getById(contextTargetId);
-    if (!file) return;
-
+    contextTargetId = file.id;
     const titleEl = document.getElementById('ctxMenuReportTitle');
     if (titleEl) titleEl.textContent = file.meta?.reportName || file.name;
 
@@ -732,7 +736,10 @@ function setupContextMenu() {
     const y = Math.min(e.clientY, window.innerHeight - 280);
     ctxMenu.style.left = `${x}px`;
     ctxMenu.style.top = `${y}px`;
-  });
+  };
+
+  const tableArea = document.querySelector('.table-area') || tableBody;
+  if (tableArea) tableArea.addEventListener('contextmenu', handleContextMenu);
 
   document.addEventListener('click', (e) => {
     if (ctxMenu && !ctxMenu.contains(e.target)) hideContextMenu();
@@ -789,11 +796,16 @@ function setupContextMenu() {
         case 'delete':
           const doSingleDelete = async () => {
             try {
-              await FrpStore.moveToTrash(id);
-              selectedIds.delete(id);
-              toast('Rapor çöp kutusuna taşındı.', 'info');
+              const res = await FrpStore.moveToTrash(id);
+              if (res) {
+                selectedIds.delete(id);
+                toast('Rapor çöp kutusuna taşındı.', 'info');
+              } else {
+                toast('Rapor çöp kutusuna taşınamadı.', 'error');
+              }
             } catch (err) {
               console.warn('Rapor çöp kutusuna taşınamadı:', err);
+              toast('Rapor çöp kutusuna taşınamadı: ' + (err.message || 'Hata oluştu'), 'error');
             } finally {
               refreshAll();
             }
@@ -1109,22 +1121,32 @@ async function initListPage() {
       });
 
       try {
-        if (FrpStore.moveManyToTrash) await FrpStore.moveManyToTrash(idsToDelete);
-        else await Promise.all(idsToDelete.map(id => FrpStore.moveToTrash(id)));
-
-        if (window.FrpAudit) {
-          window.FrpAudit.logAction({
-            action: 'REPORT_DELETE_BULK',
-            target: `${n} Rapor`,
-            details: `${n} adet rapor çöp kutusuna taşındı.`,
-            reports: deletedReports
-          });
+        let ok = false;
+        if (FrpStore.moveManyToTrash) {
+          ok = await FrpStore.moveManyToTrash(idsToDelete);
+        } else {
+          const results = await Promise.all(idsToDelete.map(id => FrpStore.moveToTrash(id)));
+          ok = results.some(Boolean);
         }
 
-        selectedIds.clear();
-        toast(`${n} rapor çöp kutusuna taşındı.`, 'info');
+        if (ok) {
+          if (window.FrpAudit) {
+            window.FrpAudit.logAction({
+              action: 'REPORT_DELETE_BULK',
+              target: `${n} Rapor`,
+              details: `${n} adet rapor çöp kutusuna taşındı.`,
+              reports: deletedReports
+            });
+          }
+
+          selectedIds.clear();
+          toast(`${n} rapor çöp kutusuna taşındı.`, 'info');
+        } else {
+          toast('Raporlar çöp kutusuna taşınamadı.', 'error');
+        }
       } catch (err) {
         console.warn('Toplu çöp kutusuna taşıma hatası:', err);
+        toast('Toplu çöp kutusuna taşıma hatası: ' + (err.message || 'Hata oluştu'), 'error');
       } finally {
         refreshAll();
       }
