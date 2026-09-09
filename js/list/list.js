@@ -676,7 +676,7 @@ function updateBulkBar() {
     const btnCompare = document.getElementById('btnCompareSelected');
     if (btnCompare) {
       btnCompare.style.display = count >= 2 ? 'inline-flex' : 'none';
-      btnCompare.textContent = count === 2 ? 'Karşılaştır (Diff)' : `Seçilen ${count} Raporu Karşılaştır`;
+      btnCompare.textContent = count === 2 ? 'Karşılaştır' : `Seçilen ${count} Raporu Karşılaştır`;
     }
 
     // Havuz Butonlarının Dinamik Durum Yönetimi
@@ -968,10 +968,19 @@ window.refreshAll = refreshAll;
 
 // ── Başlatma ve Event Listener Bağlantıları ──────────────────
 async function initListPage() {
-  if (window.FrpStoreReady) await window.FrpStoreReady;
+  // Önce yerel depodaki mevcut verileri 0ms bekleme ile anında render et:
   refreshAll();
   setupContextMenu();
   setupMobileDrawer();
+  if (typeof window.dismissSplash === 'function') {
+    window.dismissSplash();
+  }
+
+  // Ardından bulut senkronizasyonu tamamlandığında listeyi güncelle:
+  if (window.FrpStoreReady) {
+    await window.FrpStoreReady;
+    refreshAll();
+  }
 
   // Topbar Dropdown Menü Tıklama Desteği (Mobil & Masaüstü)
   document.querySelectorAll('.topbar-dropdown').forEach(dd => {

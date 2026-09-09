@@ -6,32 +6,32 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
 
 window.FrpSettingsTabs.appearance = {
   fontList: [
-    { id: 'inter', name: 'Inter (Modern & Temiz)', sample: 'Rapor listesi ve sorgular', fontCss: "'Inter', sans-serif" },
-    { id: 'jakarta', name: 'Plus Jakarta Sans (Zarif)', sample: 'Rapor listesi ve sorgular', fontCss: "'Plus Jakarta Sans', sans-serif" },
-    { id: 'outfit', name: 'Outfit (Ferah & Yuvarlak)', sample: 'Rapor listesi ve sorgular', fontCss: "'Outfit', sans-serif" },
-    { id: 'roboto', name: 'Roboto (Klasik Okunaklı)', sample: 'Rapor listesi ve sorgular', fontCss: "'Roboto', sans-serif" },
-    { id: 'poppins', name: 'Poppins (Geometrik Şık)', sample: 'Rapor listesi ve sorgular', fontCss: "'Poppins', sans-serif" },
-    { id: 'montserrat', name: 'Montserrat (Modern & Güçlü)', sample: 'Rapor listesi ve sorgular', fontCss: "'Montserrat', sans-serif" },
-    { id: 'nunito', name: 'Nunito (Yumuşak & Dostane)', sample: 'Rapor listesi ve sorgular', fontCss: "'Nunito', sans-serif" },
-    { id: 'raleway', name: 'Raleway (Zarif & Prestijli)', sample: 'Rapor listesi ve sorgular', fontCss: "'Raleway', sans-serif" },
-    { id: 'ubuntu', name: 'Ubuntu (Dinamik & Açık)', sample: 'Rapor listesi ve sorgular', fontCss: "'Ubuntu', sans-serif" },
-    { id: 'sourcesans', name: 'Source Sans 3 (Kurumsal Standart)', sample: 'Rapor listesi ve sorgular', fontCss: "'Source Sans 3', sans-serif" },
-    { id: 'opensans', name: 'Open Sans (Dengeli Nötr)', sample: 'Rapor listesi ve sorgular', fontCss: "'Open Sans', sans-serif" },
-    { id: 'jetbrains', name: 'JetBrains Mono (Geliştirici)', sample: 'SELECT * FROM rapor', fontCss: "'JetBrains Mono', monospace" },
-    { id: 'fira', name: 'Fira Code (Ligatürlü)', sample: 'SELECT count(1) >= 0', fontCss: "'Fira Code', monospace" },
-    { id: 'cascadia', name: 'Cascadia Code (Terminal)', sample: 'SELECT id, adi FROM tablo', fontCss: "'Cascadia Code', monospace" },
-    { id: 'system', name: 'Sistem Varsayılanı (Native OS)', sample: 'Segoe UI / Apple System', fontCss: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }
+    { id: 'inter', name: 'Inter', sample: 'Rapor listesi ve sorgular', fontCss: "'Inter', sans-serif" },
+    { id: 'jakarta', name: 'Plus Jakarta Sans', sample: 'Rapor listesi ve sorgular', fontCss: "'Plus Jakarta Sans', sans-serif" },
+    { id: 'outfit', name: 'Outfit', sample: 'Rapor listesi ve sorgular', fontCss: "'Outfit', sans-serif" },
+    { id: 'roboto', name: 'Roboto', sample: 'Rapor listesi ve sorgular', fontCss: "'Roboto', sans-serif" },
+    { id: 'poppins', name: 'Poppins', sample: 'Rapor listesi ve sorgular', fontCss: "'Poppins', sans-serif" },
+    { id: 'montserrat', name: 'Montserrat', sample: 'Rapor listesi ve sorgular', fontCss: "'Montserrat', sans-serif" },
+    { id: 'nunito', name: 'Nunito', sample: 'Rapor listesi ve sorgular', fontCss: "'Nunito', sans-serif" },
+    { id: 'raleway', name: 'Raleway', sample: 'Rapor listesi ve sorgular', fontCss: "'Raleway', sans-serif" },
+    { id: 'ubuntu', name: 'Ubuntu', sample: 'Rapor listesi ve sorgular', fontCss: "'Ubuntu', sans-serif" },
+    { id: 'sourcesans', name: 'Source Sans 3', sample: 'Rapor listesi ve sorgular', fontCss: "'Source Sans 3', sans-serif" },
+    { id: 'opensans', name: 'Open Sans', sample: 'Rapor listesi ve sorgular', fontCss: "'Open Sans', sans-serif" },
+    { id: 'jetbrains', name: 'JetBrains Mono', sample: 'SELECT * FROM rapor', fontCss: "'JetBrains Mono', monospace" },
+    { id: 'fira', name: 'Fira Code', sample: 'SELECT count(1) >= 0', fontCss: "'Fira Code', monospace" },
+    { id: 'cascadia', name: 'Cascadia Code', sample: 'SELECT id, adi FROM tablo', fontCss: "'Cascadia Code', monospace" },
+    { id: 'system', name: 'Sistem Varsayılanı', sample: 'Segoe UI / Apple System', fontCss: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }
   ],
 
   codeFonts: [
-    { id: 'jetbrains', name: 'JetBrains Mono (Gelişmiş)', sample: 'SELECT count(1) FROM rapor\nWHERE aktif = 1' },
-    { id: 'fira',      name: 'Fira Code (Ligatürlü)',      sample: 'SELECT * FROM musteri\nWHERE bakiye != 0' },
-    { id: 'cascadia',  name: 'Cascadia Code (Modern)',  sample: 'procedure RaporHazirla;\nbegin Engine.Start; end;' },
-    { id: 'inconsolata', name: 'Inconsolata (Net)',      sample: 'SELECT id, unvan FROM cariler\nWHERE borc > 0' },
-    { id: 'sourcecode', name: 'Source Code Pro (Adobe)', sample: 'SELECT k.id, k.adi FROM kullanicilar k' },
-    { id: 'monaco',    name: 'Monaco / Menlo (Terminal)', sample: 'UPDATE rapor SET versiyon = versiyon + 1;' },
-    { id: 'courierprime', name: 'Courier Prime (Klasik)', sample: 'CREATE TABLE raporlar (id INT PRIMARY KEY);' },
-    { id: 'consolas',  name: 'Consolas (Windows Standart)', sample: 'SELECT p.id, p.adi_soyadi\nFROM personel p' }
+    { id: 'jetbrains', name: 'JetBrains Mono', sample: 'SELECT count(1) FROM rapor\nWHERE aktif = 1' },
+    { id: 'fira',      name: 'Fira Code',      sample: 'SELECT * FROM musteri\nWHERE bakiye != 0' },
+    { id: 'cascadia',  name: 'Cascadia Code',  sample: 'procedure RaporHazirla;\nbegin Engine.Start; end;' },
+    { id: 'inconsolata', name: 'Inconsolata',  sample: 'SELECT id, unvan FROM cariler\nWHERE borc > 0' },
+    { id: 'sourcecode', name: 'Source Code Pro', sample: 'SELECT k.id, k.adi FROM kullanicilar k' },
+    { id: 'monaco',    name: 'Monaco / Menlo', sample: 'UPDATE rapor SET versiyon = versiyon + 1;' },
+    { id: 'courierprime', name: 'Courier Prime', sample: 'CREATE TABLE raporlar (id INT PRIMARY KEY);' },
+    { id: 'consolas',  name: 'Consolas', sample: 'SELECT p.id, p.adi_soyadi\nFROM personel p' }
   ],
 
   render({ stagedPrefs }) {

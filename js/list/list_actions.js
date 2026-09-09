@@ -103,13 +103,13 @@ async function downloadSingleReport(id) {
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
           <label style="font-size:.82rem;font-weight:700;color:var(--text-primary);">Versiyon Numarası Artırımı:</label>
           <div style="display:flex;align-items:center;gap:.4rem;" id="versionQuickBtns">
-            <button type="button" class="btn btn-sm btn-ghost v-btn" data-v="0" style="padding:3px 10px;font-size:.78rem;">0 (Aynı)</button>
-            <button type="button" class="btn btn-sm btn-primary v-btn active" data-v="1" style="padding:3px 10px;font-size:.78rem;font-weight:800;">+1</button>
-            <button type="button" class="btn btn-sm btn-ghost v-btn" data-v="2" style="padding:3px 10px;font-size:.78rem;">+2</button>
-            <button type="button" class="btn btn-sm btn-ghost v-btn" data-v="5" style="padding:3px 10px;font-size:.78rem;">+5</button>
-            <div style="display:flex;align-items:center;gap:.25rem;background:var(--bg-surface);padding:1px 6px;border-radius:6px;border:1px solid var(--border);">
-              <span style="font-size:.72rem;font-weight:700;color:var(--text-muted);">Özel:</span>
-              <input type="number" id="singleCustomBumpInp" min="0" max="999" style="width:48px;font-size:.78rem;font-weight:700;border:none;background:transparent;text-align:center;color:var(--accent);" placeholder="+" />
+            <button type="button" class="btn btn-sm btn-ghost v-btn" data-v="0" style="padding:4px 12px;font-size:.82rem;">0</button>
+            <button type="button" class="btn btn-sm btn-primary v-btn active" data-v="1" style="padding:4px 12px;font-size:.82rem;font-weight:800;">+1</button>
+            <button type="button" class="btn btn-sm btn-ghost v-btn" data-v="2" style="padding:4px 12px;font-size:.82rem;">+2</button>
+            <button type="button" class="btn btn-sm btn-ghost v-btn" data-v="5" style="padding:4px 12px;font-size:.82rem;">+5</button>
+            <div style="display:flex;align-items:center;gap:.35rem;background:var(--bg-surface);padding:4px 10px;border-radius:8px;border:1.5px solid var(--border);min-height:36px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+              <span style="font-size:.82rem;font-weight:700;color:var(--text-secondary);">Özel:</span>
+              <input type="number" id="singleCustomBumpInp" min="0" max="999" style="width:64px;font-size:.92rem;font-weight:800;border:none;background:transparent;text-align:center;color:var(--accent);padding:2px 4px;outline:none;" placeholder="+" />
             </div>
           </div>
         </div>
@@ -391,13 +391,13 @@ async function downloadBulkReports() {
           <div style="font-size:.72rem;color:var(--text-muted);">Örn: <code>rapor_v1.frp</code> → <code>rapor_v2.frp</code></div>
         </div>
         <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;" id="bulkVersionBtns">
-          <button type="button" class="btn btn-sm btn-ghost bv-btn" data-v="0" style="padding:.4rem .85rem;font-size:.78rem;font-weight:600;">0 (Aynı)</button>
-          <button type="button" class="btn btn-sm btn-primary bv-btn active" data-v="1" style="padding:.4rem .85rem;font-size:.78rem;font-weight:800;">+1</button>
-          <button type="button" class="btn btn-sm btn-ghost bv-btn" data-v="2" style="padding:.4rem .85rem;font-size:.78rem;font-weight:600;">+2</button>
-          <button type="button" class="btn btn-sm btn-ghost bv-btn" data-v="5" style="padding:.4rem .85rem;font-size:.78rem;font-weight:600;">+5</button>
-          <div style="display:flex;align-items:center;gap:.35rem;background:var(--bg-surface);padding:.25rem .65rem;border-radius:8px;border:1px solid var(--border);margin-left:auto;">
-            <span style="font-size:.74rem;font-weight:700;color:var(--text-muted);">Özel:</span>
-            <input type="number" id="bulkCustomBumpInp" min="0" max="999" style="width:54px;font-size:.8rem;font-weight:700;border:none;background:transparent;text-align:center;color:var(--accent);padding:2px;" placeholder="+" />
+          <button type="button" class="btn btn-sm btn-ghost bv-btn" data-v="0" style="padding:.45rem .95rem;font-size:.82rem;font-weight:600;">0</button>
+          <button type="button" class="btn btn-sm btn-primary bv-btn active" data-v="1" style="padding:.45rem .95rem;font-size:.82rem;font-weight:800;">+1</button>
+          <button type="button" class="btn btn-sm btn-ghost bv-btn" data-v="2" style="padding:.45rem .95rem;font-size:.82rem;font-weight:600;">+2</button>
+          <button type="button" class="btn btn-sm btn-ghost bv-btn" data-v="5" style="padding:.45rem .95rem;font-size:.82rem;font-weight:600;">+5</button>
+          <div style="display:flex;align-items:center;gap:.45rem;background:var(--bg-surface);padding:.4rem 1rem;border-radius:10px;border:1.5px solid var(--border);margin-left:auto;min-height:40px;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+            <span style="font-size:.86rem;font-weight:700;color:var(--text-secondary);">Özel:</span>
+            <input type="number" id="bulkCustomBumpInp" min="0" max="999" style="width:72px;font-size:1rem;font-weight:800;border:none;background:transparent;text-align:center;color:var(--accent);padding:2px 6px;outline:none;" placeholder="+" />
           </div>
         </div>
       </div>

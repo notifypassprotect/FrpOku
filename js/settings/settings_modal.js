@@ -184,7 +184,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
       { id: 'shortcuts',  label: 'Klavye Kısayolları' },
       { id: 'trash',      label: 'Çöp Kutusu', count: trashItems.length, isTrash: true },
       { id: 'storage',    label: 'Yedekleme & Depolama' },
-      { id: 'audit',      label: 'Denetim Günlüğü (Audit)' }
+      { id: 'audit',      label: 'Denetim Günlüğü' }
     ];
 
     const tabButtonsHtml = tabs.map(t => {

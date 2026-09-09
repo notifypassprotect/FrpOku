@@ -1434,9 +1434,7 @@ async function init() {
 
  if (!id) { showError('Rapor ID\'si bulunamadı veya URL hatalı.'); return; }
 
- if (window.FrpStoreReady) {
- await window.FrpStoreReady;
- }
+
 
  let file = FrpStore.getById(id);
 
@@ -1448,12 +1446,22 @@ async function init() {
  }
  }
 
+ // Eğer yerel depolarda yoksa bulut yüklemesini bekle
+ if (!file && window.FrpStoreReady) {
+ await window.FrpStoreReady;
+ file = FrpStore.getById(id);
+ }
+
  if (!file) {
  showError('Rapor bulunamadı veya silinmiş olabilir.');
  return;
  }
 
+ // Rapor zaten çözümlenmişse büyük XML'i gereksiz yere baştan parse etme
  if (file.rawXml && typeof parseFrp === 'function') {
+ const hasStructure = Array.isArray(file.queries) && file.queries.length > 0 &&
+ Array.isArray(file.tree) && file.tree.length > 0;
+ if (!hasStructure) {
  try {
  const reParsed = parseFrp(file.rawXml);
  file.pages = reParsed.pages;
@@ -1465,6 +1473,20 @@ async function init() {
  } catch (e) {
  console.error('parseFrp hatası:', e);
  }
+ }
+ }
+
+ // Arka planda buluttan daha güncel sürüm gelirse görünümü sessizce tazele
+ if (window.FrpStoreReady) {
+ window.FrpStoreReady.then(() => {
+ const fresh = FrpStore.getById(id);
+ if (fresh && file && fresh.version && fresh.version !== file.version) {
+ currentFile = fresh;
+ window.currentFile = fresh;
+ renderSidebar(fresh);
+ renderViewer(fresh);
+ }
+ }).catch(() => {});
  }
 
  currentFile = file;
@@ -2738,11 +2760,11 @@ async function exportSqlQueryModal(queryIndex) {
  <div style="display:flex;gap:1.5rem;margin-bottom:.5rem;">
  <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;">
  <input type="radio" name="queryFormatChoice" value="sql" checked />
- <strong>.SQL</strong> (Veritabanı Dosyası)
+ <strong>.SQL</strong>
  </label>
  <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;">
  <input type="radio" name="queryFormatChoice" value="txt" />
- <strong>.TXT</strong> (Metin Dosyası)
+ <strong>.TXT</strong>
  </label>
  </div>
  `;
@@ -3021,12 +3043,12 @@ function promptAndAddNewQuery() {
  if (!currentFile) return;
 
  showModal({
- title: 'Rapora Yeni SQL Sorgusu (Dataset) Ekle',
+ title: 'Rapora Yeni SQL Sorgusu Ekle',
  maxWidth: '860px',
  body: `
  <div style="display:flex;flex-direction:column;gap:1.15rem;">
  <div style="font-size:.82rem;color:var(--text-secondary);line-height:1.5;background:var(--bg-raised);padding:.75rem 1rem;border-radius:10px;border:1px solid var(--border-light);">
- Bu rapora yeni bir FastReport SQL dataseti ekleyin. Eklenen sorgu doğrudan raporun XML yapısına dahil edilir ve anında düzenlenebilir.
+ Bu rapora yeni bir FastReport SQL sorgusu ekleyin. Eklenen sorgu doğrudan raporun XML yapısına dahil edilir ve anında düzenlenebilir.
  </div>
 
  <div style="display:grid;grid-template-columns:1fr auto;gap:1rem;align-items:flex-end;">

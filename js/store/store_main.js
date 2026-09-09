@@ -233,67 +233,65 @@
       let isCloudLoaded = false;
       let loadedFiles = [];
 
-      // 1. Supabase Aktif Raporları Çek
-      if (window.FrpCloud && typeof window.FrpCloud.loadActiveReports === 'function') {
-        try {
-          const cloudFiles = await window.FrpCloud.loadActiveReports();
-          if (Array.isArray(cloudFiles)) {
-            const localMap = new Map((_read() || []).map(f => [String(f.id), f]));
-            loadedFiles = cloudFiles.map(cf => {
-              const cfId = String(cf.id);
-              if (_pendingSyncIds.has(cfId) && localMap.has(cfId)) {
-                return localMap.get(cfId);
-              }
-              return cf;
-            });
-            localMap.forEach((localFile, lId) => {
-              if (_pendingSyncIds.has(lId) && !loadedFiles.some(f => String(f.id) === lId)) {
-                loadedFiles.push(localFile);
-              }
-            });
-            isCloudLoaded = true;
-            window.FRP_CLOUD_STATUS = { ok: true, kind: 'success', count: loadedFiles.length };
-            setTimeout(_flushPendingSync, 1000);
-          } else if (typeof window.FrpCloud.getLastLoadStatus === 'function') {
-            window.FRP_CLOUD_STATUS = window.FrpCloud.getLastLoadStatus();
-            window.dispatchEvent(new CustomEvent('frp:cloud-load-error', { detail: window.FRP_CLOUD_STATUS }));
-          }
-        } catch (e) {
-          console.warn('Supabase load error:', e);
-        }
-      }
-
-      // 2. Supabase Çöp Kutusunu Çek
-      if (window.FrpCloud && typeof window.FrpCloud.loadTrashReports === 'function') {
-        try {
-          const trashCloud = await window.FrpCloud.loadTrashReports();
-          if (Array.isArray(trashCloud)) {
-            _writeTrash(trashCloud);
-          }
-        } catch (e) {}
-      }
-
-      // 3. Kategoriler & Snippets Çek
+      // Bulut verilerini (Aktif raporlar, çöp kutusu, kategoriler, snippets, ayarlar) paralel çek:
       if (window.FrpCloud) {
         try {
-          if (typeof window.FrpCloud.loadCategories === 'function') {
-            const cloudCats = await window.FrpCloud.loadCategories();
-            if (Array.isArray(cloudCats)) {
-              localStorage.setItem(CATEGORIES_KEY, JSON.stringify(cloudCats));
+          const [activeSettled, trashSettled, catSettled, snipSettled, settingsSettled] = await Promise.allSettled([
+            typeof window.FrpCloud.loadActiveReports === 'function' ? window.FrpCloud.loadActiveReports() : Promise.resolve(null),
+            typeof window.FrpCloud.loadTrashReports === 'function' ? window.FrpCloud.loadTrashReports() : Promise.resolve(null),
+            typeof window.FrpCloud.loadCategories === 'function' ? window.FrpCloud.loadCategories() : Promise.resolve(null),
+            typeof window.FrpCloud.loadSnippets === 'function' ? window.FrpCloud.loadSnippets() : Promise.resolve(null),
+            typeof window.FrpCloud.loadSettings === 'function' ? window.FrpCloud.loadSettings() : Promise.resolve(null)
+          ]);
+
+          // 1. Aktif Raporları İşle
+          if (activeSettled.status === 'fulfilled') {
+            const cloudFiles = activeSettled.value;
+            if (Array.isArray(cloudFiles)) {
+              const localMap = new Map((_read() || []).map(f => [String(f.id), f]));
+              loadedFiles = cloudFiles.map(cf => {
+                const cfId = String(cf.id);
+                if (_pendingSyncIds.has(cfId) && localMap.has(cfId)) {
+                  return localMap.get(cfId);
+                }
+                return cf;
+              });
+              localMap.forEach((localFile, lId) => {
+                if (_pendingSyncIds.has(lId) && !loadedFiles.some(f => String(f.id) === lId)) {
+                  loadedFiles.push(localFile);
+                }
+              });
+              isCloudLoaded = true;
+              window.FRP_CLOUD_STATUS = { ok: true, kind: 'success', count: loadedFiles.length };
+              setTimeout(_flushPendingSync, 1000);
+            } else if (typeof window.FrpCloud.getLastLoadStatus === 'function') {
+              window.FRP_CLOUD_STATUS = window.FrpCloud.getLastLoadStatus();
+              window.dispatchEvent(new CustomEvent('frp:cloud-load-error', { detail: window.FRP_CLOUD_STATUS }));
             }
+          } else {
+            console.warn('Supabase load error:', activeSettled.reason);
           }
-          if (typeof window.FrpCloud.loadSnippets === 'function') {
-            const cloudSnippets = await window.FrpCloud.loadSnippets();
-            if (Array.isArray(cloudSnippets)) {
-              localStorage.setItem(SNIPPET_KEY, JSON.stringify(cloudSnippets));
-            }
+
+          // 2. Çöp Kutusunu İşle
+          if (trashSettled.status === 'fulfilled' && Array.isArray(trashSettled.value)) {
+            _writeTrash(trashSettled.value);
           }
-          if (typeof window.FrpCloud.loadSettings === 'function') {
-            const cloudSettings = await window.FrpCloud.loadSettings();
+
+          // 3. Kategoriler & Snippets & Ayarları İşle
+          if (catSettled.status === 'fulfilled' && Array.isArray(catSettled.value)) {
+            localStorage.setItem(CATEGORIES_KEY, JSON.stringify(catSettled.value));
+          }
+          if (snipSettled.status === 'fulfilled' && Array.isArray(snipSettled.value)) {
+            localStorage.setItem(SNIPPET_KEY, JSON.stringify(snipSettled.value));
+          }
+          if (settingsSettled.status === 'fulfilled' && settingsSettled.value) {
+            const cloudSettings = settingsSettled.value;
             const cloudTags = cloudSettings?.custom_tags ?? cloudSettings?.customTags;
             if (Array.isArray(cloudTags)) localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(cloudTags));
           }
-        } catch (e) {}
+        } catch (cloudErr) {
+          console.warn('Bulut senkronizasyonu hatası:', cloudErr);
+        }
       }
 
       // 4. Çevrimdışı / Yerel Yedek

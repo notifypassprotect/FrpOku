@@ -514,7 +514,7 @@
  level: 'CRITICAL',
  badge: ' KRİTİK',
  title: 'TRUNCATE Komutu Tespit Edildi',
- text: "Tabloyu tamamen boşaltan 'TRUNCATE' komutu tespit edildi. Rapor sorguları salt-okunur (read-only) olmalıdır!"
+ text: "Tabloyu tamamen boşaltan 'TRUNCATE' komutu tespit edildi. Rapor sorguları salt-okunur olmalıdır!"
  });
  }
 

@@ -505,8 +505,8 @@
  <button type="button" class="btn btn-sm btn-ghost" id="ddBtnSettings" style="text-align:left;justify-content:flex-start;padding:.5rem.75rem;font-weight:700;">
  Profil & Ayarlar
  </button>
- <button type="button" class="btn btn-sm btn-ghost" id="ddBtnAuditLogs" style="text-align:left;justify-content:flex-start;padding:.5rem.75rem;font-weight:700;">
- Denetim Günlüğü (Audit)
+ <button type="button" class="btn btn-sm btn-ghost" id="ddBtnAuditLogs" style="text-align:left;justify-content:flex-start;padding:.5rem .75rem;font-weight:700;">
+ Denetim Günlüğü
  </button>
  <div style="border-top:1px solid var(--border-light,#f1f5f9);margin:.3rem 0;"></div>
  <button type="button" class="btn btn-sm btn-ghost" id="ddBtnLogout" style="text-align:left;justify-content:flex-start;padding:.5rem.75rem;font-weight:800;color:#ef4444;">

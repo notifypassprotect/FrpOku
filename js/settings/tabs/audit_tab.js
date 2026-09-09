@@ -375,7 +375,7 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
           <div>
             <div style="font-size:1.25rem;font-weight:900;color:var(--text-primary);display:flex;align-items:center;gap:.6rem;letter-spacing:-.3px;">
               <span>Kullanıcı İşlem & Denetim Günlüğü</span>
-              <span class="badge badge-purple" style="font-size:.72rem;padding:.2rem .6rem;border-radius:8px;">Bulut Senkronize (Supabase)</span>
+              <span class="badge badge-purple" style="font-size:.72rem;padding:.2rem .6rem;border-radius:8px;">Bulut Senkronize</span>
             </div>
             <div style="font-size:.8rem;color:var(--text-muted);margin-top:.2rem;">
               Sistem oturumları, indirme, silme, yükleme, havuz ve kod düzenleme hareketleri.

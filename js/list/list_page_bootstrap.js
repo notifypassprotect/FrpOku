@@ -10,6 +10,7 @@
       if (splash && splash.parentNode) splash.parentNode.removeChild(splash);
     }, 300);
   }
+  window.dismissSplash = dismissSplash;
 
   // İlk 500ms ve sayfa tam yüklendiğinde kapat
   setTimeout(dismissSplash, 500);
