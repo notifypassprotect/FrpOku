@@ -408,12 +408,18 @@
 
  if (res.success) {
  portal.remove();
- showLoginTransitionSplash(res.user, () => {
+ showLoginTransitionSplash(res.user, async () => {
  if (appWrap) appWrap.style.display = 'flex';
  if (typeof window.FrpAuth?.updateNavbarUserBadge === 'function') window.FrpAuth.updateNavbarUserBadge();
  if (typeof window.FrpAuth?.setupAdminFeatures === 'function') window.FrpAuth.setupAdminFeatures();
- if (window.FrpStore && typeof window.FrpStore.refreshFromCloud === 'function') window.FrpStore.refreshFromCloud();
- if (typeof window.toast === 'function') window.toast(`Hoş geldiniz, ${res.user.full_name || res.user.username}! `, 'success');
+ if (window.FrpStore && typeof window.FrpStore.clearSessionCache === 'function') {
+ window.FrpStore.clearSessionCache();
+ }
+ if (window.FrpStore && typeof window.FrpStore.refreshFromCloud === 'function') {
+ await window.FrpStore.refreshFromCloud();
+ }
+ if (typeof window.refreshAll === 'function') window.refreshAll();
+ if (typeof window.toast === 'function') window.toast(`Hoş geldiniz, ${res.user.full_name || res.user.username}!`, 'success');
  });
  } else {
  showAlert(res.reason || 'Giriş başarısız oldu.', res.pendingApproval? 'warning': 'error');

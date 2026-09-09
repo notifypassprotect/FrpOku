@@ -8,7 +8,7 @@ const { isValidEmail, isValidText, isValidUsername, normalizeEmail, normalizePho
 const { createMailer } = require('./lib/mailer');
 const { PASSWORD_MAX_LENGTH, hashPassword, verifyPassword: verifyPasswordHash } = require('./lib/passwords');
 const { createRateLimiter } = require('./lib/rate_limiter');
-const { buildOwnedReportRow, canManageReport, canReadReport, nextReportVersion, reportId, reportRowToClient } = require('./lib/report_access');
+const { buildOwnedReportRow, canManageReport, canReadReport, nextReportVersion, reportId, reportRowToClient, toSupabaseReportRow } = require('./lib/report_access');
 const { createSessionAuth } = require('./lib/session_auth');
 const { createStagingAccessMiddleware } = require('./lib/staging_access');
 
@@ -1219,7 +1219,7 @@ async function loadVisibleReports(user, isDeleted) {
     while (true) {
       let query = supabase.from('reports').select('*').eq('is_deleted', isDeleted);
       if (user.role !== 'admin') {
-        query = isDeleted ? query.eq('user_id', user.id) : query.or(`user_id.eq.${user.id},is_public.eq.true`);
+        query = isDeleted ? query.eq('user_id', user.id) : query.or(`user_id.eq.${user.id},data->>is_public.eq.true`);
       }
       const { data, error } = await query.order('updated_at', { ascending: false }).range(from, from + step - 1);
       if (error) throw error;
@@ -1284,8 +1284,9 @@ app.put('/api/reports/:id', apiWriteRateLimiter, requireAuth, async (req, res) =
 
     let saved;
     if (supabase) {
+      const dbRow = toSupabaseReportRow(row);
       if (!existing) {
-        const result = await supabase.from('reports').insert(row).select('*').limit(1);
+        const result = await supabase.from('reports').insert(dbRow).select('*').limit(1);
         if (result.error) {
           if (result.error.code === '23505') {
             return res.status(409).json({ success: false, code: 'REPORT_CONFLICT', reason: 'Rapor aynı anda başka bir oturumda oluşturuldu.' });
@@ -1294,7 +1295,9 @@ app.put('/api/reports/:id', apiWriteRateLimiter, requireAuth, async (req, res) =
         }
         saved = result.data?.[0];
       } else {
-        const result = await supabase.from('reports').update(row).eq('id', id).eq('version', currentVersion).select('*').limit(1);
+        let updateQuery = supabase.from('reports').update(dbRow).eq('id', id);
+        if (existing?.hasVersionColumn) updateQuery = updateQuery.eq('version', currentVersion);
+        const result = await updateQuery.select('*').limit(1);
         if (result.error) throw result.error;
         if (!result.data?.length) {
           return res.status(409).json({ success: false, code: 'REPORT_CONFLICT', reason: 'Rapor aynı anda başka bir oturumda güncellendi.' });
@@ -1444,11 +1447,8 @@ app.patch('/api/reports/:id/trash', apiWriteRateLimiter, requireAuth, async (req
       const current = reportRowToClient(report);
       const data = { ...current, isDeleted, is_deleted: isDeleted, deletedAt, deleted_at: deletedAt, version: nextVersion };
       let updateQuery = supabase.from('reports')
-        .update({ is_deleted: isDeleted, deleted_at: deletedAt, data, version: nextVersion, updated_at: new Date().toISOString() })
+        .update({ is_deleted: isDeleted, deleted_at: deletedAt, data, updated_at: new Date().toISOString() })
         .eq('id', String(req.params.id));
-      if (report.version != null) {
-        updateQuery = updateQuery.eq('version', report.version);
-      }
       const result = await updateQuery.select('*').limit(1);
       if (result.error) throw result.error;
       if (!result.data?.length) return res.status(409).json({ success: false, code: 'REPORT_CONFLICT', reason: 'Rapor aynı anda başka bir oturumda güncellendi.' });
@@ -1483,7 +1483,7 @@ app.post('/api/reports/toggle-pool', apiWriteRateLimiter, requireAuth, async (re
     if (supabase) {
       const current = reportRowToClient(report);
       const data = { ...current, isPublic, is_public: isPublic, sharedAt, shared_at: sharedAt };
-      const { error } = await supabase.from('reports').update({ is_public: isPublic, shared_at: sharedAt, data, updated_at: new Date().toISOString() }).eq('id', reportIdValue);
+      const { error } = await supabase.from('reports').update({ data, updated_at: new Date().toISOString() }).eq('id', reportIdValue);
       if (error) throw error;
     } else {
       const reports = readLocalReports();
@@ -1521,7 +1521,7 @@ app.post('/api/reports/bulk-toggle-pool', apiWriteRateLimiter, requireAuth, asyn
       for (const report of reports) {
         const current = reportRowToClient(report);
         const data = { ...current, isPublic, is_public: isPublic, sharedAt, shared_at: sharedAt };
-        const { error } = await supabase.from('reports').update({ is_public: isPublic, shared_at: sharedAt, data, updated_at: new Date().toISOString() }).eq('id', String(report.id));
+        const { error } = await supabase.from('reports').update({ data, updated_at: new Date().toISOString() }).eq('id', String(report.id));
         if (error) throw error;
       }
     } else {

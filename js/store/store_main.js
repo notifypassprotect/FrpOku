@@ -124,6 +124,21 @@
     });
   }
 
+  function _reportsVisibleToSession(files) {
+    if (!Array.isArray(files)) return [];
+    const user = window.FrpAuth && typeof window.FrpAuth.getUser === 'function' ? window.FrpAuth.getUser() : null;
+    if (!user) return [];
+    if (user.role === 'admin') return files;
+    return files.filter(file => {
+      if (!file) return false;
+      const ownerId = String(file.userId || file.user_id || file.data?.userId || file.data?.user_id || '');
+      const isPub = Boolean(file.isPublic || file.is_public || file.inPool || file.in_pool || file.data?.isPublic || file.data?.is_public);
+      if (isPub) return true;
+      if (ownerId && ownerId === String(user.id)) return true;
+      return false;
+    });
+  }
+
   let _persistedReportHashes = new Map();
   const _reportSyncChains = new Map();
   const PENDING_SYNC_KEY = 'frpoku_pending_sync';
@@ -298,10 +313,10 @@
       if (!isCloudLoaded) {
         const ls = _read();
         if (Array.isArray(ls) && ls.length > 0) {
-          loadedFiles = ls;
+          loadedFiles = _reportsVisibleToSession(ls);
         } else {
           const idbFiles = await restoreFromIndexedDB();
-          if (Array.isArray(idbFiles) && idbFiles.length > 0) loadedFiles = idbFiles;
+          if (Array.isArray(idbFiles) && idbFiles.length > 0) loadedFiles = _reportsVisibleToSession(idbFiles);
         }
       }
 
@@ -347,7 +362,7 @@
 
   // ── 4. Rapor CRUD Metotları ──────────────────────────────────
   function getAll() {
-    const list = _read();
+    const list = _reportsVisibleToSession(_read());
     return list.sort((a, b) => {
       if (a.isFavorite && !b.isFavorite) return -1;
       if (!a.isFavorite && b.isFavorite) return 1;
@@ -1883,15 +1898,16 @@
       if (window.FrpCloud && typeof window.FrpCloud.loadActiveReports === 'function') {
         const cloudFiles = await window.FrpCloud.loadActiveReports();
         if (Array.isArray(cloudFiles)) {
-          _memoryStore = cloudFiles;
-          try { localStorage.setItem(STORE_KEY, JSON.stringify(cloudFiles)); } catch (e) {}
-          syncToIndexedDB(cloudFiles);
-          _rememberPersisted(cloudFiles);
+          const visible = _reportsVisibleToSession(cloudFiles);
+          _memoryStore = visible;
+          try { localStorage.setItem(STORE_KEY, JSON.stringify(visible)); } catch (e) {}
+          syncToIndexedDB(visible);
+          _rememberPersisted(visible);
           if (typeof window.refreshAll === 'function') window.refreshAll();
-          return cloudFiles;
+          return visible;
         }
       }
-      return _read();
+      return getAll();
     }
   };
 

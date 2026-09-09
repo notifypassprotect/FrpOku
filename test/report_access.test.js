@@ -67,3 +67,44 @@ test('eski sürümle rapor yazma girişimi conflict üretir', () => {
 test('rapor istemci çıktısına authoritative sürüm eklenir', () => {
   assert.equal(reportRowToClient({ id: 'rep_1', user_id: owner.id, version: 7 }).version, 7);
 });
+
+test('toSupabaseReportRow veritabanında bulunmayan kolonları filtreler, data içeriğini korur', () => {
+  const { toSupabaseReportRow } = require('../lib/report_access');
+  const fullRow = {
+    id: 'rep_123',
+    name: 'Test Rapor',
+    user_id: owner.id,
+    is_public: true,
+    owner_name: 'Owner Name',
+    owner_username: 'owner',
+    version: 3,
+    file_size: 1024,
+    data: { id: 'rep_123', is_public: true, version: 3 }
+  };
+  const sanitized = toSupabaseReportRow(fullRow);
+  assert.equal(sanitized.id, 'rep_123');
+  assert.equal(sanitized.user_id, owner.id);
+  assert.equal(sanitized.is_public, undefined);
+  assert.equal(sanitized.owner_name, undefined);
+  assert.equal(sanitized.version, undefined);
+  assert.equal(sanitized.data.is_public, true);
+  assert.equal(sanitized.data.version, 3);
+});
+
+test('reportRowToClient kolonu olmayan is_public ve version alanlarını data içinden okur', () => {
+  const rowWithoutColumns = {
+    id: 'rep_456',
+    user_id: owner.id,
+    name: 'DB Rapor',
+    data: {
+      is_public: true,
+      owner_name: 'Ali Veli',
+      version: 5
+    }
+  };
+  const clientObj = reportRowToClient(rowWithoutColumns);
+  assert.equal(clientObj.isPublic, true);
+  assert.equal(clientObj.ownerName, 'Ali Veli');
+  assert.equal(clientObj.version, 5);
+});
+

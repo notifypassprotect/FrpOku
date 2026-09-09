@@ -1502,10 +1502,22 @@ async function init() {
 
  renderSidebar(file);
 
- const queries = Array.isArray(file.queries)? file.queries: [];
- const tree = Array.isArray(file.tree)? file.tree: [];
- const hasPages = Array.isArray(file.pages) && file.pages.length > 0;
- const hasDialogs = Array.isArray(file.dialogPages) && file.dialogPages.length > 0;
+  // ── Ortak Havuz Bannerı & Salt-Okunur Kontrolü ─────────────
+  const curUser = window.FrpAuth? window.FrpAuth.getUser(): null;
+  const isOwner = curUser && String(file.userId || file.user_id || '') === String(curUser.id);
+  const isAdmin = curUser && (curUser.role === 'admin' || curUser.username === 'admin');
+  const isPublic = !!(file.isPublic || file.is_public || file.inPool || file.in_pool);
+  const isOwnerOrAdmin = isOwner || isAdmin || !file.userId || file.userId === 'public';
+
+  if (curUser && !isOwner && !isAdmin && !isPublic) {
+    showError('Bu rapora erişim yetkiniz bulunmuyor.');
+    return;
+  }
+
+  const queries = Array.isArray(file.queries)? file.queries: [];
+  const tree = Array.isArray(file.tree)? file.tree: [];
+  const hasPages = Array.isArray(file.pages) && file.pages.length > 0;
+  const hasDialogs = Array.isArray(file.dialogPages) && file.dialogPages.length > 0;
 
  if (!file.pascalScript && queries.length === 0 && tree.length === 0 &&!hasPages &&!hasDialogs) {
  showError('Bu raporda gösterilecek kod veya tasarım bulunamadı.');
@@ -1518,12 +1530,6 @@ async function init() {
  if (viewer) viewer.style.display = 'flex';
  renderViewer(file);
 
- // ── Ortak Havuz Bannerı & Salt-Okunur Kontrolü ─────────────
- const curUser = window.FrpAuth? window.FrpAuth.getUser(): null;
- const isOwner = curUser && file.userId === curUser.id;
- const isAdmin = curUser && curUser.role === 'admin';
- const isOwnerOrAdmin = isOwner || isAdmin ||!file.userId || file.userId === 'public';
- const isPublic =!!(file.isPublic || file.is_public);
 
  const poolBanner = document.getElementById('poolDetailBanner');
  const poolOwnerInfo = document.getElementById('poolDetailOwnerInfo');
