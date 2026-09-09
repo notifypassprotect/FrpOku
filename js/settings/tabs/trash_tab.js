@@ -134,18 +134,23 @@ window.FrpSettingsTabs.trash = {
     overlay.querySelectorAll('.btn-restore-item').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.dataset.id;
-        await FrpStore.restoreFromTrash(id);
-        if (window.FrpAudit) {
-          window.FrpAudit.logAction({
-            action: 'TRASH_RESTORE',
-            target: id,
-            details: `Rapor (${id}) çöp kutusundan geri yüklendi.`
-          });
+        try {
+          await FrpStore.restoreFromTrash(id);
+          if (window.FrpAudit) {
+            window.FrpAudit.logAction({
+              action: 'TRASH_RESTORE',
+              target: id,
+              details: `Rapor (${id}) çöp kutusundan geri yüklendi.`
+            });
+          }
+          this.selectedTrashIds.delete(id);
+          safeToast('Rapor başarıyla geri yüklendi.', 'success');
+        } catch (err) {
+          console.warn('Rapor geri yüklenemedi:', err);
+        } finally {
+          if (typeof window.refreshAll === 'function') window.refreshAll();
+          renderModal();
         }
-        this.selectedTrashIds.delete(id);
-        safeToast('Rapor başarıyla geri yüklendi.', 'success');
-        if (typeof window.refreshAll === 'function') window.refreshAll();
-        renderModal();
       });
     });
 
@@ -159,18 +164,23 @@ window.FrpSettingsTabs.trash = {
           confirmText: 'Kalıcı Olarak Sil',
           isDanger: true,
           onConfirm: async () => {
-            await FrpStore.purgeFromTrash(id);
-            if (window.FrpAudit) {
-              window.FrpAudit.logAction({
-                action: 'TRASH_PURGE',
-                target: id,
-                details: `Rapor (${id}) çöp kutusundan kalıcı olarak silindi.`
-              });
+            try {
+              await FrpStore.purgeFromTrash(id);
+              if (window.FrpAudit) {
+                window.FrpAudit.logAction({
+                  action: 'TRASH_PURGE',
+                  target: id,
+                  details: `Rapor (${id}) çöp kutusundan kalıcı olarak silindi.`
+                });
+              }
+              this.selectedTrashIds.delete(id);
+              safeToast('Rapor kalıcı olarak silindi.', 'info');
+            } catch (err) {
+              console.warn('Rapor kalıcı olarak silinemedi:', err);
+            } finally {
+              if (typeof window.refreshAll === 'function') window.refreshAll();
+              renderModal();
             }
-            this.selectedTrashIds.delete(id);
-            safeToast('Rapor kalıcı olarak silindi.', 'info');
-            if (typeof window.refreshAll === 'function') window.refreshAll();
-            renderModal();
           }
         });
       });
@@ -181,21 +191,30 @@ window.FrpSettingsTabs.trash = {
       const ids = Array.from(this.selectedTrashIds);
       if (ids.length === 0) return;
       const trashItems = (FrpStore.getTrash ? FrpStore.getTrash() : []).filter(t => ids.includes(t.id));
-      for (const id of ids) {
-        await FrpStore.restoreFromTrash(id);
+      try {
+        if (FrpStore.restoreManyFromTrash) {
+          await FrpStore.restoreManyFromTrash(ids);
+        } else {
+          for (const id of ids) {
+            await FrpStore.restoreFromTrash(id);
+          }
+        }
+        if (window.FrpAudit) {
+          window.FrpAudit.logAction({
+            action: 'TRASH_RESTORE',
+            target: `${ids.length} Rapor`,
+            details: `${ids.length} adet rapor çöp kutusundan geri yüklendi.`,
+            reports: trashItems.map(t => ({ id: t.id, name: t.name, title: t.meta?.reportName || t.name }))
+          });
+        }
+        this.selectedTrashIds.clear();
+        safeToast(`${ids.length} rapor başarıyla geri yüklendi.`, 'success');
+      } catch (err) {
+        console.warn('Toplu geri yükleme hatası:', err);
+      } finally {
+        if (typeof window.refreshAll === 'function') window.refreshAll();
+        renderModal();
       }
-      if (window.FrpAudit) {
-        window.FrpAudit.logAction({
-          action: 'TRASH_RESTORE',
-          target: `${ids.length} Rapor`,
-          details: `${ids.length} adet rapor çöp kutusundan geri yüklendi.`,
-          reports: trashItems.map(t => ({ id: t.id, name: t.name, title: t.meta?.reportName || t.name }))
-        });
-      }
-      this.selectedTrashIds.clear();
-      safeToast(`${ids.length} rapor başarıyla geri yüklendi.`, 'success');
-      if (typeof window.refreshAll === 'function') window.refreshAll();
-      renderModal();
     });
 
     // Toplu Kalıcı Sil
@@ -209,21 +228,30 @@ window.FrpSettingsTabs.trash = {
         confirmText: 'Evet, Kalıcı Olarak Sil',
         isDanger: true,
         onConfirm: async () => {
-          for (const id of ids) {
-            await FrpStore.purgeFromTrash(id);
+          try {
+            if (FrpStore.purgeManyFromTrash) {
+              await FrpStore.purgeManyFromTrash(ids);
+            } else {
+              for (const id of ids) {
+                await FrpStore.purgeFromTrash(id);
+              }
+            }
+            if (window.FrpAudit) {
+              window.FrpAudit.logAction({
+                action: 'TRASH_PURGE',
+                target: `${ids.length} Rapor`,
+                details: `${ids.length} adet rapor çöp kutusundan kalıcı olarak silindi.`,
+                reports: trashItems.map(t => ({ id: t.id, name: t.name, title: t.meta?.reportName || t.name }))
+              });
+            }
+            this.selectedTrashIds.clear();
+            safeToast(`${ids.length} rapor kalıcı olarak silindi.`, 'info');
+          } catch (err) {
+            console.warn('Toplu silme hatası:', err);
+          } finally {
+            if (typeof window.refreshAll === 'function') window.refreshAll();
+            renderModal();
           }
-          if (window.FrpAudit) {
-            window.FrpAudit.logAction({
-              action: 'TRASH_PURGE',
-              target: `${ids.length} Rapor`,
-              details: `${ids.length} adet rapor çöp kutusundan kalıcı olarak silindi.`,
-              reports: trashItems.map(t => ({ id: t.id, name: t.name, title: t.meta?.reportName || t.name }))
-            });
-          }
-          this.selectedTrashIds.clear();
-          safeToast(`${ids.length} rapor kalıcı olarak silindi.`, 'info');
-          if (typeof window.refreshAll === 'function') window.refreshAll();
-          renderModal();
         }
       });
     });
@@ -236,18 +264,23 @@ window.FrpSettingsTabs.trash = {
         confirmText: 'Tümünü Temizle',
         isDanger: true,
         onConfirm: async () => {
-          await FrpStore.emptyTrash();
-          if (window.FrpAudit) {
-            window.FrpAudit.logAction({
-              action: 'TRASH_EMPTY',
-              target: 'Tüm Çöp Kutusu',
-              details: 'Çöp kutusundaki tüm raporlar kalıcı olarak temizlendi.'
-            });
+          try {
+            await FrpStore.emptyTrash();
+            if (window.FrpAudit) {
+              window.FrpAudit.logAction({
+                action: 'TRASH_EMPTY',
+                target: 'Tüm Çöp Kutusu',
+                details: 'Çöp kutusundaki tüm raporlar kalıcı olarak temizlendi.'
+              });
+            }
+            this.selectedTrashIds.clear();
+            safeToast('Çöp kutusu tamamen boşaltıldı.', 'info');
+          } catch (err) {
+            console.warn('Çöp kutusu boşaltma hatası:', err);
+          } finally {
+            if (typeof window.refreshAll === 'function') window.refreshAll();
+            renderModal();
           }
-          this.selectedTrashIds.clear();
-          safeToast('Çöp kutusu tamamen boşaltıldı.', 'info');
-          if (typeof window.refreshAll === 'function') window.refreshAll();
-          renderModal();
         }
       });
     });

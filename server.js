@@ -1421,7 +1421,9 @@ app.patch('/api/reports/:id/trash', apiWriteRateLimiter, requireAuth, async (req
     const deletedAt = isDeleted ? new Date().toISOString() : null;
     let nextVersion;
     try {
-      nextVersion = nextReportVersion(report, req.body?.version);
+      // Sürüm belirtilmemişse veya 0 ise mevcut sürümü baz al
+      const requestedVer = req.body?.version ? Number(req.body.version) : (report.version || 1);
+      nextVersion = nextReportVersion(report, requestedVer);
     } catch (versionError) {
       return res.status(409).json({ success: false, code: versionError.code, reason: 'Rapor başka bir oturumda güncellendi.', currentVersion: versionError.currentVersion });
     }
@@ -1429,9 +1431,13 @@ app.patch('/api/reports/:id/trash', apiWriteRateLimiter, requireAuth, async (req
     if (supabase) {
       const current = reportRowToClient(report);
       const data = { ...current, isDeleted, is_deleted: isDeleted, deletedAt, deleted_at: deletedAt, version: nextVersion };
-      const result = await supabase.from('reports')
+      let updateQuery = supabase.from('reports')
         .update({ is_deleted: isDeleted, deleted_at: deletedAt, data, version: nextVersion, updated_at: new Date().toISOString() })
-        .eq('id', String(req.params.id)).eq('version', nextVersion - 1).select('*').limit(1);
+        .eq('id', String(req.params.id));
+      if (report.version != null) {
+        updateQuery = updateQuery.eq('version', report.version);
+      }
+      const result = await updateQuery.select('*').limit(1);
       if (result.error) throw result.error;
       if (!result.data?.length) return res.status(409).json({ success: false, code: 'REPORT_CONFLICT', reason: 'Rapor aynı anda başka bir oturumda güncellendi.' });
       savedReport = reportRowToClient(result.data[0]);

@@ -787,11 +787,16 @@ function setupContextMenu() {
           openCategoryModalFor(id);
           break;
         case 'delete':
-          const doSingleDelete = () => {
-            FrpStore.moveToTrash(id);
-            selectedIds.delete(id);
-            toast('Rapor çöp kutusuna taşındı.', 'info');
-            refreshAll();
+          const doSingleDelete = async () => {
+            try {
+              await FrpStore.moveToTrash(id);
+              selectedIds.delete(id);
+              toast('Rapor çöp kutusuna taşındı.', 'info');
+            } catch (err) {
+              console.warn('Rapor çöp kutusuna taşınamadı:', err);
+            } finally {
+              refreshAll();
+            }
           };
           if (window.showConfirmDialog) {
             window.showConfirmDialog({
@@ -1097,27 +1102,32 @@ async function initListPage() {
     if (selectedIds.size === 0) return;
     const n = selectedIds.size;
     const idsToDelete = [...selectedIds];
-    const performBulkDelete = () => {
+    const performBulkDelete = async () => {
       const deletedReports = idsToDelete.map(id => {
         const f = FrpStore.getById(id);
         return f ? { id: f.id, name: f.name, title: f.meta?.reportName || f.name } : { id };
       });
 
-      if (FrpStore.moveManyToTrash) FrpStore.moveManyToTrash(idsToDelete);
-      else idsToDelete.forEach(id => FrpStore.moveToTrash(id));
+      try {
+        if (FrpStore.moveManyToTrash) await FrpStore.moveManyToTrash(idsToDelete);
+        else await Promise.all(idsToDelete.map(id => FrpStore.moveToTrash(id)));
 
-      if (window.FrpAudit) {
-        window.FrpAudit.logAction({
-          action: 'REPORT_DELETE_BULK',
-          target: `${n} Rapor`,
-          details: `${n} adet rapor çöp kutusuna taşındı.`,
-          reports: deletedReports
-        });
+        if (window.FrpAudit) {
+          window.FrpAudit.logAction({
+            action: 'REPORT_DELETE_BULK',
+            target: `${n} Rapor`,
+            details: `${n} adet rapor çöp kutusuna taşındı.`,
+            reports: deletedReports
+          });
+        }
+
+        selectedIds.clear();
+        toast(`${n} rapor çöp kutusuna taşındı.`, 'info');
+      } catch (err) {
+        console.warn('Toplu çöp kutusuna taşıma hatası:', err);
+      } finally {
+        refreshAll();
       }
-
-      selectedIds.clear();
-      toast(`${n} rapor çöp kutusuna taşındı.`, 'info');
-      refreshAll();
     };
 
     if (window.showConfirmDialog) {
