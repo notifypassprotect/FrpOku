@@ -1452,6 +1452,16 @@ async function init() {
  file = FrpStore.getById(id);
  }
 
+ // Rapor listeden özet olarak geldiyse veya yerelde yoksa tam detayları (XML, ağaç vb.) sunucudan çek
+ if (window.FrpStore && typeof window.FrpStore.ensureFullReport === 'function') {
+ try {
+ const fullFile = await window.FrpStore.ensureFullReport(id);
+ if (fullFile) file = fullFile;
+ } catch (e) {
+ console.warn('Tam rapor detayı yüklenemedi:', e);
+ }
+ }
+
  if (!file) {
  showError('Rapor bulunamadı veya silinmiş olabilir.');
  return;

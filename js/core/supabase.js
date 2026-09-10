@@ -242,6 +242,33 @@
       }
     },
 
+    // ── 1.1 TEKİL RAPOR DETAYI (On-Demand Fetch) ────────────────────
+    async getReport(id) {
+      if (!id) return null;
+      const strId = String(id).trim();
+      if (USE_SERVER_BRIDGE) {
+        try {
+          const res = await serverRequest('/api/reports/' + encodeURIComponent(strId), { timeout: 30000 });
+          if (res && res.success && res.report) return res.report;
+          if (res && res.id) return res;
+          return null;
+        } catch (error) {
+          console.warn('Tekil rapor sunucudan çekilemedi:', error.message);
+          return null;
+        }
+      }
+      const sb = getClient();
+      if (!sb) return null;
+      try {
+        const { data, error } = await sb.from('reports').select('*').eq('id', strId).limit(1);
+        if (error || !data || !data[0]) return null;
+        return parseReportFromRow(data[0]);
+      } catch (e) {
+        console.warn('Supabase getReport error:', e);
+        return null;
+      }
+    },
+
     // ── 2. ÇÖP KUTUSUNDAKİ RAPORLAR (is_deleted = true) ─────────────
     async loadTrashReports() {
       if (USE_SERVER_BRIDGE) {

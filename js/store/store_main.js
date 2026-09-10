@@ -163,7 +163,8 @@
   }
 
   function _reportHash(report) {
-    try { return JSON.stringify(report); } catch { return ''; }
+    if (!report) return '';
+    return `${report.id}:${report.version || 0}:${report.updated_at || report.loadedAt || ''}:${Boolean(report.isPublic || report.is_public || report.inPool || report.in_pool)}:${Boolean(report.isFavorite)}:${Boolean(report.isPinned)}:${Boolean(report.isDeleted || report.is_deleted)}`;
   }
 
   function _rememberPersisted(files) {
@@ -172,14 +173,16 @@
 
   function _persistLocal(files) {
     _memoryStore = files;
+    syncToIndexedDB(files);
     try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(files));
-      syncToIndexedDB(files);
-      return true;
+      const json = JSON.stringify(files);
+      if (json.length < 2500000) {
+        localStorage.setItem(STORE_KEY, json);
+      }
     } catch (e) {
-      syncToIndexedDB(files);
-      return true;
+      // localStorage kotası aşıldıysa IndexedDB yeterlidir
     }
+    return true;
   }
 
   function _applySavedVersion(id, version) {
@@ -384,6 +387,42 @@
     item.tags     = Array.isArray(item.tags)     ? item.tags     : [];
     item.tree     = Array.isArray(item.tree)     ? item.tree     : [];
     item.meta     = item.meta || {};
+    return item;
+  }
+
+  async function ensureFullReport(id) {
+    if (!id) return null;
+    const strId = String(id);
+    let decId = strId;
+    try { decId = decodeURIComponent(strId); } catch {}
+
+    const files = _read();
+    let index = files.findIndex(r => r.id === id || String(r.id) === strId || String(r.id) === decId);
+    let item = index >= 0 ? files[index] : null;
+
+    const hasFullDetails = item && (item.rawXml || (Array.isArray(item.tree) && item.tree.length > 0) || (Array.isArray(item.pages) && item.pages.length > 0));
+    if (hasFullDetails) return item;
+
+    if (window.FrpCloud && typeof window.FrpCloud.getReport === 'function') {
+      try {
+        const full = await window.FrpCloud.getReport(id);
+        if (full) {
+          if (index >= 0) {
+            files[index] = { ...files[index], ...full };
+            _memoryStore = files;
+            _persistLocal(files);
+            return files[index];
+          } else {
+            files.push(full);
+            _memoryStore = files;
+            _persistLocal(files);
+            return full;
+          }
+        }
+      } catch (err) {
+        console.warn('ensureFullReport yükleme hatası:', err);
+      }
+    }
     return item;
   }
 
@@ -1887,7 +1926,7 @@
 
   // ── Public Store API (Köprü ve Delegasyon) ─────────────────────
   const FrpStore = {
-    getAll, getById, add, addMany, deleteOne, deleteMany, deleteAll, resetAllUserData, clearSessionCache,
+    getAll, getById, ensureFullReport, add, addMany, deleteOne, deleteMany, deleteAll, resetAllUserData, clearSessionCache,
     updateNote, updateMeta, updateCode, updateReport, saveFile, updateFileName, restoreFromIndexedDB, hydrateFromIndexedDB,
     exportBackup, importBackup,
     toggleFavorite, togglePin, setFavoriteMany, toggleFavoriteMany, addTag, removeTag, getAllTags, getCustomTags, addCustomTag, deleteCustomTag,
@@ -1924,9 +1963,7 @@
         const cloudFiles = await window.FrpCloud.loadActiveReports();
         if (Array.isArray(cloudFiles)) {
           const visible = _reportsVisibleToSession(cloudFiles);
-          _memoryStore = visible;
-          try { localStorage.setItem(STORE_KEY, JSON.stringify(visible)); } catch (e) {}
-          syncToIndexedDB(visible);
+          _persistLocal(visible);
           _rememberPersisted(visible);
           if (typeof window.refreshAll === 'function') window.refreshAll();
           if (typeof window !== 'undefined') {

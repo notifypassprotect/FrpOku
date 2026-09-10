@@ -187,6 +187,9 @@ async function downloadSingleReport(id) {
   await new Promise(r => setTimeout(r, 120));
 
   try {
+    if (!file.rawXml && window.FrpStore && typeof window.FrpStore.ensureFullReport === 'function') {
+      file = await window.FrpStore.ensureFullReport(file.id) || file;
+    }
     const xmlData = window.buildUpdatedFrpXml ? window.buildUpdatedFrpXml(file, null) : (file.rawXml || '');
     const blob = new Blob([xmlData], { type: 'application/octet-stream;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -533,6 +536,9 @@ async function downloadBulkReports() {
             fName = `${cat}/${fName}`;
           }
         }
+        if (!file.rawXml && window.FrpStore && typeof window.FrpStore.ensureFullReport === 'function') {
+          file = await window.FrpStore.ensureFullReport(file.id) || file;
+        }
         const xml = window.buildUpdatedFrpXml ? window.buildUpdatedFrpXml(file, null) : (file.rawXml || '');
         zip.addFile(fName, xml);
         successCount++;
@@ -585,11 +591,14 @@ async function downloadBulkReports() {
     }
   } else {
     for (let i = 0; i < selectedList.length; i++) {
-      const file = selectedList[i];
+      let file = selectedList[i];
       try {
         let fName = file.name;
         if (versionBump > 0 && typeof FrpStore.bumpVersionFilename === 'function') {
           fName = FrpStore.bumpVersionFilename(fName, versionBump);
+        }
+        if (!file.rawXml && window.FrpStore && typeof window.FrpStore.ensureFullReport === 'function') {
+          file = await window.FrpStore.ensureFullReport(file.id) || file;
         }
         const xml = window.buildUpdatedFrpXml ? window.buildUpdatedFrpXml(file, null) : (file.rawXml || '');
         const blob = new Blob([xml], { type: 'application/octet-stream;charset=utf-8' });

@@ -8,7 +8,7 @@ const { isValidEmail, isValidText, isValidUsername, normalizeEmail, normalizePho
 const { createMailer } = require('./lib/mailer');
 const { PASSWORD_MAX_LENGTH, hashPassword, verifyPassword: verifyPasswordHash } = require('./lib/passwords');
 const { createRateLimiter } = require('./lib/rate_limiter');
-const { buildOwnedReportRow, canManageReport, canReadReport, nextReportVersion, reportId, reportRowToClient, toSupabaseReportRow } = require('./lib/report_access');
+const { buildOwnedReportRow, canManageReport, canReadReport, nextReportVersion, reportId, reportRowToClient, reportRowToSummaryClient, toSupabaseReportRow } = require('./lib/report_access');
 const { createSessionAuth } = require('./lib/session_auth');
 const { createStagingAccessMiddleware } = require('./lib/staging_access');
 
@@ -1210,14 +1210,17 @@ async function getReportRecord(id) {
   }) || null;
 }
 
-async function loadVisibleReports(user, isDeleted) {
+const SUMMARY_SELECT_COLUMNS = 'id, name, file_size, category, tags, is_favorite, is_pinned, sql_count, memo_count, dataset_count, page_count, has_script, created_at, updated_at, user_note, is_deleted, deleted_at, user_id, data->meta, data->isPublic, data->is_public, data->inPool, data->in_pool, data->ownerName, data->ownerUsername, data->ownerDepartment, data->sharedAt, data->version';
+
+async function loadVisibleReports(user, isDeleted, { summaryOnly = true } = {}) {
   if (supabase) {
     let rows = [];
     let from = 0;
     const step = 1000;
+    const selectCols = summaryOnly ? SUMMARY_SELECT_COLUMNS : '*';
 
     while (true) {
-      let query = supabase.from('reports').select('*').eq('is_deleted', isDeleted);
+      let query = supabase.from('reports').select(selectCols).eq('is_deleted', isDeleted);
       if (user.role !== 'admin') {
         query = isDeleted
           ? query.eq('user_id', user.id)
@@ -1230,17 +1233,19 @@ async function loadVisibleReports(user, isDeleted) {
       if (data.length < step) break;
       from += step;
     }
-    return rows.map(reportRowToClient);
+    return summaryOnly ? rows.map(reportRowToSummaryClient) : rows.map(reportRowToClient);
   }
 
-  return readLocalReports()
+  const rawList = readLocalReports()
     .filter(report => Boolean(report.isDeleted || report.is_deleted) === isDeleted && canReadReport(user, report))
     .sort((left, right) => new Date(right.loadedAt || right.updated_at || 0) - new Date(left.loadedAt || left.updated_at || 0));
+
+  return summaryOnly ? rawList.map(reportRowToSummaryClient) : rawList.map(reportRowToClient);
 }
 
 app.get('/api/store/load', requireAuth, async (req, res) => {
   try {
-    res.json(await loadVisibleReports(req.authUser, false));
+    res.json(await loadVisibleReports(req.authUser, false, { summaryOnly: true }));
   } catch (error) {
     console.warn('Raporlar yüklenemedi:', safeLogStr(error.message));
     res.status(503).json({ success: false, reason: 'Rapor verileri geçici olarak yüklenemiyor.' });
@@ -1249,10 +1254,29 @@ app.get('/api/store/load', requireAuth, async (req, res) => {
 
 app.get('/api/store/trash', requireAuth, async (req, res) => {
   try {
-    res.json(await loadVisibleReports(req.authUser, true));
+    res.json(await loadVisibleReports(req.authUser, true, { summaryOnly: true }));
   } catch (error) {
     console.warn('Çöp kutusu yüklenemedi:', safeLogStr(error.message));
     res.status(503).json({ success: false, reason: 'Çöp kutusu geçici olarak yüklenemiyor.' });
+  }
+});
+
+app.get('/api/reports/:id', requireAuth, async (req, res) => {
+  const id = String(req.params.id || '').trim();
+  if (!id) return res.status(400).json({ success: false, reason: 'Rapor kimliği gereklidir.' });
+
+  try {
+    const existing = await getReportRecord(id);
+    if (!existing) {
+      return res.status(404).json({ success: false, reason: 'Rapor bulunamadı.' });
+    }
+    if (!canReadReport(req.authUser, existing)) {
+      return res.status(403).json({ success: false, reason: 'Bu rapora erişim yetkiniz yok.' });
+    }
+    res.json({ success: true, report: reportRowToClient(existing) });
+  } catch (error) {
+    console.warn('Rapor detayı getirilemedi:', safeLogStr(error.message));
+    res.status(503).json({ success: false, reason: 'Rapor detayı geçici olarak yüklenemiyor.' });
   }
 });
 
