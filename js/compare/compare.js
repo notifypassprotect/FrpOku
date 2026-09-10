@@ -454,9 +454,12 @@ function openReportPickerForDiff(slot) {
     });
   }
 
-  function selectFile(id) {
-    const selFile = FrpStore.getById(id);
+  async function selectFile(id) {
+    let selFile = FrpStore.getById(id);
     if (!selFile) return;
+    if (FrpStore.ensureFullReport) {
+      selFile = (await FrpStore.ensureFullReport(id)) || selFile;
+    }
     if (slot === 'A') fileA = selFile;
     else if (slot === 'B') fileB = selFile;
     else fileC = selFile;
@@ -551,7 +554,7 @@ function openReportPickerForDiff(slot) {
   document.addEventListener('keydown', escHandler);
 }
 
-function initSelectors() {
+async function initSelectors() {
   const files = FrpStore.getAll();
   if (files.length < 2) {
     document.body.innerHTML = `
@@ -573,6 +576,14 @@ function initSelectors() {
   fileA = (idA && FrpStore.getById(idA)) || files[0];
   fileB = (idB && FrpStore.getById(idB)) || (files.length > 1 ? files[1] : files[0]);
   fileC = idC ? (FrpStore.getById(idC) || null) : null;
+
+  if (FrpStore.ensureFullReport) {
+    const promises = [];
+    if (fileA && fileA.id) promises.push(FrpStore.ensureFullReport(fileA.id).then(f => { if (f) fileA = f; }));
+    if (fileB && fileB.id) promises.push(FrpStore.ensureFullReport(fileB.id).then(f => { if (f) fileB = f; }));
+    if (fileC && fileC.id) promises.push(FrpStore.ensureFullReport(fileC.id).then(f => { if (f) fileC = f; }));
+    await Promise.allSettled(promises);
+  }
 
   // Picker buton bağlantıları
   document.getElementById('btnPickerA')?.addEventListener('click', () => openReportPickerForDiff('A'));

@@ -102,3 +102,42 @@ test('detail ve indirme dosyalarında ensureFullReport entegrasyonu vardır', ()
   const listActionsCode = fs.readFileSync(path.join(__dirname, '../js/list/list_actions.js'), 'utf8');
   assert.match(listActionsCode, /ensureFullReport/);
 });
+
+test('buildOwnedReportRow hafifletilmiş güncellemede mevcut rawXml, pages ve tree verilerini korur', () => {
+  const { buildOwnedReportRow } = require('../lib/report_access');
+  const existing = {
+    id: 'rep-preserve-1',
+    user_id: 'usr-1',
+    file_size: 150000,
+    page_count: 4,
+    sql_count: 2,
+    data: {
+      rawXml: '<TfrxReport>varolan_icerik</TfrxReport>',
+      pages: [{ p: 1 }, { p: 2 }, { p: 3 }, { p: 4 }],
+      tree: [{ node: 'Root' }],
+      queries: [{ name: 'Q1', sql: 'SELECT 1' }]
+    }
+  };
+
+  const incomingLightweight = {
+    id: 'rep-preserve-1',
+    name: 'Güncellenen İsim',
+    isFavorite: true,
+    userNote: 'Yeni Not',
+    category: 'Maliye',
+    rawXml: null,
+    pages: [],
+    tree: []
+  };
+
+  const result = buildOwnedReportRow(incomingLightweight, { id: 'usr-1' }, { existing });
+  assert.equal(result.data.rawXml, '<TfrxReport>varolan_icerik</TfrxReport>');
+  assert.equal(result.data.pages.length, 4);
+  assert.equal(result.data.tree.length, 1);
+  assert.equal(result.page_count, 4);
+  assert.equal(result.sql_count, 1);
+  assert.equal(result.is_favorite, true);
+  assert.equal(result.user_note, 'Yeni Not');
+  assert.equal(result.category, 'Maliye');
+});
+
