@@ -1026,13 +1026,54 @@ async function initListPage() {
     applySearch();
   });
 
-  document.getElementById('tabWsPool')?.addEventListener('click', () => {
+  document.getElementById('tabWsPool')?.addEventListener('click', async () => {
     document.getElementById('tabWsPool')?.classList.add('active');
     document.getElementById('tabWsPersonal')?.classList.remove('active');
     if (FrpStore.setActiveWorkspace) FrpStore.setActiveWorkspace('pool');
     const pn = document.getElementById('poolNotice');
     if (pn) pn.style.display = 'block';
     applySearch();
+
+    // Ortak havuz sekmesine geçildiğinde havuz raporlarını arka planda buluttan anında tazele:
+    if (FrpStore.refreshFromCloud) {
+      try {
+        await FrpStore.refreshFromCloud();
+      } catch (e) {}
+    }
+  });
+
+  // Bulut & Havuz Manuel Yenileme Butonu
+  const btnSyncCloud = document.getElementById('btnSyncCloudReports');
+  const syncIcon = document.getElementById('syncIconSvg');
+  const syncText = document.getElementById('syncBtnText');
+  let _isSyncing = false;
+
+  btnSyncCloud?.addEventListener('click', async () => {
+    if (_isSyncing) return;
+    _isSyncing = true;
+    if (syncIcon) syncIcon.style.transform = 'rotate(360deg)';
+    if (syncText) syncText.textContent = 'Yenileniyor...';
+
+    try {
+      if (FrpStore.refreshFromCloud) {
+        await FrpStore.refreshFromCloud();
+      } else {
+        refreshAll();
+      }
+      toast('Raporlar ve ortak havuz güncellendi.', 'success');
+    } catch (e) {
+      toast('Yenileme sırasında hata oluştu: ' + (e?.message || ''), 'warning');
+    } finally {
+      setTimeout(() => {
+        if (syncIcon) syncIcon.style.transform = 'none';
+        if (syncText) syncText.textContent = 'Havuzu & Listeyi Yenile';
+        _isSyncing = false;
+      }, 400);
+    }
+  });
+
+  window.addEventListener('frp:cloud-synced', () => {
+    refreshAll();
   });
 
   // Dosya Ekleme Butonları

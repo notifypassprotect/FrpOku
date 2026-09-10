@@ -1219,7 +1219,9 @@ async function loadVisibleReports(user, isDeleted) {
     while (true) {
       let query = supabase.from('reports').select('*').eq('is_deleted', isDeleted);
       if (user.role !== 'admin') {
-        query = isDeleted ? query.eq('user_id', user.id) : query.or(`user_id.eq.${user.id},data->>is_public.eq.true`);
+        query = isDeleted
+          ? query.eq('user_id', user.id)
+          : query.or(`user_id.eq.${user.id},data->>is_public.eq.true,data->>isPublic.eq.true,data->>in_pool.eq.true,data->>inPool.eq.true`);
       }
       const { data, error } = await query.order('updated_at', { ascending: false }).range(from, from + step - 1);
       if (error) throw error;
@@ -1482,14 +1484,14 @@ app.post('/api/reports/toggle-pool', apiWriteRateLimiter, requireAuth, async (re
     const sharedAt = isPublic ? new Date().toISOString() : null;
     if (supabase) {
       const current = reportRowToClient(report);
-      const data = { ...current, isPublic, is_public: isPublic, sharedAt, shared_at: sharedAt };
+      const data = { ...current, isPublic, is_public: isPublic, inPool: isPublic, in_pool: isPublic, sharedAt, shared_at: sharedAt };
       const { error } = await supabase.from('reports').update({ data, updated_at: new Date().toISOString() }).eq('id', reportIdValue);
       if (error) throw error;
     } else {
       const reports = readLocalReports();
       const index = reports.findIndex(item => reportId(item) === reportIdValue);
       if (index === -1) return res.status(404).json({ success: false, reason: 'Rapor bulunamadı.' });
-      reports[index] = { ...reports[index], isPublic, is_public: isPublic, sharedAt, shared_at: sharedAt };
+      reports[index] = { ...reports[index], isPublic, is_public: isPublic, inPool: isPublic, in_pool: isPublic, sharedAt, shared_at: sharedAt };
       writeLocalReports(reports);
     }
     res.json({ success: true, isPublic });
@@ -1520,7 +1522,7 @@ app.post('/api/reports/bulk-toggle-pool', apiWriteRateLimiter, requireAuth, asyn
     if (supabase) {
       for (const report of reports) {
         const current = reportRowToClient(report);
-        const data = { ...current, isPublic, is_public: isPublic, sharedAt, shared_at: sharedAt };
+        const data = { ...current, isPublic, is_public: isPublic, inPool: isPublic, in_pool: isPublic, sharedAt, shared_at: sharedAt };
         const { error } = await supabase.from('reports').update({ data, updated_at: new Date().toISOString() }).eq('id', String(report.id));
         if (error) throw error;
       }
@@ -1528,7 +1530,7 @@ app.post('/api/reports/bulk-toggle-pool', apiWriteRateLimiter, requireAuth, asyn
       const localReports = readLocalReports();
       const idSet = new Set(reportIds);
       localReports.forEach((report, index) => {
-        if (idSet.has(reportId(report))) localReports[index] = { ...report, isPublic, is_public: isPublic, sharedAt, shared_at: sharedAt };
+        if (idSet.has(reportId(report))) localReports[index] = { ...report, isPublic, is_public: isPublic, inPool: isPublic, in_pool: isPublic, sharedAt, shared_at: sharedAt };
       });
       writeLocalReports(localReports);
     }

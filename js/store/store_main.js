@@ -1149,6 +1149,8 @@
 
     files[idx].isPublic = !!makePublic;
     files[idx].is_public = !!makePublic;
+    files[idx].inPool = !!makePublic;
+    files[idx].in_pool = !!makePublic;
 
     if (makePublic) {
       files[idx].sharedAt = nowIso;
@@ -1160,6 +1162,16 @@
     }
 
     _write(files);
+
+    const ownerInfo = curUser ? {
+      fullName: curUser.full_name || curUser.username,
+      username: curUser.username,
+      department: curUser.department || 'Bilgi İşlem'
+    } : null;
+
+    if (window.FrpCloud && typeof window.FrpCloud.togglePoolStatus === 'function') {
+      window.FrpCloud.togglePoolStatus(id, makePublic, ownerInfo).catch(e => console.warn('togglePoolStatus hatası:', e));
+    }
 
     if (window.FrpAudit) {
       window.FrpAudit.logAction({
@@ -1184,6 +1196,8 @@
       if (idSet.has(f.id)) {
         f.isPublic = !!makePublic;
         f.is_public = !!makePublic;
+        f.inPool = !!makePublic;
+        f.in_pool = !!makePublic;
         if (makePublic) {
           f.sharedAt = nowIso;
           if (curUser) {
@@ -1198,6 +1212,17 @@
 
     if (count > 0) {
       _write(files);
+
+      const ownerInfo = curUser ? {
+        fullName: curUser.full_name || curUser.username,
+        username: curUser.username,
+        department: curUser.department || 'Bilgi İşlem'
+      } : null;
+
+      if (window.FrpCloud && typeof window.FrpCloud.bulkTogglePoolStatus === 'function') {
+        window.FrpCloud.bulkTogglePoolStatus(ids, makePublic, ownerInfo).catch(e => console.warn('bulkTogglePoolStatus hatası:', e));
+      }
+
       if (window.FrpAudit) {
         window.FrpAudit.logAction({
           action: makePublic ? 'POOL_ADD_BULK' : 'POOL_REMOVE_BULK',
@@ -1904,6 +1929,9 @@
           syncToIndexedDB(visible);
           _rememberPersisted(visible);
           if (typeof window.refreshAll === 'function') window.refreshAll();
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('frp:cloud-synced', { detail: { count: visible.length } }));
+          }
           return visible;
         }
       }
@@ -1911,9 +1939,56 @@
     }
   };
 
+  let _lastBackgroundSyncTime = Date.now();
+  function startBackgroundSync() {
+    setInterval(async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      if (Date.now() - _lastBackgroundSyncTime < 30000) return;
+      _lastBackgroundSyncTime = Date.now();
+      try {
+        await FrpStore.refreshFromCloud();
+      } catch (e) {}
+    }, 45000);
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', async () => {
+        if (Date.now() - _lastBackgroundSyncTime < 15000) return;
+        _lastBackgroundSyncTime = Date.now();
+        try {
+          await FrpStore.refreshFromCloud();
+        } catch (e) {}
+      });
+
+      if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', async () => {
+          if (!document.hidden && Date.now() - _lastBackgroundSyncTime >= 15000) {
+            _lastBackgroundSyncTime = Date.now();
+            try {
+              await FrpStore.refreshFromCloud();
+            } catch (e) {}
+          }
+        });
+      }
+    }
+
+    try {
+      const sb = window.FrpCloud && typeof window.FrpCloud.getClient === 'function' ? window.FrpCloud.getClient() : null;
+      if (sb && typeof sb.channel === 'function') {
+        const channel = sb.channel('public:reports_changes');
+        channel.on('postgres_changes', { event: '*', schema: 'public', table: 'reports' }, () => {
+          if (Date.now() - _lastBackgroundSyncTime >= 3000) {
+            _lastBackgroundSyncTime = Date.now();
+            FrpStore.refreshFromCloud().catch(() => {});
+          }
+        }).subscribe();
+      }
+    } catch (e) {}
+  }
+
   window.FrpStore = FrpStore;
   try { 
     applyPreferences(); 
     startAutoBackupTimer();
+    startBackgroundSync();
   } catch (e) {}
 })();

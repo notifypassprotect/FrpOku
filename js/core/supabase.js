@@ -41,7 +41,7 @@
 
   async function serverRequest(path, options = {}) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), options.timeout || 7000);
+    const timer = setTimeout(() => controller.abort(), options.timeout || 30000);
     try {
       const response = await fetch(path, {
         ...options,
@@ -169,8 +169,11 @@
     r.tags = Array.isArray(row.tags) ? row.tags : (Array.isArray(r.tags) ? r.tags : []);
     r.userNote = row.user_note || r.userNote || '';
     r.isFavorite = !!(row.is_favorite || r.isFavorite);
-    r.isPinned = !!(row.is_pinned || r.isPinned);
-    r.isPublic = !!(row.is_public || r.isPublic || r.is_public);
+    const isPub = !!(row.is_public || r.isPublic || r.is_public || r.inPool || r.in_pool || row.isPublic);
+    r.isPublic = isPub;
+    r.is_public = isPub;
+    r.inPool = isPub;
+    r.in_pool = isPub;
     r.ownerName = row.owner_name || r.ownerName || r.owner_name || '';
     r.ownerUsername = row.owner_username || r.ownerUsername || r.owner_username || '';
     r.ownerDepartment = row.owner_department || r.ownerDepartment || r.owner_department || '';
@@ -193,7 +196,7 @@
     async loadActiveReports() {
       if (USE_SERVER_BRIDGE) {
         try {
-          const data = await serverRequest('/api/store/load');
+          const data = await serverRequest('/api/store/load', { timeout: 45000 });
           if (!Array.isArray(data)) throw new Error('Sunucu geçersiz rapor yanıtı döndürdü.');
           lastLoadStatus = { ok: true, kind: 'success', status: 200, count: data.length };
           return data;
@@ -243,7 +246,7 @@
     async loadTrashReports() {
       if (USE_SERVER_BRIDGE) {
         try {
-          const data = await serverRequest('/api/store/trash');
+          const data = await serverRequest('/api/store/trash', { timeout: 45000 });
           return Array.isArray(data) ? data : null;
         } catch (error) {
           return null;
@@ -423,7 +426,7 @@
           const { data: row, error: rowError } = await sb.from('reports').select('data').eq('id', String(reportId)).single();
           if (rowError) throw rowError;
           if (row && row.data) {
-            const updatedData = { ...row.data, isPublic: !!makePublic, is_public: !!makePublic };
+            const updatedData = { ...row.data, isPublic: !!makePublic, is_public: !!makePublic, inPool: !!makePublic, in_pool: !!makePublic };
             if (ownerInfo) {
               updatedData.ownerName = ownerInfo.fullName || ownerInfo.name || updatedData.ownerName || '';
               updatedData.ownerUsername = ownerInfo.username || updatedData.ownerUsername || '';
@@ -462,7 +465,7 @@
           if (Array.isArray(rows)) {
             const nowIso = new Date().toISOString();
             for (const r of rows) {
-              const updatedData = { ...(r.data || {}), isPublic: !!makePublic, is_public: !!makePublic };
+              const updatedData = { ...(r.data || {}), isPublic: !!makePublic, is_public: !!makePublic, inPool: !!makePublic, in_pool: !!makePublic };
               if (ownerInfo) {
                 updatedData.ownerName = ownerInfo.fullName || ownerInfo.name || updatedData.ownerName || '';
                 updatedData.ownerUsername = ownerInfo.username || updatedData.ownerUsername || '';
