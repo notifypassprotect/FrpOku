@@ -72,7 +72,7 @@ function hideProgressModal() {
 
 // ── TEKLİ RAPOR İNDİRME MODALI & AKIŞI (YALNIZCA .FRP) ────────────
 async function downloadSingleReport(id) {
-  const file = FrpStore.getById(id);
+  let file = FrpStore.getById(id);
   if (!file) {
     toast('İndirilecek rapor bulunamadı.', 'error');
     return;
@@ -520,7 +520,7 @@ async function downloadBulkReports() {
   if (isZip) {
     const zip = new window.ZipWriter();
     for (let i = 0; i < selectedList.length; i++) {
-      const file = selectedList[i];
+      let file = selectedList[i];
       try {
         let fName = file.name;
         if (versionBump > 0 && typeof FrpStore.bumpVersionFilename === 'function') {

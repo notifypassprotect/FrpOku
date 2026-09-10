@@ -141,3 +141,10 @@ test('buildOwnedReportRow hafifletilmiş güncellemede mevcut rawXml, pages ve t
   assert.equal(result.category, 'Maliye');
 });
 
+test('list_actions.js indirme fonksiyonlarında const re-assignment hatası bulunmaz', () => {
+  const listActionsCode = fs.readFileSync(path.join(__dirname, '../js/list/list_actions.js'), 'utf8');
+  assert.doesNotMatch(listActionsCode, /const\s+file\s*=\s*FrpStore\.getById\(id\);[\s\S]*?file\s*=\s*await/);
+  assert.doesNotMatch(listActionsCode, /const\s+file\s*=\s*selectedList\[i\];[\s\S]*?file\s*=\s*await/);
+});
+
+
