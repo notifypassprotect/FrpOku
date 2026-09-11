@@ -60,7 +60,7 @@ window.FrpListRenderers.renderCards = function(files, container) {
 
         <div class="card-body" style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;overflow:hidden;">
           ${ownerChip}
-          <span class="badge badge-blue">${(file.queries || []).length} SQL</span>
+          <span class="badge badge-blue">${(Array.isArray(file.queries) && file.queries.length > 0 ? file.queries.length : (Number(file.stats?.sqlCount || file.sql_count || file.sqlCount || 0) || 0))} SQL</span>
           ${file.pascalScript ? '<span class="badge badge-purple">Pascal</span>' : ''}
           ${file.category ? `<span class="badge badge-purple" data-list-action="category" data-id="${encodedId}" style="cursor:pointer;" title="Kategori: ${escHtml(file.category)}">${escHtml(file.category)}</span>` : `<button class="btn btn-sm" data-list-action="category" data-id="${encodedId}" style="font-size:.7rem;padding:1px 6px;border-radius:5px;opacity:.7;">+ Kategori</button>`}
         </div>

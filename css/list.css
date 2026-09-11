@@ -1202,69 +1202,79 @@ td.col-fileSize {
 
 /* ── TABLO SIKIŞIKLIĞI (DENSITY LEVELS) ───────────────────── */
 /* 1. Rahat (Comfortable - 44px) */
-[data-density="comfortable"].report-table thead th {
- padding: 1rem 1.1rem;
- font-size: 0.8rem;
+:is([data-density="comfortable"], html[data-density="comfortable"], body[data-density="comfortable"]) :is(.report-table, table) thead th,
+.report-table[data-density="comfortable"] thead th {
+  padding: 1rem 1.1rem;
+  font-size: 0.8rem;
 }
-[data-density="comfortable"].report-table tbody td {
- padding: 0.95rem 1.1rem;
- font-size: 0.92rem;
+:is([data-density="comfortable"], html[data-density="comfortable"], body[data-density="comfortable"]) :is(.report-table, table) tbody td,
+.report-table[data-density="comfortable"] tbody td {
+  padding: 0.95rem 1.1rem;
+  font-size: 0.92rem;
 }
-[data-density="comfortable"].file-name {
- font-size: 0.92rem;
+:is([data-density="comfortable"], html[data-density="comfortable"], body[data-density="comfortable"]) .file-name {
+  font-size: 0.92rem;
 }
 
 /* 2. Standart (Normal - 36px) */
-[data-density="normal"].report-table thead th {
- padding: 0.8rem 1rem;
- font-size: 0.76rem;
+:is([data-density="normal"], html[data-density="normal"], body[data-density="normal"]) :is(.report-table, table) thead th,
+.report-table[data-density="normal"] thead th {
+  padding: 0.8rem 1rem;
+  font-size: 0.76rem;
 }
-[data-density="normal"].report-table tbody td {
- padding: 0.65rem 0.9rem;
- font-size: 0.84rem;
+:is([data-density="normal"], html[data-density="normal"], body[data-density="normal"]) :is(.report-table, table) tbody td,
+.report-table[data-density="normal"] tbody td {
+  padding: 0.65rem 0.9rem;
+  font-size: 0.84rem;
 }
 
 /* 3. Kompakt (Compact - 28px) */
-[data-density="compact"].report-table thead th {
- padding: 0.5rem 0.75rem;
- font-size: 0.72rem;
+:is([data-density="compact"], html[data-density="compact"], body[data-density="compact"]) :is(.report-table, table) thead th,
+.report-table[data-density="compact"] thead th {
+  padding: 0.45rem 0.75rem;
+  font-size: 0.72rem;
 }
-[data-density="compact"].report-table tbody td {
- padding: 0.35rem 0.7rem;
- font-size: 0.78rem;
+:is([data-density="compact"], html[data-density="compact"], body[data-density="compact"]) :is(.report-table, table) tbody td,
+.report-table[data-density="compact"] tbody td {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.78rem;
 }
-[data-density="compact"].badge {
- padding: 0.1rem 0.4rem;
- font-size: 0.65rem;
+:is([data-density="compact"], html[data-density="compact"], body[data-density="compact"]) .badge {
+  padding: 0.1rem 0.4rem;
+  font-size: 0.65rem;
 }
-[data-density="compact"].tag-pill {
- padding: 1px 6px;
- font-size: 0.68rem;
+:is([data-density="compact"], html[data-density="compact"], body[data-density="compact"]) .tag-pill {
+  padding: 1px 6px;
+  font-size: 0.68rem;
 }
 
 /* 4. Ultra Sıkışık (Minimal - 22px) */
-[data-density="minimal"].report-table thead th {
- padding: 0.3rem 0.55rem;
- font-size: 0.68rem;
- letter-spacing: 0;
+:is([data-density="minimal"], html[data-density="minimal"], body[data-density="minimal"]) :is(.report-table, table) thead th,
+.report-table[data-density="minimal"] thead th {
+  padding: 0.22rem 0.5rem !important;
+  font-size: 0.68rem !important;
+  letter-spacing: 0;
+  height: 24px;
 }
-[data-density="minimal"].report-table tbody td {
- padding: 0.18rem 0.5rem;
- font-size: 0.73rem;
- line-height: 1.25;
+:is([data-density="minimal"], html[data-density="minimal"], body[data-density="minimal"]) :is(.report-table, table) tbody td,
+.report-table[data-density="minimal"] tbody td {
+  padding: 0.14rem 0.45rem !important;
+  font-size: 0.73rem !important;
+  line-height: 1.25;
+  height: 22px;
 }
-[data-density="minimal"].badge {
- padding: 0.05rem 0.35rem;
- font-size: 0.62rem;
+:is([data-density="minimal"], html[data-density="minimal"], body[data-density="minimal"]) .badge {
+  padding: 0.05rem 0.35rem;
+  font-size: 0.62rem;
 }
-[data-density="minimal"].tag-pill {
- padding: 0 4px;
- font-size: 0.64rem;
+:is([data-density="minimal"], html[data-density="minimal"], body[data-density="minimal"]) .tag-pill {
+  padding: 0 4px;
+  font-size: 0.64rem;
 }
-[data-density="minimal"].btn-icon {
- width: 22px;
- height: 22px;
- font-size: 0.72rem;
+:is([data-density="minimal"], html[data-density="minimal"], body[data-density="minimal"]) .btn-icon {
+  width: 22px;
+  height: 22px;
+  font-size: 0.72rem;
 }
 
 /* ── SÜRÜKLE-BIRAK SÜTUN BAŞLIKLARI (DRAG & DROP COLUMNS) ── */

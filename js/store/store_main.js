@@ -1677,18 +1677,19 @@
     // 5. Tablo & Liste Sıkışıklığı (Density)
     const density = prefs.density || 'normal';
     root.setAttribute('data-density', density);
-    if (density === 'compact-ultra' || density === 'ultra') {
-      root.style.setProperty('--row-height', '28px');
-      root.style.setProperty('--cell-padding', '4px 8px');
+    if (document.body) document.body.setAttribute('data-density', density);
+    if (density === 'minimal' || density === 'compact-ultra' || density === 'ultra') {
+      root.style.setProperty('--row-height', '24px');
+      root.style.setProperty('--cell-padding', '2px 6px');
     } else if (density === 'compact') {
-      root.style.setProperty('--row-height', '34px');
-      root.style.setProperty('--cell-padding', '6px 10px');
-    } else if (density === 'spacious') {
-      root.style.setProperty('--row-height', '50px');
-      root.style.setProperty('--cell-padding', '14px 16px');
+      root.style.setProperty('--row-height', '30px');
+      root.style.setProperty('--cell-padding', '5px 8px');
+    } else if (density === 'comfortable' || density === 'spacious') {
+      root.style.setProperty('--row-height', '48px');
+      root.style.setProperty('--cell-padding', '12px 14px');
     } else {
-      root.style.setProperty('--row-height', '42px');
-      root.style.setProperty('--cell-padding', '9px 12px');
+      root.style.setProperty('--row-height', '38px');
+      root.style.setProperty('--cell-padding', '8px 10px');
     }
   }
 

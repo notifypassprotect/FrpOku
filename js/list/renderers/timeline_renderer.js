@@ -51,7 +51,7 @@ window.FrpListRenderers.renderTimeline = function(files, container) {
                 ${ownerChip}
                 <span>Dosya: <code style="font-family:var(--font);font-size:.76rem;">${escHtml(file.name)}</code></span>
                 <span class="badge badge-gray" style="font-family:var(--mono);font-size:.7rem;">GUID: ${escHtml(guidVal)}</span>
-                <span class="badge badge-blue" style="font-size:.7rem;">${(file.queries || []).length} SQL</span>
+                <span class="badge badge-blue" style="font-size:.7rem;">${(Array.isArray(file.queries) && file.queries.length > 0 ? file.queries.length : (Number(file.stats?.sqlCount || file.sql_count || file.sqlCount || 0) || 0))} SQL</span>
               </div>
             </div>
           `;

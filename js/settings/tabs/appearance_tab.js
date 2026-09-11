@@ -213,8 +213,11 @@ window.FrpSettingsTabs.appearance = {
     overlay.querySelectorAll('input[name="stagedFontSize"]').forEach(radio => {
       radio.addEventListener('change', (e) => {
         stagedPrefs.fontSize = e.target.value;
+        const fontSizeMap = { micro: '13px', compact: '14px', normal: '15px', spacious: '16px', large: '17px' };
+        document.documentElement.setAttribute('data-ui-scale', e.target.value);
+        if (fontSizeMap[e.target.value]) document.documentElement.style.setProperty('--font-size-base', fontSizeMap[e.target.value]);
         overlay.querySelectorAll('input[name="stagedFontSize"]').forEach(r => {
-          r.parentElement?.classList.toggle('active', r.checked);
+          r.closest('.settings-radio-card')?.classList.toggle('active', r.checked);
         });
         markDirty();
       });
@@ -222,9 +225,25 @@ window.FrpSettingsTabs.appearance = {
 
     overlay.querySelectorAll('input[name="stagedDensity"]').forEach(radio => {
       radio.addEventListener('change', (e) => {
-        stagedPrefs.density = e.target.value;
+        const dVal = e.target.value;
+        stagedPrefs.density = dVal;
+        document.documentElement.setAttribute('data-density', dVal);
+        if (document.body) document.body.setAttribute('data-density', dVal);
+        if (dVal === 'minimal') {
+          document.documentElement.style.setProperty('--row-height', '24px');
+          document.documentElement.style.setProperty('--cell-padding', '2px 6px');
+        } else if (dVal === 'compact') {
+          document.documentElement.style.setProperty('--row-height', '30px');
+          document.documentElement.style.setProperty('--cell-padding', '5px 8px');
+        } else if (dVal === 'comfortable') {
+          document.documentElement.style.setProperty('--row-height', '48px');
+          document.documentElement.style.setProperty('--cell-padding', '12px 14px');
+        } else {
+          document.documentElement.style.setProperty('--row-height', '38px');
+          document.documentElement.style.setProperty('--cell-padding', '8px 10px');
+        }
         overlay.querySelectorAll('input[name="stagedDensity"]').forEach(r => {
-          r.parentElement?.classList.toggle('active', r.checked);
+          r.closest('.settings-radio-card')?.classList.toggle('active', r.checked);
         });
         markDirty();
       });
@@ -233,8 +252,19 @@ window.FrpSettingsTabs.appearance = {
     overlay.querySelectorAll('input[name="stagedCodeFont"]').forEach(radio => {
       radio.addEventListener('change', (e) => {
         stagedPrefs.codeFont = e.target.value;
+        const codeFontMap = {
+          'jetbrains': "'JetBrains Mono', monospace",
+          'fira': "'Fira Code', monospace",
+          'cascadia': "'Cascadia Code', monospace",
+          'inconsolata': "'Inconsolata', monospace",
+          'sourcecode': "'Source Code Pro', monospace",
+          'monaco': "'Monaco', 'Menlo', monospace",
+          'courierprime': "'Courier Prime', monospace",
+          'consolas': "'Consolas', monospace"
+        };
+        if (codeFontMap[e.target.value]) document.documentElement.style.setProperty('--mono', codeFontMap[e.target.value]);
         overlay.querySelectorAll('input[name="stagedCodeFont"]').forEach(r => {
-          r.parentElement?.classList.toggle('active', r.checked);
+          r.closest('.settings-radio-card')?.classList.toggle('active', r.checked);
         });
         markDirty();
       });

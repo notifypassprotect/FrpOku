@@ -115,7 +115,7 @@ window.FrpListRenderers = window.FrpListRenderers || {};
       title: 'SQL',
       sortField: 'queries',
       renderTd: (file) => {
-        const qCount = (file.queries || []).length;
+        const qCount = Array.isArray(file.queries) && file.queries.length > 0 ? file.queries.length : (Number(file.stats?.sqlCount || file.sql_count || file.sqlCount || 0) || 0);
         return `
           <td class="col-queries" style="white-space:nowrap;text-align:center;">
             <span class="badge ${qCount > 0 ? 'badge-blue' : 'badge-gray'}" style="font-size:.72rem;padding:.18rem .45rem;">${qCount} SQL</span>
@@ -158,9 +158,17 @@ window.FrpListRenderers = window.FrpListRenderers || {};
     const tableHeaderRow = document.getElementById('tableHeaderRow');
     if (!tableHeaderRow) return;
 
-    let currentOrder = Array.isArray(prefs.columnOrder) && prefs.columnOrder.length > 0
-      ? [...prefs.columnOrder]
-      : [...DEFAULT_COLUMN_ORDER];
+    let sessionOrder = null;
+    try {
+      const raw = sessionStorage.getItem('frp_session_column_order');
+      if (raw) sessionOrder = JSON.parse(raw);
+    } catch {}
+
+    let currentOrder = Array.isArray(sessionOrder) && sessionOrder.length > 0
+      ? [...sessionOrder]
+      : (Array.isArray(prefs.columnOrder) && prefs.columnOrder.length > 0
+          ? [...prefs.columnOrder]
+          : [...DEFAULT_COLUMN_ORDER]);
 
     currentOrder = currentOrder.filter(c => c !== 'actions');
     if (!currentOrder.includes('fileName')) {
@@ -199,5 +207,89 @@ window.FrpListRenderers = window.FrpListRenderers || {};
     });
 
     tableHeaderRow.innerHTML = thsHtml;
+
+    // Sürükle - Bırak (Drag & Drop) Olayları
+    let draggedColKey = null;
+
+    tableHeaderRow.querySelectorAll('th.draggable-col').forEach(th => {
+      th.addEventListener('dragstart', (e) => {
+        draggedColKey = th.getAttribute('data-col');
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', draggedColKey); } catch {}
+        th.classList.add('dragging-col');
+      });
+
+      th.addEventListener('dragend', () => {
+        th.classList.remove('dragging-col');
+        tableHeaderRow.querySelectorAll('th.draggable-col').forEach(el => {
+          el.classList.remove('drag-over-left', 'drag-over-right');
+        });
+      });
+
+      th.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const targetColKey = th.getAttribute('data-col');
+        if (!draggedColKey || draggedColKey === targetColKey) return;
+
+        const rect = th.getBoundingClientRect();
+        const midPoint = rect.left + rect.width / 2;
+        if (e.clientX < midPoint) {
+          th.classList.add('drag-over-left');
+          th.classList.remove('drag-over-right');
+        } else {
+          th.classList.add('drag-over-right');
+          th.classList.remove('drag-over-left');
+        }
+      });
+
+      th.addEventListener('dragleave', () => {
+        th.classList.remove('drag-over-left', 'drag-over-right');
+      });
+
+      th.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const targetColKey = th.getAttribute('data-col');
+        th.classList.remove('drag-over-left', 'drag-over-right');
+        if (!draggedColKey || draggedColKey === targetColKey) return;
+
+        const rect = th.getBoundingClientRect();
+        const midPoint = rect.left + rect.width / 2;
+        const insertBefore = e.clientX < midPoint;
+
+        const oldIdx = currentOrder.indexOf(draggedColKey);
+        if (oldIdx !== -1) currentOrder.splice(oldIdx, 1);
+
+        let targetIdx = currentOrder.indexOf(targetColKey);
+        if (targetIdx !== -1) {
+          if (!insertBefore) targetIdx++;
+          currentOrder.splice(targetIdx, 0, draggedColKey);
+        } else {
+          currentOrder.push(draggedColKey);
+        }
+
+        // 1. Session Storage'a yaz (oturum boyunca saklanır)
+        try {
+          sessionStorage.setItem('frp_session_column_order', JSON.stringify(currentOrder));
+        } catch {}
+
+        // 2. Runtime tercihleri güncelle
+        if (prefs) prefs.columnOrder = [...currentOrder];
+        if (window.FrpStore && typeof window.FrpStore.getPreferences === 'function') {
+          const p = window.FrpStore.getPreferences();
+          if (p) p.columnOrder = [...currentOrder];
+        }
+
+        // 3. Tabloyu yeniden çiz
+        if (typeof window.renderTableView === 'function') {
+          window.renderTableView();
+        } else if (typeof window.renderCurrentView === 'function') {
+          window.renderCurrentView();
+        }
+        if (typeof window.safeToast === 'function') {
+          window.safeToast('Sütun sıralaması güncellendi.', 'info');
+        }
+      });
+    });
   };
 })();

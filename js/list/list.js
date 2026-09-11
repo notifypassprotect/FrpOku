@@ -231,8 +231,8 @@ function sortFiles(files) {
         vb = (b.category || '').toLowerCase();
         break;
       case 'queries':
-        va = (a.queries || []).length;
-        vb = (b.queries || []).length;
+        va = Array.isArray(a.queries) && a.queries.length > 0 ? a.queries.length : (Number(a.stats?.sqlCount || a.sql_count || a.sqlCount || 0) || 0);
+        vb = Array.isArray(b.queries) && b.queries.length > 0 ? b.queries.length : (Number(b.stats?.sqlCount || b.sql_count || b.sqlCount || 0) || 0);
         break;
       case 'lastModified':
         va = new Date(a.updatedAt || a.lastModified || a.loadedAt).getTime() || 0;
@@ -250,6 +250,38 @@ function sortFiles(files) {
   });
 }
 window.sortFiles = sortFiles;
+
+const SEARCH_SQL_RESERVED = new Set([
+  'SELECT', 'WHERE', 'AND', 'OR', 'NOT', 'ON', 'DUAL', 'AS', 'SET', 'INTO', 'VALUES',
+  'FROM', 'JOIN', 'LEFT', 'RIGHT', 'INNER', 'OUTER', 'FULL', 'CROSS', 'GROUP', 'ORDER',
+  'HAVING', 'BY', 'UNION', 'ALL', 'WITH', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END',
+  'YEAR', 'MONTH', 'DAY', 'HOUR', 'MINUTE', 'SECOND', 'DATE', 'TIME', 'TIMESTAMP',
+  'TRUNC', 'SYSDATE', 'ROWNUM', 'LEVEL', 'TABLE', 'LATERAL', 'ROW', 'ROWS'
+]);
+
+function getReportTables(file) {
+  if (!file) return [];
+  if (Array.isArray(file.tableNames) && file.tableNames.length > 0) return file.tableNames;
+  if (Array.isArray(file.tables) && file.tables.length > 0) return file.tables;
+  const set = new Set();
+  (file.queries || []).forEach(q => {
+    const sql = String(q.sql || '').replace(/--[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/'(?:''|[^'\r\n])*'/g, "''");
+    const rx = /\b(?:FROM|JOIN)\s+([a-zA-Z0-9_$.]+)/gi;
+    let m;
+    while ((m = rx.exec(sql)) !== null) {
+      let t = m[1].replace(/[()]/g, '').trim().toUpperCase().split('.')[0];
+      if (t && !SEARCH_SQL_RESERVED.has(t) && t.length > 2 && !/^\d+$/.test(t)) {
+        set.add(t);
+      }
+    }
+  });
+  (file.datasets || []).forEach(d => {
+    if (d && typeof d === 'string' && d.length > 2) set.add(d.toUpperCase());
+  });
+  file.tableNames = Array.from(set);
+  return file.tableNames;
+}
+window.getReportTables = getReportTables;
 
 // ── Arama & Filtreleme ──────────────────────────────────────
 function applySearch() {
@@ -292,19 +324,32 @@ function applySearch() {
     const name = file.meta?.reportName || file.name || '';
     const fileName = file.name || '';
     const guid = file.meta?.guid || '';
-    const owner = file.ownerName || file.owner_name || '';
-    const sql = (file.queries || []).map(x => x.sql || '').join(' ');
+    const owner = [file.ownerName, file.owner_name, file.ownerUsername, file.ownerDepartment].filter(Boolean).join(' ');
+    const sql = (file.queries || []).map(x => (x.name || '') + ' ' + (x.sql || '')).join(' ');
+    const queryNames = Array.isArray(file.queryNames) ? file.queryNames.join(' ') : '';
     const pascal = file.pascalScript || '';
     const notes = file.userNote || '';
+    const cat = file.category || '';
+    const tagsStr = (file.tags || []).join(' ');
+    const tablesList = getReportTables(file);
+    const tablesStr = tablesList.join(' ');
+    const datasetsStr = (file.datasets || []).join(' ');
+    const metaDesc = file.meta?.description || '';
+    const metaAuthor = file.meta?.author || '';
 
     if (regex) {
-      if (searchField === 'name') return regex.test(name);
+      if (searchField === 'name') return regex.test(name) || regex.test(fileName);
       if (searchField === 'guid') return regex.test(guid);
-      if (searchField === 'sql') return regex.test(sql);
+      if (searchField === 'sql') return regex.test(sql) || regex.test(queryNames);
       if (searchField === 'pascal') return regex.test(pascal);
+      if (searchField === 'tables') return regex.test(tablesStr) || tablesList.some(t => regex.test(t));
       if (searchField === 'notes') return regex.test(notes);
-      if (searchField === 'author' || searchField === 'owner') return regex.test(owner);
-      return regex.test(name) || regex.test(fileName) || regex.test(guid) || regex.test(owner) || regex.test(sql) || regex.test(pascal) || regex.test(notes);
+      if (searchField === 'author' || searchField === 'owner') return regex.test(owner) || regex.test(metaAuthor);
+      // searchField === 'all'
+      return regex.test(name) || regex.test(fileName) || regex.test(guid) || regex.test(owner) ||
+             regex.test(sql) || regex.test(queryNames) || regex.test(pascal) || regex.test(notes) ||
+             regex.test(cat) || regex.test(tagsStr) || regex.test(tablesStr) || regex.test(datasetsStr) ||
+             regex.test(metaDesc) || regex.test(metaAuthor) || tablesList.some(t => regex.test(t));
     }
 
     const q = searchQuery.toLowerCase();
@@ -312,17 +357,26 @@ function applySearch() {
     const lFileName = fileName.toLowerCase();
     const lGuid = guid.toLowerCase();
     const lOwner = owner.toLowerCase();
-    const lSql = sql.toLowerCase();
+    const lSql = (sql + ' ' + queryNames).toLowerCase();
     const lPascal = pascal.toLowerCase();
     const lNotes = notes.toLowerCase();
+    const lCat = cat.toLowerCase();
+    const lTags = tagsStr.toLowerCase();
+    const lTables = tablesStr.toLowerCase();
+    const lDatasets = datasetsStr.toLowerCase();
+    const lDesc = metaDesc.toLowerCase();
+    const lAuthor = metaAuthor.toLowerCase();
 
-    if (searchField === 'name') return lName.includes(q);
+    if (searchField === 'name') return lName.includes(q) || lFileName.includes(q);
     if (searchField === 'guid') return lGuid.includes(q);
     if (searchField === 'sql') return lSql.includes(q);
     if (searchField === 'pascal') return lPascal.includes(q);
+    if (searchField === 'tables') return lTables.includes(q) || tablesList.some(t => t.toLowerCase().includes(q));
     if (searchField === 'notes') return lNotes.includes(q);
-    if (searchField === 'author' || searchField === 'owner') return lOwner.includes(q);
-    return lName.includes(q) || lFileName.includes(q) || lGuid.includes(q) || lOwner.includes(q) || lSql.includes(q) || lPascal.includes(q) || lNotes.includes(q);
+    if (searchField === 'author' || searchField === 'owner') return lOwner.includes(q) || lAuthor.includes(q);
+    return lName.includes(q) || lFileName.includes(q) || lGuid.includes(q) || lOwner.includes(q) ||
+           lSql.includes(q) || lPascal.includes(q) || lNotes.includes(q) || lCat.includes(q) ||
+           lTags.includes(q) || lTables.includes(q) || lDatasets.includes(q) || lDesc.includes(q) || lAuthor.includes(q);
   });
 
   window.allFiles = allFiles;
@@ -470,9 +524,17 @@ function renderTable() {
     return;
   }
 
-  const currentOrder = prefs.columnOrder && prefs.columnOrder.length > 0
-    ? prefs.columnOrder
-    : (window.FrpListRenderers?.DEFAULT_COLUMN_ORDER || ['reportName', 'fileName', 'fileSize', 'category', 'guid', 'tags', 'queries', 'date', 'lastModified']);
+  let sessionOrder = null;
+  try {
+    const raw = sessionStorage.getItem('frp_session_column_order');
+    if (raw) sessionOrder = JSON.parse(raw);
+  } catch {}
+
+  const currentOrder = Array.isArray(sessionOrder) && sessionOrder.length > 0
+    ? sessionOrder
+    : (prefs.columnOrder && prefs.columnOrder.length > 0
+        ? prefs.columnOrder
+        : (window.FrpListRenderers?.DEFAULT_COLUMN_ORDER || ['reportName', 'fileName', 'fileSize', 'category', 'guid', 'tags', 'queries', 'date', 'lastModified']));
 
   tableBody.innerHTML = pagedFiles.map(file => {
     const encodedId = encodeInlineArg(file.id);
@@ -912,7 +974,7 @@ function exportReportListExcel() {
     const cat = f.category || '';
     const guid = f.meta?.guid || '';
     const tags = (f.tags || []).join(', ');
-    const qCount = (f.queries || []).length;
+    const qCount = Array.isArray(f.queries) && f.queries.length > 0 ? f.queries.length : (Number(f.stats?.sqlCount || f.sql_count || f.sqlCount || 0) || 0);
     const date = new Date(f.loadedAt).toLocaleString('tr-TR');
     rows.push([rName, fName, size, cat, guid, tags, qCount, date]);
   });
@@ -1016,6 +1078,16 @@ async function initListPage() {
     document.querySelectorAll('.topbar-dropdown.open').forEach(d => d.classList.remove('open'));
   });
 
+  // Analizler Butonu Görünürlük Kontrolü (Ortak Havuzda gizle)
+  function updateAnalyticsVisibility() {
+    const curWs = FrpStore.getActiveWorkspace ? FrpStore.getActiveWorkspace() : 'personal';
+    const ddAnalytics = document.getElementById('dropdownAnalytics');
+    if (ddAnalytics) {
+      ddAnalytics.style.display = (curWs === 'pool') ? 'none' : '';
+    }
+  }
+  updateAnalyticsVisibility();
+
   // Çalışma Alanı Değiştirici
   document.getElementById('tabWsPersonal')?.addEventListener('click', () => {
     document.getElementById('tabWsPersonal')?.classList.add('active');
@@ -1023,6 +1095,7 @@ async function initListPage() {
     if (FrpStore.setActiveWorkspace) FrpStore.setActiveWorkspace('personal');
     const pn = document.getElementById('poolNotice');
     if (pn) pn.style.display = 'none';
+    updateAnalyticsVisibility();
     applySearch();
   });
 
@@ -1032,6 +1105,7 @@ async function initListPage() {
     if (FrpStore.setActiveWorkspace) FrpStore.setActiveWorkspace('pool');
     const pn = document.getElementById('poolNotice');
     if (pn) pn.style.display = 'block';
+    updateAnalyticsVisibility();
     applySearch();
 
     // Ortak havuz sekmesine geçildiğinde havuz raporlarını arka planda buluttan anında tazele:

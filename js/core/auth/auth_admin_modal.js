@@ -299,14 +299,14 @@
  </div>
  </div>
  </div>
- <div class="admin-actions">
- <button type="button" class="btn btn-sm btn-success btn-approve-user" data-id="${u.id}" data-name="${escHtml(u.full_name || u.username)}" style="font-weight:800;padding:.45rem.85rem;box-shadow:0 2px 6px rgba(16,185,129,0.25);">
- ✅ Onayla
- </button>
- <button type="button" class="btn btn-sm btn-danger btn-reject-user" data-id="${u.id}" data-name="${escHtml(u.full_name || u.username)}" style="font-weight:800;padding:.45rem.85rem;">
- ❌ Reddet
- </button>
- </div>
+  <div class="admin-actions">
+  <button type="button" class="btn btn-sm btn-approve-user" data-id="${u.id}" data-name="${escHtml(u.full_name || u.username)}" title="Kullanıcıyı Onayla ve Hesabı Aç">
+  <span>✅</span> <span>Onayla</span>
+  </button>
+  <button type="button" class="btn btn-sm btn-reject-user" data-id="${u.id}" data-name="${escHtml(u.full_name || u.username)}" title="Kayıt Başvurusunu Reddet">
+  <span>❌</span> <span>Reddet</span>
+  </button>
+  </div>
  </div>
  `;
  });
@@ -429,23 +429,23 @@
  <span style="font-weight:800;font-size:.95rem;color:var(--text-primary,#0f172a);">${escHtml(u.full_name || u.username)}</span>
  <span style="font-size:.78rem;font-weight:700;font-family:monospace;color:#2563eb;background:rgba(37,99,235,0.08);padding:.15rem.45rem;border-radius:6px;display:inline-flex;align-items:center;gap:.35rem;">
  @${escHtml(u.username)}
- <button type="button" class="btn btn-sm btn-ghost btn-edit-username" data-id="${u.id}" data-name="${escHtml(u.username)}" style="padding:1px 6px;font-size:.72rem;font-weight:700;color:#2563eb;background:#ffffff;border:1px solid rgba(37,99,235,0.25);border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;gap:2px;box-shadow:0 1px 3px rgba(0,0,0,0.06);" title="Kullanıcı Adını Değiştir">
+ <button type="button" class="btn btn-sm btn-edit-username" data-id="${u.id}" data-name="${escHtml(u.username)}" title="Kullanıcı Adını Değiştir" style="padding:2px 8px;font-size:.72rem;">
  <span>✏️</span><span>Düzenle</span>
  </button>
  </span>
- ${isUsrAdmin? `<span class="badge badge-purple" style="font-size:.68rem;"> Admin</span>`: `<span class="badge badge-blue" style="font-size:.68rem;">Kullanıcı</span>`}
- ${isPending? `<span class="badge badge-amber" style="font-size:.68rem;">⏳ Onay Bekliyor</span>`: `<span class="badge badge-green" style="font-size:.68rem;"> Aktif</span>`}
+ ${isUsrAdmin? `<span class="badge badge-purple" style="font-size:.68rem;">👑 Admin</span>`: `<span class="badge badge-blue" style="font-size:.68rem;">Kullanıcı</span>`}
+ ${isPending? `<span class="badge badge-amber" style="font-size:.68rem;">⏳ Onay Bekliyor</span>`: `<span class="badge badge-green" style="font-size:.68rem;">✓ Aktif</span>`}
  </div>
  <div style="display:flex;align-items:center;gap:.8rem;flex-wrap:wrap;font-size:.75rem;color:var(--text-secondary,#64748b);">
- <span> ${escHtml(u.email || '-')}</span>
- ${u.phone? `<span> ${escHtml(u.phone)}</span>`: ''}
- <span> ${escHtml(u.department || 'Bilgi İşlem')}</span>
+ <span>✉️ ${escHtml(u.email || '-')}</span>
+ ${u.phone? `<span>📞 ${escHtml(u.phone)}</span>`: ''}
+ <span>🏢 ${escHtml(u.department || 'Bilgi İşlem')}</span>
  </div>
  </div>
  </div>
  <div class="admin-actions">
- <button type="button" class="btn btn-sm btn-ghost btn-admin-reset-pass" data-id="${u.id}" data-name="${escHtml(u.full_name || u.username)}" title="Şifre Sıfırla" style="font-size:.78rem;font-weight:700;">
- Şifre Sıfırla
+ <button type="button" class="btn btn-sm btn-admin-reset-pass" data-id="${u.id}" data-name="${escHtml(u.full_name || u.username)}" title="Şifre Sıfırla" style="font-size:.78rem;padding:.38rem .75rem;">
+ 🔑 Şifre Sıfırla
  </button>
  </div>
  </div>

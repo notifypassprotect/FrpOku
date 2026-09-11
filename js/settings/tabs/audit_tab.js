@@ -235,12 +235,36 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
       </div>
     ` : '';
 
+    const categoryNames = {
+      auth: 'Oturum & Kimlik Doğrulama',
+      files: 'Rapor & Dosya Aktarımı',
+      edits: 'Kod & Tasarım Düzenleme',
+      pool: 'Ortak Rapor Havuzu',
+      trash: 'Çöp Kutusu & Silme',
+      tags: 'Kategori & Etiket',
+      system: 'Sistem & Güvenlik',
+      other: 'Genel İşlem'
+    };
+    const categoryLabel = categoryNames[actInfo.group] || 'Genel İşlem';
+
+    let severityBadge = '<span class="badge badge-green" style="font-size:.68rem;">✓ Başarılı İşlem</span>';
+    const actUpper = String(log.action || '').toUpperCase();
+    if (['TRASH_PURGE', 'TRASH_EMPTY', 'DATA_RESET', 'REPORT_CLEAR_ALL'].includes(actUpper)) {
+      severityBadge = '<span class="badge badge-red" style="font-size:.68rem;">⚠️ Kritik İşlem</span>';
+    } else if (['REPORT_DELETE', 'TRASH_MOVE', 'PASSWORD_CHANGE', 'POOL_REMOVE'].includes(actUpper)) {
+      severityBadge = '<span class="badge badge-amber" style="font-size:.68rem;">⚡ Dikkat</span>';
+    }
+
+    const logJsonStr = JSON.stringify(log, null, 2);
+    const clientAgent = (typeof navigator !== 'undefined' ? (navigator.userAgentData?.platform || navigator.platform || 'Web İstemcisi') : 'Web');
+
     overlay.innerHTML = `
-      <div class="modal" style="max-width:620px;width:94vw;padding:1.6rem;border-radius:18px;box-shadow:0 28px 70px rgba(0,0,0,.5);border:1.5px solid var(--border);background:var(--bg-surface);animation:fadeIn .18s ease-out;">
+      <div class="modal" style="max-width:680px;width:94vw;padding:1.6rem;border-radius:18px;box-shadow:0 28px 70px rgba(0,0,0,.5);border:1.5px solid var(--border);background:var(--bg-surface);animation:fadeIn .18s ease-out;max-height:90vh;overflow-y:auto;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;border-bottom:1px solid var(--border-light);padding-bottom:.75rem;">
-          <div style="font-size:1.1rem;font-weight:900;color:var(--text-primary);display:flex;align-items:center;gap:.6rem;">
+          <div style="font-size:1.1rem;font-weight:900;color:var(--text-primary);display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">
             <span>İşlem Detay Kartı</span>
             <span class="badge ${actInfo.badge}">${escHtml(actInfo.label)}</span>
+            ${severityBadge}
           </div>
           <button type="button" class="btn btn-sm btn-ghost btn-close-detail" style="font-size:1.15rem;padding:2px 8px;border-radius:8px;line-height:1;color:var(--text-muted);" title="Kapat">✕</button>
         </div>
@@ -252,28 +276,52 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
           </div>
           <div>
             <div style="font-size:.7rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px;">Kullanıcı & Rol</div>
-            <div style="font-weight:700;color:var(--text-primary);">@${escHtml(log.username || 'misafir')} <span class="badge ${log.role === 'admin' ? 'badge-purple' : 'badge-gray'}" style="font-size:.65rem;margin-left:4px;">${escHtml(log.role || 'user')}</span></div>
+            <div style="font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;">
+              <span>@${escHtml(log.username || 'misafir')}</span>
+              <span class="badge ${log.role === 'admin' ? 'badge-purple' : 'badge-gray'}" style="font-size:.65rem;">${escHtml(log.role || 'user')}</span>
+            </div>
           </div>
           <div>
-            <div style="font-size:.7rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px;">İstemci IP Adresi</div>
-            <div style="font-weight:800;font-family:var(--mono);color:var(--accent);font-size:.82rem;">${escHtml(ipDisplay)}</div>
+            <div style="font-size:.7rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px;">İstemci IP & Cihaz</div>
+            <div style="font-weight:800;font-family:var(--mono);color:var(--accent);font-size:.82rem;">${escHtml(ipDisplay)} <span style="font-size:.7rem;font-weight:500;color:var(--text-muted);">(${escHtml(clientAgent)})</span></div>
           </div>
           <div>
-            <div style="font-size:.7rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px;">Hedef / Rapor</div>
+            <div style="font-size:.7rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px;">İşlem Kategorisi</div>
+            <div style="font-weight:700;color:var(--text-primary);"><span class="badge badge-purple" style="font-size:.72rem;">${escHtml(categoryLabel)}</span></div>
+          </div>
+          <div style="grid-column:1/-1;">
+            <div style="font-size:.7rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px;">Hedef / Rapor Nesnesi</div>
             <div style="font-weight:700;color:var(--text-primary);word-break:break-all;">${escHtml(log.target || 'Genel Sistem')}</div>
           </div>
         </div>
 
         ${reportsSectionHtml}
 
-        <div style="margin-bottom:1.4rem;">
-          <div style="font-size:.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:.45rem;">Açıklama & Detaylar</div>
+        <div style="margin-bottom:1.2rem;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.45rem;">
+            <div style="font-size:.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.3px;">Açıklama & Detaylar</div>
+            <button type="button" class="btn btn-sm btn-ghost" id="btnCopyLogDetails" style="font-size:.72rem;padding:2px 8px;" title="Açıklama Metnini Kopyala">📋 Kopyala</button>
+          </div>
           <div style="background:var(--bg-raised);padding:.85rem 1rem;border-radius:10px;border:1px solid var(--border);font-size:.84rem;line-height:1.6;color:var(--text-secondary);word-break:break-word;max-height:180px;overflow-y:auto;">
             ${escHtml(log.details || 'Açıklama bulunmuyor.')}
           </div>
         </div>
 
-        <div style="display:flex;justify-content:flex-end;">
+        <!-- Gelişmiş Teknik Detay & JSON Akordiyonu -->
+        <details style="margin-bottom:1.4rem;background:var(--bg-raised);border:1px solid var(--border);border-radius:10px;padding:.6rem .85rem;font-size:.8rem;">
+          <summary style="font-weight:800;cursor:pointer;color:var(--text-primary);display:flex;align-items:center;justify-content:space-between;user-select:none;">
+            <span>🔍 Ham Veri & JSON (Teknik Denetim Bilgisi)</span>
+            <button type="button" class="btn btn-sm btn-ghost" id="btnCopyLogJson" style="font-size:.72rem;padding:2px 8px;">📋 JSON Kopyala</button>
+          </summary>
+          <pre style="margin-top:.7rem;padding:.75rem;background:var(--bg-surface);border:1px solid var(--border-light);border-radius:8px;font-family:var(--mono);font-size:.72rem;color:var(--text-secondary);overflow-x:auto;max-height:180px;line-height:1.4;">${escHtml(logJsonStr)}</pre>
+        </details>
+
+        <!-- Hızlı Filtre ve Kapat Aksiyonları -->
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:.6rem;flex-wrap:wrap;border-top:1px solid var(--border-light);padding-top:1rem;">
+          <div style="display:flex;gap:.4rem;flex-wrap:wrap;">
+            ${log.username ? `<button type="button" class="btn btn-sm btn-ghost" id="btnFilterByUser" style="font-size:.75rem;font-weight:700;border:1px solid var(--border);">👤 @${escHtml(log.username)} Filtrele</button>` : ''}
+            <button type="button" class="btn btn-sm btn-ghost" id="btnFilterByAction" style="font-size:.75rem;font-weight:700;border:1px solid var(--border);">⚡ Bu İşlemi Filtrele</button>
+          </div>
           <button type="button" class="btn btn-sm btn-primary btn-close-detail" style="padding:.5rem 1.4rem;font-weight:800;border-radius:9px;font-size:.84rem;">Kapat</button>
         </div>
       </div>
@@ -288,6 +336,41 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
         }
       });
     });
+
+    overlay.querySelector('#btnCopyLogDetails')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      try {
+        navigator.clipboard.writeText(log.details || '');
+        if (typeof window.safeToast === 'function') window.safeToast('Açıklama panoya kopyalandı.', 'success');
+      } catch {}
+    });
+
+    overlay.querySelector('#btnCopyLogJson')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      try {
+        navigator.clipboard.writeText(logJsonStr);
+        if (typeof window.safeToast === 'function') window.safeToast('Log JSON verisi panoya kopyalandı.', 'success');
+      } catch {}
+    });
+
+    overlay.querySelector('#btnFilterByUser')?.addEventListener('click', () => {
+      overlay.remove();
+      const inp = document.getElementById('wideAuditSearchInput') || document.getElementById('auditSearchInput');
+      if (inp) {
+        inp.value = log.username || '';
+        inp.dispatchEvent(new Event('input'));
+      }
+    });
+
+    overlay.querySelector('#btnFilterByAction')?.addEventListener('click', () => {
+      overlay.remove();
+      const sel = document.getElementById('wideAuditActionFilter');
+      if (sel) {
+        sel.value = log.action || '';
+        sel.dispatchEvent(new Event('change'));
+      }
+    });
+
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
     document.body.appendChild(overlay);
   }

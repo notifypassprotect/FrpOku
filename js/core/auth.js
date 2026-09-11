@@ -118,6 +118,7 @@
  localStorage.removeItem(REMEMBER_KEY);
  localStorage.removeItem('frpoku_auth_token');
  sessionStorage.removeItem(AUTH_STORAGE_KEY);
+ try { sessionStorage.removeItem('frp_session_column_order'); } catch {}
  if (window.FrpStore && typeof window.FrpStore.clearSessionCache === 'function') {
   window.FrpStore.clearSessionCache();
  }
