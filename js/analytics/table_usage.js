@@ -19,7 +19,10 @@
     const tableRx = /\b(?:FROM|JOIN)\s+([a-zA-Z0-9_$.]+)/gi;
 
     list.forEach(file => {
+      let foundQueries = false;
       (file.queries || []).forEach(q => {
+        if (!q || !q.sql) return;
+        foundQueries = true;
         let match;
         const sql = (q.sql || '')
           .replace(/--[^\n]*/g, '')
@@ -37,6 +40,22 @@
           }
         }
       });
+
+      // Hafifletilmiş özet modunda SQL sorguları bellekte yoksa tableNames/tables/datasets kullan:
+      if (!foundQueries) {
+        const tables = Array.isArray(file.tableNames) && file.tableNames.length > 0
+          ? file.tableNames
+          : (Array.isArray(file.tables) && file.tables.length > 0
+            ? file.tables
+            : (Array.isArray(file.datasets) ? file.datasets : []));
+        tables.forEach(tbl => {
+          let rawTable = String(tbl || '').replace(/[()]/g, '').trim().toUpperCase().split('.')[0];
+          if (rawTable && !rawTable.startsWith('(') && !SQL_RESERVED.has(rawTable) && rawTable.length > 2 && !/^\d+$/.test(rawTable)) {
+            if (!tableMap.has(rawTable)) tableMap.set(rawTable, new Set());
+            tableMap.get(rawTable).add(file);
+          }
+        });
+      }
     });
 
     const result = [];

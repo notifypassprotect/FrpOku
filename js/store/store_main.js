@@ -1974,10 +1974,10 @@
 
     // Analytics delegasyonları
     getSqlComplexity: (sql) => window.FrpComplexity ? window.FrpComplexity.getSqlComplexity(sql) : {},
-    getDependencyMap: () => window.FrpDependencies ? window.FrpDependencies.getDependencyMap(_read()) : [],
-    getTableUsage: () => window.FrpTableUsage ? window.FrpTableUsage.getTableUsage(_read()) : [],
-    findDuplicateQueries: () => window.FrpTableUsage ? window.FrpTableUsage.findDuplicateQueries(_read()) : [],
-    getParameterUsage: () => window.FrpParamUsage ? window.FrpParamUsage.getParameterUsage(_read()) : [],
+    getDependencyMap: (files) => window.FrpDependencies ? window.FrpDependencies.getDependencyMap(files || getAll()) : [],
+    getTableUsage: (files) => window.FrpTableUsage ? window.FrpTableUsage.getTableUsage(files || getAll()) : [],
+    findDuplicateQueries: (files) => window.FrpTableUsage ? window.FrpTableUsage.findDuplicateQueries(files || getAll()) : [],
+    getParameterUsage: (files) => window.FrpParamUsage ? window.FrpParamUsage.getParameterUsage(files || getAll()) : [],
     checkPascalSyntax: (code, reportContext) => window.FrpSyntaxCheck ? window.FrpSyntaxCheck.checkPascalSyntax(code, reportContext) : { errors: [], warnings: [] },
     checkSqlStaticSyntax: (sql) => window.FrpSyntaxCheck ? window.FrpSyntaxCheck.checkSqlStaticSyntax(sql) : { errors: [], warnings: [] },
     bumpVersionFilename: (name, count) => window.FrpTags ? window.FrpTags.bumpVersionFilename(name, count) : name,

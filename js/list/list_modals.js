@@ -9,12 +9,67 @@ window.FrpListModals = window.FrpListModals || {};
   'use strict';
 
   const escHtml = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const encodeInlineArg = window.encodeInlineArg || (s => encodeURIComponent(String(s || '')));
 
   // 1. Parametre Yönetim Paneli
   window.FrpListModals.openParamsModal = async function() {
-    const usage = FrpStore.getParameterUsage ? FrpStore.getParameterUsage() : [];
+    const files = FrpStore.getAll ? FrpStore.getAll() : [];
+    const usage = FrpStore.getParameterUsage ? FrpStore.getParameterUsage(files) : [];
     if (!usage || usage.length === 0) {
-      if (typeof window.toast === 'function') window.toast('Sistemde analiz edilmiş SQL parametresi bulunamadı.', 'warning');
+      if (typeof window.showModal === 'function') {
+        const bodyHtml = `
+          <div style="padding:1.5rem;text-align:center;display:flex;flex-direction:column;align-items:center;gap:1rem;">
+            <div style="width:52px;height:52px;border-radius:50%;background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:var(--accent);">
+              ⚡
+            </div>
+            <div>
+              <h4 style="margin:0 0 .4rem 0;font-size:1.05rem;font-weight:700;color:var(--text-primary);">Taranmış SQL Parametresi Bulunamadı</h4>
+              <p style="margin:0;font-size:.82rem;color:var(--text-muted);max-width:460px;line-height:1.5;">
+                Raporlar optimize edilmiş özet modunda yüklendiği için SQL parametreleri henüz belleğe alınmamış olabilir veya sistemdeki raporlarda parametreli sorgu (:PARAM) bulunmuyor.
+              </p>
+            </div>
+            ${files.length > 0 ? `
+              <button class="btn btn-primary" id="btnDeepScanParams" style="padding:.5rem 1.2rem;font-weight:700;display:flex;align-items:center;gap:.5rem;">
+                <span>Raporları Tara ve Parametreleri Çıkar</span>
+              </button>
+              <div id="scanParamsProgress" style="font-size:.78rem;color:var(--accent);display:none;font-weight:600;"></div>
+            ` : `
+              <div style="font-size:.8rem;color:var(--text-muted);">Lütfen önce bir .frp rapor dosyası ekleyin.</div>
+            `}
+          </div>
+        `;
+        await window.showModal({
+          title: 'SQL Parametre Yönetim Paneli',
+          body: bodyHtml,
+          confirmText: 'Kapat',
+          cancelText: '',
+          maxWidth: '560px',
+          onOpen: (overlay) => {
+            const btnScan = overlay.querySelector('#btnDeepScanParams');
+            const prog = overlay.querySelector('#scanParamsProgress');
+            if (btnScan) {
+              btnScan.addEventListener('click', async () => {
+                btnScan.disabled = true;
+                btnScan.innerHTML = '<span>Taranıyor...</span>';
+                if (prog) {
+                  prog.style.display = 'block';
+                  prog.textContent = 'Rapor sorguları inceleniyor...';
+                }
+                const targetFiles = files.slice(0, 40);
+                for (let i = 0; i < targetFiles.length; i++) {
+                  const f = targetFiles[i];
+                  if (prog) prog.textContent = `İnceleniyor (${i + 1}/${targetFiles.length}): ${f.name}`;
+                  if (FrpStore.ensureFullReport) {
+                    await FrpStore.ensureFullReport(f.id);
+                  }
+                }
+                window.closeModal?.();
+                setTimeout(() => window.openParamsModal?.(), 100);
+              });
+            }
+          }
+        });
+      }
       return;
     }
 
@@ -194,9 +249,23 @@ window.FrpListModals = window.FrpListModals || {};
 
   // 2. Bağımlılık Haritası Modalı
   window.FrpListModals.openDependenciesModal = async function() {
-    const deps = FrpStore.getDependencyMap ? FrpStore.getDependencyMap() : [];
-    if (deps.length === 0) {
-      if (typeof window.toast === 'function') window.toast('Bağımlılık analizi için tablo verisi bulunamadı.', 'warning');
+    const files = FrpStore.getAll ? FrpStore.getAll() : [];
+    const deps = FrpStore.getDependencyMap ? FrpStore.getDependencyMap(files) : [];
+    if (!deps || deps.length === 0) {
+      if (typeof window.showModal === 'function') {
+        await window.showModal({
+          title: 'Tablo Bağımlılık Haritası',
+          body: `
+            <div style="padding:2rem;text-align:center;color:var(--text-muted);font-size:.88rem;line-height:1.5;">
+              Bağımlılık analizi için henüz veritabanı tablosu içeren bir rapor bulunamadı.<br>
+              Lütfen önce veritabanı tablolarına bağlı .frp raporları yükleyin veya raporları inceleyin.
+            </div>
+          `,
+          confirmText: 'Kapat',
+          cancelText: '',
+          maxWidth: '520px'
+        });
+      }
       return;
     }
 
@@ -368,76 +437,144 @@ window.FrpListModals = window.FrpListModals || {};
 
   // 3. SQL Karmaşıklık Analiz Merkezi Modalı
   window.FrpListModals.openComplexityCenter = async function() {
-    const files = FrpStore.getAll();
+    const files = FrpStore.getAll ? FrpStore.getAll() : [];
     if (!files || files.length === 0) {
       if (typeof window.toast === 'function') window.toast('Analiz edilecek rapor bulunamadı.', 'warning');
       return;
     }
 
-    const analyzed = [];
-    files.forEach(f => {
-      (f.queries || []).forEach(q => {
-        const c = window.FrpComplexity ? window.FrpComplexity.getSqlComplexity(q.sql) : { score: 10, healthScore: 100, level: 'Normal', color: '#10b981', grade: 'A', warnings: [] };
-        analyzed.push({
-          fileId: f.id,
-          reportName: f.meta?.reportName || f.name,
-          fileName: f.name,
-          queryName: q.name || 'Sorgu',
-          sql: q.sql,
-          complexity: c
+    function buildAnalyzed() {
+      const list = [];
+      files.forEach(f => {
+        (f.queries || []).forEach(q => {
+          if (!q || !q.sql) return;
+          const c = window.FrpComplexity ? window.FrpComplexity.getSqlComplexity(q.sql) : { score: 10, healthScore: 100, level: 'Normal', color: '#10b981', grade: 'A', warnings: [] };
+          list.push({
+            fileId: f.id,
+            reportName: f.meta?.reportName || f.name,
+            fileName: f.name,
+            queryName: q.name || 'Sorgu',
+            sql: q.sql,
+            complexity: c
+          });
         });
       });
-    });
+      return list.sort((a, b) => b.complexity.score - a.complexity.score);
+    }
 
-    analyzed.sort((a, b) => b.complexity.score - a.complexity.score);
+    let analyzed = buildAnalyzed();
 
-    const bodyHtml = `
-      <div style="display:flex;flex-direction:column;gap:1rem;max-height:70vh;overflow-y:auto;padding-right:.3rem;">
-        <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg-raised);padding:.8rem 1rem;border-radius:10px;border:1px solid var(--border-light);">
-          <div>
-            <div style="font-weight:800;font-size:.92rem;color:var(--text-primary);">Toplam ${analyzed.length} SQL Sorgusu İncelendi</div>
-            <div style="font-size:.74rem;color:var(--text-muted);margin-top:.15rem;">Sorgular mimari yük ve karmaşıklık puanına göre sıralanmıştır.</div>
-          </div>
-          <span class="badge badge-blue" style="font-size:.78rem;padding:.3rem .6rem;">${files.length} Rapor</span>
-        </div>
-
-        <div style="display:flex;flex-direction:column;gap:.5rem;">
-          ${analyzed.map(item => `
-            <div style="background:var(--bg-surface);border:1px solid var(--border-light);border-radius:10px;padding:.8rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;">
-              <div style="min-width:0;flex:1;">
-                <div style="display:flex;align-items:center;gap:.5rem;">
-                  <strong style="font-size:.88rem;color:var(--text-primary);">${escHtml(item.reportName)}</strong>
-                  <span class="badge" style="background:${item.complexity.color}15;color:${item.complexity.color};border:1px solid ${item.complexity.color}40;font-weight:700;font-size:.72rem;">
-                    Puan: ${item.complexity.score}/100 (${item.complexity.grade})
-                  </span>
-                </div>
-                <div style="font-size:.75rem;color:var(--text-muted);margin-top:.2rem;font-family:var(--mono);">
-                  ${escHtml(item.queryName)} · ${item.complexity.details?.totalJoins || 0} JOIN · ${item.complexity.details?.subqCount || 0} Subquery · ${item.complexity.details?.lines || 0} Satır
-                </div>
-              </div>
-              <button class="btn btn-sm btn-primary" data-list-action="open-detail" data-id="${encodeInlineArg(item.fileId)}" style="font-size:.75rem;padding:.3rem .7rem;">İncele →</button>
+    function getComplexityBody(items) {
+      if (!items || items.length === 0) {
+        return `
+          <div style="padding:2rem;text-align:center;display:flex;flex-direction:column;align-items:center;gap:1.1rem;background:var(--bg-surface);border-radius:12px;border:1px solid var(--border-light);">
+            <div style="width:52px;height:52px;border-radius:50%;background:rgba(59,130,246,0.12);display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:var(--accent);">
+              📊
             </div>
-          `).join('')}
+            <div>
+              <h4 style="margin:0 0 .4rem 0;font-size:1.05rem;font-weight:700;color:var(--text-primary);">SQL Sorguları Derinlemesine Taranmalı</h4>
+              <p style="margin:0;font-size:.82rem;color:var(--text-muted);max-width:500px;line-height:1.5;">
+                Raporlar optimize edilmiş özet modunda yüklendiğinden SQL metinleri henüz belleğe alınmamış olabilir. Aşağıdaki butona tıklayarak raporların SQL karmaşıklık, JOIN sayısı ve DBA anti-pattern analizini başlatabilirsiniz.
+              </p>
+            </div>
+            <button class="btn btn-primary" id="btnDeepScanComplexity" style="padding:.5rem 1.3rem;font-weight:700;display:flex;align-items:center;gap:.5rem;">
+              <span>⚡ SQL Karmaşıklık Analizini Başlat</span>
+            </button>
+            <div id="complexityScanProg" style="display:none;font-size:.8rem;color:var(--accent);font-weight:600;"></div>
+          </div>
+        `;
+      }
+
+      return `
+        <div style="display:flex;flex-direction:column;gap:1rem;max-height:70vh;overflow-y:auto;padding-right:.3rem;">
+          <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg-raised);padding:.8rem 1rem;border-radius:10px;border:1px solid var(--border-light);">
+            <div>
+              <div style="font-weight:800;font-size:.92rem;color:var(--text-primary);">Toplam ${items.length} SQL Sorgusu İncelendi</div>
+              <div style="font-size:.74rem;color:var(--text-muted);margin-top:.15rem;">Sorgular mimari yük ve karmaşıklık puanına göre sıralanmıştır.</div>
+            </div>
+            <span class="badge badge-blue" style="font-size:.78rem;padding:.3rem .6rem;">${files.length} Rapor</span>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:.5rem;">
+            ${items.map(item => `
+              <div style="background:var(--bg-surface);border:1px solid var(--border-light);border-radius:10px;padding:.8rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;">
+                <div style="min-width:0;flex:1;">
+                  <div style="display:flex;align-items:center;gap:.5rem;">
+                    <strong style="font-size:.88rem;color:var(--text-primary);">${escHtml(item.reportName)}</strong>
+                    <span class="badge" style="background:${item.complexity.color}15;color:${item.complexity.color};border:1px solid ${item.complexity.color}40;font-weight:700;font-size:.72rem;">
+                      Puan: ${item.complexity.score}/100 (${item.complexity.grade})
+                    </span>
+                  </div>
+                  <div style="font-size:.75rem;color:var(--text-muted);margin-top:.2rem;font-family:var(--mono);">
+                    ${escHtml(item.queryName)} · ${item.complexity.details?.totalJoins || 0} JOIN · ${item.complexity.details?.subqCount || 0} Subquery · ${item.complexity.details?.lines || 0} Satır
+                  </div>
+                </div>
+                <button class="btn btn-sm btn-primary" data-list-action="open-detail" data-id="${encodeInlineArg(item.fileId)}" style="font-size:.75rem;padding:.3rem .7rem;">İncele →</button>
+              </div>
+            `).join('')}
+          </div>
         </div>
-      </div>
-    `;
+      `;
+    }
 
     if (typeof window.showModal === 'function') {
       await window.showModal({
         title: 'SQL Karmaşıklık & Anti-Pattern Analiz Merkezi',
-        body: bodyHtml,
+        body: `<div id="complexityContainer">${getComplexityBody(analyzed)}</div>`,
         confirmText: 'Kapat',
         cancelText: '',
-        maxWidth: '1000px'
+        maxWidth: '1000px',
+        onOpen: (overlay) => {
+          const btnScan = overlay.querySelector('#btnDeepScanComplexity');
+          const prog = overlay.querySelector('#complexityScanProg');
+          const container = overlay.querySelector('#complexityContainer');
+          if (btnScan) {
+            btnScan.addEventListener('click', async () => {
+              btnScan.disabled = true;
+              btnScan.innerHTML = '<span>Taranıyor...</span>';
+              if (prog) {
+                prog.style.display = 'block';
+                prog.textContent = 'Raporlar inceleniyor...';
+              }
+              const targetFiles = files.filter(f => (f.stats?.sqlCount || 0) > 0 || (f.queryNames || []).length > 0).slice(0, 40);
+              const listToScan = targetFiles.length > 0 ? targetFiles : files.slice(0, 30);
+              for (let i = 0; i < listToScan.length; i++) {
+                const f = listToScan[i];
+                if (prog) prog.textContent = `İnceleniyor (${i + 1}/${listToScan.length}): ${f.name}`;
+                if (FrpStore.ensureFullReport) {
+                  await FrpStore.ensureFullReport(f.id);
+                }
+              }
+              analyzed = buildAnalyzed();
+              if (container) {
+                container.innerHTML = getComplexityBody(analyzed);
+              }
+            });
+          }
+        }
       });
     }
   };
 
   // 4. Veritabanı Tablo Kullanım Analizi Modalı
   window.FrpListModals.openTableUsageModal = async function() {
-    const usage = FrpStore.getTableUsage ? FrpStore.getTableUsage() : [];
-    if (usage.length === 0) {
-      if (typeof window.toast === 'function') window.toast('Tablo kullanım verisi bulunamadı.', 'warning');
+    const files = FrpStore.getAll ? FrpStore.getAll() : [];
+    const usage = FrpStore.getTableUsage ? FrpStore.getTableUsage(files) : [];
+    if (!usage || usage.length === 0) {
+      if (typeof window.showModal === 'function') {
+        await window.showModal({
+          title: 'Veritabanı Tablo Kullanım Analizi',
+          body: `
+            <div style="padding:2rem;text-align:center;color:var(--text-muted);font-size:.88rem;line-height:1.5;">
+              Sistemde henüz analiz edilmiş veritabanı tablosu bulunamadı.<br>
+              Lütfen önce veritabanı tablolarına bağlı .frp raporları yükleyin veya raporları inceleyin.
+            </div>
+          `,
+          confirmText: 'Kapat',
+          cancelText: '',
+          maxWidth: '520px'
+        });
+      }
       return;
     }
 

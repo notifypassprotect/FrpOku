@@ -18,7 +18,10 @@
     const depMap = {};
 
     list.forEach(file => {
+      let foundQueries = false;
       (file.queries || []).forEach(q => {
+        if (!q || !q.sql) return;
+        foundQueries = true;
         const sql = (q.sql || '')
           .replace(/--[^\n]*/g, '')
           .replace(/\/\*[\s\S]*?\*\//g, '')
@@ -35,10 +38,33 @@
             fileId: file.id,
             fileName: file.name,
             reportName: (file.meta && file.meta.reportName) || file.name,
-            queryName: q.name
+            queryName: q.name || 'Sorgu'
           });
         }
       });
+
+      // Hafifletilmiş özet modunda SQL sorguları bellekte yoksa tableNames/tables kullan:
+      if (!foundQueries) {
+        const tblList = (Array.isArray(file.tableNames) && file.tableNames.length > 0)
+          ? file.tableNames
+          : (Array.isArray(file.tables) && file.tables.length > 0
+            ? file.tables
+            : (Array.isArray(file.datasets) ? file.datasets : []));
+        const queryLabel = (Array.isArray(file.queryNames) && file.queryNames.length > 0)
+          ? file.queryNames.join(', ')
+          : 'SQL Sorgusu';
+        tblList.forEach(t => {
+          const tbl = String(t || '').split('.').pop().toUpperCase().trim();
+          if (!tbl || SQL_RESERVED.has(tbl) || tbl.length <= 2 || /^\d+$/.test(tbl)) return;
+          if (!depMap[tbl]) depMap[tbl] = [];
+          depMap[tbl].push({
+            fileId: file.id,
+            fileName: file.name,
+            reportName: (file.meta && file.meta.reportName) || file.name,
+            queryName: queryLabel
+          });
+        });
+      }
     });
 
     return Object.entries(depMap)

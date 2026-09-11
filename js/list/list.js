@@ -1050,7 +1050,7 @@ function refreshAll() {
 window.refreshAll = refreshAll;
 
 // ── Başlatma ve Event Listener Bağlantıları ──────────────────
-async function initListPage() {
+function initListPage() {
   // Önce yerel depodaki mevcut verileri 0ms bekleme ile anında render et:
   refreshAll();
   setupContextMenu();
@@ -1059,10 +1059,24 @@ async function initListPage() {
     window.dismissSplash();
   }
 
-  // Ardından bulut senkronizasyonu tamamlandığında listeyi güncelle:
+  // Analizler Butonu Görünürlük Kontrolü (Ortak Havuzda gizle)
+  function updateAnalyticsVisibility() {
+    const curWs = FrpStore.getActiveWorkspace ? FrpStore.getActiveWorkspace() : 'personal';
+    const ddAnalytics = document.getElementById('dropdownAnalytics');
+    if (ddAnalytics) {
+      ddAnalytics.style.display = (curWs === 'pool') ? 'none' : '';
+    }
+  }
+  updateAnalyticsVisibility();
+
+  // Bulut senkronizasyonu tamamlandığında listeyi arka planda güncelle (UI event binding'i asla BLOKE ETMEZ):
   if (window.FrpStoreReady) {
-    await window.FrpStoreReady;
-    refreshAll();
+    window.FrpStoreReady.then(() => {
+      refreshAll();
+      updateAnalyticsVisibility();
+    }).catch(err => {
+      console.warn('FrpStoreReady hatası:', err);
+    });
   }
 
   // Topbar Dropdown Menü Tıklama Desteği (Mobil & Masaüstü)
@@ -1077,20 +1091,20 @@ async function initListPage() {
         if (!isOpen) dd.classList.add('open');
       });
     }
+
+    // Menü elemanına tıklandığında dropdown'ı otomatik kapat
+    dd.querySelectorAll('.topbar-dropdown-item').forEach(item => {
+      if (!item._boundCloseClick) {
+        item._boundCloseClick = true;
+        item.addEventListener('click', () => {
+          dd.classList.remove('open');
+        });
+      }
+    });
   });
   document.addEventListener('click', () => {
     document.querySelectorAll('.topbar-dropdown.open').forEach(d => d.classList.remove('open'));
   });
-
-  // Analizler Butonu Görünürlük Kontrolü (Ortak Havuzda gizle)
-  function updateAnalyticsVisibility() {
-    const curWs = FrpStore.getActiveWorkspace ? FrpStore.getActiveWorkspace() : 'personal';
-    const ddAnalytics = document.getElementById('dropdownAnalytics');
-    if (ddAnalytics) {
-      ddAnalytics.style.display = (curWs === 'pool') ? 'none' : '';
-    }
-  }
-  updateAnalyticsVisibility();
 
   // Çalışma Alanı Değiştirici
   document.getElementById('tabWsPersonal')?.addEventListener('click', () => {
