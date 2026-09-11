@@ -21,6 +21,89 @@
     { tag: 'Yatış / Sevk', rx: /\b(YATIS|TABURCU|SEVK|DEVIR|ODAK|YATAK_DOLULUK)\b/i }
   ];
 
+  /**
+   * Bir raporun gerçek bir barkod raporu olup olmadığını kesin olarak tespit eder.
+   * SQL sorguları içerisindeki kolon adları (TETKIK_BARKOD vb.) KESİNLİKLE dikkate alınmaz.
+   * Şartlar:
+   * 1. Dosya adı veya rapor başlığında 'BARKOD', 'BARCODE' veya 'BRKD' geçmeli.
+   * 2. Rapor sayfalarının isimlerinde (büyük, küçük, baş harfi büyük) 'argox', 'zebra', 'beiyang', 'godex', 'barkod' geçmeli.
+   * 3. Rapor içeriğinde (MasterData, Memo, XML) 'A20,22,423,231,1,1' gibi barkod yazıcı dili (PPLA/PPLB/EPL/ZPL/TSPL) komutları olmalı.
+   * 4. Raporda TfrxBarCodeView gibi FastReport barkod bileşeni bulunmalı.
+   */
+  function isBarcodeReport(parsedData, fileName) {
+    if (!parsedData && !fileName) return false;
+
+    const fn = String(fileName || '').trim();
+    const rn = String(parsedData?.meta?.reportName || parsedData?.name || '').trim();
+
+    // 1. Kural: Dosya adı veya rapor başlığı kontrolü
+    if (/\b(?:BARKOD|BARCODE|BRKD)\b/i.test(fn) || /[-_.]barkod[-_.]/i.test(fn) || /barkod/i.test(fn) || /barkod/i.test(rn) || /barcode/i.test(rn)) {
+      return true;
+    }
+
+    // 2. Kural: Rapor sayfalarının (TfrxReportPage vb.) isimlerinde argox, zebra, beiyang, godex, barkod
+    const pageNames = [];
+    if (Array.isArray(parsedData?.pages)) {
+      parsedData.pages.forEach(p => {
+        if (p.name) pageNames.push(p.name);
+        if (p.title) pageNames.push(p.title);
+        if (p.pageName) pageNames.push(p.pageName);
+      });
+    }
+    if (Array.isArray(parsedData?.dialogPages)) {
+      parsedData.dialogPages.forEach(p => {
+        if (p.name) pageNames.push(p.name);
+      });
+    }
+    const pagesText = pageNames.join(' ');
+    if (/\b(argox|zebra|beiyang|godex|barkod|barcode)\b/i.test(pagesText)) {
+      return true;
+    }
+
+    // 3. Kural: MasterData / Memo / XML içerisinde barkod yazıcı dili komutları
+    const rawXml = typeof parsedData?.rawXml === 'string' ? parsedData.rawXml : '';
+    const memos = Array.isArray(parsedData?.memos) ? parsedData.memos.map(m => typeof m === 'string' ? m : (m.text || '')).join('\n') : '';
+    const contentToScan = rawXml + '\n' + memos;
+
+    if (contentToScan.length > 0) {
+      // EPL/PPLB: A<x>,<y>,<rotation>,<font>,<h_mul>,<v_mul>,<sub_type>,... (Örn: A20,22,423,231,1,1)
+      if (/\bA\d+,\s*\d+,\s*\d+,\s*\d+/i.test(contentToScan) || /\bB\d+,\s*\d+,\s*\d+,\s*\d+/i.test(contentToScan)) {
+        return true;
+      }
+      // Zebra ZPL: ^XA ... ^XZ veya ^FO\d+,\d+\^B
+      if (/\^XA[\s\S]*?\^XZ/i.test(contentToScan) || /\^FO\d+,\s*\d+\^B/i.test(contentToScan) || /\^BY\d+/i.test(contentToScan)) {
+        return true;
+      }
+      // TSPL / Godex / Beiyang komutları
+      if (/\b(?:BARCODE|BAR|CODE128|EAN13)\s+\d+,\s*\d+/i.test(contentToScan)) {
+        return true;
+      }
+      // XML içinde sayfa adı tanımları: <TfrxReportPage Name="Zebra"...> veya <TfrxReportPage Name="Argox"...>
+      if (/<TfrxReportPage[^>]*\bName=["']?[^"'>]*(argox|zebra|beiyang|godex|barkod)[^"'>]*["']?/i.test(rawXml)) {
+        return true;
+      }
+      // 4. Kural: FastReport yerel barkod bileşeni
+      if (/<TfrxBarCodeView\b/i.test(rawXml) || /\bTfrxBarCodeView\b/i.test(rawXml)) {
+        return true;
+      }
+    }
+
+    // Bileşen ağacı (tree) içinde TfrxBarCodeView var mı?
+    if (Array.isArray(parsedData?.tree)) {
+      const hasBarcodeComp = (nodes) => {
+        if (!Array.isArray(nodes)) return false;
+        return nodes.some(n => {
+          if (n?.type === 'TfrxBarCodeView' || /barcode/i.test(n?.type || '')) return true;
+          if (Array.isArray(n?.children) && hasBarcodeComp(n.children)) return true;
+          return false;
+        });
+      };
+      if (hasBarcodeComp(parsedData.tree)) return true;
+    }
+
+    return false;
+  }
+
   function generateAutoTags(parsedData, fileName) {
     const tags = new Set();
     const queriesText = Array.isArray(parsedData.queries) 
@@ -39,7 +122,7 @@
 
     if (isSypg) tags.add('SYPG');
     if (isIndicator) tags.add('Gösterge');
-    if (/BARKOD|BRKD/i.test(textToScan)) tags.add('Barkod');
+    if (isBarcodeReport(parsedData, fileName)) tags.add('Barkod');
 
     return [...tags];
   }
@@ -64,6 +147,8 @@
 
   window.FrpTags = {
     generateAutoTags,
-    bumpVersionFilename
+    isBarcodeReport,
+    bumpVersionFilename,
+    TAG_RULES
   };
 })();

@@ -217,6 +217,7 @@ document.addEventListener('click', event => {
  const target = event.target.closest('[data-dashboard-action]');
  if (!target) return;
  if (target.dataset.dashboardAction === 'open-index') window.location.href = 'index.html';
+ if (target.dataset.dashboardAction === 'reload') window.location.reload();
  if (target.dataset.dashboardAction === 'filter-table') filterByTable(decodeURIComponent(target.dataset.table || ''));
 });
 (function() {
@@ -253,6 +254,16 @@ function esc(s) {
 .replace(/'/g, '&#39;');
 }
 
+function encodeInlineArg(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+window.encodeInlineArg = encodeInlineArg;
+
 function toast(msg, type) {
  const stack = document.getElementById('toastStack');
  if (!stack) return;
@@ -264,71 +275,104 @@ function toast(msg, type) {
 }
 
 function renderDashboard() {
- const files = FrpStore.getAll();
- const wrap = document.getElementById('dashWrap');
+  const wrap = document.getElementById('dashWrap');
+  try {
+    const files = FrpStore.getAll();
 
- if (files.length === 0) {
- wrap.innerHTML = `
- <div style="text-align:center;padding:5rem;color:var(--text-muted);">
- <div style="font-size:3rem;margin-bottom:1rem;"></div>
- <div style="font-size:1.1rem;font-weight:600;">Henüz rapor yüklenmedi</div>
- <div style="margin-top:1rem;"><a href="index.html" class="btn btn-primary btn-sm">← Rapora Git</a></div>
- </div>`;
- return;
- }
+    if (files.length === 0) {
+      wrap.innerHTML = `
+      <div style="text-align:center;padding:5rem;color:var(--text-muted);">
+        <div style="font-size:3rem;margin-bottom:1rem;">📭</div>
+        <div style="font-size:1.1rem;font-weight:600;">Henüz rapor yüklenmedi</div>
+        <div style="margin-top:1rem;"><a href="index.html" class="btn btn-primary btn-sm">← Rapora Git</a></div>
+      </div>`;
+      return;
+    }
 
- // — Hesaplamalar —
- const totalReports = files.length;
- const totalFav = files.filter(f => f.isFavorite).length;
- const totalQueries = files.reduce((a,f) => a + (Array.isArray(f.queries) && f.queries.length > 0 ? f.queries.length : (Number(f.stats?.sqlCount || f.sql_count || f.sqlCount || 0) || 0)), 0);
- const totalPascal = files.filter(f => f.pascalScript).length;
+    // — Hesaplamalar —
+    const totalReports = files.length;
+    const totalFav = files.filter(f => f.isFavorite).length;
+    const totalQueries = files.reduce((a,f) => a + (Array.isArray(f.queries) && f.queries.length > 0 ? f.queries.length : (Number(f.stats?.sqlCount || f.sql_count || f.sqlCount || 0) || 0)), 0);
+    const totalPascal = files.filter(f => f.pascalScript).length;
 
- // Kullanıcı Bazlı Rapor Yükleme İstatistiği
- const userUploadMap = {};
- files.forEach(f => {
-   const uName = f.ownerName || f.owner_name || f.ownerUsername || (f.userId === 'usr_admin_root' ? 'Admin' : 'Sistem');
-   const uDept = f.ownerDepartment || f.owner_department || '';
-   const uKey = uName;
-   if (!userUploadMap[uKey]) {
-     userUploadMap[uKey] = {
-       name: uName,
-       department: uDept,
-       reportCount: 0,
-       poolCount: 0,
-       sqlCount: 0,
-       totalBytes: 0,
-       reports: []
-     };
-   }
-   userUploadMap[uKey].reportCount++;
-   if (f.isPublic || f.is_public) userUploadMap[uKey].poolCount++;
-   const qCount = Array.isArray(f.queries) && f.queries.length > 0 ? f.queries.length : (Number(f.stats?.sqlCount || f.sql_count || f.sqlCount || 0) || 0);
-   userUploadMap[uKey].sqlCount += qCount;
-   userUploadMap[uKey].totalBytes += Number(f.sizeBytes || f.size) || 0;
-   userUploadMap[uKey].reports.push(f.meta?.reportName || f.name);
- });
+    // SQL Parametre Kullanım Analizi
+    const paramUsageMap = {};
+    files.forEach(file => {
+      (file.queries || []).forEach(q => {
+        const fn = window.extractParamsFromSql || (() => []);
+        const params = fn(q.sql || '');
+        params.forEach(p => {
+          if (!paramUsageMap[p]) paramUsageMap[p] = { param: p, count: 0, reports: new Set() };
+          paramUsageMap[p].count++;
+          paramUsageMap[p].reports.add(file.meta?.reportName || file.name);
+        });
+      });
+    });
 
- const userAnalytics = Object.values(userUploadMap).sort((a, b) => b.reportCount - a.reportCount);
- const maxUserReports = userAnalytics.length > 0 ? userAnalytics[0].reportCount : 1;
+    const paramAnalytics = Object.values(paramUsageMap)
+      .map(item => ({
+        param: item.param,
+        count: item.count,
+        reportCount: item.reports.size,
+        reports: Array.from(item.reports)
+      }))
+      .sort((a, b) => b.count !== a.count ? b.count - a.count : b.reportCount - a.reportCount);
 
- // En Çok SQL Sorgusu İçeren Raporlar
- const topSqlReports = files
-.map(f => ({ name: f.meta?.reportName || f.name, id: f.id, sqlCount: (Array.isArray(f.queries) && f.queries.length > 0 ? f.queries.length : (Number(f.stats?.sqlCount || f.sql_count || f.sqlCount || 0) || 0)) }))
-.sort((a, b) => b.sqlCount - a.sqlCount)
-.slice(0, 8);
+    const totalParams = paramAnalytics.length;
+    const avgQueries = totalReports > 0 ? (totalQueries / totalReports).toFixed(1) : 0;
 
- // Aylık yükleme trendi (son 12 ay)
- const monthLabels = [], monthData = [];
- const now = new Date();
- for (let i = 11; i >= 0; i--) {
- const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
- const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
- monthLabels.push(d.toLocaleString('tr-TR', {month:'short', year:'2-digit'}));
- monthData.push(files.filter(f => {
- const fd = new Date(f.loadedAt);
- return fd.getFullYear() === d.getFullYear() && fd.getMonth() === d.getMonth();
- }).length);
- }
+    // En çok kullanılan tablolar
+    const tableUsage = (typeof FrpStore !== 'undefined' && typeof FrpStore.getTableUsage === 'function')
+      ? FrpStore.getTableUsage()
+      : [];
+    const topTables = tableUsage.slice(0, 10).map(t => [t.tableName, t.count]);
+
+    // Kullanıcı Bazlı Rapor Yükleme İstatistiği
+    const userUploadMap = {};
+    files.forEach(f => {
+      const uName = f.ownerName || f.owner_name || f.ownerUsername || (f.userId === 'usr_admin_root' ? 'Admin' : 'Sistem');
+      const uDept = f.ownerDepartment || f.owner_department || '';
+      const uKey = uName;
+      if (!userUploadMap[uKey]) {
+        userUploadMap[uKey] = {
+          name: uName,
+          department: uDept,
+          reportCount: 0,
+          poolCount: 0,
+          sqlCount: 0,
+          totalBytes: 0,
+          reports: []
+        };
+      }
+      userUploadMap[uKey].reportCount++;
+      if (f.isPublic || f.is_public) userUploadMap[uKey].poolCount++;
+      const qCount = Array.isArray(f.queries) && f.queries.length > 0 ? f.queries.length : (Number(f.stats?.sqlCount || f.sql_count || f.sqlCount || 0) || 0);
+      userUploadMap[uKey].sqlCount += qCount;
+      userUploadMap[uKey].totalBytes += Number(f.sizeBytes || f.size) || 0;
+      userUploadMap[uKey].reports.push(f.meta?.reportName || f.name);
+    });
+
+    const userAnalytics = Object.values(userUploadMap).sort((a, b) => b.reportCount - a.reportCount);
+    const maxUserReports = userAnalytics.length > 0 ? userAnalytics[0].reportCount : 1;
+
+    // En Çok SQL Sorgusu İçeren Raporlar
+    const topSqlReports = files
+      .map(f => ({ name: f.meta?.reportName || f.name, id: f.id, sqlCount: (Array.isArray(f.queries) && f.queries.length > 0 ? f.queries.length : (Number(f.stats?.sqlCount || f.sql_count || f.sqlCount || 0) || 0)) }))
+      .sort((a, b) => b.sqlCount - a.sqlCount)
+      .slice(0, 8);
+
+    // Aylık yükleme trendi (son 12 ay)
+    const monthLabels = [], monthData = [];
+    const now = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+      monthLabels.push(d.toLocaleString('tr-TR', {month:'short', year:'2-digit'}));
+      monthData.push(files.filter(f => {
+        const fd = new Date(f.loadedAt);
+        return fd.getFullYear() === d.getFullYear() && fd.getMonth() === d.getMonth();
+      }).length);
+    }
 
  // — HTML Render —
  const CHART_COLORS = ['#3b82f6','#10b981','#f59e0b','#8b5cf6','#ef4444','#ec4899','#06b6d4','#84cc16','#f97316','#6366f1'];
@@ -501,8 +545,23 @@ function renderDashboard() {
  </div>`: ''}
  `;
 
- // — Canvas Grafikleri —
- drawTrendChart(document.getElementById('trendChart'), monthLabels, monthData);
+  // — Canvas Grafikleri —
+  drawTrendChart(document.getElementById('trendChart'), monthLabels, monthData);
+  } catch (err) {
+    console.error('Dashboard render error:', err);
+    if (wrap) {
+      wrap.innerHTML = `
+        <div style="text-align:center;padding:4rem 1.5rem;color:var(--text-muted);">
+          <div style="font-size:3rem;margin-bottom:1rem;">⚠️</div>
+          <div style="font-size:1.1rem;font-weight:700;color:var(--red);">İstatistikler hesaplanırken bir sorun oluştu</div>
+          <div style="font-size:.82rem;margin-top:.4rem;color:var(--text-secondary);">${esc(err?.message || 'Bilinmeyen hata')}</div>
+          <div style="margin-top:1.5rem;">
+            <button class="btn btn-primary btn-sm" data-dashboard-action="reload">Sayfayı Yenile</button>
+            <a href="index.html" class="btn btn-ghost btn-sm" style="margin-left:.5rem;">← Rapor Listesine Dön</a>
+          </div>
+        </div>`;
+    }
+  }
 }
 
 // Bar chart — aylık trend

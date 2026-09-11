@@ -52,6 +52,14 @@ window.FrpListRenderers = window.FrpListRenderers || {};
       renderTd: (file, { reportName, hasNote }) => {
         const isPublic = !!(file.isPublic || file.is_public);
         const poolBadge = isPublic ? `<span class="badge badge-pool" style="font-size:.68rem;padding:1px 6px;border-radius:10px;margin-left:.25rem;" title="Ortak Havuzda Paylaşıldı">Havuzda</span>` : '';
+        const prefs = window.FrpStore ? window.FrpStore.getPreferences() : {};
+        let riskBadge = '';
+        if (prefs.showSqlRiskBadge !== false && Array.isArray(file.queries)) {
+          const hasRisk = file.queries.some(q => /\b(DROP|TRUNCATE|ALTER)\s+(TABLE|DATABASE|VIEW|PROCEDURE|INDEX)\b/i.test(q.sql || ''));
+          if (hasRisk) {
+            riskBadge = `<span class="badge" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);font-size:.68rem;padding:1px 5px;border-radius:6px;margin-left:.25rem;" title="Bu raporda DROP/TRUNCATE/ALTER komutları tespit edildi!">⚠️ Risk</span>`;
+          }
+        }
         const oName = file.ownerName || file.owner_name || (file.userId === 'usr_admin_root' ? 'Admin' : 'Sistem');
         const oDept = file.ownerDepartment || file.owner_department || '';
         const ownerChip = `<span class="owner-chip" style="font-size:.72rem;padding:.12rem .5rem;border-radius:6px;margin-left:.35rem;" title="Yükleyen: ${escHtml(oName)}${oDept ? ' · ' + escHtml(oDept) : ''}">${escHtml(oName)}</span>`;
@@ -61,6 +69,7 @@ window.FrpListRenderers = window.FrpListRenderers || {};
             <div class="file-name" style="display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;">
               <span class="report-name-title" style="font-weight:var(--report-title-weight, 700);font-size:.88rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(reportName)}">${escHtml(reportName)}</span>
               ${poolBadge}
+              ${riskBadge}
               ${ownerChip}
               ${hasNote ? `<span title="Not mevcut" style="font-size:.72rem;color:var(--accent);font-weight:var(--bold-weight, 700);">[Not]</span>` : ''}
             </div>

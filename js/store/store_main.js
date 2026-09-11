@@ -366,6 +366,15 @@
   // ── 4. Rapor CRUD Metotları ──────────────────────────────────
   function getAll() {
     const list = _reportsVisibleToSession(_read());
+    if (window.FrpTags && typeof window.FrpTags.isBarcodeReport === 'function') {
+      list.forEach(file => {
+        if (Array.isArray(file.tags) && file.tags.includes('Barkod')) {
+          if (!window.FrpTags.isBarcodeReport(file, file.name)) {
+            file.tags = file.tags.filter(t => t !== 'Barkod');
+          }
+        }
+      });
+    }
     return list.sort((a, b) => {
       if (a.isFavorite && !b.isFavorite) return -1;
       if (!a.isFavorite && b.isFavorite) return 1;
@@ -1561,7 +1570,14 @@
         density: 'normal',
         defaultSort: 'updated_desc', 
         compactView: false, 
-        autoTagging: true 
+        autoTagging: true,
+        sqlFormatMode: 'expanded',
+        sqlKeywordsUpper: true,
+        showSqlRiskBadge: true,
+        csvDelimiter: ';',
+        toastDuration: 3500,
+        defaultTab: 'personal',
+        quickSearchKey: true
       };
       return raw ? { ...defaults, ...JSON.parse(raw) } : defaults;
     } catch {
@@ -1574,7 +1590,14 @@
         density: 'normal',
         defaultSort: 'updated_desc', 
         compactView: false, 
-        autoTagging: true 
+        autoTagging: true,
+        sqlFormatMode: 'expanded',
+        sqlKeywordsUpper: true,
+        showSqlRiskBadge: true,
+        csvDelimiter: ';',
+        toastDuration: 3500,
+        defaultTab: 'personal',
+        quickSearchKey: true
       };
     }
   }

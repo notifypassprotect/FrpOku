@@ -42,7 +42,9 @@ function escHtml(s) {
 }
 window.escHtml = escHtml;
 
-function toast(msg, type = 'info', duration = 3500) {
+function toast(msg, type = 'info', duration) {
+  const prefs = window.FrpStore ? window.FrpStore.getPreferences() : {};
+  const activeDuration = Number(duration) || Number(prefs?.toastDuration) || 3500;
   const stack = document.getElementById('toastStack');
   if (!stack) return;
   const el = document.createElement('div');
@@ -54,7 +56,7 @@ function toast(msg, type = 'info', duration = 3500) {
     el.style.transform = 'translateX(40px)';
     el.style.transition = '.3s';
     setTimeout(() => el.remove(), 350);
-  }, duration);
+  }, activeDuration);
 }
 window.toast = toast;
 
@@ -978,7 +980,9 @@ function exportReportListExcel() {
     const date = new Date(f.loadedAt).toLocaleString('tr-TR');
     rows.push([rName, fName, size, cat, guid, tags, qCount, date]);
   });
-  const csvContent = '\uFEFF' + rows.map(row => row.map(csvEsc).join(';')).join('\r\n');
+  const prefs = window.FrpStore ? window.FrpStore.getPreferences() : {};
+  const delimiter = prefs.csvDelimiter === ',' ? ',' : ';';
+  const csvContent = '\uFEFF' + rows.map(row => row.map(csvEsc).join(delimiter)).join('\r\n');
 
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -1115,6 +1119,12 @@ async function initListPage() {
       } catch (e) {}
     }
   });
+
+  // Kullanıcının varsayılan başlangıç sekmesi tercihi kontrolü
+  const listInitPrefs = window.FrpStore ? window.FrpStore.getPreferences() : {};
+  if (listInitPrefs?.defaultTab === 'pool' && !window.location.search.includes('ws=')) {
+    document.getElementById('tabWsPool')?.click();
+  }
 
   // Bulut & Havuz Manuel Yenileme Butonu
   const btnSyncCloud = document.getElementById('btnSyncCloudReports');
@@ -1437,7 +1447,7 @@ async function initListPage() {
   document.getElementById('btnOpenSettingsModal')?.addEventListener('click', () => window.openSettingsModal?.('appearance'));
   document.getElementById('btnMenuToggle')?.addEventListener('click', () => window.openSettingsModal?.('appearance'));
   
-  // Klavye Kısayolları (F6 Görünüm Değişimi, vs)
+  // Klavye Kısayolları (F6 Görünüm Değişimi, / Hızlı Arama, vs)
   document.addEventListener('keydown', e => {
     if (e.key === 'F6') {
       e.preventDefault();
@@ -1445,6 +1455,19 @@ async function initListPage() {
       const nextIdx = (modes.indexOf(currentViewMode) + 1) % modes.length;
       currentViewMode = modes[nextIdx];
       renderCurrentView();
+    }
+    // '/' tuşu ile arama kutusuna hızlı odaklanma
+    const isEditing = e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable);
+    if (e.key === '/' && !isEditing) {
+      const prefs = window.FrpStore ? window.FrpStore.getPreferences() : {};
+      if (prefs.quickSearchKey !== false) {
+        e.preventDefault();
+        const sInput = document.getElementById('searchInput');
+        if (sInput) {
+          sInput.focus();
+          sInput.select();
+        }
+      }
     }
   });
 }

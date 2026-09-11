@@ -54,6 +54,30 @@ window.FrpSettingsTabs.columns = {
             <option value="9999" ${stagedPrefs.pageSize >= 9999 ? 'selected' : ''}>Tümü (Sonsuz)</option>
           </select>
         </div>
+
+        <!-- Çalışma Alanı & Arama Davranışı -->
+        <div class="settings-card" style="display:flex;flex-direction:column;gap:.75rem;">
+          <div style="font-weight:700;font-size:.85rem;">Çalışma Alanı & Arama Davranışı</div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.3rem 0;border-bottom:1px solid var(--border-light);">
+            <div>
+              <div style="font-weight:700;font-size:.82rem;">Varsayılan Başlangıç Sekmesi</div>
+              <div style="font-size:.72rem;color:var(--text-muted);">Uygulama açıldığında ilk hangi çalışma alanı sekmesi görüntülensin?</div>
+            </div>
+            <select id="stagedDefaultTab" class="master-search-input" style="width:170px;font-weight:700;">
+              <option value="personal" ${stagedPrefs.defaultTab !== 'pool' ? 'selected' : ''}>Kişisel Raporlarım</option>
+              <option value="pool" ${stagedPrefs.defaultTab === 'pool' ? 'selected' : ''}>Ortak Rapor Havuzu</option>
+            </select>
+          </div>
+
+          <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:.3rem 0;">
+            <div>
+              <div style="font-weight:700;font-size:.82rem;">Klavyeden '/' ile Hızlı Arama Odaklanması</div>
+              <div style="font-size:.72rem;color:var(--text-muted);">Klavyeden '/' tuşuna basıldığında fare kullanmadan doğrudan arama kutusuna odaklar.</div>
+            </div>
+            <input type="checkbox" id="stagedQuickSearchKey" ${stagedPrefs.quickSearchKey !== false ? 'checked' : ''} style="cursor:pointer;" />
+          </label>
+        </div>
       </div>
     `;
   },
@@ -71,6 +95,16 @@ window.FrpSettingsTabs.columns = {
 
     overlay.querySelector('#stagedPageSize')?.addEventListener('change', (e) => {
       stagedPrefs.pageSize = parseInt(e.target.value, 10) || 25;
+      markDirty();
+    });
+
+    overlay.querySelector('#stagedDefaultTab')?.addEventListener('change', (e) => {
+      stagedPrefs.defaultTab = e.target.value;
+      markDirty();
+    });
+
+    overlay.querySelector('#stagedQuickSearchKey')?.addEventListener('change', (e) => {
+      stagedPrefs.quickSearchKey = e.target.checked;
       markDirty();
     });
   }

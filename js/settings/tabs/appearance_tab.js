@@ -144,6 +144,38 @@ window.FrpSettingsTabs.appearance = {
             `).join('')}
           </div>
         </div>
+
+        <!-- SQL Formatlama & Güvenlik Tercihleri -->
+        <div class="settings-card" style="display:flex;flex-direction:column;gap:.75rem;">
+          <div style="font-weight:700;font-size:.85rem;">SQL Formatlama & Güvenlik Tercihleri</div>
+          
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.3rem 0;border-bottom:1px solid var(--border-light);">
+            <div>
+              <div style="font-weight:700;font-size:.82rem;">Varsayılan SQL Formatlama Düzeni</div>
+              <div style="font-size:.72rem;color:var(--text-muted);">Sorgular güzelleştirilirken kullanılacak standart görünüm.</div>
+            </div>
+            <select id="stagedSqlFormatMode" class="master-search-input" style="width:170px;font-weight:700;">
+              <option value="expanded" ${stagedPrefs.sqlFormatMode !== 'compact' ? 'selected' : ''}>Genişletilmiş (Alt Alta)</option>
+              <option value="compact" ${stagedPrefs.sqlFormatMode === 'compact' ? 'selected' : ''}>Kompakt (Kısa Bloklar)</option>
+            </select>
+          </div>
+
+          <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:.3rem 0;border-bottom:1px solid var(--border-light);">
+            <div>
+              <div style="font-weight:700;font-size:.82rem;">SQL Anahtar Kelimelerini BÜYÜK HARF Yap</div>
+              <div style="font-size:.72rem;color:var(--text-muted);">SELECT, FROM, WHERE gibi komutları formatlarken büyük harfe çevirir.</div>
+            </div>
+            <input type="checkbox" id="stagedSqlKeywordsUpper" ${stagedPrefs.sqlKeywordsUpper !== false ? 'checked' : ''} style="cursor:pointer;" />
+          </label>
+
+          <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:.3rem 0;">
+            <div>
+              <div style="font-weight:700;font-size:.82rem;">Riskli/DDL SQL Komutlarında Uyarı Rozeti Göster</div>
+              <div style="font-size:.72rem;color:var(--text-muted);">DROP, TRUNCATE, ALTER gibi komutlar içeren raporlara listede uyarı rozeti ekler.</div>
+            </div>
+            <input type="checkbox" id="stagedShowSqlRiskBadge" ${stagedPrefs.showSqlRiskBadge !== false ? 'checked' : ''} style="cursor:pointer;" />
+          </label>
+        </div>
       </div>
     `;
   },
@@ -252,22 +284,37 @@ window.FrpSettingsTabs.appearance = {
     overlay.querySelectorAll('input[name="stagedCodeFont"]').forEach(radio => {
       radio.addEventListener('change', (e) => {
         stagedPrefs.codeFont = e.target.value;
-        const codeFontMap = {
+        markDirty();
+        const codeMap = {
           'jetbrains': "'JetBrains Mono', monospace",
           'fira': "'Fira Code', monospace",
           'cascadia': "'Cascadia Code', monospace",
           'inconsolata': "'Inconsolata', monospace",
           'sourcecode': "'Source Code Pro', monospace",
-          'monaco': "'Monaco', 'Menlo', monospace",
+          'monaco': "Monaco, Menlo, monospace",
           'courierprime': "'Courier Prime', monospace",
-          'consolas': "'Consolas', monospace"
+          'consolas': "Consolas, 'Courier New', monospace"
         };
-        if (codeFontMap[e.target.value]) document.documentElement.style.setProperty('--mono', codeFontMap[e.target.value]);
+        if (codeMap[e.target.value]) document.documentElement.style.setProperty('--mono', codeMap[e.target.value]);
         overlay.querySelectorAll('input[name="stagedCodeFont"]').forEach(r => {
           r.closest('.settings-radio-card')?.classList.toggle('active', r.checked);
         });
-        markDirty();
       });
+    });
+
+    overlay.querySelector('#stagedSqlFormatMode')?.addEventListener('change', (e) => {
+      stagedPrefs.sqlFormatMode = e.target.value;
+      markDirty();
+    });
+
+    overlay.querySelector('#stagedSqlKeywordsUpper')?.addEventListener('change', (e) => {
+      stagedPrefs.sqlKeywordsUpper = e.target.checked;
+      markDirty();
+    });
+
+    overlay.querySelector('#stagedShowSqlRiskBadge')?.addEventListener('change', (e) => {
+      stagedPrefs.showSqlRiskBadge = e.target.checked;
+      markDirty();
     });
   }
 };

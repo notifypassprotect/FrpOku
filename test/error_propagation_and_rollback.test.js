@@ -15,15 +15,28 @@ test('store_tags.js SYPG raporları için SYPG etiketi üretir', () => {
   assert.ok(fnMatch, 'generateAutoTags bulunamadı');
   const tagRulesMatch = code.match(/const TAG_RULES = \[[\s\S]*?\];/);
   assert.ok(tagRulesMatch, 'TAG_RULES bulunamadı');
+  const isBarcodeFnMatch = code.match(/function isBarcodeReport\(parsedData, fileName\) \{[\s\S]*?\n  \}/);
+  const isBarcodeCode = isBarcodeFnMatch ? isBarcodeFnMatch[0] : 'function isBarcodeReport() { return false; }';
 
   const evalScope = new Function(`
     ${tagRulesMatch[0]}
+    ${isBarcodeCode}
     ${fnMatch[0]}
-    return generateAutoTags({ meta: { reportName: 'SYPG Aylık Analiz Raporu' }, queries: [] }, 'sypg_test.frp');
+    return {
+      sypgTags: generateAutoTags({ meta: { reportName: 'SYPG Aylık Analiz Raporu' }, queries: [] }, 'sypg_test.frp'),
+      sqlOnlyTags: generateAutoTags({ meta: { reportName: 'Laboratuvar Tetkik Listesi' }, queries: [{ sql: 'SELECT TETKIK_BARKOD, BARKOD_NO FROM TETKIKLER' }] }, 'lab_tetkik.frp'),
+      barcodeFileTags: generateAutoTags({ meta: { reportName: 'Hasta Etiketi' }, queries: [] }, 'Mbarkod-001.fr3'),
+      zebraPageTags: generateAutoTags({ meta: { reportName: 'Etiket Raporu' }, pages: [{ name: 'Zebra' }] }, 'etiket.frp'),
+      printerLangTags: generateAutoTags({ meta: { reportName: 'Barkod Çıktı' }, rawXml: 'A20,22,423,231,1,1' }, 'cikti.frp')
+    };
   `);
-  const tags = evalScope();
-  assert.ok(tags.includes('SYPG'), 'SYPG etiketi üretilmedi');
-  assert.ok(!tags.includes('Gören'), 'Gören etiketi üretilmemeli');
+  const results = evalScope();
+  assert.ok(results.sypgTags.includes('SYPG'), 'SYPG etiketi üretilmedi');
+  assert.ok(!results.sypgTags.includes('Gören'), 'Gören etiketi üretilmemeli');
+  assert.ok(!results.sqlOnlyTags.includes('Barkod'), 'SQL içinde BARKOD kolonu geçmesi rapora Barkod etiketi vermemeli');
+  assert.ok(results.barcodeFileTags.includes('Barkod'), 'Dosya adında barkod geçen rapora Barkod etiketi verilmeli');
+  assert.ok(results.zebraPageTags.includes('Barkod'), 'Sayfa adı Zebra olan rapora Barkod etiketi verilmeli');
+  assert.ok(results.printerLangTags.includes('Barkod'), 'Barkod yazıcı komutu (A20,22...) içeren rapora Barkod etiketi verilmeli');
 });
 
 test('supabase.js çöp ve silme operasyonlarında hataları yutmaz ve yukarı iletir', () => {

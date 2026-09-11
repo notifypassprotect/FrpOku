@@ -53,6 +53,34 @@ window.FrpSettingsTabs.storage = {
           </select>
         </div>
 
+        <!-- CSV Dışa Aktarma & Bildirim Tercihleri -->
+        <div class="settings-card" style="display:flex;flex-direction:column;gap:.75rem;">
+          <div style="font-weight:700;font-size:.85rem;">Dışa Aktarma & Bildirim Tercihleri</div>
+          
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.3rem 0;border-bottom:1px solid var(--border-light);">
+            <div>
+              <div style="font-weight:700;font-size:.82rem;">Excel / CSV Dosya Ayracı</div>
+              <div style="font-size:.72rem;color:var(--text-muted);">Türkçe Excel için Noktalı Virgül (;), diğer analiz araçları için Virgül (,).</div>
+            </div>
+            <select id="stagedCsvDelimiter" class="master-search-input" style="width:170px;font-weight:700;">
+              <option value=";" ${stagedPrefs.csvDelimiter !== ',' ? 'selected' : ''}>Noktalı Virgül (;)</option>
+              <option value="," ${stagedPrefs.csvDelimiter === ',' ? 'selected' : ''}>Standart Virgül (,)</option>
+            </select>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.3rem 0;">
+            <div>
+              <div style="font-weight:700;font-size:.82rem;">Toast Bildirim Süresi</div>
+              <div style="font-size:.72rem;color:var(--text-muted);">Bilgilendirme ve işlem mesajlarının ekranda kalma süresi.</div>
+            </div>
+            <select id="stagedToastDuration" class="master-search-input" style="width:170px;font-weight:700;">
+              <option value="2000" ${stagedPrefs.toastDuration === 2000 ? 'selected' : ''}>Hızlı (2 Saniye)</option>
+              <option value="3500" ${!stagedPrefs.toastDuration || stagedPrefs.toastDuration === 3500 ? 'selected' : ''}>Standart (3.5 Saniye)</option>
+              <option value="5000" ${stagedPrefs.toastDuration === 5000 ? 'selected' : ''}>Uzun (5 Saniye)</option>
+            </select>
+          </div>
+        </div>
+
         <!-- Yedekleme Eylemleri -->
         <div class="settings-card" style="display:flex;flex-direction:column;gap:.75rem;">
           <div style="font-weight:700;font-size:.85rem;">JSON Yedekleme & İçe Aktarma</div>
@@ -101,6 +129,16 @@ window.FrpSettingsTabs.storage = {
         FrpStore.setAutoBackupInterval(val);
       }
       safeToast(val > 0 ? `Otomatik yedekleme her ${val} dakikada bir ayarlandı.` : 'Otomatik yedekleme kapatıldı.', 'info');
+    });
+
+    overlay.querySelector('#stagedCsvDelimiter')?.addEventListener('change', (e) => {
+      stagedPrefs.csvDelimiter = e.target.value;
+      if (typeof markDirty === 'function') markDirty();
+    });
+
+    overlay.querySelector('#stagedToastDuration')?.addEventListener('change', (e) => {
+      stagedPrefs.toastDuration = parseInt(e.target.value, 10) || 3500;
+      if (typeof markDirty === 'function') markDirty();
     });
 
     const backupInput = overlay.querySelector('#settingsBackupFileInput');
