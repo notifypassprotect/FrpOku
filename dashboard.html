@@ -7,8 +7,9 @@
  <link rel="preconnect" href="https://fonts.googleapis.com">
  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inconsolata:wght@400;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700;800&family=Nunito:wght@400;600;700;800&family=Open+Sans:wght@400;600;700&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&family=Raleway:wght@400;600;700;800&family=Roboto:wght@400;500;700&family=Source+Code+Pro:wght@400;600;700&family=Source+Sans+3:wght@400;600;700&family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet">
- <link rel="stylesheet" href="css/style.css?v=4.3" />
- <link rel="stylesheet" href="css/themes.css?v=4.3" />
+ <link rel="stylesheet" href="css/style.css?v=5.0" />
+ <link rel="stylesheet" href="css/themes.css?v=5.2" />
+ <link rel="stylesheet" href="css/list.css?v=5.0" />
  <script src="js/core/theme_bootstrap.js?v=4.4"></script>
  <style>
  body { margin: 0; overflow: auto; }
@@ -264,15 +265,24 @@ function encodeInlineArg(value) {
 }
 window.encodeInlineArg = encodeInlineArg;
 
-function toast(msg, type) {
- const stack = document.getElementById('toastStack');
- if (!stack) return;
- const el = document.createElement('div');
- el.className = 'toast-item ' + (type||'info');
- el.textContent = msg;
- stack.appendChild(el);
- setTimeout(() => el.remove(), 3500);
+function toast(msg, type = 'info') {
+  if (window.FrpNotify && typeof window.FrpNotify[type] === 'function') {
+    window.FrpNotify[type](msg);
+    return;
+  }
+  if (typeof window.showToast === 'function') {
+    window.showToast(msg, type);
+    return;
+  }
+  const stack = document.getElementById('toastStack');
+  if (!stack) return;
+  const el = document.createElement('div');
+  el.className = 'toast-item ' + (type || 'info');
+  el.textContent = msg;
+  stack.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
 }
+window.toast = toast;
 
 function renderDashboard() {
   const wrap = document.getElementById('dashWrap');
@@ -634,19 +644,24 @@ window.filterByTable = filterByTable;
 
 // Init
 async function initDashboard() {
- const wrap = document.getElementById('dashWrap');
- if (window.FrpStoreReady) {
- if (wrap) {
- wrap.innerHTML = `
- <div style="text-align:center;padding:5rem;color:var(--text-muted);">
- <div style="font-size:3rem;margin-bottom:1rem;animation:pulse 1.5s infinite;">⏳</div>
- <div style="font-size:1.1rem;font-weight:700;color:var(--text-primary);">Rapor Veritabanı Yükleniyor...</div>
- <div style="font-size:.85rem;margin-top:.4rem;">IndexedDB ve önbellek analizi yapılıyor</div>
- </div>`;
- }
- await window.FrpStoreReady;
- }
- renderDashboard();
+  // Eski oturumlardan kalan çakışma artıklarını localStorage'dan temizle
+  try {
+    localStorage.removeItem('frpoku_pending_sync');
+  } catch (e) {}
+
+  const wrap = document.getElementById('dashWrap');
+  if (window.FrpStoreReady) {
+    if (wrap) {
+      wrap.innerHTML = `
+        <div style="text-align:center;padding:5rem;color:var(--text-muted);">
+          <div style="font-size:3rem;margin-bottom:1rem;animation:pulse 1.5s infinite;">⏳</div>
+          <div style="font-size:1.1rem;font-weight:700;color:var(--text-primary);">Rapor Veritabanı Yükleniyor...</div>
+          <div style="font-size:.85rem;margin-top:.4rem;">IndexedDB ve önbellek analizi yapılıyor</div>
+        </div>`;
+    }
+    await window.FrpStoreReady;
+  }
+  renderDashboard();
 }
 
 document.getElementById('btnRefresh')?.addEventListener('click', renderDashboard);

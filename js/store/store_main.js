@@ -204,7 +204,11 @@
     const previous = _reportSyncChains.get(key) || Promise.resolve();
     const next = previous.catch(() => {}).then(async () => {
       const latest = _memoryStore.find(report => String(report.id) === key);
-      if (!latest) return;
+      if (!latest) {
+        _pendingSyncIds.delete(key);
+        _savePendingSyncIds();
+        return;
+      }
       try {
         const saved = await window.FrpCloud.saveReport(latest);
         if (!saved) throw new Error('Bulut kaydı doğrulanamadı.');
@@ -213,12 +217,32 @@
         _savePendingSyncIds();
       } catch (error) {
         console.warn('Rapor senkronizasyonu başarısız:', error);
-        _pendingSyncIds.add(key);
-        _savePendingSyncIds();
+        if (error?.status === 409) {
+          // Çakışma: Sunucudaki sürüm yerelden daha yeni. Stale raporu kuyruktan kaldır, döngüyü sonlandır:
+          _pendingSyncIds.delete(key);
+          _savePendingSyncIds();
+          if (error.currentVersion) {
+            _applySavedVersion(key, error.currentVersion);
+          }
+          if (window.FrpCloud && typeof window.FrpCloud.getReport === 'function') {
+            window.FrpCloud.getReport(key).then(fresh => {
+              if (fresh) {
+                const idx = _memoryStore.findIndex(r => String(r.id) === key);
+                if (idx >= 0) {
+                  _memoryStore[idx] = fresh;
+                  _persistLocal(_memoryStore);
+                  _persistedReportHashes.set(key, _reportHash(fresh));
+                }
+              }
+            }).catch(() => {});
+          }
+        } else {
+          // Ağ hatası veya geçici kesinti durumunda kuyrukta koru
+          _pendingSyncIds.add(key);
+          _savePendingSyncIds();
+          _notifySyncIssue('Bulut kaydı başarısız oldu; değişiklik yerel kuyrukta korunuyor.');
+        }
         const eventName = error?.status === 409 ? 'frp:sync-conflict' : 'frp:sync-error';
-        _notifySyncIssue(error?.status === 409
-          ? 'Bu rapor başka bir oturumda değiştirildi. Yenileyip tekrar deneyin.'
-          : 'Bulut kaydı başarısız oldu; değişiklik yerel kuyrukta korunuyor.');
         window.dispatchEvent(new CustomEvent(eventName, { detail: { id: key, message: error?.message || 'Rapor kaydedilemedi.' } }));
       }
     }).finally(() => {
@@ -270,7 +294,14 @@
               loadedFiles = cloudFiles.map(cf => {
                 const cfId = String(cf.id);
                 if (_pendingSyncIds.has(cfId) && localMap.has(cfId)) {
-                  return localMap.get(cfId);
+                  const local = localMap.get(cfId);
+                  if ((Number(local?.version) || 0) > (Number(cf?.version) || 0)) {
+                    return local;
+                  }
+                  // Buluttaki sürüm yerelle aynı veya daha güncel; bayat bekleyen kuyruğu temizle:
+                  _pendingSyncIds.delete(cfId);
+                  _savePendingSyncIds();
+                  return cf;
                 }
                 return cf;
               });
