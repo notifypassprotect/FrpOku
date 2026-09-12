@@ -38,6 +38,14 @@ services:
         value: "false"
       - key: MAIL_ENABLED
         value: "true"
+      - key: MAIL_PROVIDER
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_FROM_EMAIL
+        sync: false
+      - key: BREVO_FROM_NAME
+        value: FrpOku Cloud Portal
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT

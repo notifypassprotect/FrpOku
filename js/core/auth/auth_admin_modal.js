@@ -153,7 +153,7 @@
  // ── Sekme 3: E-posta altyapısı ──
  async function renderMailTab() {
  const body = overlay.querySelector('#adminModalBody');
- body.innerHTML = `<div style="text-align:center;padding:2.5rem;color:var(--text-muted,#64748b);"><div class="splash-spinner" style="margin-bottom:1rem;"></div><div>Sistem durumu ve SMTP kontrol ediliyor...</div></div>`;
+ body.innerHTML = `<div style="text-align:center;padding:2.5rem;color:var(--text-muted,#64748b);"><div class="splash-spinner" style="margin-bottom:1rem;"></div><div>Sistem durumu ve e-posta altyapısı kontrol ediliyor...</div></div>`;
 
  try {
  const headers = (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') ? window.FrpAuth.getAuthHeaders() : {};
@@ -227,27 +227,27 @@
  </div>
  </div>
 
- <!-- 2. SMTP Gönderim Durumu -->
+ <!-- 2. E-posta Gönderim Durumu -->
  <div style="padding:1.1rem;border:1px solid var(--border,#cbd5e1);border-radius:14px;background:var(--bg-surface,#fff);">
  <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
  <div>
- <div style="font-size:1rem;font-weight:800;">SMTP Gönderim Durumu</div>
+ <div style="font-size:1rem;font-weight:800;">E-Posta Gönderim Durumu</div>
  <div style="font-size:.78rem;color:var(--text-muted,#64748b);margin-top:.25rem;">E-posta bildirimleri (kayıt onayı, güvenlik uyarıları, doğrulama kodları)</div>
  </div>
  <span class="badge ${ready ? 'badge-green' : 'badge-amber'}">${ready ? 'Hazır' : !mail.enabled ? 'Kapalı' : mail.configured ? 'Bağlantı Hatası' : 'Eksik Yapılandırma'}</span>
  </div>
  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.75rem;margin-top:1rem;font-size:.8rem;">
- <div><strong>Sunucu:</strong> ${escHtml(mail.provider || 'Tanımlanmadı')}</div>
+ <div><strong>Sağlayıcı:</strong> ${escHtml(mail.provider || 'Tanımlanmadı')}</div>
  <div><strong>Gönderen:</strong> ${escHtml(mail.from || 'Tanımlanmadı')}</div>
  <div><strong>Mail Durumu:</strong> ${mail.enabled ? 'Aktif' : 'Pasif'}</div>
  </div>
- ${mail.enabled && mail.configured && !mail.verified ? `<div style="color:#ef4444;margin-top:.75rem;font-size:.76rem;font-weight:700;word-break:break-word;">SMTP bağlantısı doğrulanamadı: ${escHtml(mail.error || 'Sunucu SMTP bağlantısını kabul etmedi.')}</div>` : ''}
+ ${mail.enabled && mail.configured && !mail.verified ? `<div style="color:#ef4444;margin-top:.75rem;font-size:.76rem;font-weight:700;word-break:break-word;">E-posta altyapısı doğrulanamadı: ${escHtml(mail.error || 'Sağlayıcı bağlantıyı kabul etmedi.')}</div>` : ''}
  ${!ready ? `
  <div style="background:rgba(37,99,235,0.06);border:1px solid rgba(37,99,235,0.25);border-radius:10px;padding:12px 16px;margin-top:1rem;font-size:.78rem;line-height:1.6;color:var(--text-secondary,#334155);">
- <strong style="color:var(--accent,#2563eb);">Render.com Ortam Değişkeni (Environment) Rehberi:</strong>
+ <strong style="color:var(--accent,#2563eb);">Render.com Ücretsiz Brevo API Ayarı:</strong>
  <div>Render Dashboard -> Web Service -> <strong>Environment</strong> sekmesine şu değişkenleri tanımlayınız:</div>
  <div style="margin-top:6px;font-family:monospace;font-size:.74rem;background:var(--bg-raised,#f1f5f9);padding:6px 10px;border-radius:6px;word-break:break-all;">
- MAIL_ENABLED=true | SMTP_HOST=smtp.gmail.com | SMTP_PORT=465 | SMTP_SECURE=true | SMTP_USER=... | SMTP_PASS=... | SMTP_FROM=...
+ MAIL_ENABLED=true | MAIL_PROVIDER=brevo | BREVO_API_KEY=... | BREVO_FROM_EMAIL=... | BREVO_FROM_NAME=FrpOku Cloud Portal
  </div>
  ${mail.missing && mail.missing.length ? `<div style="color:#ef4444;margin-top:6px;font-weight:700;">Eksik veya Kapalı Değişkenler: ${escHtml(mail.missing.join(', '))}</div>` : ''}
  </div>` : ''}
@@ -257,7 +257,7 @@
  <div style="padding:1.1rem;border:1px solid var(--border,#cbd5e1);border-radius:14px;background:var(--bg-surface,#fff);">
  <div style="font-size:.95rem;font-weight:800;margin-bottom:.3rem;">Manuel Test & Sistem Özeti E-postası</div>
  <div style="font-size:.78rem;color:var(--text-muted,#64748b);margin-bottom:.9rem;">
- SMTP altyapısını test edebilir veya tüm sistem metriklerini içeren özet raporu admin adresinize tetikleyebilirsiniz.
+ E-posta altyapısını test edebilir veya tüm sistem metriklerini içeren özet raporu admin adresinize tetikleyebilirsiniz.
  </div>
  <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:.65rem;">
  <input type="email" id="adminMailTestAddress" class="master-search-input" placeholder="ornek@gmail.com" style="flex:1;min-width:220px;" />

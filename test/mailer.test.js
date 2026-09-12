@@ -46,6 +46,74 @@ test('onay mailini yapılandırılmış transporter ile gönderir', async () => 
   assert.match(sentMessage.html, /testuser/);
 });
 
+test('Brevo HTTPS API ile SMTP kullanmadan e-posta gönderir', async () => {
+  let request = null;
+  const mailer = createMailer({
+    env: {
+      MAIL_ENABLED: 'true',
+      MAIL_PROVIDER: 'brevo',
+      BREVO_API_KEY: 'brevo-secret',
+      BREVO_FROM_EMAIL: 'sender@gmail.com',
+      BREVO_FROM_NAME: 'FrpOku Cloud Portal'
+    },
+    fetchImpl: async (url, options) => {
+      request = { url, options };
+      return { ok: true, status: 201, json: async () => ({ messageId: 'brevo-1' }) };
+    }
+  });
+
+  const result = await mailer.sendTestEmail({ to: 'user@example.com' });
+  const body = JSON.parse(request.options.body);
+
+  assert.equal(result.sent, true);
+  assert.equal(result.provider, 'brevo');
+  assert.equal(request.url, 'https://api.brevo.com/v3/smtp/email');
+  assert.equal(request.options.headers['api-key'], 'brevo-secret');
+  assert.deepEqual(body.sender, { email: 'sender@gmail.com', name: 'FrpOku Cloud Portal' });
+  assert.deepEqual(body.to, [{ email: 'user@example.com' }]);
+});
+
+test('Brevo hesap doğrulaması gönderim yapmadan API anahtarını kontrol eder', async () => {
+  let requestedUrl = '';
+  const mailer = createMailer({
+    env: {
+      MAIL_ENABLED: 'true',
+      BREVO_API_KEY: 'brevo-secret',
+      BREVO_FROM_EMAIL: 'sender@gmail.com'
+    },
+    fetchImpl: async url => {
+      requestedUrl = url;
+      return { ok: true, status: 200, json: async () => ({ email: 'sender@gmail.com' }) };
+    }
+  });
+
+  const status = mailer.getStatus();
+  const verification = await mailer.verify();
+
+  assert.equal(status.providerType, 'brevo');
+  assert.equal(status.ready, true);
+  assert.equal(verification.ok, true);
+  assert.equal(requestedUrl, 'https://api.brevo.com/v3/account');
+});
+
+test('Brevo API hatasını kullanıcıya anlamlı biçimde döndürür', async () => {
+  const mailer = createMailer({
+    env: {
+      MAIL_ENABLED: 'true',
+      MAIL_PROVIDER: 'brevo',
+      BREVO_API_KEY: 'invalid',
+      BREVO_FROM_EMAIL: 'sender@gmail.com'
+    },
+    fetchImpl: async () => ({ ok: false, status: 401, json: async () => ({ message: 'Key not found' }) }),
+    logger: { warn() {} }
+  });
+
+  const result = await mailer.sendTestEmail({ to: 'user@example.com' });
+  assert.equal(result.sent, false);
+  assert.equal(result.status, 'failed');
+  assert.equal(result.error, 'Key not found');
+});
+
 test('mail şablonu kullanıcı HTML girdisini escape eder', () => {
   const templates = createMailTemplates({ appName: 'FrpOku', baseUrl: 'https://example.com' });
   const message = templates.accountApproved({ fullName: '<img src=x onerror=alert(1)>', username: "a'b" });
