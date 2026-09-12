@@ -105,13 +105,17 @@
     });
   }
 
-  // Modern Dosya Önizleme Modalı (Resimler için Zoom/Pan Motoru ve PDF'ler için)
+  // Modern Dosya Önizleme Modalı (Resim, PDF, Word & Excel için)
   async function openAttachmentPreview(att) {
     const existing = document.getElementById('frpAttPreviewOverlay');
     if (existing) existing.remove();
 
-    const isPdf = (att.type || '').includes('pdf') || (att.name || '').toLowerCase().endsWith('.pdf');
-    const isImage = (att.type || '').startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(att.name || '');
+    const fileName = (att.name || '').toLowerCase();
+    const ext = fileName.split('.').pop();
+    const isPdf = (att.type || '').includes('pdf') || fileName.endsWith('.pdf');
+    const isImage = (att.type || '').startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(fileName);
+    const isExcel = ['xlsx', 'xls', 'csv'].includes(ext) || (att.type || '').includes('sheet') || (att.type || '').includes('excel') || (att.type || '').includes('csv');
+    const isWord = ['docx', 'doc'].includes(ext) || (att.type || '').includes('word') || (att.type || '').includes('document');
 
     const overlay = document.createElement('div');
     overlay.id = 'frpAttPreviewOverlay';
@@ -122,14 +126,24 @@
     `;
 
     overlay.innerHTML = `
-      <div style="background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); border-radius: 18px; width: 94vw; max-width: 1050px; height: 88vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 65px rgba(0,0,0,0.5);">
+      <div style="background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); border-radius: 18px; width: 94vw; max-width: 1100px; height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 65px rgba(0,0,0,0.5);">
         <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border-light, #e2e8f0); background: var(--bg-card, #f8fafc); flex-wrap: wrap; gap: 0.5rem;">
-          <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-primary, #0f172a); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 45vw;">
-            ${escHtml(att.name)} <span style="font-size: 0.76rem; color: var(--text-muted, #64748b); font-weight: 500;">(${formatFileSize(att.size)})</span>
+          <div style="display: flex; align-items: center; gap: 0.6rem; max-width: 55vw;">
+            <div style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; background: ${isExcel ? 'rgba(16,185,129,0.12)' : (isWord ? 'rgba(37,99,235,0.12)' : (isPdf ? 'rgba(239,68,68,0.12)' : 'rgba(99,102,241,0.12)'))};">
+              ${isExcel ? '📊' : (isWord ? '📝' : (isPdf ? '📄' : '🖼️'))}
+            </div>
+            <div style="min-width: 0;">
+              <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-primary, #0f172a); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                ${escHtml(att.name)}
+              </div>
+              <div style="font-size: 0.72rem; color: var(--text-muted, #64748b);">
+                ${formatFileSize(att.size)} • ${isExcel ? 'Excel Elektronik Tablo' : (isWord ? 'Word Metin Belgesi' : (isPdf ? 'PDF Dokümanı' : 'Görsel'))}
+              </div>
+            </div>
           </div>
           
           <div style="display: flex; align-items: center; gap: 0.5rem;">
-            ${isImage ? `
+            ${isImage || isWord ? `
               <!-- Zoom & Görsel Kontrolleri -->
               <div style="display: flex; align-items: center; background: var(--bg-surface, #fff); border: 1px solid var(--border, #cbd5e1); border-radius: 8px; padding: 0.15rem 0.35rem; gap: 0.2rem;">
                 <button type="button" id="btnPrevZoomOut" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.45rem; font-size: 0.85rem;" title="Uzaklaştır">➖</button>
@@ -137,7 +151,7 @@
                 <button type="button" id="btnPrevZoomIn" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.45rem; font-size: 0.85rem;" title="Yakınlaştır">➕</button>
                 <button type="button" id="btnPrevZoom100" class="btn btn-sm btn-ghost" style="font-size: 0.72rem; padding: 0.2rem 0.4rem; font-weight: 700;" title="Gerçek Boyut (%100)">1:1</button>
                 <button type="button" id="btnPrevZoomFit" class="btn btn-sm btn-ghost" style="font-size: 0.72rem; padding: 0.2rem 0.45rem; font-weight: 700;" title="Ekrana Sığdır">Sığdır</button>
-                <button type="button" id="btnPrevRotate" class="btn btn-sm btn-ghost" style="font-size: 0.74rem; padding: 0.2rem 0.4rem;" title="90° Döndür">↷</button>
+                ${isImage ? `<button type="button" id="btnPrevRotate" class="btn btn-sm btn-ghost" style="font-size: 0.74rem; padding: 0.2rem 0.4rem;" title="90° Döndür">↷</button>` : ''}
               </div>
             ` : ''}
 
@@ -150,8 +164,11 @@
           </div>
         </div>
 
-        <div id="attPreviewBody" style="flex: 1; overflow: auto; display: flex; align-items: center; justify-content: center; background: #0b1120; padding: 1.5rem; position: relative;">
-          <div style="color: #94a3b8; font-size: 0.9rem; font-weight: 600;">Belge hazırlanıyor...</div>
+        <div id="attPreviewBody" style="flex: 1; overflow: auto; display: flex; align-items: center; justify-content: center; background: #0f172a; position: relative;">
+          <div style="color: #94a3b8; font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+            <div class="splash-spinner" style="width: 20px; height: 20px;"></div>
+            <span>Belge hazırlanıyor ve işleniyor...</span>
+          </div>
         </div>
       </div>
     `;
@@ -175,6 +192,19 @@
 
     const previewBody = overlay.querySelector('#attPreviewBody');
     const mediaUrl = await getAuthenticatedMediaUrl(att.url);
+
+    // Kütüphane Yükleyici Yardımcısı
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const existing = document.querySelector(`script[src="${src}"]`);
+        if (existing) return resolve();
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error('Kütüphane yüklenemedi: ' + src));
+        document.head.appendChild(s);
+      });
+    }
 
     if (isImage) {
       previewBody.innerHTML = `
@@ -269,6 +299,156 @@
           container.style.cursor = 'grab';
         }
       });
+
+    } else if (isExcel) {
+      // ── EXCEL (.xlsx, .xls, .csv) DOĞRUDAN ÖNİZLEME MOTORU ──
+      try {
+        await loadScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+        const res = await fetch(mediaUrl);
+        const arrayBuf = await res.arrayBuffer();
+        const workbook = window.XLSX.read(arrayBuf, { type: 'array' });
+
+        if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
+          throw new Error('Excel çalışma sayfası boş.');
+        }
+
+        let activeSheetIndex = 0;
+
+        function renderSheet(idx) {
+          activeSheetIndex = idx;
+          const sheetName = workbook.SheetNames[idx];
+          const sheet = workbook.Sheets[sheetName];
+          const jsonData = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+          const sheetTabsHtml = workbook.SheetNames.map((name, i) => `
+            <button type="button" class="btn-excel-sheet-tab ${i === activeSheetIndex ? 'active' : ''}" data-sheet-idx="${i}" style="padding: 0.4rem 0.85rem; font-size: 0.76rem; font-weight: 700; border: none; background: ${i === activeSheetIndex ? '#10b981' : '#334155'}; color: #ffffff; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 0.35rem;">
+              <span>📑</span> <span>${escHtml(name)}</span>
+            </button>
+          `).join('');
+
+          let rowsHtml = '';
+          if (jsonData.length === 0) {
+            rowsHtml = `<tr><td colspan="5" style="text-align: center; padding: 2rem; color: #94a3b8;">Bu çalışma sayfasında görüntülenecek veri bulunmuyor.</td></tr>`;
+          } else {
+            jsonData.slice(0, 500).forEach((row, rowIdx) => {
+              const rowCells = Array.isArray(row) ? row : [];
+              const isHeader = (rowIdx === 0);
+              rowsHtml += `<tr style="${isHeader ? 'background: #0f172a; font-weight: 800; color: #38bdf8;' : (rowIdx % 2 === 0 ? 'background: #1e293b;' : 'background: #0f172a;')}">`;
+              rowsHtml += `<td style="padding: 0.45rem 0.65rem; border: 1px solid #334155; font-size: 0.72rem; color: #64748b; text-align: center; font-family: monospace; background: rgba(0,0,0,0.25); user-select: none;">${rowIdx + 1}</td>`;
+              rowCells.forEach(cellVal => {
+                rowsHtml += `<td style="padding: 0.45rem 0.75rem; border: 1px solid #334155; font-size: 0.78rem; color: #f1f5f9; white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis;">${escHtml(cellVal)}</td>`;
+              });
+              rowsHtml += `</tr>`;
+            });
+          }
+
+          previewBody.innerHTML = `
+            <div style="width: 100%; height: 100%; display: flex; flex-direction: column; background: #0b1120; overflow: hidden;">
+              <!-- Sayfa Sekmeleri & Tablo İçi Arama -->
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 1rem; background: #1e293b; border-bottom: 1px solid #334155; gap: 0.5rem; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 0.4rem; overflow-x: auto;">
+                  ${sheetTabsHtml}
+                </div>
+                <div style="font-size: 0.74rem; color: #94a3b8;">
+                  Toplam <strong>${jsonData.length}</strong> satır • İlk 500 satır gösteriliyor
+                </div>
+              </div>
+
+              <!-- Excel Grid Tablosu -->
+              <div style="flex: 1; overflow: auto; padding: 0.5rem;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; background: #1e293b; border-radius: 8px; overflow: hidden;">
+                  <thead>
+                    <tr style="background: #090e17; color: #94a3b8; font-size: 0.72rem; font-family: monospace;">
+                      <th style="padding: 0.45rem 0.65rem; border: 1px solid #334155; width: 40px; text-align: center;">#</th>
+                      ${(jsonData[0] || []).map((_, colI) => `<th style="padding: 0.45rem 0.75rem; border: 1px solid #334155;">${String.fromCharCode(65 + (colI % 26))}</th>`).join('')}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${rowsHtml}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          `;
+
+          previewBody.querySelectorAll('.btn-excel-sheet-tab').forEach(b => {
+            b.addEventListener('click', () => {
+              const sIdx = parseInt(b.getAttribute('data-sheet-idx'), 10) || 0;
+              renderSheet(sIdx);
+            });
+          });
+        }
+
+        renderSheet(0);
+      } catch (err) {
+        previewBody.innerHTML = `
+          <div style="text-align: center; color: #94a3b8; padding: 2.5rem 1rem;">
+            <div style="font-size: 3rem; margin-bottom: 0.75rem;">📊</div>
+            <div style="font-size: 1.1rem; font-weight: 800; color: #ffffff; margin-bottom: 0.4rem;">Excel Tablosu Hazırlandı</div>
+            <div style="font-size: 0.82rem; color: #94a3b8; margin-bottom: 1.25rem;">Bu dosya doğrudan bilgisayarınıza indirilerek Excel veya LibreOffice ile açılabilir.</div>
+            <button type="button" id="btnFallbackExcelDownload" class="btn btn-primary" style="padding: 0.5rem 1.4rem; font-weight: 700;">⬇️ Excel Dosyasını İndir</button>
+          </div>
+        `;
+        previewBody.querySelector('#btnFallbackExcelDownload')?.addEventListener('click', () => downloadAttachment(att));
+      }
+
+    } else if (isWord) {
+      // ── WORD (.docx) DOĞRUDAN ÖNİZLEME MOTORU ──
+      try {
+        await loadScript('https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js');
+        const res = await fetch(mediaUrl);
+        const arrayBuf = await res.arrayBuffer();
+        const result = await window.mammoth.convertToHtml({ arrayBuffer: arrayBuf });
+
+        const zoomBadge = overlay.querySelector('#prevZoomBadge');
+        let wordZoom = 1.0;
+
+        previewBody.innerHTML = `
+          <div id="wordScrollContainer" style="width: 100%; height: 100%; overflow-y: auto; padding: 2rem; background: #0f172a; display: flex; justify-content: center;">
+            <div id="wordPaperSheet" style="width: 100%; max-width: 820px; background: #ffffff; color: #0f172a; padding: 3rem 3.5rem; border-radius: 8px; box-shadow: 0 15px 50px rgba(0,0,0,0.5); font-family: 'Segoe UI', Calibri, Arial, sans-serif; font-size: 0.95rem; line-height: 1.7; min-height: 800px; transform-origin: top center; transition: transform 0.1s ease-out;">
+              ${result.value || '<p style="color: #64748b; text-align: center;">Belge içeriği boş.</p>'}
+            </div>
+          </div>
+        `;
+
+        const paper = previewBody.querySelector('#wordPaperSheet');
+
+        function updateWordZoom() {
+          paper.style.transform = `scale(${wordZoom})`;
+          if (zoomBadge) zoomBadge.textContent = `%${Math.round(wordZoom * 100)}`;
+        }
+
+        overlay.querySelector('#btnPrevZoomIn')?.addEventListener('click', () => {
+          wordZoom = Math.min(2.5, wordZoom + 0.2);
+          updateWordZoom();
+        });
+
+        overlay.querySelector('#btnPrevZoomOut')?.addEventListener('click', () => {
+          wordZoom = Math.max(0.4, wordZoom - 0.2);
+          updateWordZoom();
+        });
+
+        overlay.querySelector('#btnPrevZoom100')?.addEventListener('click', () => {
+          wordZoom = 1.0;
+          updateWordZoom();
+        });
+
+        overlay.querySelector('#btnPrevZoomFit')?.addEventListener('click', () => {
+          wordZoom = 1.0;
+          updateWordZoom();
+        });
+
+      } catch (err) {
+        previewBody.innerHTML = `
+          <div style="text-align: center; color: #94a3b8; padding: 2.5rem 1rem;">
+            <div style="font-size: 3rem; margin-bottom: 0.75rem;">📝</div>
+            <div style="font-size: 1.1rem; font-weight: 800; color: #ffffff; margin-bottom: 0.4rem;">Word Belgesi Hazırlandı</div>
+            <div style="font-size: 0.82rem; color: #94a3b8; margin-bottom: 1.25rem;">Bu belge bilgisayarınıza indirilerek Microsoft Word veya LibreOffice ile düzenlenebilir.</div>
+            <button type="button" id="btnFallbackWordDownload" class="btn btn-primary" style="padding: 0.5rem 1.4rem; font-weight: 700;">⬇️ Word Belgesini İndir</button>
+          </div>
+        `;
+        previewBody.querySelector('#btnFallbackWordDownload')?.addEventListener('click', () => downloadAttachment(att));
+      }
 
     } else if (isPdf) {
       previewBody.innerHTML = `
@@ -481,6 +661,11 @@
                 <option value="Ubuntu, sans-serif">Ubuntu</option>
                 <option value="Raleway, sans-serif">Raleway</option>
                 <option value="Cabin, sans-serif">Cabin</option>
+                <option value="'Plus Jakarta Sans', sans-serif">Plus Jakarta Sans</option>
+                <option value="Outfit, sans-serif">Outfit</option>
+                <option value="'DM Sans', sans-serif">DM Sans</option>
+                <option value="Rubik, sans-serif">Rubik</option>
+                <option value="Quicksand, sans-serif">Quicksand</option>
                 <option value="Arial, sans-serif">Arial</option>
                 <option value="'Segoe UI', sans-serif">Segoe UI</option>
                 <option value="Tahoma, sans-serif">Tahoma</option>
@@ -495,14 +680,27 @@
                 <option value="'Playfair Display', serif">Playfair Display</option>
                 <option value="Merriweather, serif">Merriweather</option>
                 <option value="Palatino, serif">Palatino</option>
+                <option value="'Libre Baskerville', serif">Libre Baskerville</option>
+                <option value="'Cormorant Garamond', serif">Cormorant Garamond</option>
+                <option value="Cinzel, serif">Cinzel</option>
+                <option value="'Bodoni MT', serif">Bodoni MT</option>
+                <option value="'Book Antiqua', serif">Book Antiqua</option>
               </optgroup>
-              <optgroup label="Yazılımcı / Monospace & Özel">
+              <optgroup label="Yazılımcı / Monospace & Kod">
                 <option value="Consolas, monospace">Consolas</option>
                 <option value="'Courier New', monospace">Courier New</option>
                 <option value="'Fira Code', monospace">Fira Code</option>
                 <option value="'JetBrains Mono', monospace">JetBrains Mono</option>
+                <option value="'Source Code Pro', monospace">Source Code Pro</option>
+                <option value="Inconsolata, monospace">Inconsolata</option>
+                <option value="'Space Mono', monospace">Space Mono</option>
+              </optgroup>
+              <optgroup label="Başlık & Dekoratif">
                 <option value="Impact, sans-serif">Impact</option>
                 <option value="Oswald, sans-serif">Oswald</option>
+                <option value="'Bebas Neue', cursive">Bebas Neue</option>
+                <option value="Anton, sans-serif">Anton</option>
+                <option value="Lobster, cursive">Lobster</option>
               </optgroup>
             </select>
 
@@ -985,19 +1183,24 @@
       const tip = document.createElement('div');
       tip.id = 'frpEditorLinkTooltip';
       tip.style.cssText = `
-        position: fixed; top: ${rect.top - 42}px; left: ${Math.max(10, rect.left)}px;
-        z-index: 200050; display: flex; align-items: center; gap: 0.35rem;
-        background: #0f172a; color: #ffffff; padding: 0.35rem 0.65rem; border-radius: 8px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.4); font-size: 0.76rem; font-weight: 600;
-        animation: fadeIn 0.15s ease-out;
+        position: fixed; top: ${Math.max(10, rect.top - 46)}px; left: ${Math.max(10, Math.min(window.innerWidth - 380, rect.left))}px;
+        z-index: 200050; display: flex; align-items: center; gap: 0.45rem;
+        background: rgba(15, 23, 42, 0.94); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+        color: #ffffff; padding: 0.35rem 0.65rem; border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0,0,0,0.2);
+        font-size: 0.78rem; font-weight: 600; animation: fadeIn 0.15s ease-out;
       `;
 
       const hrefDisplay = linkEl.getAttribute('href') || '';
       tip.innerHTML = `
-        <span style="color: #93c5fd; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">🔗 ${escHtml(hrefDisplay)}</span>
-        <button type="button" id="btnTipOpen" class="btn btn-sm" style="padding: 0.15rem 0.45rem; font-size: 0.72rem; background: #2563eb; color: #ffffff; border: none; border-radius: 4px; cursor: pointer;">↗️ Aç</button>
-        <button type="button" id="btnTipEdit" class="btn btn-sm btn-ghost" style="padding: 0.15rem 0.45rem; font-size: 0.72rem; color: #f8fafc; cursor: pointer;">✏️ Düzenle</button>
-        <button type="button" id="btnTipRemove" class="btn btn-sm btn-ghost" style="padding: 0.15rem 0.45rem; font-size: 0.72rem; color: #ef4444; cursor: pointer;">🗑️ Kaldır</button>
+        <a href="${escHtml(hrefDisplay)}" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem;" title="${escHtml(hrefDisplay)}">
+          <span>🔗</span> <span>${escHtml(hrefDisplay)}</span>
+        </a>
+        <button type="button" id="btnTipOpen" style="padding: 0.22rem 0.55rem; font-size: 0.72rem; background: #2563eb; color: #ffffff; border: none; border-radius: 6px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 0.25rem;">↗️ Aç</button>
+        <button type="button" id="btnTipCopy" style="padding: 0.22rem 0.55rem; font-size: 0.72rem; background: rgba(255,255,255,0.12); color: #f1f5f9; border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem;">📋 Kopyala</button>
+        <button type="button" id="btnTipEdit" style="padding: 0.22rem 0.55rem; font-size: 0.72rem; background: rgba(255,255,255,0.12); color: #f8fafc; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem;">✏️ Düzenle</button>
+        <button type="button" id="btnTipRemove" style="padding: 0.22rem 0.55rem; font-size: 0.72rem; background: rgba(239,68,68,0.2); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); border-radius: 6px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem;">🗑️ Kaldır</button>
       `;
 
       document.body.appendChild(tip);
@@ -1007,6 +1210,22 @@
         ev.stopPropagation();
         window.open(linkEl.href, '_blank', 'noopener,noreferrer');
         removeLinkTooltip();
+      });
+
+      tip.querySelector('#btnTipCopy').addEventListener('click', async (ev) => {
+        ev.stopPropagation();
+        try {
+          await navigator.clipboard.writeText(linkEl.href || hrefDisplay);
+          if (typeof window.toast === 'function') window.toast('Bağlantı kopyalandı', 'success');
+        } catch {
+          const ta = document.createElement('textarea');
+          ta.value = linkEl.href || hrefDisplay;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          ta.remove();
+          if (typeof window.toast === 'function') window.toast('Bağlantı kopyalandı', 'success');
+        }
       });
 
       tip.querySelector('#btnTipEdit').addEventListener('click', (ev) => {

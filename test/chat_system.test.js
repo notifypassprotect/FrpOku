@@ -87,11 +87,17 @@ test('rich_note_editor.js içinde modern link modalı ve yüksek çözünürlük
   assert.doesNotMatch(editor, /\s+on(?:click|change|input|keydown|keyup|submit|load|error)\s*=/i);
 });
 
-test('auth_admin_modal.js içinde Odalar ve Kanallar sekmesi bulunur ve native alert/prompt bulunmaz', () => {
+test('Odalar ve Kanallar yönetimi Ayarlar sekmesine modüler olarak taşınmıştır ve native alert/prompt bulunmaz', () => {
+  const roomsTab = fs.readFileSync(path.join(root, 'js', 'settings', 'tabs', 'rooms_tab.js'), 'utf8');
+  const mailTab = fs.readFileSync(path.join(root, 'js', 'settings', 'tabs', 'mail_tab.js'), 'utf8');
+  const settingsModal = fs.readFileSync(path.join(root, 'js', 'settings', 'settings_modal.js'), 'utf8');
   const adminModal = fs.readFileSync(path.join(root, 'js', 'core', 'auth', 'auth_admin_modal.js'), 'utf8');
-  assert.match(adminModal, /tabAdminRooms/);
-  assert.match(adminModal, /renderRoomsTab/);
-  assert.match(adminModal, /openRoomModal/);
+
+  assert.match(roomsTab, /window\.FrpSettingsTabs\.rooms/);
+  assert.match(roomsTab, /openRoomEditModal/);
+  assert.match(mailTab, /window\.FrpSettingsTabs\.mail/);
+  assert.match(settingsModal, /rooms/);
+  assert.match(settingsModal, /mail/);
   assert.doesNotMatch(adminModal, /\balert\(/);
   assert.doesNotMatch(adminModal, /\bprompt\(/);
 });

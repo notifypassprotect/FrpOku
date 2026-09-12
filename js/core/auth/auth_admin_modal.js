@@ -224,13 +224,6 @@
         <span>👥 Tüm Kullanıcılar</span>
         <span id="adminAllTabBadge" class="badge badge-blue" style="font-size:.72rem;padding:.15rem .45rem;">...</span>
       </button>
-      <button type="button" id="tabAdminRooms" class="admin-tab-btn ${initialTab === 'rooms' ? 'active' : ''}">
-        <span>🏢 Odalar & Kanallar</span>
-        <span id="adminRoomsTabBadge" class="badge" style="font-size:.72rem;padding:.15rem .45rem;background:rgba(147,51,234,0.12);color:#9333ea;">...</span>
-      </button>
-      <button type="button" id="tabAdminMail" class="admin-tab-btn ${initialTab === 'mail' ? 'active' : ''}">
-        <span>✉️ E-posta & Sistem Sağlığı</span>
-      </button>
     </div>
 
     <!-- İçerik Alanı -->
@@ -261,11 +254,9 @@
 
  const tabPending = overlay.querySelector('#tabAdminPending');
  const tabAll = overlay.querySelector('#tabAdminAll');
- const tabRooms = overlay.querySelector('#tabAdminRooms');
- const tabMail = overlay.querySelector('#tabAdminMail');
 
  const activateTab = activeTab => {
- [tabPending, tabAll, tabRooms, tabMail].forEach(tab => tab && tab.classList.toggle('active', tab === activeTab));
+ [tabPending, tabAll].forEach(tab => tab && tab.classList.toggle('active', tab === activeTab));
  };
 
  tabPending.onclick = () => {
@@ -273,20 +264,10 @@
  renderPendingTab();
  };
 
- tabAll.onclick = () => {
- activateTab(tabAll);
- renderAllUsersTab();
- };
-
- tabRooms.onclick = () => {
- activateTab(tabRooms);
- renderRoomsTab();
- };
-
- tabMail.onclick = () => {
- activateTab(tabMail);
- renderMailTab();
- };
+  tabAll.onclick = () => {
+    activateTab(tabAll);
+    renderAllUsersTab();
+  };
 
  // ── Sekme 3: E-posta altyapısı & İstatistik ──
  async function renderMailTab() {
@@ -1383,9 +1364,14 @@
 
   updateTabBadges();
 
+  if (initialTab === 'rooms' || initialTab === 'mail') {
+    overlay.remove();
+    if (typeof window.openSettingsModal === 'function') {
+      window.openSettingsModal(initialTab);
+    }
+    return;
+  }
   if (initialTab === 'all') renderAllUsersTab();
-  else if (initialTab === 'mail') renderMailTab();
-  else if (initialTab === 'rooms') renderRoomsTab();
   else renderPendingTab();
  }
 

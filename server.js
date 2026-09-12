@@ -1068,7 +1068,7 @@ app.post('/api/auth/change-password', authRateLimiter, requireAuth, async (req, 
 });
 
 app.post('/api/auth/update-profile', authRateLimiter, requireAuth, async (req, res) => {
-  const { fullName, phone, department, email, username } = req.body;
+  const { fullName, phone, department, email, username, emailChatDigest, email_chat_digest } = req.body;
   const userId = req.authUser.id;
 
   try {
@@ -1092,6 +1092,9 @@ app.post('/api/auth/update-profile', authRateLimiter, requireAuth, async (req, r
       if (!isValidUsername(cleanUsername)) return res.status(400).json({ success: false, reason: 'Geçerli bir kullanıcı adı giriniz.' });
       updates.username = cleanUsername;
     }
+    if (emailChatDigest !== undefined || email_chat_digest !== undefined) {
+      updates.email_chat_digest = emailChatDigest !== undefined ? Boolean(emailChatDigest) : Boolean(email_chat_digest);
+    }
     if (Object.keys(updates).length === 0) return res.status(400).json({ success: false, reason: 'Güncellenecek profil alanı bulunamadı.' });
 
     if (supabase) {
@@ -1106,7 +1109,16 @@ app.post('/api/auth/update-profile', authRateLimiter, requireAuth, async (req, r
         if (result.data?.length) return res.status(409).json({ success: false, reason: 'Bu kullanıcı adı zaten kullanımda.' });
       }
       const { error } = await supabase.from('app_users').update(updates).eq('id', userId);
-      if (error) throw error;
+      if (error) {
+        if (String(error.message || '').includes('email_chat_digest')) {
+          delete updates.email_chat_digest;
+          if (Object.keys(updates).length > 0) {
+            await supabase.from('app_users').update(updates).eq('id', userId);
+          }
+        } else {
+          throw error;
+        }
+      }
     } else {
       const localUsers = getLocalUsers();
       if (updates.email && localUsers.some(user => user.id !== userId && normalizeEmail(user.email) === updates.email)) {
@@ -1967,6 +1979,75 @@ app.post('/api/presence/offline', async (req, res) => {
   }
 });
 
+// ── OKUNMAMIŞ SOHBET MESAJLARI İÇİN E-POSTA BİLDİRİM YÖNETİCİSİ (DEBOUNCED & ANTI-SPAM) ──
+const chatEmailTimers = new Map(); // `${senderId}_${receiverId}` -> { timer }
+const chatEmailCooldowns = new Map(); // `${receiverId}` -> timestamp
+
+function clearChatEmailTimer(senderId, receiverId) {
+  const timerKey = `${senderId}_${receiverId}`;
+  const existing = chatEmailTimers.get(timerKey);
+  if (existing) {
+    if (existing.timer) clearTimeout(existing.timer);
+    chatEmailTimers.delete(timerKey);
+  }
+}
+
+async function scheduleChatEmailDigest(senderUser, receiverId, messageSnippet) {
+  if (!senderUser || !receiverId) return;
+  const strReceiver = String(receiverId);
+  const strSender = String(senderUser.id);
+  if (strReceiver === strSender) return;
+
+  try {
+    const recipient = await loadUserById(strReceiver);
+    if (!recipient || !recipient.email) return;
+    if (recipient.email_chat_digest === false || recipient.emailChatDigest === false) return;
+
+    // 15 dakikalık anti-spam soğuma kontrolü
+    const lastSent = chatEmailCooldowns.get(strReceiver) || 0;
+    if (Date.now() - lastSent < 15 * 60 * 1000) return;
+
+    const timerKey = `${strSender}_${strReceiver}`;
+    if (chatEmailTimers.has(timerKey)) return;
+
+    const delayMs = process.env.CHAT_EMAIL_DELAY_MS ? parseInt(process.env.CHAT_EMAIL_DELAY_MS, 10) : 3 * 60 * 1000;
+
+    const timer = setTimeout(async () => {
+      chatEmailTimers.delete(timerKey);
+      try {
+        const all = getChatMessages();
+        const unreads = all.filter(m => String(m.senderId) === strSender && String(m.receiverId) === strReceiver && !m.isRead);
+        if (unreads.length === 0) return;
+
+        const currentLastSent = chatEmailCooldowns.get(strReceiver) || 0;
+        if (Date.now() - currentLastSent < 15 * 60 * 1000) return;
+
+        chatEmailCooldowns.set(strReceiver, Date.now());
+
+        const recName = recipient.full_name || recipient.username || 'Kullanıcı';
+        const sndName = senderUser.full_name || senderUser.username || 'Ekip Arkadaşınız';
+        const lastMsg = unreads[unreads.length - 1];
+        const snippet = lastMsg.text || (lastMsg.attachment ? '📎 Görsel / Belge eki' : (lastMsg.voice ? '🎤 Sesli mesaj' : messageSnippet || 'Yeni ileti'));
+
+        await mailer.sendUnreadMessageDigest({
+          to: recipient.email,
+          recipientName: recName,
+          senderName: sndName,
+          unreadCount: unreads.length,
+          lastMessageSnippet: snippet
+        });
+      } catch (err) {
+        console.warn('Okunmamış mesaj bildirim e-postası gönderilemedi:', err.message);
+      }
+    }, delayMs);
+
+    if (timer.unref) timer.unref();
+    chatEmailTimers.set(timerKey, { timer });
+  } catch (err) {
+    console.warn('E-posta bildirim planlaması yapılamadı:', err.message);
+  }
+}
+
 // Chat: Mesaj Gönderme
 app.post('/api/chat/send', requireAuth, async (req, res) => {
   try {
@@ -1998,6 +2079,11 @@ app.post('/api/chat/send', requireAuth, async (req, res) => {
 
     messages.push(newMsg);
     saveChatMessages();
+
+    // 1-e-1 sohbette okunmayan mesajlar için gecikmeli e-posta bildirimini planla
+    if (receiverId && !roomId) {
+      scheduleChatEmailDigest(req.authUser, receiverId, newMsg.text).catch(() => {});
+    }
 
     // Supabase yedekleme (varsa)
     if (supabase) {
@@ -2052,6 +2138,7 @@ app.get('/api/chat/messages', requireAuth, async (req, res) => {
 
     // Okundu işaretleme (Bana gelen okunmamış mesajları okundu yap)
     if (peerId) {
+      clearChatEmailTimer(peerId, myId);
       matched.forEach(m => {
         if (String(m.senderId) === peerId && String(m.receiverId) === myId && !m.isRead) {
           m.isRead = true;
@@ -2076,6 +2163,8 @@ app.post('/api/chat/mark-read', requireAuth, async (req, res) => {
     const peerId = req.body?.peerId ? String(req.body.peerId) : null;
     const myId = String(req.authUser.id);
     if (!peerId) return res.json({ success: true });
+
+    clearChatEmailTimer(peerId, myId);
 
     const all = getChatMessages();
     let changed = false;

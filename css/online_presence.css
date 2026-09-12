@@ -241,30 +241,38 @@
   transition: border-color 0.15s;
 }
 
-/* ── NAV TABS ── */
+/* ── NAV TABS (MODERN SEGMENTED PILL) ── */
 .frp-presence-nav-tabs {
   display: flex;
-  border-bottom: 1px solid var(--border-light, #e2e8f0);
-  background: var(--bg-card, #f8fafc);
+  padding: 4px;
+  margin: 6px 8px;
+  background: var(--bg-card, #f1f5f9);
+  border-radius: 10px;
+  border: 1px solid var(--border-light, #e2e8f0);
+  gap: 4px;
 }
 
 .frp-presence-tab-btn {
   flex: 1;
-  padding: 0.5rem 0.6rem;
+  padding: 0.4rem 0.5rem;
   font-size: 0.76rem;
   font-weight: 700;
   color: var(--text-muted, #64748b);
   border: none;
-  background: none;
+  background: transparent;
   cursor: pointer;
-  transition: all 0.15s;
-  border-bottom: 2px solid transparent;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
 }
 
 .frp-presence-tab-btn.active {
-  color: var(--accent, #2563eb);
-  border-bottom-color: var(--accent, #2563eb);
+  color: var(--text-primary, #0f172a);
   background: var(--bg-surface, #ffffff);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
 /* ── SEARCH BAR ── */
@@ -1093,3 +1101,182 @@
     height: 52px !important;
   }
 }
+
+/* ── GÖNDEREN KİŞİ ETİKETİ ── */
+.frp-chat-sender-name {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: var(--text-secondary, #475569);
+  margin-bottom: 2px;
+  padding-left: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ── HIZLI YANIT ÇİPLERİ (QUICK REPLIES) ── */
+.frp-chat-quick-replies {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  overflow-x: auto;
+  padding: 0.35rem 0.65rem;
+  background: var(--bg-surface, #ffffff);
+  border-top: 1px solid var(--border-light, #e2e8f0);
+  scrollbar-width: none;
+}
+.frp-chat-quick-replies::-webkit-scrollbar {
+  display: none;
+}
+
+.frp-chat-quick-chip {
+  background: var(--bg-card, #f1f5f9);
+  color: var(--text-secondary, #475569);
+  border: 1px solid var(--border-light, #e2e8f0);
+  border-radius: 9999px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.frp-chat-quick-chip:hover {
+  background: var(--accent, #2563eb);
+  color: #ffffff;
+  border-color: var(--accent, #2563eb);
+  transform: translateY(-1px);
+}
+
+/* ── IN-APP CANLI BİLDİRİM BANNERI (FLOATING NOTIFICATION) ── */
+.frp-inapp-toast-container {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 200060;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.frp-inapp-toast {
+  pointer-events: auto;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 14px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  padding: 0.75rem 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #ffffff;
+  cursor: pointer;
+  animation: inappToastSlideIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+}
+
+.frp-inapp-toast:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.5);
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.frp-inapp-toast-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.frp-inapp-toast-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.frp-inapp-toast-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 2px;
+}
+
+.frp-inapp-toast-sender {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #f8fafc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.frp-inapp-toast-time {
+  font-size: 0.68rem;
+  color: #94a3b8;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.frp-inapp-toast-text {
+  font-size: 0.78rem;
+  color: #cbd5e1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.35;
+}
+
+.frp-inapp-toast-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.28rem 0.6rem;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border: none;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.frp-inapp-toast-action:hover {
+  background: #1d4ed8;
+}
+
+.frp-inapp-toast-close {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 2px;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.frp-inapp-toast-close:hover {
+  color: #ffffff;
+}
+
+@keyframes inappToastSlideIn {
+  from { opacity: 0; transform: translateY(-16px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+

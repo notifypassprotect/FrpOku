@@ -225,3 +225,37 @@ test('mailer kaynak kodu SMTP bağlantısını sınırlı sürede sonlandırır 
   assert.match(source, /gmail\\\.com\$\/i\.test\(smtpHost\)/);
   assert.match(source, /rawPassword\.replace\(\/\\s\+\/g, ''\)/);
 });
+
+test('sendUnreadMessageDigest okunmamış mesaj sayısını, gönderen adını ve mesaj özetini şablonda barındırır', async () => {
+  let sentMessage;
+  const mailer = createMailer({
+    env: {
+      MAIL_ENABLED: 'true',
+      SMTP_HOST: 'smtp.example.com',
+      SMTP_USER: 'sender@example.com',
+      SMTP_PASS: 'secret',
+      SMTP_FROM: 'FrpOku <sender@example.com>'
+    },
+    transporter: {
+      sendMail: async message => {
+        sentMessage = message;
+        return { messageId: 'digest-123' };
+      }
+    }
+  });
+
+  const res = await mailer.sendUnreadMessageDigest({
+    to: 'target@example.com',
+    recipientName: 'Ahmet Yılmaz',
+    senderName: 'Mehmet Demir',
+    unreadCount: 3,
+    lastMessageSnippet: 'Rapor revizyonu tamamlandı.'
+  });
+
+  assert.equal(res.sent, true);
+  assert.match(sentMessage.subject, /3 Yeni Mesajınız Var/);
+  assert.match(sentMessage.html, /Ahmet Yılmaz/);
+  assert.match(sentMessage.html, /Mehmet Demir/);
+  assert.match(sentMessage.html, /Rapor revizyonu tamamlandı\./);
+  assert.match(sentMessage.text, /Rapor revizyonu tamamlandı\./);
+});

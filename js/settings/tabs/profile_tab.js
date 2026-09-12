@@ -93,6 +93,19 @@ window.FrpSettingsTabs.profile = {
               <label style="font-size:.75rem;font-weight:700;color:var(--text-secondary);margin-bottom:.2rem;display:block;">Hesap Oluşturulma Tarihi</label>
               <input type="text" class="master-search-input" style="width:100%;background:rgba(0,0,0,.03);cursor:not-allowed;" value="${escHtml(stagedProfile.accountCreatedDate || '01.05.2026 18:55')}" readonly />
             </div>
+
+            <!-- Okunmamış Mesaj E-posta Bildirimi -->
+            <div style="background:var(--bg-raised,#f8fafc);border:1px solid var(--border-light,#e2e8f0);border-radius:10px;padding:.75rem;margin-top:.35rem;">
+              <label style="display:flex;align-items:flex-start;gap:.6rem;cursor:pointer;font-size:.82rem;font-weight:700;color:var(--text-primary,#0f172a);">
+                <input type="checkbox" id="cbChatEmailDigest" ${stagedProfile.emailChatDigest !== false ? 'checked' : ''} style="width:17px;height:17px;accent-color:var(--accent,#2563eb);margin-top:2px;cursor:pointer;" />
+                <div>
+                  <div>💬 Okunmamış Mesajlar İçin E-Posta Bildirimi</div>
+                  <div style="font-size:.7rem;color:var(--text-muted,#64748b);font-weight:normal;margin-top:2px;line-height:1.4;">
+                    Mesaj aldığınızda 3-5 dakika boyunca okunmazsa e-posta kutunuza akıllı özet gönderilir (Anti-spam korumalı).
+                  </div>
+                </div>
+              </label>
+            </div>
           </div>
 
           <!-- Sağ Kart: Tarayıcı ve Sistem Çalışma Ortamı -->
@@ -241,6 +254,14 @@ window.FrpSettingsTabs.profile = {
     bindInput('#profFirstName', 'firstName');
     bindInput('#profLastName', 'lastName');
     bindInput('#profUsername', 'username');
+
+    const cbDigest = overlay.querySelector('#cbChatEmailDigest');
+    if (cbDigest) {
+      cbDigest.addEventListener('change', () => {
+        stagedProfile.emailChatDigest = cbDigest.checked;
+        markDirty();
+      });
+    }
 
     // E-Posta Güvenli Güncelle (6 Haneli Doğrulama Kodu ile)
     const emailInput = overlay.querySelector('#profNewEmail');

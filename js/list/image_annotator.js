@@ -85,12 +85,15 @@
             <button type="button" id="toolLine" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Düz Çizgi (Shift ile 45° kilit)">📏 Çizgi</button>
             <button type="button" id="toolArrow" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Yön Oku (Shift ile 45° kilit)">➡️ Ok</button>
             <button type="button" id="toolDoubleArrow" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Çift Yönlü Ok">↔️ Çift Ok</button>
+            <button type="button" id="toolDimension" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Ölçülendirme & Mesafe Çizgisi">📐 Ölçü</button>
             <button type="button" id="toolCircle" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Çember / Daire (Shift ile tam daire)">⭕ Daire</button>
             <button type="button" id="toolRect" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Dikdörtgen Kutu (Shift ile kare)">⬛ Kutu</button>
+            <button type="button" id="toolRoundRect" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Yuvarlak Köşeli Kutu">▢ Yuvarlak</button>
             <button type="button" id="toolFilledRect" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Dolu Dikdörtgen">🟩 Dolu Kutu</button>
             <button type="button" id="toolStar" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Yıldız">⭐ Yıldız</button>
             <button type="button" id="toolCallout" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Konuşma Balonu">💬 Balon</button>
             <button type="button" id="toolText" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Modern Metin / Not Ekle">🔤 Metin</button>
+            <button type="button" id="toolStamp" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 800; color: #dc2626;" title="Kurumsal Kaşe (ONAYLANDI, KVKK...)">📑 Kaşe</button>
             <button type="button" id="toolStep" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700; color: #2563eb;" title="Adım Rozeti Ekle (1, 2, 3...)">🔢 Adım <span id="annotatorStepNum">①</span></button>
             <button type="button" id="toolEraser" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Silgi">🧽 Silgi</button>
           </div>
@@ -648,7 +651,133 @@
       saveState();
     }
 
-    // MODERN METİN MODALI
+    // YUVARLAK KÖŞELİ KUTU
+    function drawRoundRect(context, x, y, w, h, radius = 12) {
+      const rx = Math.min(x, x + w);
+      const ry = Math.min(y, y + h);
+      const rw = Math.abs(w);
+      const rh = Math.abs(h);
+      const r = Math.min(radius, rw / 2, rh / 2);
+      context.beginPath();
+      context.moveTo(rx + r, ry);
+      context.lineTo(rx + rw - r, ry);
+      context.quadraticCurveTo(rx + rw, ry, rx + rw, ry + r);
+      context.lineTo(rx + rw, ry + rh - r);
+      context.quadraticCurveTo(rx + rw, ry + rh, rx + rw - r, ry + rh);
+      context.lineTo(rx + r, ry + rh);
+      context.quadraticCurveTo(rx, ry + rh, rx, ry + rh - r);
+      context.lineTo(rx, ry + r);
+      context.quadraticCurveTo(rx, ry, rx + r, ry);
+      context.closePath();
+      context.stroke();
+    }
+
+    // ÖLÇÜLENDİRME & MESAFE ÇİZGİSİ (PİKSEL CETVELİ)
+    function drawDimensionLine(context, fromx, fromy, tox, toy, width) {
+      drawDoubleArrow(context, fromx, fromy, tox, toy, width);
+      const dist = Math.round(Math.hypot(tox - fromx, toy - fromy));
+      const midX = (fromx + tox) / 2;
+      const midY = (fromy + toy) / 2;
+      const text = `${dist} px`;
+      context.save();
+      context.font = 'bold 12px sans-serif';
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      const textWidth = context.measureText(text).width;
+      context.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      context.fillRect(midX - textWidth / 2 - 6, midY - 10, textWidth + 12, 20);
+      context.fillStyle = '#ffffff';
+      context.fillText(text, midX, midY);
+      context.restore();
+    }
+
+    // KURUMSAL KAŞELER (ONAYLANDI, KVKK, REDDEDİLDİ, İNCELENECEK)
+    const STAMPS = [
+      { id: 'approved', text: 'ONAYLANDI', color: '#059669', icon: '✅' },
+      { id: 'kvkk', text: 'KVKK UYUMLU', color: '#4f46e5', icon: '🛡️' },
+      { id: 'rejected', text: 'REDDEDİLDİ', color: '#dc2626', icon: '❌' },
+      { id: 'review', text: 'İNCELENECEK', color: '#d97706', icon: '⏳' },
+      { id: 'urgent', text: 'ÇOK ACİL / ÖNEMLİ', color: '#e11d48', icon: '⚠️' }
+    ];
+    let selectedStampIndex = 0;
+
+    function showStampSelectionModal({ onSelect }) {
+      const existing = document.getElementById('frpAnnotatorStampModal');
+      if (existing) existing.remove();
+
+      const mOverlay = document.createElement('div');
+      mOverlay.id = 'frpAnnotatorStampModal';
+      mOverlay.className = 'modal-overlay';
+      mOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.7);backdrop-filter:blur(6px);z-index:200080;display:flex;align-items:center;justify-content:center;padding:1rem;';
+
+      const optionsHtml = STAMPS.map((s, idx) => `
+        <button type="button" class="btn-stamp-option" data-idx="${idx}" style="display:flex;align-items:center;gap:.6rem;padding:.75rem 1rem;border-radius:10px;border:2px solid ${s.color};background:rgba(255,255,255,0.95);cursor:pointer;width:100%;text-align:left;transition:transform .12s;">
+          <span style="font-size:1.3rem;">${s.icon}</span>
+          <div style="flex:1;">
+            <div style="font-weight:900;color:${s.color};font-size:.92rem;">${s.text}</div>
+            <div style="font-size:.7rem;color:#64748b;">Resmi kurumsal mühür damgası</div>
+          </div>
+        </button>
+      `).join('');
+
+      mOverlay.innerHTML = `
+        <div class="modal" style="max-width:400px;width:92vw;padding:1.4rem;border-radius:16px;background:var(--bg-surface,#ffffff);box-shadow:0 20px 50px rgba(0,0,0,0.35);">
+          <div style="font-size:1rem;font-weight:800;margin-bottom:.85rem;display:flex;align-items:center;gap:.45rem;">
+            <span>📑</span>
+            <span>Kurumsal Kaşe Seçin</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:1rem;">
+            ${optionsHtml}
+          </div>
+          <div style="text-align:right;">
+            <button type="button" id="btnStampModalCancel" class="btn btn-sm btn-ghost">Vazgeç</button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(mOverlay);
+      const close = () => mOverlay.remove();
+      mOverlay.querySelector('#btnStampModalCancel').addEventListener('click', close);
+      mOverlay.querySelectorAll('.btn-stamp-option').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt(btn.dataset.idx, 10) || 0;
+          selectedStampIndex = idx;
+          close();
+          onSelect(STAMPS[idx]);
+        });
+      });
+    }
+
+    function stampCorporateBadge(cx, cy, stamp = STAMPS[selectedStampIndex]) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(-10 * Math.PI / 180);
+
+      const w = 175;
+      const h = 56;
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = stamp.color;
+      ctx.strokeRect(-w / 2, -h / 2, w, h);
+
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(-w / 2 + 3, -h / 2 + 3, w - 6, h - 6);
+
+      ctx.fillStyle = stamp.color;
+      ctx.font = '900 16px "Arial Black", Impact, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(stamp.text, 0, -6);
+
+      const d = new Date();
+      const dateStr = `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+      ctx.font = 'bold 9px sans-serif';
+      ctx.fillText(`${stamp.icon} ${dateStr} · KONTROL EDİLDİ`, 0, 14);
+
+      ctx.restore();
+      saveState();
+    }
+
+    // MODERN METİN MODALI (35+ YAZI TİPİ DESTEKLİ)
     function showAnnotatorTextModal({ onAdd }) {
       const existing = document.getElementById('frpAnnotatorTextModal');
       if (existing) existing.remove();
@@ -661,29 +790,69 @@
         z-index: 200080; display: flex; align-items: center; justify-content: center; padding: 1rem;
       `;
       mOverlay.innerHTML = `
-        <div class="modal" style="max-width: 440px; width: 92vw; padding: 1.4rem; border-radius: 16px; background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); box-shadow: 0 20px 50px rgba(0,0,0,0.35);">
+        <div class="modal" style="max-width: 460px; width: 92vw; padding: 1.4rem; border-radius: 16px; background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); box-shadow: 0 20px 50px rgba(0,0,0,0.35);">
           <div style="font-size: 1rem; font-weight: 800; color: var(--text-primary, #0f172a); margin-bottom: 0.85rem; display: flex; align-items: center; gap: 0.45rem;">
             <span>🔤</span>
             <span>Görsele Metin Ekle</span>
           </div>
           <div style="margin-bottom: 1rem;">
-            <label style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--text-secondary, #475569); margin-bottom: 0.35rem;">Yazılacak Açıklama / Metin</label>
+            <label style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--text-secondary, #475569); margin-bottom: 0.35rem;">Yazılacak Açıklama / Not</label>
             <textarea id="annotatorTextInput" rows="3" placeholder="Örn: Bu alandaki tutar incelenmeli..." style="width: 100%; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border, #cbd5e1); font-size: 0.88rem; background: var(--bg-card); color: var(--text-primary); font-family: inherit; resize: vertical;"></textarea>
           </div>
-          <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 1.25rem;">
-            <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; color: var(--text-secondary); cursor: pointer;">
-              <input type="checkbox" id="annotatorTextBold" checked style="accent-color: var(--accent, #2563eb);" />
-              <span>Kalın (Bold)</span>
-            </label>
-            <div style="display: flex; align-items: center; gap: 0.35rem;">
-              <span style="font-size: 0.78rem; color: var(--text-muted);">Boyut:</span>
-              <select id="annotatorTextFontSize" style="padding: 0.25rem 0.45rem; border-radius: 6px; border: 1px solid var(--border); font-size: 0.78rem; background: var(--bg-card); color: var(--text-primary);">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-bottom: 1rem;">
+            <div>
+              <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Yazı Tipi</label>
+              <select id="annotatorTextFontFamily" style="width: 100%; padding: 0.3rem 0.45rem; border-radius: 6px; border: 1px solid var(--border); font-size: 0.78rem; background: var(--bg-card); color: var(--text-primary);">
+                <optgroup label="Modern Sans-Serif">
+                  <option value="Inter, sans-serif">Inter</option>
+                  <option value="Roboto, sans-serif">Roboto</option>
+                  <option value="'Open Sans', sans-serif">Open Sans</option>
+                  <option value="Montserrat, sans-serif">Montserrat</option>
+                  <option value="Poppins, sans-serif">Poppins</option>
+                  <option value="Lato, sans-serif">Lato</option>
+                  <option value="Nunito, sans-serif">Nunito</option>
+                  <option value="Ubuntu, sans-serif">Ubuntu</option>
+                  <option value="'Plus Jakarta Sans', sans-serif">Plus Jakarta Sans</option>
+                  <option value="Outfit, sans-serif">Outfit</option>
+                  <option value="Arial, sans-serif">Arial</option>
+                  <option value="'Segoe UI', sans-serif">Segoe UI</option>
+                  <option value="Tahoma, sans-serif">Tahoma</option>
+                  <option value="Verdana, sans-serif">Verdana</option>
+                </optgroup>
+                <optgroup label="Serif & Kurumsal">
+                  <option value="Georgia, serif">Georgia</option>
+                  <option value="Garamond, serif">Garamond</option>
+                  <option value="'Times New Roman', serif">Times New Roman</option>
+                  <option value="'Playfair Display', serif">Playfair Display</option>
+                  <option value="Merriweather, serif">Merriweather</option>
+                </optgroup>
+                <optgroup label="Monospace & Kod">
+                  <option value="Consolas, monospace">Consolas</option>
+                  <option value="'Courier New', monospace">Courier New</option>
+                  <option value="'Fira Code', monospace">Fira Code</option>
+                  <option value="'JetBrains Mono', monospace">JetBrains Mono</option>
+                </optgroup>
+                <optgroup label="Başlık">
+                  <option value="Impact, sans-serif">Impact</option>
+                  <option value="Oswald, sans-serif">Oswald</option>
+                </optgroup>
+              </select>
+            </div>
+            <div>
+              <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Yazı Boyutu</label>
+              <select id="annotatorTextFontSize" style="width: 100%; padding: 0.3rem 0.45rem; border-radius: 6px; border: 1px solid var(--border); font-size: 0.78rem; background: var(--bg-card); color: var(--text-primary);">
                 <option value="16">16px Küçük</option>
                 <option value="22" selected>22px Standart</option>
                 <option value="32">32px Büyük</option>
                 <option value="44">44px Çok Büyük</option>
               </select>
             </div>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 1.25rem;">
+            <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; color: var(--text-secondary); cursor: pointer;">
+              <input type="checkbox" id="annotatorTextBold" checked style="accent-color: var(--accent, #2563eb);" />
+              <span>Kalın (Bold)</span>
+            </label>
           </div>
           <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.6rem;">
             <button type="button" id="btnTextModalCancel" class="btn btn-sm btn-ghost">Vazgeç</button>
@@ -702,8 +871,9 @@
         if (!text) return;
         const isBold = mOverlay.querySelector('#annotatorTextBold').checked;
         const fSize = parseInt(mOverlay.querySelector('#annotatorTextFontSize').value, 10) || 22;
+        const fontFamily = mOverlay.querySelector('#annotatorTextFontFamily').value || 'sans-serif';
         close();
-        onAdd({ text, isBold, fSize });
+        onAdd({ text, isBold, fSize, fontFamily });
       });
     }
 
@@ -765,6 +935,15 @@
         return;
       }
 
+      if (activeTool === 'stamp') {
+        showStampSelectionModal({
+          onSelect: (stamp) => {
+            stampCorporateBadge(x, y, stamp);
+          }
+        });
+        return;
+      }
+
       if (activeTool === 'magnifier') {
         stampLoupeMagnifier(x, y, 55, 2.0);
         return;
@@ -772,10 +951,10 @@
 
       if (activeTool === 'text') {
         showAnnotatorTextModal({
-          onAdd: ({ text, isBold, fSize }) => {
+          onAdd: ({ text, isBold, fSize, fontFamily }) => {
             ctx.save();
             ctx.fillStyle = currentColor;
-            ctx.font = `${isBold ? 'bold ' : ''}${fSize}px sans-serif`;
+            ctx.font = `${isBold ? 'bold ' : ''}${fSize}px ${fontFamily || 'sans-serif'}`;
             ctx.shadowColor = 'rgba(0,0,0,0.5)';
             ctx.shadowBlur = 4;
             ctx.fillText(text, x, y);
@@ -863,12 +1042,16 @@
         drawArrow(oCtx, startX, startY, x, y, currentLineWidth);
       } else if (activeTool === 'doubleArrow') {
         drawDoubleArrow(oCtx, startX, startY, x, y, currentLineWidth);
+      } else if (activeTool === 'dimension') {
+        drawDimensionLine(oCtx, startX, startY, x, y, currentLineWidth);
       } else if (activeTool === 'circle') {
         oCtx.beginPath();
         oCtx.arc(startX, startY, Math.sqrt(w * w + h * h), 0, Math.PI * 2);
         oCtx.stroke();
       } else if (activeTool === 'rect') {
         oCtx.strokeRect(startX, startY, w, h);
+      } else if (activeTool === 'roundRect') {
+        drawRoundRect(oCtx, startX, startY, w, h, 14);
       } else if (activeTool === 'filledRect') {
         oCtx.fillRect(startX, startY, w, h);
       } else if (activeTool === 'star') {
@@ -921,12 +1104,16 @@
         drawArrow(ctx, startX, startY, x, y, currentLineWidth);
       } else if (activeTool === 'doubleArrow') {
         drawDoubleArrow(ctx, startX, startY, x, y, currentLineWidth);
+      } else if (activeTool === 'dimension') {
+        drawDimensionLine(ctx, startX, startY, x, y, currentLineWidth);
       } else if (activeTool === 'circle') {
         ctx.beginPath();
         ctx.arc(startX, startY, Math.sqrt(w * w + h * h), 0, Math.PI * 2);
         ctx.stroke();
       } else if (activeTool === 'rect') {
         ctx.strokeRect(startX, startY, w, h);
+      } else if (activeTool === 'roundRect') {
+        drawRoundRect(ctx, startX, startY, w, h, 14);
       } else if (activeTool === 'filledRect') {
         ctx.fillRect(startX, startY, w, h);
       } else if (activeTool === 'star') {
@@ -984,6 +1171,8 @@
         viewport.style.cursor = 'cell';
       } else if (tool === 'magnifier') {
         viewport.style.cursor = 'zoom-in';
+      } else if (tool === 'stamp') {
+        viewport.style.cursor = 'pointer';
       } else {
         viewport.style.cursor = 'crosshair';
       }
@@ -996,12 +1185,15 @@
       toolLine: 'line',
       toolArrow: 'arrow',
       toolDoubleArrow: 'doubleArrow',
+      toolDimension: 'dimension',
       toolCircle: 'circle',
       toolRect: 'rect',
+      toolRoundRect: 'roundRect',
       toolFilledRect: 'filledRect',
       toolStar: 'star',
       toolCallout: 'callout',
       toolText: 'text',
+      toolStamp: 'stamp',
       toolStep: 'step',
       toolBlur: 'blur',
       toolRedact: 'redact',

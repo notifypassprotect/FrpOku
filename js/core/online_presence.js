@@ -85,6 +85,82 @@
     } catch {}
   }
 
+  // ── AVATAR VE İNİSİYAL YARDIMCILARI (SORU İŞARETİ GLYPH HATASINI GİDERİR) ──
+  function getAvatarGradient(name) {
+    const palettes = [
+      'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+      'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+      'linear-gradient(135deg, #ec4899, #be185d)',
+      'linear-gradient(135deg, #10b981, #047857)',
+      'linear-gradient(135deg, #f59e0b, #d97706)',
+      'linear-gradient(135deg, #06b6d4, #0e7490)',
+      'linear-gradient(135deg, #6366f1, #4338ca)'
+    ];
+    let hash = 0;
+    const str = String(name || '');
+    for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    const idx = Math.abs(hash) % palettes.length;
+    return palettes[idx];
+  }
+
+  function getCleanInitials(fullName, username) {
+    const text = String(fullName || username || 'U').trim();
+    const parts = text.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return (parts[0].charAt(0) + parts[1].charAt(0)).toLocaleUpperCase('tr-TR');
+    }
+    return text.slice(0, 2).toLocaleUpperCase('tr-TR');
+  }
+
+  // ── IN-APP CANLI BİLDİRİM BANNERI (İŞLETİM SİSTEMİ BİLDİRİMİ YERİNE DAHA ŞIK) ──
+  function showInAppChatNotification({ senderName, senderInitials, senderGradient, messageText, onOpen }) {
+    let container = document.getElementById('frpInAppToastContainer');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'frpInAppToastContainer';
+      container.className = 'frp-inapp-toast-container';
+      document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = 'frp-inapp-toast';
+    toast.innerHTML = `
+      <div class="frp-inapp-toast-avatar" style="background: ${senderGradient || 'linear-gradient(135deg, #2563eb, #6366f1)'};">
+        ${escHtml(senderInitials || 'U')}
+      </div>
+      <div class="frp-inapp-toast-content">
+        <div class="frp-inapp-toast-top">
+          <span class="frp-inapp-toast-sender">${escHtml(senderName || 'Ekip Arkadaşı')}</span>
+          <span class="frp-inapp-toast-time">Şimdi</span>
+        </div>
+        <div class="frp-inapp-toast-text">${escHtml(messageText || 'Yeni bir mesaj gönderdi')}</div>
+      </div>
+      <button type="button" class="frp-inapp-toast-action">Yanıtla</button>
+      <button type="button" class="frp-inapp-toast-close" title="Kapat">✕</button>
+    `;
+
+    const closeToast = () => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(-10px) scale(0.95)';
+      setTimeout(() => { if (toast.parentNode) toast.remove(); }, 200);
+    };
+
+    toast.querySelector('.frp-inapp-toast-close').addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeToast();
+    });
+
+    toast.addEventListener('click', () => {
+      closeToast();
+      if (typeof onOpen === 'function') onOpen();
+    });
+
+    container.appendChild(toast);
+    setTimeout(() => {
+      if (toast.isConnected) closeToast();
+    }, 6500);
+  }
+
   function requestDesktopNotification() {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission().catch(() => {});
@@ -167,7 +243,7 @@
   function handleUnreadUpdate(newCounts) {
     let total = 0;
     const bySender = {};
-    let hasNewIncoming = false;
+    const newSenders = [];
 
     if (newCounts && typeof newCounts === 'object') {
       Object.entries(newCounts).forEach(([senderId, count]) => {
@@ -176,16 +252,35 @@
           bySender[senderId] = c;
           total += c;
           const oldC = (unreadData.bySender && unreadData.bySender[senderId]) || 0;
-          if (c > oldC) hasNewIncoming = true;
+          if (c > oldC) {
+            newSenders.push({ senderId, count: c, diff: c - oldC });
+          }
         }
       });
     }
 
     unreadData = { bySender, total };
 
-    if (hasNewIncoming && total > lastTotalUnread) {
+    if (newSenders.length > 0 && total > lastTotalUnread) {
       playNotificationChime();
-      showDesktopNotification('FRP Ekip Sohbeti', 'Yeni bir ekip mesajınız var.');
+      newSenders.forEach(({ senderId, count }) => {
+        const senderUser = cachedUsers.find(u => String(u.id) === String(senderId));
+        const senderName = senderUser ? (senderUser.fullName || senderUser.username) : 'Ekip Arkadaşı';
+        const senderInitials = getCleanInitials(senderUser?.fullName, senderUser?.username);
+        const senderGradient = getAvatarGradient(senderName);
+
+        showInAppChatNotification({
+          senderName,
+          senderInitials,
+          senderGradient,
+          messageText: count > 1 ? `${count} yeni okunmamış mesajınız var.` : 'Size yeni bir mesaj gönderdi.',
+          onOpen: () => {
+            if (senderUser) {
+              openChatWindow({ targetUser: senderUser });
+            }
+          }
+        });
+      });
     }
     lastTotalUnread = total;
 
@@ -415,6 +510,22 @@
       return fn.includes(q) || un.includes(q) || dp.includes(q);
     });
 
+    // OKUNMAMIŞ MESAJI OLAN KULLANICILARI VE ÇEVRİMİÇİLERİ EN ÜSTE SIRALA
+    filtered.sort((a, b) => {
+      const unreadA = (unreadData.bySender && unreadData.bySender[String(a.id)]) || 0;
+      const unreadB = (unreadData.bySender && unreadData.bySender[String(b.id)]) || 0;
+      if (unreadA > 0 && unreadB === 0) return -1;
+      if (unreadB > 0 && unreadA === 0) return 1;
+      if (unreadA !== unreadB) return unreadB - unreadA;
+
+      const isOnlineA = a.isOnline || a.status === 'online' || a.status === 'busy';
+      const isOnlineB = b.isOnline || b.status === 'online' || b.status === 'busy';
+      if (isOnlineA && !isOnlineB) return -1;
+      if (!isOnlineA && isOnlineB) return 1;
+
+      return (a.fullName || a.username || '').localeCompare(b.fullName || b.username || '', 'tr');
+    });
+
     listEl.innerHTML = '';
 
     // WHATSAPP TARZI KENDİNE NOTLAR KARTI (EN ÜSTTE SABİT)
@@ -481,16 +592,18 @@
         statusLabel = 'Rahatsız Etmeyin';
       }
 
-      const initial = (u.avatar || u.fullName || u.username || 'U')[0].toUpperCase();
+      const name = u.fullName || u.username || 'Kullanıcı';
+      const initials = getCleanInitials(u.fullName, u.username);
+      const gradient = getAvatarGradient(name);
 
       li.innerHTML = `
         <div class="frp-presence-avatar-wrap">
-          <div class="frp-presence-avatar">${escHtml(initial)}</div>
+          <div class="frp-presence-avatar" style="background: ${gradient}; font-size: 0.85rem; font-weight: 800; color: #ffffff;">${escHtml(initials)}</div>
           <span class="frp-presence-status-dot ${statusClass}"></span>
         </div>
         <div class="frp-presence-info">
           <div class="frp-presence-name-row">
-            <span class="frp-presence-name">${escHtml(u.fullName || u.username)}</span>
+            <span class="frp-presence-name">${escHtml(name)}</span>
             <div style="display:flex;align-items:center;gap:0.35rem;">
               ${unreadCount > 0 ? `<span class="frp-presence-unread-badge">${unreadCount}</span>` : ''}
               <span class="frp-presence-time ${statusClass}">${escHtml(statusLabel)}</span>
@@ -597,19 +710,25 @@
       else if (userStatus === 'offline') statusDotColor = '#94a3b8';
     }
 
-    const initial = isRoom ? room.icon : (targetUser.isSelfNote ? '📌' : (targetUser.avatar || targetUser.fullName || targetUser.username || 'U')[0].toUpperCase());
+    const userInitials = isRoom ? (room.icon || '🏢') : (targetUser.isSelfNote ? '📌' : getCleanInitials(targetUser.fullName, targetUser.username));
+    const avatarBg = isRoom
+      ? 'linear-gradient(135deg, #059669, #10b981)'
+      : (targetUser.isSelfNote ? 'linear-gradient(135deg, #2563eb, #6366f1)' : getAvatarGradient(chatTitle));
 
     chatEl.innerHTML = `
       <!-- BAŞLIK BARI -->
       <div class="frp-chat-header">
         <div class="frp-chat-header-user">
           <div class="frp-chat-avatar-wrap">
-            <div class="frp-chat-avatar" style="${isRoom ? 'background: linear-gradient(135deg, #059669, #10b981);' : (targetUser.isSelfNote ? 'background: linear-gradient(135deg, #2563eb, #6366f1);' : '')}">${escHtml(initial)}</div>
+            <div class="frp-chat-avatar" style="background: ${avatarBg}; font-size: ${isRoom || targetUser.isSelfNote ? '1rem' : '0.82rem'}; font-weight: 800; color: #ffffff;">${escHtml(userInitials)}</div>
             ${!isRoom ? `<span class="frp-chat-status-dot" style="background-color: ${statusDotColor};"></span>` : ''}
           </div>
           <div class="frp-chat-header-text">
-            <div class="frp-chat-header-name">${escHtml(chatTitle)}</div>
-            <div class="frp-chat-header-status">${escHtml(statusText)}</div>
+            <div class="frp-chat-header-name" title="${escHtml(chatTitle)}">${escHtml(chatTitle)}</div>
+            <div class="frp-chat-header-status">
+              <span>${escHtml(statusText)}</span>
+              ${!isRoom && !targetUser.isSelfNote && targetUser.department ? `<span class="frp-presence-dept-badge" style="margin-left: 3px; font-size: 0.62rem;">${escHtml(targetUser.department)}</span>` : ''}
+            </div>
           </div>
         </div>
         <div class="frp-chat-header-controls">
@@ -658,6 +777,15 @@
         <div class="frp-chat-emoji-grid"></div>
       </div>
 
+      <!-- HIZLI YANIT ÇİPLERİ (QUICK REPLIES) -->
+      <div class="frp-chat-quick-replies">
+        <button type="button" class="frp-chat-quick-chip" data-quick="👍 İnceliyorum">👍 İnceliyorum</button>
+        <button type="button" class="frp-chat-quick-chip" data-quick="✅ Onaylandı">✅ Onaylandı</button>
+        <button type="button" class="frp-chat-quick-chip" data-quick="📋 Rapor hazır">📋 Rapor hazır</button>
+        <button type="button" class="frp-chat-quick-chip" data-quick="📞 Arıyorum">📞 Arıyorum</button>
+        <button type="button" class="frp-chat-quick-chip" data-quick="⏳ Birazdan döneceğim">⏳ Birazdan döneceğim</button>
+      </div>
+
       <!-- FOOTER / GİRİŞ ALANI (INSTAGRAM DM KAPSÜLÜ) -->
       <div class="frp-chat-footer">
         <div class="frp-chat-input-row">
@@ -677,6 +805,14 @@
     `;
 
     document.body.appendChild(chatEl);
+
+    // Hızlı yanıt çipleri dinleyicileri
+    chatEl.querySelectorAll('.frp-chat-quick-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        input.value = chip.dataset.quick || chip.textContent;
+        input.focus();
+      });
+    });
 
     // Kontroller
     const btnClose = chatEl.querySelector('.btn-close');
@@ -1118,9 +1254,15 @@
           </div>
         `;
 
+        const senderLabel = isSelf ? '' : (m.senderName || (!isRoom ? (targetUser.fullName || targetUser.username) : 'Ekip Arkadaşı'));
         msgDiv.innerHTML = `
           ${hoverReactionHtml}
-          ${isRoom && !isSelf ? `<div style="font-size:0.68rem; font-weight:700; color:var(--text-muted); margin-bottom:2px;">${escHtml(m.senderName)}</div>` : ''}
+          ${!isSelf ? `
+            <div class="frp-chat-sender-name">
+              <span>${escHtml(senderLabel)}</span>
+              ${!isRoom && !targetUser.isSelfNote && targetUser.department ? `<span class="frp-presence-dept-badge" style="font-size:0.58rem;padding:0 4px;font-weight:600;">${escHtml(targetUser.department)}</span>` : ''}
+            </div>
+          ` : ''}
           <div class="frp-chat-bubble">${contentHtml}</div>
           ${reactionsHtml}
           <div class="frp-chat-msg-time">

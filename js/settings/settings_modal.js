@@ -166,15 +166,18 @@ window.openSettingsModal = function(initialTab = 'appearance') {
     const lName = overlay.querySelector('#profLastName')?.value;
     const uName = overlay.querySelector('#profUsername')?.value;
     const email = overlay.querySelector('#profEmail')?.value;
+    const emailDigestEl = overlay.querySelector('#cbChatEmailDigest');
 
     if (fName !== undefined) stagedProfile.firstName = fName.trim();
     if (lName !== undefined) stagedProfile.lastName = lName.trim();
     if (uName !== undefined) stagedProfile.username = uName.trim();
     if (email !== undefined) stagedProfile.email = email.trim();
+    if (emailDigestEl) stagedProfile.emailChatDigest = emailDigestEl.checked;
   }
 
   function renderModal() {
     const trashItems = FrpStore.getTrash() || [];
+    const isAdmin = authUser?.role === 'admin';
 
     const tabs = [
       { id: 'appearance', label: 'Görünüm & Yazı Tipi' },
@@ -184,6 +187,10 @@ window.openSettingsModal = function(initialTab = 'appearance') {
       { id: 'shortcuts',  label: 'Klavye Kısayolları' },
       { id: 'trash',      label: 'Çöp Kutusu', count: trashItems.length, isTrash: true },
       { id: 'storage',    label: 'Yedekleme & Depolama' },
+      ...(isAdmin ? [
+        { id: 'rooms',    label: '🏢 Sohbet Odaları & Kanallar' },
+        { id: 'mail',     label: '✉️ E-posta & SMTP Sağlığı' }
+      ] : []),
       { id: 'audit',      label: 'Denetim Günlüğü' }
     ];
 
@@ -319,7 +326,8 @@ window.openSettingsModal = function(initialTab = 'appearance') {
             window.FrpAuth.updateProfile({
               name: `${stagedProfile.firstName || ''} ${stagedProfile.lastName || ''}`.trim(),
               phone: stagedProfile.phone,
-              department: stagedProfile.department
+              department: stagedProfile.department,
+              email_chat_digest: stagedProfile.emailChatDigest
             }),
             new Promise(res => setTimeout(res, 800))
           ]).catch(() => {});
