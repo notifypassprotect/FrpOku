@@ -97,14 +97,44 @@ async function loadUserById(userId) {
 
 async function updateUserById(userId, updates) {
   if (supabase) {
-    const { data, error } = await supabase
-      .from('app_users')
-      .update(updates)
-      .eq('id', String(userId))
-      .select('id, username, email, full_name, phone, department, role, is_active, avatar, created_at, last_login')
-      .limit(1);
-    if (error) throw error;
-    return data && data[0] ? data[0] : null;
+    try {
+      const { data, error } = await supabase
+        .from('app_users')
+        .update(updates)
+        .eq('id', String(userId))
+        .select('id, username, email, full_name, phone, department, role, is_active, avatar, created_at, last_login')
+        .limit(1);
+      if (error) {
+        if (error.message && error.message.includes('is_frozen')) {
+          const fallbackUpdates = { ...updates };
+          delete fallbackUpdates.is_frozen;
+          const { data: fbData, error: fbError } = await supabase
+            .from('app_users')
+            .update(fallbackUpdates)
+            .eq('id', String(userId))
+            .select('id, username, email, full_name, phone, department, role, is_active, avatar, created_at, last_login')
+            .limit(1);
+          if (fbError) throw fbError;
+          return fbData && fbData[0] ? fbData[0] : null;
+        }
+        throw error;
+      }
+      return data && data[0] ? data[0] : null;
+    } catch (err) {
+      if (err.message && err.message.includes('is_frozen')) {
+        const fallbackUpdates = { ...updates };
+        delete fallbackUpdates.is_frozen;
+        const { data: fbData, error: fbError } = await supabase
+          .from('app_users')
+          .update(fallbackUpdates)
+          .eq('id', String(userId))
+          .select('id, username, email, full_name, phone, department, role, is_active, avatar, created_at, last_login')
+          .limit(1);
+        if (fbError) throw fbError;
+        return fbData && fbData[0] ? fbData[0] : null;
+      }
+      throw err;
+    }
   }
 
   const users = getLocalUsers();
@@ -2060,13 +2090,13 @@ app.get('/api/admin/system-health', adminRateLimiter, requireAdmin, async (req, 
 
   if (supabase) {
     try {
-      const uRes = await supabase.from('app_users').select('id, is_active, is_frozen');
+      const uRes = await supabase.from('app_users').select('id, is_active');
       dbLatencyMs = Date.now() - start;
       if (!uRes.error && Array.isArray(uRes.data)) {
         dbConnected = true;
         totalUsers = uRes.data.length;
-        pendingUsers = uRes.data.filter(u => u.is_active === false && !u.is_frozen).length;
-        frozenUsers = uRes.data.filter(u => u.is_frozen === true).length;
+        pendingUsers = uRes.data.filter(u => u.is_active === false).length;
+        frozenUsers = 0;
       }
     } catch {
       dbConnected = false;
@@ -2118,16 +2148,20 @@ app.get('/api/admin/system-health', adminRateLimiter, requireAdmin, async (req, 
 
 // ── ADMİN: SİSTEM & HAVUZ DURUM ÖZETİ E-POSTASI GÖNDERME ──────────────────
 app.post('/api/admin/mail/send-digest', adminRateLimiter, requireAdmin, async (req, res) => {
-  const adminEmail = req.adminUser.email || process.env.BOOTSTRAP_ADMIN_EMAIL || process.env.SMTP_USER;
+  const requestedEmail = String(req.body?.email || '').trim().toLowerCase();
+  const adminEmail = (requestedEmail && isValidEmail(requestedEmail))
+    ? requestedEmail
+    : (req.adminUser?.email || process.env.BOOTSTRAP_ADMIN_EMAIL || process.env.SMTP_USER);
+
   if (!adminEmail) return res.status(400).json({ success: false, reason: 'Yönetici e-posta adresi bulunamadı.' });
 
   try {
     let users = [];
     let reports = [];
     if (supabase) {
-      const uRes = await supabase.from('app_users').select('id, is_active, is_frozen, role');
+      const uRes = await supabase.from('app_users').select('id, is_active, role');
       users = uRes.data || [];
-      const rRes = await supabase.from('reports').select('id, is_public, in_pool');
+      const rRes = await supabase.from('reports').select('id, is_public');
       reports = rRes.data || [];
     } else {
       users = getLocalUsers();
@@ -2151,16 +2185,17 @@ app.post('/api/admin/mail/send-digest', adminRateLimiter, requireAdmin, async (r
       userId: req.adminUser.id,
       username: req.adminUser.username,
       role: 'admin',
-      action: 'MAIL_DIGEST_SENT',
+      action: mailResult.sent ? 'MAIL_DIGEST_SENT' : 'MAIL_DIGEST_FAILED',
       target: adminEmail,
-      details: `Sistem durum özeti gönderildi: ${mailResult.status}`,
+      details: `Sistem durum özeti: ${mailResult.status}${mailResult.error ? ' (' + mailResult.error + ')' : ''}`,
       ip: req.ip
     });
 
-    res.json({
+    res.status(mailResult.sent ? 200 : 503).json({
       success: mailResult.sent,
       status: mailResult.status,
-      message: mailResult.sent ? 'Sistem özeti e-posta adresinize gönderildi.' : 'E-posta gönderilemedi (SMTP kapalı veya hatalı).'
+      message: mailResult.sent ? 'Sistem özeti e-posta adresinize gönderildi.' : (mailResult.error || mailResult.reason || 'E-posta gönderilemedi (SMTP kapalı veya hatalı).'),
+      reason: mailResult.sent ? undefined : (mailResult.error || mailResult.reason || 'E-posta gönderilemedi (SMTP kapalı veya hatalı).')
     });
   } catch (err) {
     res.status(503).json({ success: false, reason: err.message });

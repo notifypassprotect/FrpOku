@@ -286,35 +286,48 @@
  resultEl.style.color = 'var(--accent,#2563eb)';
  resultEl.textContent = 'Test e-postası gönderiliyor...';
  try {
+ const authHeaders = (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') ? window.FrpAuth.getAuthHeaders() : {};
  const testResponse = await fetch('/api/admin/mail/test', {
  method: 'POST',
- headers: (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') ? window.FrpAuth.getAuthHeaders() : { 'Content-Type': 'application/json' },
+ headers: {
+ 'Content-Type': 'application/json',
+ ...authHeaders
+ },
  body: JSON.stringify({ email })
  });
  const testData = await testResponse.json();
  resultEl.style.color = testData.success ? '#10b981' : '#ef4444';
- resultEl.textContent = testData.success ? 'Test e-postası başarıyla gönderildi.' : (testData.reason || 'E-posta gönderilemedi.');
+ resultEl.textContent = testData.success ? 'Test e-postası başarıyla gönderildi.' : (testData.reason || testData.message || 'E-posta gönderilemedi.');
+ if (testData.success && typeof window.toast === 'function') {
+ window.toast('Test e-postası başarıyla gönderildi.', 'success');
+ }
  } catch (error) {
  resultEl.style.color = '#ef4444';
- resultEl.textContent = 'Mail servisine ulaşılamadı.';
+ resultEl.textContent = 'Mail servisine ulaşılamadı: ' + error.message;
  } finally {
  event.currentTarget.disabled = false;
  }
  });
 
  body.querySelector('#btnAdminSendDigest')?.addEventListener('click', async event => {
+ const email = (body.querySelector('#adminMailTestAddress')?.value || '').trim();
  const resultEl = body.querySelector('#adminMailTestResult');
  event.currentTarget.disabled = true;
  resultEl.style.color = 'var(--accent,#2563eb)';
  resultEl.textContent = 'Sistem özeti e-postası hazırlanıp gönderiliyor...';
  try {
+ const authHeaders = (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') ? window.FrpAuth.getAuthHeaders() : {};
  const res = await fetch('/api/admin/mail/send-digest', {
  method: 'POST',
- headers: (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') ? window.FrpAuth.getAuthHeaders() : {}
+ headers: {
+ 'Content-Type': 'application/json',
+ ...authHeaders
+ },
+ body: JSON.stringify({ email })
  });
  const data = await res.json();
  resultEl.style.color = data.success ? '#10b981' : '#ef4444';
- resultEl.textContent = data.success ? 'Sistem özeti başarıyla admin e-postasına gönderildi.' : (data.reason || 'Özet e-posta gönderilemedi.');
+ resultEl.textContent = data.success ? 'Sistem özeti başarıyla e-posta adresine gönderildi.' : (data.reason || data.message || 'Özet e-posta gönderilemedi.');
  if (data.success && typeof window.toast === 'function') {
  window.toast('Sistem özeti e-postası gönderildi.', 'success');
  }
