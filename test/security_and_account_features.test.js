@@ -107,3 +107,10 @@ test('normal giriş ve kurtarma anahtarı aynı güvenli oturum yolunu kullanır
   assert.match(recoveryUi, /clearSessionCache/);
   assert.match(recoveryUi, /refreshFromCloud/);
 });
+
+test('Supabase şeması kimlik kurtarma ve e-posta tercih alanlarını içerir', () => {
+  const migration = fs.readFileSync(path.join(__dirname, '../supabase/migrations/008_auth_recovery_and_mail_preferences.sql'), 'utf8');
+  assert.match(migration, /add column if not exists recovery_keys jsonb not null default '\[\]'::jsonb/i);
+  assert.match(migration, /add column if not exists previous_password_hashes jsonb not null default '\[\]'::jsonb/i);
+  assert.match(migration, /add column if not exists email_chat_digest boolean not null default true/i);
+});
