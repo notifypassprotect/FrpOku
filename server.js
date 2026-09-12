@@ -832,6 +832,7 @@ app.post('/api/auth/recover-with-key', authRateLimiter, async (req, res) => {
     const safeUser = { ...user, ...updates };
     delete safeUser.password_hash;
     delete safeUser.previous_password_hashes;
+    delete safeUser.recovery_keys;
 
     const token = signToken({
       id: safeUser.id,
@@ -999,11 +1000,16 @@ app.post('/api/auth/reset-password-with-code', authRateLimiter, async (req, res)
       exp: Date.now() + 7 * 24 * 3600 * 1000
     });
 
+    const safeUser = { ...updatedUser };
+    delete safeUser.password_hash;
+    delete safeUser.previous_password_hashes;
+    delete safeUser.recovery_keys;
+
     res.json({
       success: true,
       message: 'Şifreniz başarıyla sıfırlandı ve oturum açıldı.',
       token,
-      user: updatedUser
+      user: safeUser
     });
   } catch (err) {
     console.error('Kod ile şifre sıfırlama hatası:', err.message);

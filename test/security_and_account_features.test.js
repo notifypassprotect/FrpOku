@@ -83,3 +83,17 @@ test('şifre değişiminde yeni token istemci oturumuna yazılır ve şema geçi
   assert.match(serverContent, /\['is_frozen', 'password_changed_at'\]/);
   assert.match(migration, /add column if not exists password_changed_at timestamptz/i);
 });
+
+test('kod ile şifre sıfırlama güvenli oturum kurar ve raporları yeniden yükler', () => {
+  const authContent = fs.readFileSync(path.join(__dirname, '../js/core/auth.js'), 'utf8');
+  const portalContent = fs.readFileSync(path.join(__dirname, '../js/core/auth/auth_portal.js'), 'utf8');
+  const serverContent = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
+  assert.match(authContent, /function applyExternalSession\(token, user, remember = true\)/);
+  assert.match(authContent, /delete safeUser\.password_hash/);
+  assert.match(portalContent, /FrpStore\.clearSessionCache/);
+  assert.match(portalContent, /await window\.FrpStore\.refreshFromCloud\(\)/);
+  const resetRoute = serverContent.slice(serverContent.indexOf("app.post('/api/auth/reset-password-with-code'"), serverContent.indexOf("// ── 3. ADMİN"));
+  assert.match(resetRoute, /delete safeUser\.password_hash/);
+  assert.match(resetRoute, /user: safeUser/);
+  assert.doesNotMatch(resetRoute, /user: updatedUser/);
+});

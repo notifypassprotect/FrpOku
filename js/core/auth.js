@@ -122,6 +122,17 @@
  refreshAdminPendingBadge();
  }
 
+ function applyExternalSession(token, user, remember = true) {
+ if (!token || !user || !user.id) return null;
+ const safeUser = { ...user, token };
+ delete safeUser.password_hash;
+ delete safeUser.previous_password_hashes;
+ delete safeUser.recovery_keys;
+ try { localStorage.setItem('frpoku_auth_token', token); } catch {}
+ setSession(safeUser, remember);
+ return safeUser;
+ }
+
  function getSession() {
  if (currentUser) return currentUser;
  try {
@@ -452,6 +463,7 @@
  requestEmailChange,
  confirmEmailChange,
  updateProfile,
+ applyExternalSession,
  updateSession
  };
 })();

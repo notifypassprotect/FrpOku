@@ -643,12 +643,15 @@
         });
         const d = await r.json().catch(() => ({}));
         if (r.ok && d.success) {
-          if (d.token) {
-            if (window.FrpAuth && typeof window.FrpAuth.applyExternalSession === 'function') {
-              window.FrpAuth.applyExternalSession(d.token, d.user);
-            } else {
-              localStorage.setItem('frpoku_session', d.token);
-            }
+          if (!d.token || !d.user || !window.FrpAuth || typeof window.FrpAuth.applyExternalSession !== 'function') {
+            throw new Error('Güvenli oturum oluşturulamadı. Lütfen yeni şifrenizle giriş yapınız.');
+          }
+          window.FrpAuth.applyExternalSession(d.token, d.user, true);
+          if (window.FrpStore && typeof window.FrpStore.clearSessionCache === 'function') {
+            window.FrpStore.clearSessionCache();
+          }
+          if (window.FrpStore && typeof window.FrpStore.refreshFromCloud === 'function') {
+            await window.FrpStore.refreshFromCloud();
           }
           portal.remove();
           const appWrapEl = document.querySelector('.app-wrap');
