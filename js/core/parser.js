@@ -535,8 +535,8 @@ function parseFrp(xmlText) {
     };
   }
 
-  // 1. TfrxReportPage & TfrxDMPPage (Rapor & Nokta Vuruşlu/Barkod Sayfaları & Bantlar)
-  const pageRx = /<(TfrxReportPage|TfrxDMPPage)\b([\s\S]*?)>([\s\S]*?)<\/\1>/gi;
+  // 1. Rapor sayfaları (FastReport sürümleri farklı sayfa sınıf adları kullanabilir)
+  const pageRx = /<(TfrxReportPage|TfrxDMPPage|TfrxPage|ReportPage)\b([\s\S]*?)>([\s\S]*?)<\/\1>/gi;
   let pMatch;
   while ((pMatch = pageRx.exec(xmlText)) !== null) {
     const pType = pMatch[1];
@@ -650,6 +650,48 @@ function parseFrp(xmlText) {
     });
 
     result.pages.push(pageObj);
+  }
+
+  // Sayfa sarmalayıcısı olmayan eski/özel FRP çıktılarında görsel nesneleri kaybetme.
+  if (result.pages.length === 0) {
+    const fallbackComponents = [];
+    const fallbackCompRx = /<(Tfrx[A-Za-z0-9_]+View|TfrxChartView|TfrxShapeView|TfrxDMPMemoView|TfrxBarCodeView|TfrxPictureView|TfrxLineView|TfrxMemoView|TfrxSubreport)\b([\s\S]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi;
+    let fallbackMatch;
+    while ((fallbackMatch = fallbackCompRx.exec(xmlText)) !== null) {
+      fallbackComponents.push(parseComponentNode(fallbackMatch[1], fallbackMatch[2]));
+    }
+
+    if (fallbackComponents.length > 0) {
+      const maxBottom = fallbackComponents.reduce((max, component) => {
+        return Math.max(max, (component.top || 0) + (component.height || 0));
+      }, 30);
+      result.pages.push({
+        type: 'TfrxReportPage',
+        name: 'Page1',
+        orientation: 'poPortrait',
+        paperWidth: 210,
+        paperHeight: 297,
+        leftMargin: 10,
+        topMargin: 10,
+        rightMargin: 10,
+        bottomMargin: 10,
+        columnWidth: 0,
+        bands: [{
+          type: 'TfrxPageContent',
+          name: 'KurtarılanSayfaİçeriği',
+          top: 0,
+          height: Math.max(30, maxBottom),
+          width: 794,
+          dataSet: '',
+          condition: '',
+          stretched: false,
+          vertical: false,
+          left: 0,
+          rawAttrs: '',
+          components: fallbackComponents
+        }]
+      });
+    }
   }
 
   // 2. TfrxDialogPage (Kullanıcı Parametre / Filtreleme Formları)

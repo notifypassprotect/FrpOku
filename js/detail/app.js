@@ -1473,15 +1473,17 @@ async function init() {
  if (file.rawXml && typeof parseFrp === 'function') {
  const hasStructure = Array.isArray(file.queries) && file.queries.length > 0 &&
  Array.isArray(file.tree) && file.tree.length > 0;
- if (!hasStructure) {
+ const hasVisualPages = (Array.isArray(file.pages) && file.pages.length > 0) ||
+ (Array.isArray(file.dialogPages) && file.dialogPages.length > 0);
+ if (!hasStructure || !hasVisualPages) {
  try {
  const reParsed = parseFrp(file.rawXml);
- file.pages = reParsed.pages;
- file.dialogPages = reParsed.dialogPages;
- file.queries = reParsed.queries;
- file.tree = reParsed.tree;
- file.pascalScript = reParsed.pascalScript;
- file.datasets = reParsed.datasets;
+ if (Array.isArray(reParsed.pages) && reParsed.pages.length > 0) file.pages = reParsed.pages;
+ if (Array.isArray(reParsed.dialogPages) && reParsed.dialogPages.length > 0) file.dialogPages = reParsed.dialogPages;
+ if (Array.isArray(reParsed.queries) && reParsed.queries.length > 0) file.queries = reParsed.queries;
+ if (Array.isArray(reParsed.tree) && reParsed.tree.length > 0) file.tree = reParsed.tree;
+ if (reParsed.pascalScript) file.pascalScript = reParsed.pascalScript;
+ if (Array.isArray(reParsed.datasets) && reParsed.datasets.length > 0) file.datasets = reParsed.datasets;
  } catch (e) {
  console.error('parseFrp hatası:', e);
  }

@@ -138,6 +138,24 @@ test('FRP parser iç içe SQL, TfrxParamItem ve şemalı tablo adlarını eksiks
   assert.deepEqual(parsed.tableNames, ['APP.SECIMLER', 'HASTANE.HASTALAR', 'ORTAK.BIRIMLER']);
 });
 
+test('tasarım önizlemesi alternatif sayfa adı ve sayfasız görsel bileşen için fallback üretir', () => {
+  const alternatePage = parseFrp(`
+    <TfrxReport><TfrxPage Name="OzelSayfa" PaperWidth="100" PaperHeight="200">
+      <TfrxMemoView Name="Baslik" Top="12" Height="20" Text="Merhaba" />
+    </TfrxPage></TfrxReport>
+  `);
+  assert.equal(alternatePage.pages[0].name, 'OzelSayfa');
+
+  const orphanComponent = parseFrp(`
+    <TfrxReport><TfrxMemoView Name="YetimMemo" Top="40" Height="20" Text="Kurtar" /></TfrxReport>
+  `);
+  assert.equal(orphanComponent.pages.length, 1);
+  assert.equal(orphanComponent.pages[0].bands[0].components[0].name, 'YetimMemo');
+
+  const detailCode = fs.readFileSync(path.join(__dirname, '../js/detail/app.js'), 'utf8');
+  assert.match(detailCode, /!hasStructure \|\| !hasVisualPages/);
+});
+
 test('buildOwnedReportRow hafifletilmiş güncellemede mevcut rawXml, pages ve tree verilerini korur', () => {
   const { buildOwnedReportRow } = require('../lib/report_access');
   const existing = {
