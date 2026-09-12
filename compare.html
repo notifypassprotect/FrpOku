@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
-  <title>FrpOku â€” Rapor KarÅŸÄ±laÅŸtÄ±rma</title>
+  <title>FrpOku — Rapor Karşılaştırma</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inconsolata:wght@400;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700;800&family=Nunito:wght@400;600;700;800&family=Open+Sans:wght@400;600;700&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&family=Raleway:wght@400;600;700;800&family=Roboto:wght@400;500;700&family=Source+Code+Pro:wght@400;600;700&family=Source+Sans+3:wght@400;600;700&family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet">
@@ -18,91 +18,91 @@
 <body>
 <div class="cmp-shell">
 
-  <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• TOPBAR â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+  <!-- ═══════════════ TOPBAR ═══════════════ -->
   <nav class="cmp-topbar">
     <!-- Sol -->
     <div class="cmp-topbar-left">
       <button class="btn btn-sm btn-ghost" id="btnBack" style="gap:.4rem;">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
-        <span>Listeye DÃ¶n</span>
+        <span>Listeye Dön</span>
       </button>
       <div class="cmp-brand">
         <span class="cmp-brand-icon" style="display:inline-flex;align-items:center;justify-content:center;color:var(--accent);">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg>
         </span>
         <div>
-          <div class="cmp-brand-title">Rapor KarÅŸÄ±laÅŸtÄ±rma</div>
+          <div class="cmp-brand-title">Rapor Karşılaştırma</div>
           <div class="cmp-brand-sub">Yan yana fark ve kod analizi</div>
         </div>
       </div>
     </div>
 
-    <!-- Orta â€” Sekmeler (KaydÄ±rÄ±labilir & HÄ±zlÄ± SeÃ§im MenÃ¼lÃ¼) -->
+    <!-- Orta — Sekmeler (Kaydırılabilir & Hızlı Seçim Menülü) -->
     <div class="cmp-topbar-center">
-      <button class="btn btn-sm btn-ghost cmp-tab-scroll-btn" id="btnTabScrollLeft" title="Sola KaydÄ±r">
+      <button class="btn btn-sm btn-ghost cmp-tab-scroll-btn" id="btnTabScrollLeft" title="Sola Kaydır">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
       <div class="tab-bar-scroll-wrap" id="tabBarScrollWrap">
         <div class="tab-bar" id="diffTabBar"></div>
       </div>
-      <button class="btn btn-sm btn-ghost cmp-tab-scroll-btn" id="btnTabScrollRight" title="SaÄŸa KaydÄ±r">
+      <button class="btn btn-sm btn-ghost cmp-tab-scroll-btn" id="btnTabScrollRight" title="Sağa Kaydır">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
       </button>
-      <select class="field-select cmp-query-dropdown" id="selectQueryJump" title="HÄ±zlÄ± Sorgu SeÃ§imi" style="display:none;">
-        <option value="">Sorgu SeÃ§...</option>
+      <select class="field-select cmp-query-dropdown" id="selectQueryJump" title="Hızlı Sorgu Seçimi" style="display:none;">
+        <option value="">Sorgu Seç...</option>
       </select>
     </div>
 
-    <!-- SaÄŸ â€” AraÃ§lar -->
+    <!-- Sağ — Araçlar -->
     <div class="cmp-topbar-right">
       <div class="cmp-diff-nav">
-        <button class="btn btn-sm btn-ghost" id="btnPrevDiff" title="Ã–nceki Fark (Alt+P)">
+        <button class="btn btn-sm btn-ghost" id="btnPrevDiff" title="Önceki Fark (Alt+P)">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
         </button>
-        <span id="diffCounterBadge" class="badge badge-gray" style="font-size:.72rem;min-width:64px;text-align:center;">â€”</span>
+        <span id="diffCounterBadge" class="badge badge-gray" style="font-size:.72rem;min-width:64px;text-align:center;">—</span>
         <button class="btn btn-sm btn-ghost" id="btnNextDiff" title="Sonraki Fark (Alt+N)">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
       </div>
-      <button class="btn btn-sm btn-ghost" id="btnToggleFold" title="Sadece FarklarÄ± GÃ¶ster (deÄŸiÅŸmeyen satÄ±rlar katlanÄ±r)">Sadece Farklar</button>
-      <button class="btn btn-sm btn-ghost" id="btnUndoTransfer" title="Son koda aktarÄ±mÄ± geri al (Ctrl+Z)">Geri Al</button>
-      <select class="field-select" id="selectDiffTheme" style="font-size:.78rem;padding:.28rem .5rem;border-radius:7px;" title="Diff Kod TemasÄ±">
-        <option value="default">VarsayÄ±lan Tema</option>
+      <button class="btn btn-sm btn-ghost" id="btnToggleFold" title="Sadece Farkları Göster (değişmeyen satırlar katlanır)">Sadece Farklar</button>
+      <button class="btn btn-sm btn-ghost" id="btnUndoTransfer" title="Son koda aktarımı geri al (Ctrl+Z)">Geri Al</button>
+      <select class="field-select" id="selectDiffTheme" style="font-size:.78rem;padding:.28rem .5rem;border-radius:7px;" title="Diff Kod Teması">
+        <option value="default">Varsayılan Tema</option>
         <option value="vscode-dark">VS Code Dark</option>
         <option value="github-light">GitHub Light</option>
         <option value="monokai">Monokai</option>
         <option value="solarized">Solarized</option>
       </select>
-      <button class="theme-switch-pill" id="btnThemeToggle" title="Tema DeÄŸiÅŸtir">Koyu Mod</button>
+      <button class="theme-switch-pill" id="btnThemeToggle" title="Tema Değiştir">Koyu Mod</button>
     </div>
   </nav>
 
-  <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• SELECTOR BAR â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+  <!-- ═══════════════ SELECTOR BAR ═══════════════ -->
   <div class="cmp-selector-bar">
     <!-- Rapor A -->
     <div class="cmp-slot" id="slotA">
       <div class="cmp-slot-label">
         <span class="cmp-slot-num">1</span>
-        <span>Sol Â· Baz Rapor</span>
+        <span>Sol · Baz Rapor</span>
       </div>
       <button type="button" class="cmp-slot-btn" id="btnPickerA">
-        <span class="cmp-slot-name" id="titleFileA">Rapor seÃ§ilmedi...</span>
-        <span class="cmp-slot-change">DeÄŸiÅŸtir</span>
+        <span class="cmp-slot-name" id="titleFileA">Rapor seçilmedi...</span>
+        <span class="cmp-slot-change">Değiştir</span>
       </button>
     </div>
 
-    <!-- AyraÃ§ -->
+    <!-- Ayraç -->
     <div class="cmp-vs-badge">VS</div>
 
     <!-- Rapor B -->
     <div class="cmp-slot" id="slotB">
       <div class="cmp-slot-label">
         <span class="cmp-slot-num cmp-slot-num-b">2</span>
-        <span>SaÄŸ Â· KarÅŸÄ±laÅŸtÄ±rÄ±lan</span>
+        <span>Sağ · Karşılaştırılan</span>
       </div>
       <button type="button" class="cmp-slot-btn" id="btnPickerB">
-        <span class="cmp-slot-name" id="titleFileB">Rapor seÃ§ilmedi...</span>
-        <span class="cmp-slot-change">DeÄŸiÅŸtir</span>
+        <span class="cmp-slot-name" id="titleFileB">Rapor seçilmedi...</span>
+        <span class="cmp-slot-change">Değiştir</span>
       </button>
     </div>
 
@@ -114,13 +114,13 @@
       </div>
       <button type="button" class="cmp-slot-btn cmp-slot-btn-c" id="btnPickerC">
         <span class="cmp-slot-name" id="titleFileC">+ Panel Ekle</span>
-        <span class="cmp-slot-change">SeÃ§ / KaldÄ±r</span>
+        <span class="cmp-slot-change">Seç / Kaldır</span>
       </button>
     </div>
 
-    <!-- Ã–zet -->
+    <!-- Özet -->
     <div class="cmp-summary-pill" id="diffSummaryBar">
-      <span>Ä°ki rapor seÃ§in...</span>
+      <span>İki rapor seçin...</span>
     </div>
 
     <!-- Hidden selects (backward compat) -->
@@ -129,7 +129,7 @@
     <select id="selectFileC" style="display:none;"></select>
   </div>
 
-  <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• DIFF VIEWPORT â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+  <!-- ═══════════════ DIFF VIEWPORT ═══════════════ -->
   <div class="cmp-diff-container" style="position:relative;">
     <div class="diff-grid" id="diffGrid">
 
@@ -139,7 +139,7 @@
           <span id="labelPaneA" class="diff-pane-title">Rapor 1</span>
           <div style="display:flex;align-items:center;gap:.4rem;">
             <span class="badge badge-blue" id="badgePaneA" style="font-size:.68rem;">Baz</span>
-            <button class="btn btn-sm btn-ghost cmp-pane-change" data-compare-action="picker" data-pane="A" title="Raporu DeÄŸiÅŸtir" style="font-size:.72rem;padding:2px 8px;">DeÄŸiÅŸtir</button>
+            <button class="btn btn-sm btn-ghost cmp-pane-change" data-compare-action="picker" data-pane="A" title="Raporu Değiştir" style="font-size:.72rem;padding:2px 8px;">Değiştir</button>
           </div>
         </div>
         <div class="diff-scroll" id="scrollPaneA">
@@ -147,13 +147,13 @@
         </div>
       </div>
 
-      <!-- SaÄŸ Pane (B) -->
+      <!-- Sağ Pane (B) -->
       <div class="diff-pane">
         <div class="diff-pane-header">
           <span id="labelPaneB" class="diff-pane-title">Rapor 2</span>
           <div style="display:flex;align-items:center;gap:.4rem;">
-            <span class="badge badge-green" id="badgePaneB" style="font-size:.68rem;">KarÅŸÄ±laÅŸtÄ±rÄ±lan</span>
-            <button class="btn btn-sm btn-ghost cmp-pane-change" data-compare-action="picker" data-pane="B" title="Raporu DeÄŸiÅŸtir" style="font-size:.72rem;padding:2px 8px;">DeÄŸiÅŸtir</button>
+            <span class="badge badge-green" id="badgePaneB" style="font-size:.68rem;">Karşılaştırılan</span>
+            <button class="btn btn-sm btn-ghost cmp-pane-change" data-compare-action="picker" data-pane="B" title="Raporu Değiştir" style="font-size:.72rem;padding:2px 8px;">Değiştir</button>
           </div>
         </div>
         <div class="diff-scroll" id="scrollPaneB">
@@ -161,13 +161,13 @@
         </div>
       </div>
 
-      <!-- 3. Pane (C) â€” Gizli -->
+      <!-- 3. Pane (C) — Gizli -->
       <div class="diff-pane" id="paneC" style="display:none;">
         <div class="diff-pane-header">
           <span id="labelPaneC" class="diff-pane-title">Rapor 3</span>
           <div style="display:flex;align-items:center;gap:.4rem;">
             <span class="badge badge-orange" id="badgePaneC" style="font-size:.68rem;">3. Panel</span>
-            <button class="btn btn-sm btn-ghost cmp-pane-change" data-compare-action="picker" data-pane="C" title="Raporu DeÄŸiÅŸtir" style="font-size:.72rem;padding:2px 8px;">DeÄŸiÅŸtir</button>
+            <button class="btn btn-sm btn-ghost cmp-pane-change" data-compare-action="picker" data-pane="C" title="Raporu Değiştir" style="font-size:.72rem;padding:2px 8px;">Değiştir</button>
           </div>
         </div>
         <div class="diff-scroll" id="scrollPaneC">
@@ -177,7 +177,7 @@
 
     </div>
     <!-- VS Code stili Minimap -->
-    <div class="diff-minimap" id="diffMinimap" title="Fark haritasÄ± â€” tÄ±klayarak atla"></div>
+    <div class="diff-minimap" id="diffMinimap" title="Fark haritası — tıklayarak atla"></div>
   </div>
 
 </div><!-- /cmp-shell -->
@@ -185,7 +185,7 @@
 <!-- Toast Stack -->
 <div id="toastCompare" class="toast-stack"></div>
 
-<!-- Scripts (ModÃ¼ler Mimari) -->
+<!-- Scripts (Modüler Mimari) -->
 <script src="js/lib/supabase.js?v=4.3"></script>
 <script src="/runtime-config.js"></script>
 <script src="js/core/notify.js?v=4.3"></script>
