@@ -1817,40 +1817,81 @@ app.put('/api/reports/:id', apiWriteRateLimiter, requireAuth, async (req, res) =
   }
 });
 
-app.get('/api/settings', requireAuth, async (req, res) => {
-  if (!supabase) return res.json({ success: true, settings: null });
+// ── KULLANICI AYARLARI (SUPABASE & YEREL JSON ÇİFT KATMANLI DEPO) ──
+const USER_SETTINGS_PATH = path.join(__dirname, 'data', 'user_settings.json');
+
+function getUserSettingsFileMap() {
   try {
-    const { data, error } = await supabase.from('user_settings').select('*').eq('id', String(req.authUser.id)).limit(1);
-    if (error) throw error;
-    const settings = data && data[0] ? data[0] : null;
-    res.json({ success: true, settings: settings ? { ...settings, customTags: settings.custom_tags || [] } : null });
-  } catch (error) {
-    console.warn('Kullanıcı ayarları yüklenemedi:', safeLogStr(error.message));
-    res.status(503).json({ success: false, reason: 'Kullanıcı ayarları yüklenemedi.' });
+    if (fs.existsSync(USER_SETTINGS_PATH)) {
+      return JSON.parse(fs.readFileSync(USER_SETTINGS_PATH, 'utf8')) || {};
+    }
+  } catch {}
+  return {};
+}
+
+function saveUserSettingsFileMap(map) {
+  try {
+    const dir = path.dirname(USER_SETTINGS_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(map, null, 2), 'utf8');
+  } catch {}
+}
+
+app.get('/api/settings', requireAuth, async (req, res) => {
+  const userId = String(req.authUser.id);
+  const localMap = getUserSettingsFileMap();
+  let settings = localMap[userId] || null;
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from('user_settings').select('*').eq('id', userId).limit(1);
+      if (!error && data && data[0]) {
+        settings = { ...data[0], customTags: data[0].custom_tags || [] };
+        // Yerel önbelleğe de senkronize et
+        localMap[userId] = settings;
+        saveUserSettingsFileMap(localMap);
+      }
+    } catch (error) {
+      console.warn('Supabase ayar yükleme uyarısı (yerel yedek kullanılacak):', safeLogStr(error.message));
+    }
   }
+
+  res.json({ success: true, settings: settings ? { ...settings, customTags: settings.custom_tags || settings.customTags || [] } : null });
 });
 
 app.patch('/api/settings', apiWriteRateLimiter, requireAuth, async (req, res) => {
-  if (!supabase) return res.status(503).json({ success: false, reason: 'Ayar senkronizasyonu kullanılamıyor.' });
+  const userId = String(req.authUser.id);
+  const localMap = getUserSettingsFileMap();
+  const current = localMap[userId] || {};
+
   try {
-    const currentResult = await supabase.from('user_settings').select('*').eq('id', String(req.authUser.id)).limit(1);
-    if (currentResult.error) throw currentResult.error;
-    const current = currentResult.data?.[0] || {};
     const customTagsInput = req.body?.custom_tags ?? req.body?.customTags;
     const row = {
-      id: String(req.authUser.id),
+      id: userId,
       theme: boundedSetting(req.body?.theme ?? current.theme, 50, 'light'),
       preferences: plainObject(req.body?.preferences) ? req.body.preferences : (current.preferences || {}),
       recent_reports: Array.isArray(req.body?.recent_reports) ? req.body.recent_reports.slice(0, 100) : (current.recent_reports || []),
       custom_tags: Array.isArray(customTagsInput) ? customTagsInput.slice(0, 100).map(tag => boundedSetting(tag, 100)).filter(Boolean) : (current.custom_tags || []),
       updated_at: new Date().toISOString()
     };
-    const { error } = await supabase.from('user_settings').upsert(row, { onConflict: 'id' });
-    if (error) throw error;
+
+    // 1. Yerel dosya deposuna kullanıcı bazlı kaydet
+    localMap[userId] = row;
+    saveUserSettingsFileMap(localMap);
+
+    // 2. Supabase varsa buluta da yaz
+    if (supabase) {
+      try {
+        await supabase.from('user_settings').upsert(row, { onConflict: 'id' });
+      } catch (sbErr) {
+        console.warn('Supabase ayar kaydetme uyarısı:', safeLogStr(sbErr.message));
+      }
+    }
+
     res.json({ success: true, settings: { ...row, customTags: row.custom_tags } });
   } catch (error) {
     console.warn('Kullanıcı ayarları kaydedilemedi:', safeLogStr(error.message));
-    res.status(503).json({ success: false, reason: 'Kullanıcı ayarları kaydedilemedi.' });
+    res.status(500).json({ success: false, reason: 'Kullanıcı ayarları kaydedilemedi.' });
   }
 });
 
@@ -2290,16 +2331,28 @@ function saveChatMessages() {
 function getUnreadCountsForUser(userId) {
   const msgs = getChatMessages();
   const counts = {};
+  const lastInteraction = {};
   let total = 0;
   const strUser = String(userId);
   for (const m of msgs) {
-    if (String(m.receiverId) === strUser && !m.isRead) {
+    const isIncoming = String(m.receiverId) === strUser;
+    const isOutgoing = String(m.senderId) === strUser;
+    if (isIncoming && !m.isRead) {
       const senderKey = String(m.senderId);
       counts[senderKey] = (counts[senderKey] || 0) + 1;
       total++;
     }
+    if (isIncoming || isOutgoing) {
+      const peerId = isIncoming ? String(m.senderId) : String(m.receiverId);
+      if (peerId && peerId !== strUser) {
+        const time = new Date(m.createdAt || 0).getTime();
+        if (!lastInteraction[peerId] || time > lastInteraction[peerId]) {
+          lastInteraction[peerId] = time;
+        }
+      }
+    }
   }
-  return { bySender: counts, total };
+  return { bySender: counts, total, lastInteraction };
 }
 
 app.post('/api/presence/heartbeat', requireAuth, async (req, res) => {

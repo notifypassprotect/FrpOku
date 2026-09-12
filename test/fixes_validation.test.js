@@ -130,3 +130,53 @@ test('tüm toast katmanları tam ekran modalların üzerinde gösterilir', () =>
   assert.match(presenceCss, /\.frp-inapp-toast-container[\s\S]*?z-index:\s*999999\s*!important/);
   assert.match(styleCss, /\.frp-toast-container[\s\S]*?z-index:\s*999999/);
 });
+
+test('report_designer.js dosyasında sözdizimi hatası yoktur ve FastReportDesigner tanımlanır', () => {
+  const designerPath = path.join(__dirname, '..', 'js', 'detail', 'report_designer.js');
+  const code = fs.readFileSync(designerPath, 'utf8');
+
+  assert.doesNotThrow(() => {
+    new Function(code);
+  }, 'report_designer.js temiz derlenmeli');
+  assert.match(code, /window\.FastReportDesigner\s*=/);
+});
+
+test('store_main.js ve themes.js ayarları kullanıcı bazlı izole anahtarlarla saklar', () => {
+  const storePath = path.join(__dirname, '..', 'js', 'store', 'store_main.js');
+  const themePath = path.join(__dirname, '..', 'js', 'core', 'themes.js');
+  const storeCode = fs.readFileSync(storePath, 'utf8');
+  const themeCode = fs.readFileSync(themePath, 'utf8');
+
+  assert.match(storeCode, /function _scopedStorageKey\(/);
+  assert.match(storeCode, /_scopedStorageKey\(PREFS_KEY\)/);
+  assert.match(themeCode, /function _scopedUserKey\(/);
+  assert.match(themeCode, /_scopedUserKey\(THEME_CODE_KEY\)/);
+});
+
+test('online_presence.js son mesajlaşılan kullanıcıları en üstte sıralar ve ses oynatıcı seeking desteği barındırır', () => {
+  const presenceJs = fs.readFileSync(path.join(__dirname, '..', 'js', 'core', 'online_presence.js'), 'utf8');
+
+  assert.match(presenceJs, /localLastInteractions/);
+  assert.match(presenceJs, /lastInteraction/);
+  assert.match(presenceJs, /bindAudioPlayer/);
+  assert.match(presenceJs, /isFinite\(audioEl\.duration\)/);
+  assert.match(presenceJs, /frp-audio-track/);
+});
+
+test('online_presence.css okunmamış mesaj içeren kullanıcı satırını canlı mavi ile vurgular', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'css', 'online_presence.css'), 'utf8');
+
+  assert.match(css, /\.frp-presence-item\.unread/);
+  assert.match(css, /linear-gradient\(90deg,\s*rgba\(37,\s*99,\s*235/);
+  assert.match(css, /border-left:\s*4px\s+solid/);
+});
+
+test('detail/app.js zengin not şablonları, sayaç ve Word modu tetikleyicisi barındırır', () => {
+  const appJs = fs.readFileSync(path.join(__dirname, '..', 'js', 'detail', 'app.js'), 'utf8');
+
+  assert.match(appJs, /selNoteTemplate/);
+  assert.match(appJs, /noteCharStats/);
+  assert.match(appJs, /btnOpenRichNoteModalDetail/);
+  assert.match(appJs, /btnInsertDateStamp/);
+});
+

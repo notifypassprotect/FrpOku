@@ -396,8 +396,22 @@
           }
           if (settingsSettled.status === 'fulfilled' && settingsSettled.value) {
             const cloudSettings = settingsSettled.value;
+            if (cloudSettings.preferences && typeof cloudSettings.preferences === 'object') {
+              setPreferences(cloudSettings.preferences);
+            }
+            if (cloudSettings.theme) {
+              if (window.FrpThemes && typeof window.FrpThemes.setTheme === 'function') {
+                window.FrpThemes.setTheme(cloudSettings.theme);
+              } else {
+                setTheme(cloudSettings.theme);
+              }
+            }
             const cloudTags = cloudSettings?.custom_tags ?? cloudSettings?.customTags;
-            if (Array.isArray(cloudTags)) localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(cloudTags));
+            if (Array.isArray(cloudTags)) {
+              localStorage.setItem(_scopedStorageKey(CUSTOM_TAGS_KEY), JSON.stringify(cloudTags));
+              localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(cloudTags));
+            }
+            applyPreferences();
           }
         } catch (cloudErr) {
           console.warn('Bulut senkronizasyonu hatası:', cloudErr);
@@ -1713,7 +1727,7 @@
 
   function getPreferences() {
     try {
-      const raw = localStorage.getItem(PREFS_KEY);
+      const raw = localStorage.getItem(_scopedStorageKey(PREFS_KEY)) || localStorage.getItem(PREFS_KEY);
       const defaults = { 
         theme: getTheme(), 
         fontWeight: 'normal',
@@ -1759,10 +1773,14 @@
     const cur = getPreferences();
     const updated = { ...cur, ...patch };
     if (updated.theme) {
+      localStorage.setItem(_scopedStorageKey(THEME_KEY), updated.theme);
       localStorage.setItem(THEME_KEY, updated.theme);
       localStorage.setItem('frpoku_theme', updated.theme);
     }
-    try { localStorage.setItem(PREFS_KEY, JSON.stringify(updated)); } catch {}
+    try {
+      localStorage.setItem(_scopedStorageKey(PREFS_KEY), JSON.stringify(updated));
+      localStorage.setItem(PREFS_KEY, JSON.stringify(updated));
+    } catch {}
     if (window.FrpCloud && typeof window.FrpCloud.saveSettings === 'function') {
       window.FrpCloud.saveSettings({ preferences: updated, theme: updated.theme });
     }
@@ -1871,7 +1889,7 @@
 
   function getUserProfile() {
     try {
-      const raw = localStorage.getItem(PROFILE_KEY);
+      const raw = localStorage.getItem(_scopedStorageKey(PROFILE_KEY)) || localStorage.getItem(PROFILE_KEY);
       return raw ? JSON.parse(raw) : { name: 'Kullanıcı', email: '' };
     } catch {
       return { name: 'Kullanıcı', email: '' };
@@ -1879,7 +1897,10 @@
   }
 
   function setUserProfile(profile) {
-    try { localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); } catch {}
+    try {
+      localStorage.setItem(_scopedStorageKey(PROFILE_KEY), JSON.stringify(profile));
+      localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+    } catch {}
     return profile;
   }
 

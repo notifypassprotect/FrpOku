@@ -1909,15 +1909,17 @@ function esc(str) {
       } else if (typeof window.showPromptDialog === 'function') {
         newText = await new Promise(resolve => {
           window.showPromptDialog({
- title: `"${selectedItem.name}" Metnini Düzenle`,
- message: 'Memo bileşeni metnini veya alan ifadesini düzenleyin:',
- defaultValue: oldText,
- onConfirm: resolve
- });
- } else {
- resolve(oldText);
- }
- });
+            title: `"${selectedItem.name}" Metnini Düzenle`,
+            message: 'Memo bileşeni metnini veya alan ifadesini düzenleyin:',
+            defaultValue: oldText,
+            onConfirm: resolve,
+            onCancel: () => resolve(oldText)
+          });
+        });
+      } else {
+        const res = window.prompt('Memo bileşeni metnini veya alan ifadesini düzenleyin:', oldText);
+        newText = res !== null ? res : oldText;
+      }
 
  if (newText!== null && newText!== oldText) {
  pushUndoState();

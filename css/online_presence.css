@@ -333,8 +333,18 @@
 }
 
 .frp-presence-item.unread {
-  background: rgba(37, 99, 235, 0.08);
-  border-left: 3px solid var(--accent, #2563eb);
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.22), rgba(59, 130, 246, 0.08)) !important;
+  border-left: 4px solid var(--accent, #2563eb) !important;
+  box-shadow: inset 0 0 12px rgba(37, 99, 235, 0.1);
+}
+
+.frp-presence-item.unread .frp-presence-name {
+  font-weight: 700;
+  color: var(--accent-bright, #2563eb);
+}
+
+.frp-presence-item.unread .frp-presence-avatar {
+  box-shadow: 0 0 0 2px #2563eb, 0 0 10px rgba(37, 99, 235, 0.4);
 }
 
 .frp-presence-unread-badge {
@@ -1004,12 +1014,17 @@
 
 .frp-audio-progress-wrap {
   width: 100%;
-  height: 4px;
+  height: 6px;
   background: rgba(255, 255, 255, 0.35);
-  border-radius: 2px;
+  border-radius: 3px;
   position: relative;
   cursor: pointer;
   overflow: hidden;
+  transition: height 0.15s ease;
+}
+
+.frp-audio-progress-wrap:hover {
+  height: 8px;
 }
 
 .frp-chat-msg.incoming .frp-audio-progress-wrap {
@@ -1020,7 +1035,7 @@
   height: 100%;
   width: 0%;
   background: #ffffff;
-  border-radius: 2px;
+  border-radius: 3px;
   transition: width 0.1s linear;
 }
 
@@ -1034,6 +1049,36 @@
   justify-content: space-between;
   font-size: 0.65rem;
   opacity: 0.85;
+}
+
+.frp-audio-wave-bars {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  height: 14px;
+  margin-left: 4px;
+}
+
+.frp-chat-audio-player.playing .frp-audio-wave-bars {
+  display: inline-flex;
+}
+
+.frp-audio-wave-bars span {
+  width: 2px;
+  height: 100%;
+  background: currentColor;
+  border-radius: 1px;
+  animation: audioWave 0.8s ease-in-out infinite alternate;
+}
+
+.frp-audio-wave-bars span:nth-child(2) { animation-delay: 0.15s; height: 60%; }
+.frp-audio-wave-bars span:nth-child(3) { animation-delay: 0.3s; height: 80%; }
+.frp-audio-wave-bars span:nth-child(4) { animation-delay: 0.45s; height: 50%; }
+.frp-audio-wave-bars span:nth-child(5) { animation-delay: 0.6s; height: 70%; }
+
+@keyframes audioWave {
+  0% { transform: scaleY(0.3); }
+  100% { transform: scaleY(1); }
 }
 
 /* ── PAYLAŞILAN MEDYA & BELGE ÇEKMECESİ (İNOVASYON 4) ── */

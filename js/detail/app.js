@@ -262,11 +262,42 @@ function renderSidebar(file) {
  }).join(''): '<span style="color:var(--text-muted);font-size:.75rem;">Sorgu bulunamadı.</span>'}
  </div>
 
- <div class="note-area">
- <div class="meta-label">Kullanıcı Notu</div>
- <textarea class="note-textarea" id="noteTextarea" placeholder="Bu rapora not ekleyin...">${esc(file.userNote || '')}</textarea>
- <button class="btn-save-note" id="btnSaveNote">Kaydet</button>
- </div>
+ <div class="note-area" style="background:var(--bg-card);border:1px solid var(--border-light);border-radius:10px;padding:.75rem;margin-top:.6rem;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:.4rem;margin-bottom:.4rem;">
+      <div class="meta-label" style="margin:0;font-weight:700;">Kullanıcı Notu</div>
+      <button type="button" id="btnOpenRichNoteModalDetail" class="btn btn-sm" style="font-size:.72rem;padding:.2rem.55rem;background:rgba(37,99,235,0.12);color:var(--accent-bright);border:1px solid rgba(37,99,235,0.3);border-radius:6px;font-weight:700;display:inline-flex;align-items:center;gap:3px;cursor:pointer;" title="Gelişmiş Zengin Editörü Aç (Word Modu & Ekler)">
+        <span>📝 Word Modu</span>
+      </button>
+    </div>
+
+    <!-- Hızlı Şablonlar ve Araçlar -->
+    <div style="display:flex;align-items:center;gap:.35rem;margin-bottom:.4rem;flex-wrap:wrap;">
+      <select id="selNoteTemplate" style="flex:1;min-width:130px;font-size:.74rem;padding:.22rem.4rem;border-radius:6px;border:1px solid var(--border-light);background:var(--bg-raised);color:var(--text-primary);cursor:pointer;" title="Hazır Not Şablonu">
+        <option value="">💡 Hazır Şablon Ekle...</option>
+        <option value="⚠️ HATA BİLDİRİMİ:&#10;- Hata Detayı: &#10;- Etkilenen Parametre / Tablo: &#10;- Öncelik: Kritik">⚠️ Hata Bildirimi</option>
+        <option value="🔄 SQL REVİZYONU:&#10;- Sorgu: &#10;- Yapılan İyileştirme: &#10;- Test Durumu: Başarılı">🔄 SQL Revizyonu</option>
+        <option value="⚡ PERFORMANS İNCELEMESİ:&#10;- Çalışma Süresi: &#10;- İyileştirme Önerisi: ">⚡ Performans İncelemesi</option>
+        <option value="✅ KONTROL EDİLDİ:&#10;- Rapor parametreleri ve çıktıları test edilip onaylandı.">✅ Test Edildi & Onaylandı</option>
+      </select>
+
+      <button type="button" id="btnInsertDateStamp" class="btn btn-sm btn-ghost" style="font-size:.72rem;padding:.22rem.45rem;border-radius:6px;cursor:pointer;" title="Şu anki tarih ve saat damgasını ekle">
+        📅 Tarih
+      </button>
+      <button type="button" id="btnCopyNote" class="btn btn-sm btn-ghost" style="font-size:.72rem;padding:.22rem.45rem;border-radius:6px;cursor:pointer;" title="Notu panoya kopyala">
+        📋
+      </button>
+      <button type="button" id="btnClearNote" class="btn btn-sm btn-ghost" style="font-size:.72rem;padding:.22rem.45rem;border-radius:6px;color:var(--red);cursor:pointer;" title="Notu temizle">
+        🧹
+      </button>
+    </div>
+
+    <textarea class="note-textarea" id="noteTextarea" placeholder="Bu rapora ait detaylı notlar, açıklamalar veya SQL hatırlatmaları ekleyin..." style="margin-top:0;">${esc(file.userNote || '')}</textarea>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:.45rem;gap:.5rem;flex-wrap:wrap;">
+      <span id="noteCharStats" style="font-size:.7rem;color:var(--text-muted);font-family:var(--mono);font-weight:600;">0 karakter</span>
+      <button class="btn-save-note" id="btnSaveNote" style="margin-top:0;">Kaydet</button>
+    </div>
+  </div>
 
  <div class="meta-card">
  <div class="meta-label">Dışa Aktar & Araçlar</div>
@@ -366,21 +397,95 @@ function renderSidebar(file) {
  });
  }
 
- const btnSaveNote = document.getElementById('btnSaveNote');
- if (btnSaveNote) {
- btnSaveNote.addEventListener('click', function () {
- const noteInp = document.getElementById('noteTextarea');
- const note = noteInp? noteInp.value: '';
- FrpStore.updateNote(file.id, note);
+  const noteInp = document.getElementById('noteTextarea');
+  const noteStats = document.getElementById('noteCharStats');
+  function updateNoteStats() {
+    if (!noteInp || !noteStats) return;
+    const len = noteInp.value.length;
+    const words = noteInp.value.trim() ? noteInp.value.trim().split(/\s+/).length : 0;
+    noteStats.textContent = `${len} karakter · ${words} kelime`;
+  }
+  if (noteInp) {
+    noteInp.addEventListener('input', updateNoteStats);
+    updateNoteStats();
+  }
+
+  const btnOpenRich = document.getElementById('btnOpenRichNoteModalDetail');
+  if (btnOpenRich) {
+    btnOpenRich.addEventListener('click', () => {
+      if (typeof window.openReportNoteModal === 'function') {
+        window.openReportNoteModal(file.id);
+      } else if (window.FrpRichNotes && typeof window.FrpRichNotes.open === 'function') {
+        window.FrpRichNotes.open(file.id);
+      } else {
+        showToast('Zengin not editörü yüklenemedi.', 'warning');
+      }
+    });
+  }
+
+  const selTemplate = document.getElementById('selNoteTemplate');
+  if (selTemplate && noteInp) {
+    selTemplate.addEventListener('change', () => {
+      const val = selTemplate.value;
+      if (!val) return;
+      const cur = noteInp.value;
+      noteInp.value = cur ? (cur.trim() + '\n\n' + val) : val;
+      selTemplate.value = '';
+      updateNoteStats();
+      noteInp.focus();
+    });
+  }
+
+  const btnDateStamp = document.getElementById('btnInsertDateStamp');
+  if (btnDateStamp && noteInp) {
+    btnDateStamp.addEventListener('click', () => {
+      const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
+      const uName = curUser ? (curUser.name || curUser.username) : 'Kullanıcı';
+      const stamp = `[${new Date().toLocaleString('tr-TR')} - ${uName}]: `;
+      const start = noteInp.selectionStart || 0;
+      const end = noteInp.selectionEnd || 0;
+      const val = noteInp.value;
+      noteInp.value = val.substring(0, start) + stamp + val.substring(end);
+      noteInp.selectionStart = noteInp.selectionEnd = start + stamp.length;
+      updateNoteStats();
+      noteInp.focus();
+    });
+  }
+
+  const btnCopyN = document.getElementById('btnCopyNote');
+  if (btnCopyN && noteInp) {
+    btnCopyN.addEventListener('click', () => {
+      if (!noteInp.value) { showToast('Kopyalanacak not bulunamadı.', 'warning'); return; }
+      navigator.clipboard.writeText(noteInp.value).then(() => {
+        showToast('Not panoya kopyalandı.', 'success');
+      }).catch(() => {});
+    });
+  }
+
+  const btnClearN = document.getElementById('btnClearNote');
+  if (btnClearN && noteInp) {
+    btnClearN.addEventListener('click', () => {
+      if (!noteInp.value) return;
+      noteInp.value = '';
+      updateNoteStats();
+      showToast('Not temizlendi.', 'info');
+    });
+  }
+
+  const btnSaveNote = document.getElementById('btnSaveNote');
+  if (btnSaveNote) {
+    btnSaveNote.addEventListener('click', function () {
+      const note = noteInp ? noteInp.value : '';
+      FrpStore.updateNote(file.id, note);
       file.userNote = note;
       file.user_note = note;
       currentFile = FrpStore.getById(file.id) || file;
- this.textContent = 'Kaydedildi';
- this.classList.add('saved');
- setTimeout(() => { this.textContent = 'Kaydet'; this.classList.remove('saved'); }, 2000);
- showToast('Not kaydedildi.', 'success');
- });
- }
+      this.textContent = 'Kaydedildi';
+      this.classList.add('saved');
+      setTimeout(() => { this.textContent = 'Kaydet'; this.classList.remove('saved'); }, 2000);
+      showToast('Not kaydedildi.', 'success');
+    });
+  }
 
  // PascalScript Outline Ağacını Çiz
  const outlineContainer = sb.querySelector('#pascalOutlineContainer');
@@ -1293,8 +1398,20 @@ function activateTab(id) {
   if (id === 'tab_pascal') refreshPascalSyntaxButtonState();
   if (id === 'tab_designer') {
     const wrap = document.getElementById('tab_designer_designer_wrap');
-    if (wrap && window.FastReportDesigner && !wrap.hasChildNodes() && currentFile) {
-      window.FastReportDesigner.render(currentFile, wrap);
+    if (wrap && currentFile) {
+      if (window.FastReportDesigner && !wrap.hasChildNodes()) {
+        try {
+          window.FastReportDesigner.render(currentFile, wrap);
+        } catch (e) {
+          console.error('FastReportDesigner render hatası:', e);
+        }
+      } else if (!window.FastReportDesigner) {
+        setTimeout(() => {
+          if (wrap && window.FastReportDesigner && !wrap.hasChildNodes()) {
+            try { window.FastReportDesigner.render(currentFile, wrap); } catch (e) { console.error(e); }
+          }
+        }, 200);
+      }
     }
   }
   performCodeSearch();

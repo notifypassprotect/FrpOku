@@ -831,7 +831,7 @@
           <div style="width: 1px; height: 20px; background: var(--border-light, #e2e8f0); margin: 0 0.15rem;"></div>
 
           <!-- Vurgu Kutusu, Tablo, Link, Çizgi, Temizle -->
-          <div style="display: flex; align-items: center; gap: 0.2rem;">
+          <div style="display: flex; align-items: center; gap: 0.2rem; flex-wrap: wrap;">
             <select id="tbCallout" style="padding: 0.3rem 0.45rem; border-radius: 7px; border: 1px solid var(--border, #cbd5e1); font-size: 0.78rem; background: var(--bg-card); color: var(--text-primary); cursor: pointer;" title="Vurgu Kutusu Ekle">
               <option value="">💡 Vurgu Kutusu</option>
               <option value="info">ℹ️ Bilgi Kutusu</option>
@@ -839,9 +839,20 @@
               <option value="success">✅ Başarı Kutusu</option>
               <option value="danger">❌ Kritik Hata</option>
             </select>
+            <select id="tbTemplates" style="padding: 0.3rem 0.45rem; border-radius: 7px; border: 1px solid var(--border, #cbd5e1); font-size: 0.78rem; background: var(--bg-card); color: var(--text-primary); cursor: pointer;" title="Hazır Şablon Ekle">
+              <option value="">📋 Şablonlar</option>
+              <option value="bug">⚠️ Hata Bildirimi</option>
+              <option value="sql">🔄 SQL Revizyonu</option>
+              <option value="perf">⚡ Performans İncelemesi</option>
+              <option value="approved">✅ Onay & Teslim</option>
+            </select>
+            <button type="button" id="tbChecklist" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Görev Listesi / Checklist Ekle">☑ Liste</button>
+            <button type="button" id="tbTimestamp" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Tarih &amp; Zaman Damgası Ekle">📅 Zaman</button>
             <button type="button" id="tbTable" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Tablo Ekle">▦ Tablo</button>
             <button type="button" id="tbLink" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Bağlantı (Link) Ekle">🔗 Link</button>
             <button type="button" id="tbHr" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Yatay Çizgi Ekle">― Çizgi</button>
+            <button type="button" id="tbFullscreen" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Tam Ekran Aç / Kapat">⛶</button>
+            <button type="button" id="tbExportTxt" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Notu İndir (.txt / .md)">💾 İndir</button>
             <button type="button" id="tbClearFormat" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem; color: #ef4444;" title="Biçimlendirmeyi Temizle">🧹</button>
           </div>
 
@@ -1203,6 +1214,105 @@
         <p><br></p>
       `;
       formatDoc('insertHTML', tableHtml);
+    });
+
+    // Görev Listesi / Checklist
+    overlay.querySelector('#tbChecklist')?.addEventListener('click', () => {
+      const checkHtml = `
+        <div style="margin: 0.6rem 0; padding: 0.5rem 0.8rem; background: var(--bg-card, #f8fafc); border: 1px solid var(--border, #cbd5e1); border-radius: 8px;">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom: 4px;">
+            <input type="checkbox" style="width:16px;height:16px;cursor:pointer;" />
+            <span>Görev maddesi 1...</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" style="width:16px;height:16px;cursor:pointer;" />
+            <span>Görev maddesi 2...</span>
+          </div>
+        </div>
+        <p><br></p>
+      `;
+      formatDoc('insertHTML', checkHtml);
+    });
+
+    // Zaman Damgası
+    overlay.querySelector('#tbTimestamp')?.addEventListener('click', () => {
+      const user = window.FrpAuth?.getUser();
+      const uName = user?.name || user?.username || 'Kullanıcı';
+      const stamp = `<span style="background:rgba(37,99,235,0.1);color:#2563eb;padding:2px 6px;border-radius:4px;font-family:monospace;font-size:0.8rem;font-weight:700;">[${new Date().toLocaleString('tr-TR')} - ${escHtml(uName)}]</span>&nbsp;`;
+      formatDoc('insertHTML', stamp);
+    });
+
+    // Hazır Şablonlar
+    overlay.querySelector('#tbTemplates')?.addEventListener('change', (e) => {
+      const val = e.target.value;
+      if (!val) return;
+      let tHtml = '';
+      if (val === 'bug') {
+        tHtml = `
+          <div style="border-left: 4px solid #ef4444; background: rgba(239,68,68,0.06); padding: 0.75rem 1rem; border-radius: 6px; margin: 0.8rem 0;">
+            <strong style="color: #ef4444;">⚠️ HATA BİLDİRİMİ</strong>
+            <ul style="margin: 0.4rem 0 0 1.2rem; padding: 0;">
+              <li><strong>Hata Tanımı:</strong> Rapor çıktısında...</li>
+              <li><strong>Etkilenen Parametre / Tablo:</strong> </li>
+              <li><strong>Öncelik:</strong> Kritik</li>
+            </ul>
+          </div><p><br></p>`;
+      } else if (val === 'sql') {
+        tHtml = `
+          <div style="border-left: 4px solid #3b82f6; background: rgba(59,130,246,0.06); padding: 0.75rem 1rem; border-radius: 6px; margin: 0.8rem 0;">
+            <strong style="color: #2563eb;">🔄 SQL REVİZYON NOTU</strong>
+            <ul style="margin: 0.4rem 0 0 1.2rem; padding: 0;">
+              <li><strong>Sorgu Adı:</strong> </li>
+              <li><strong>Yapılan İyileştirme:</strong> İndeks kullanımı eklendi.</li>
+              <li><strong>Test Sonucu:</strong> Başarılı</li>
+            </ul>
+          </div><p><br></p>`;
+      } else if (val === 'perf') {
+        tHtml = `
+          <div style="border-left: 4px solid #f59e0b; background: rgba(245,158,11,0.06); padding: 0.75rem 1rem; border-radius: 6px; margin: 0.8rem 0;">
+            <strong style="color: #d97706;">⚡ PERFORMANS İNCELEMESİ</strong>
+            <p style="margin: 0.3rem 0;">Mevcut sorgu yanıt süresi ve sunucu yükü analiz edildi.</p>
+          </div><p><br></p>`;
+      } else if (val === 'approved') {
+        tHtml = `
+          <div style="border-left: 4px solid #10b981; background: rgba(16,185,129,0.06); padding: 0.75rem 1rem; border-radius: 6px; margin: 0.8rem 0;">
+            <strong style="color: #059669;">✅ RAPOR ONAYLANDI</strong>
+            <p style="margin: 0.3rem 0;">Tasarım, veri bağlamları ve hesaplama alanları kontrol edildi, üretime uygundur.</p>
+          </div><p><br></p>`;
+      }
+      if (tHtml) formatDoc('insertHTML', tHtml);
+      e.target.value = '';
+    });
+
+    // Tam Ekran Modu
+    const modalDialog = overlay.querySelector('.modal');
+    overlay.querySelector('#tbFullscreen')?.addEventListener('click', () => {
+      if (!modalDialog) return;
+      const isFull = modalDialog.style.width === '100vw' && modalDialog.style.height === '100vh';
+      if (isFull) {
+        modalDialog.style.width = '95vw';
+        modalDialog.style.height = '90vh';
+        modalDialog.style.borderRadius = '20px';
+      } else {
+        modalDialog.style.width = '100vw';
+        modalDialog.style.height = '100vh';
+        modalDialog.style.maxWidth = '100vw';
+        modalDialog.style.maxHeight = '100vh';
+        modalDialog.style.borderRadius = '0';
+      }
+    });
+
+    // Notu İndir
+    overlay.querySelector('#tbExportTxt')?.addEventListener('click', () => {
+      const textContent = editor.innerText || editor.textContent || '';
+      const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${(reportName || 'Rapor').replace(/[^a-zA-Z0-9_\-]/g, '_')}_Notu.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      safeToast('Not metin dosyası olarak indirildi.', 'success');
     });
 
     // Modern Link Modalı & Editör İçi Tıklanabilir Bağlantı Çubuğu

@@ -10,9 +10,10 @@
   let dockEl = null;
   let activeChatWindows = new Map(); // peerId/roomId/groupId -> { el, timer, lastMsgCount }
   let currentTab = 'users'; // 'users' | 'groups' | 'rooms'
-  let unreadData = { bySender: {}, total: 0 };
+  let unreadData = { bySender: {}, total: 0, lastInteraction: {} };
   let lastTotalUnread = 0;
   let cachedGroups = [];
+  const localLastInteractions = {};
 
   // MSN Nudge Buzzer Sesi (Web Audio API ile otantik çift ton titreşim sesi)
   function playMsnNudgeSound() {
@@ -292,20 +293,28 @@
     const newSenders = [];
 
     if (newCounts && typeof newCounts === 'object') {
-      Object.entries(newCounts).forEach(([senderId, count]) => {
-        const c = Number(count) || 0;
-        if (c > 0) {
-          bySender[senderId] = c;
-          total += c;
-          const oldC = (unreadData.bySender && unreadData.bySender[senderId]) || 0;
-          if (c > oldC) {
-            newSenders.push({ senderId, count: c, diff: c - oldC });
-          }
+      if (newCounts.bySender && typeof newCounts.bySender === 'object') {
+        bySender = { ...newCounts.bySender };
+        total = Number(newCounts.total) || 0;
+        if (newCounts.lastInteraction && typeof newCounts.lastInteraction === 'object') {
+          unreadData.lastInteraction = { ...unreadData.lastInteraction, ...newCounts.lastInteraction };
         }
-      });
+      } else {
+        Object.entries(newCounts).forEach(([senderId, count]) => {
+          const c = Number(count) || 0;
+          if (c > 0) {
+            bySender[senderId] = c;
+            total += c;
+            const oldC = (unreadData.bySender && unreadData.bySender[senderId]) || 0;
+            if (c > oldC) {
+              newSenders.push({ senderId, count: c, diff: c - oldC });
+            }
+          }
+        });
+      }
     }
 
-    unreadData = { bySender, total };
+    unreadData = { bySender, total, lastInteraction: unreadData.lastInteraction || {} };
 
     if (newSenders.length > 0 && total > lastTotalUnread) {
       playNotificationChime();
@@ -565,19 +574,35 @@
       return fn.includes(q) || un.includes(q) || dp.includes(q);
     });
 
-    // OKUNMAMIŞ MESAJI OLAN KULLANICILARI VE ÇEVRİMİÇİLERİ EN ÜSTE SIRALA
+    // OKUNMAMIŞ MESAJI OLAN KULLANICILARI VE EN SON MESAJLAŞILAN KİŞİLERİ EN ÜSTE SIRALA
     filtered.sort((a, b) => {
+      // 1. Okunmamış mesajı olanlar en başta
       const unreadA = (unreadData.bySender && unreadData.bySender[String(a.id)]) || 0;
       const unreadB = (unreadData.bySender && unreadData.bySender[String(b.id)]) || 0;
       if (unreadA > 0 && unreadB === 0) return -1;
       if (unreadB > 0 && unreadA === 0) return 1;
       if (unreadA !== unreadB) return unreadB - unreadA;
 
+      // 2. En son mesajlaşılan kişi (son etkileşim zamanı azalan sırada)
+      const lastA = Math.max(
+        (unreadData.lastInteraction && unreadData.lastInteraction[String(a.id)]) || 0,
+        localLastInteractions[String(a.id)] || 0
+      );
+      const lastB = Math.max(
+        (unreadData.lastInteraction && unreadData.lastInteraction[String(b.id)]) || 0,
+        localLastInteractions[String(b.id)] || 0
+      );
+      if (lastA > 0 || lastB > 0) {
+        if (lastA !== lastB) return lastB - lastA;
+      }
+
+      // 3. Çevrimiçi olanlar
       const isOnlineA = a.isOnline || a.status === 'online' || a.status === 'busy';
       const isOnlineB = b.isOnline || b.status === 'online' || b.status === 'busy';
       if (isOnlineA && !isOnlineB) return -1;
       if (!isOnlineA && isOnlineB) return 1;
 
+      // 4. Alfabetik isim
       return (a.fullName || a.username || '').localeCompare(b.fullName || b.username || '', 'tr');
     });
 
@@ -1189,6 +1214,7 @@
     if (btnNudgeAction) btnNudgeAction.addEventListener('click', triggerNudge);
 
     // Pencere Takibi ve Otomatik Polling (Her 2.5 saniyede bir yeni mesajları sorgula)
+    let currentMessages = [];
     async function loadMessages() {
       if (!window.FrpAuth || !window.FrpAuth.isLoggedIn()) return;
       try {
@@ -1201,7 +1227,16 @@
         if (res.ok) {
           const data = await res.json();
           if (data && data.success && Array.isArray(data.messages)) {
-            renderMessageStream(data.messages);
+            currentMessages = data.messages;
+            if (currentMessages.length > 0) {
+              const lastMsg = currentMessages[currentMessages.length - 1];
+              const t = new Date(lastMsg.createdAt).getTime();
+              if (t > (localLastInteractions[chatId] || 0)) {
+                localLastInteractions[chatId] = t;
+                if (currentTab === 'users') renderUsers();
+              }
+            }
+            renderMessageStream(currentMessages);
           }
         }
       } catch {}
@@ -1482,7 +1517,14 @@
         if (!isRecordingVoice) {
           try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
+            const mimeType = (typeof MediaRecorder.isTypeSupported === 'function' && MediaRecorder.isTypeSupported('audio/webm;codecs=opus'))
+              ? 'audio/webm;codecs=opus'
+              : (typeof MediaRecorder.isTypeSupported === 'function' && MediaRecorder.isTypeSupported('audio/webm'))
+              ? 'audio/webm'
+              : (typeof MediaRecorder.isTypeSupported === 'function' && MediaRecorder.isTypeSupported('audio/mp4'))
+              ? 'audio/mp4'
+              : '';
+            mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
             audioChunks = [];
             recordingStartTime = Date.now();
 
@@ -1493,7 +1535,8 @@
             mediaRecorder.onstop = () => {
               clearInterval(recordingTimer);
               const durationSec = Math.max(1, Math.round((Date.now() - recordingStartTime) / 1000));
-              const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+              const recordedType = mediaRecorder.mimeType || mimeType || 'audio/webm';
+              const audioBlob = new Blob(audioChunks, { type: recordedType });
               const reader = new FileReader();
               reader.onloadend = () => {
                 sendMessage({
@@ -1542,7 +1585,7 @@
       });
     }
 
-    // Mesaj Gönderme Mantığı
+    // Mesaj Gönderme Mantığı (İyimser UI & Anlık Sıralama Bumps)
     async function sendMessage(payload) {
       const currentAuth = window.FrpAuth && window.FrpAuth.getUser ? window.FrpAuth.getUser() : null;
       if (!currentAuth) return;
@@ -1556,6 +1599,32 @@
         voice: payload.voice || null
       };
 
+      localLastInteractions[chatId] = Date.now();
+      if (currentTab === 'users') renderUsers();
+
+      // İyimser UI
+      const tempId = 'temp_' + Date.now();
+      const optimisticMsg = {
+        id: tempId,
+        senderId: currentAuth.id,
+        senderName: currentAuth.full_name || currentAuth.username || 'Siz',
+        senderUsername: currentAuth.username,
+        text: payload.text || '',
+        attachment: payload.attachment || null,
+        voice: payload.voice || null,
+        reactions: {},
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        isOptimistic: true
+      };
+
+      const optimisticDiv = createMessageDiv(optimisticMsg, true, String(currentAuth.id));
+      optimisticDiv.classList.add('optimistic-pending');
+      optimisticDiv.dataset.text = payload.text || '';
+      optimisticDiv.style.opacity = '0.75';
+      msgStream.appendChild(optimisticDiv);
+      msgStream.scrollTop = msgStream.scrollHeight;
+
       try {
         const res = await fetch('/api/chat/send', {
           method: 'POST',
@@ -1565,10 +1634,16 @@
         if (res.ok) {
           const data = await res.json();
           if (data && data.success && data.message) {
-            loadMessages();
+            localLastInteractions[chatId] = Date.now();
+            currentMessages = currentMessages.filter(m => m.id !== tempId);
+            currentMessages.push(data.message);
+            renderMessageStream(currentMessages);
+            if (currentTab === 'users') renderUsers();
           }
         }
-      } catch {}
+      } catch (err) {
+        console.warn('Mesaj gönderilemedi:', err);
+      }
     }
 
     function handleSend() {
@@ -1590,189 +1665,300 @@
       });
     }
 
-    // Mesajları Akışa Basma (Instagram DM Stili + Gerçek Ses Çalar)
+    // Ses Oynatıcı Bağlayıcı (WebM Duration Fallback & Seeking & Equalizer)
+    function bindAudioPlayer(audioPlayer, m) {
+      const btnPlay = audioPlayer.querySelector('.frp-audio-play-btn');
+      const audioEl = audioPlayer.querySelector('audio');
+      const progBar = audioPlayer.querySelector('.frp-audio-progress-bar');
+      const timeSpan = audioPlayer.querySelector('.frp-audio-time');
+      const track = audioPlayer.querySelector('.frp-audio-track');
+      const fallbackDuration = (m.voice && m.voice.duration > 0) ? m.voice.duration : 5;
+
+      function getEffectiveDuration() {
+        return (isFinite(audioEl.duration) && audioEl.duration > 0) ? audioEl.duration : fallbackDuration;
+      }
+
+      btnPlay.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        if (audioEl.paused) {
+          document.querySelectorAll('audio').forEach(a => { if (a !== audioEl) a.pause(); });
+          const p = audioEl.play();
+          if (p && typeof p.then === 'function') {
+            p.then(() => {
+              btnPlay.textContent = '⏸️';
+              audioPlayer.classList.add('playing');
+            }).catch(err => {
+              console.warn('Ses oynatma hatası:', err);
+              btnPlay.textContent = '▶️';
+              audioPlayer.classList.remove('playing');
+            });
+          } else {
+            btnPlay.textContent = '⏸️';
+            audioPlayer.classList.add('playing');
+          }
+        } else {
+          audioEl.pause();
+          btnPlay.textContent = '▶️';
+          audioPlayer.classList.remove('playing');
+        }
+      });
+
+      if (track) {
+        track.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          const rect = track.getBoundingClientRect();
+          const clickX = Math.max(0, Math.min(ev.clientX - rect.left, rect.width));
+          const pct = clickX / (rect.width || 1);
+          const targetDuration = getEffectiveDuration();
+          audioEl.currentTime = pct * targetDuration;
+          progBar.style.width = (pct * 100) + '%';
+        });
+      }
+
+      audioEl.addEventListener('timeupdate', () => {
+        const dur = getEffectiveDuration();
+        if (dur > 0) {
+          const cur = audioEl.currentTime || 0;
+          const pct = Math.min(100, Math.max(0, (cur / dur) * 100));
+          progBar.style.width = pct + '%';
+          const cMin = Math.floor(cur / 60);
+          const cSec = String(Math.floor(cur % 60)).padStart(2, '0');
+          const dMin = Math.floor(dur / 60);
+          const dSec = String(Math.floor(dur % 60)).padStart(2, '0');
+          timeSpan.textContent = `${cMin}:${cSec} / ${dMin}:${dSec}`;
+        }
+      });
+
+      audioEl.addEventListener('ended', () => {
+        btnPlay.textContent = '▶️';
+        audioPlayer.classList.remove('playing');
+        progBar.style.width = '0%';
+        const dur = getEffectiveDuration();
+        const dMin = Math.floor(dur / 60);
+        const dSec = String(Math.floor(dur % 60)).padStart(2, '0');
+        timeSpan.textContent = `0:00 / ${dMin}:${dSec}`;
+      });
+
+      audioEl.addEventListener('pause', () => {
+        btnPlay.textContent = '▶️';
+        audioPlayer.classList.remove('playing');
+      });
+    }
+
+    // Tekil Mesaj DOM Elemanı Üretici
+    function createMessageDiv(m, isSelf, myId) {
+      const msgDiv = document.createElement('div');
+      msgDiv.className = `frp-chat-msg ${isSelf ? 'outgoing' : 'incoming'}`;
+      msgDiv.dataset.msgId = m.id;
+
+      const isNudgeMsg = Boolean(m.isNudge || (m.text && m.text.includes('📳')));
+      if (isNudgeMsg) msgDiv.classList.add('nudge-msg');
+
+      const isNew = !seenMsgIds.has(m.id);
+      seenMsgIds.add(m.id);
+      if (!isInitialStream && isNew && isNudgeMsg && !isSelf) {
+        chatEl.classList.remove('msn-shaking');
+        void chatEl.offsetWidth;
+        chatEl.classList.add('msn-shaking');
+        setTimeout(() => chatEl.classList.remove('msn-shaking'), 700);
+        playMsnNudgeSound();
+        if (navigator.vibrate) navigator.vibrate([120, 60, 180]);
+      }
+
+      const time = new Date(m.createdAt || Date.now());
+      const timeStr = `${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
+
+      let contentHtml = escHtml(m.text || '');
+
+      if (m.attachment && m.attachment.dataUrl) {
+        if ((m.attachment.type || '').startsWith('image/')) {
+          contentHtml += `
+            <div style="margin-top: 6px; border-radius: 8px; overflow: hidden; max-width: 220px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+              <img src="${m.attachment.dataUrl}" alt="${escHtml(m.attachment.name || 'Görsel')}" style="width: 100%; display: block; cursor: pointer;" />
+            </div>
+          `;
+        } else {
+          contentHtml += `
+            <div style="margin-top: 6px; padding: 5px 9px; background: rgba(0,0,0,0.08); border-radius: 8px; font-size: 0.74rem; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+              <span>📄</span> <span>${escHtml(m.attachment.name || 'Belge')}</span>
+            </div>
+          `;
+        }
+      }
+
+      if (m.voice && m.voice.dataUrl) {
+        const duration = (m.voice.duration && m.voice.duration > 0) ? m.voice.duration : 5;
+        const durMin = Math.floor(duration / 60);
+        const durSec = String(duration % 60).padStart(2, '0');
+        contentHtml = `
+          <div class="frp-chat-audio-player">
+            <button type="button" class="frp-audio-play-btn" title="Oynat / Durdur">▶️</button>
+            <div class="frp-audio-track" title="İleri / Geri Sar">
+              <div class="frp-audio-progress-wrap">
+                <div class="frp-audio-progress-bar"></div>
+              </div>
+              <div class="frp-audio-meta">
+                <span class="frp-audio-time">0:00 / ${durMin}:${durSec}</span>
+                <span>🎙️ Ses Kaydı</span>
+              </div>
+            </div>
+            <div class="frp-audio-wave-bars">
+              <span></span><span></span><span></span><span></span><span></span>
+            </div>
+            <audio src="${m.voice.dataUrl}" preload="metadata" style="display:none;"></audio>
+          </div>
+        `;
+      }
+
+      let reactionsHtml = '';
+      if (m.reactions && Object.keys(m.reactions).length > 0) {
+        reactionsHtml = '<div class="frp-chat-reactions-row">';
+        Object.entries(m.reactions).forEach(([emoji, userIds]) => {
+          if (userIds && userIds.length > 0) {
+            const hasMy = userIds.includes(myId);
+            reactionsHtml += `<span class="frp-chat-reaction-pill ${hasMy ? 'active' : ''}">${emoji} ${userIds.length}</span>`;
+          }
+        });
+        reactionsHtml += '</div>';
+      }
+
+      const currentAuthUser = window.FrpAuth && window.FrpAuth.getUser ? window.FrpAuth.getUser() : null;
+      const canDelete = isSelf || (currentAuthUser && currentAuthUser.role === 'admin');
+      const hoverReactionHtml = `
+        <div class="frp-chat-hover-bar">
+          <button type="button" class="btn-react" data-emoji="👍">👍</button>
+          <button type="button" class="btn-react" data-emoji="❤️">❤️</button>
+          <button type="button" class="btn-react" data-emoji="😂">😂</button>
+          <button type="button" class="btn-react" data-emoji="😮">😮</button>
+          <button type="button" class="btn-react" data-emoji="🔥">🔥</button>
+          ${canDelete ? `<button type="button" class="btn-delete-msg" title="Mesajı Sil / Geri Al" style="background:none;border:none;cursor:pointer;font-size:0.75rem;padding:1px 3px;color:#ef4444;">🗑️</button>` : ''}
+        </div>
+      `;
+
+      const senderLabel = isSelf ? '' : (m.senderName || (!isRoom ? (targetUser.fullName || targetUser.username) : 'Ekip Arkadaşı'));
+      msgDiv.innerHTML = `
+        ${hoverReactionHtml}
+        ${!isSelf ? `
+          <div class="frp-chat-sender-name">
+            <span>${escHtml(senderLabel)}</span>
+            ${!isRoom && !targetUser.isSelfNote && targetUser.department ? `<span class="frp-presence-dept-badge" style="font-size:0.58rem;padding:0 4px;font-weight:600;">${escHtml(targetUser.department)}</span>` : ''}
+          </div>
+        ` : ''}
+        <div class="frp-chat-bubble">${contentHtml}</div>
+        ${reactionsHtml}
+        <div class="frp-chat-msg-time">
+          <span>${timeStr}</span>
+          ${isSelf ? `<span class="frp-chat-tick ${m.isRead ? 'read' : ''}" title="${m.isRead ? 'Görüldü' : 'İtildi'}">✓✓</span>` : ''}
+        </div>
+      `;
+
+      // Event binding
+      msgDiv.querySelectorAll('.btn-react').forEach(rbtn => {
+        rbtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          const emoji = rbtn.dataset.emoji;
+          fetch('/api/chat/react', {
+            method: 'POST',
+            headers: window.FrpAuth.getAuthHeaders ? window.FrpAuth.getAuthHeaders() : { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messageId: m.id, emoji })
+          }).then(() => loadMessages()).catch(() => {});
+        });
+      });
+
+      const btnDel = msgDiv.querySelector('.btn-delete-msg');
+      if (btnDel) {
+        btnDel.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          fetch(`/api/chat/messages/${encodeURIComponent(m.id)}`, {
+            method: 'DELETE',
+            headers: window.FrpAuth.getAuthHeaders ? window.FrpAuth.getAuthHeaders() : {}
+          }).then(() => loadMessages()).catch(() => {});
+        });
+      }
+
+      const audioPlayer = msgDiv.querySelector('.frp-chat-audio-player');
+      if (audioPlayer) {
+        bindAudioPlayer(audioPlayer, m);
+      }
+
+      return msgDiv;
+    }
+
+    // Mesajları Akışa Basma (Artımlı / Incremental DOM Güncellemesi & Kesintisiz Ses)
     function renderMessageStream(messages) {
       const currentAuthUser = window.FrpAuth && window.FrpAuth.getUser ? window.FrpAuth.getUser() : null;
       const myId = currentAuthUser ? String(currentAuthUser.id) : '';
 
-      msgStream.innerHTML = '';
+      const incomingIds = new Set(messages.map(m => m.id));
+
+      // 1. Silinmiş mesajları DOM'dan temizle
+      msgStream.querySelectorAll('.frp-chat-msg').forEach(node => {
+        const mid = node.dataset.msgId;
+        if (mid && !mid.startsWith('temp_') && !incomingIds.has(mid)) {
+          node.remove();
+        }
+      });
+
+      // 2. Mesajları ekle veya güncelle
+      const isNearBottom = (msgStream.scrollHeight - msgStream.scrollTop - msgStream.clientHeight) < 100;
+      let hasNewMessage = false;
+
       messages.forEach(m => {
         const isSelf = String(m.senderId) === myId;
-        const msgDiv = document.createElement('div');
-        msgDiv.className = `frp-chat-msg ${isSelf ? 'outgoing' : 'incoming'}`;
-        msgDiv.dataset.msgId = m.id;
+        let existingDiv = msgStream.querySelector(`[data-msg-id="${m.id}"]`);
 
-        const isNudgeMsg = Boolean(m.isNudge || (m.text && m.text.includes('📳')));
-        if (isNudgeMsg) {
-          msgDiv.classList.add('nudge-msg');
-        }
-
-        const isNew = !seenMsgIds.has(m.id);
-        seenMsgIds.add(m.id);
-        if (!isInitialStream && isNew && isNudgeMsg && !isSelf) {
-          chatEl.classList.remove('msn-shaking');
-          void chatEl.offsetWidth;
-          chatEl.classList.add('msn-shaking');
-          setTimeout(() => chatEl.classList.remove('msn-shaking'), 700);
-          playMsnNudgeSound();
-          if (navigator.vibrate) navigator.vibrate([120, 60, 180]);
-        }
-
-        const time = new Date(m.createdAt);
-        const timeStr = `${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
-
-        let contentHtml = escHtml(m.text);
-
-        // Görsel veya Doküman Eki
-        if (m.attachment && m.attachment.dataUrl) {
-          if ((m.attachment.type || '').startsWith('image/')) {
-            contentHtml += `
-              <div style="margin-top: 6px; border-radius: 8px; overflow: hidden; max-width: 220px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
-                <img src="${m.attachment.dataUrl}" alt="${escHtml(m.attachment.name)}" style="width: 100%; display: block; cursor: pointer;" />
-              </div>
-            `;
-          } else {
-            contentHtml += `
-              <div style="margin-top: 6px; padding: 5px 9px; background: rgba(0,0,0,0.08); border-radius: 8px; font-size: 0.74rem; display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                <span>📄</span> <span>${escHtml(m.attachment.name)}</span>
-              </div>
-            `;
+        // İyimser mesaj eşleştirmesi
+        if (!existingDiv && isSelf) {
+          const pendingDiv = msgStream.querySelector('.frp-chat-msg.optimistic-pending');
+          if (pendingDiv && pendingDiv.dataset.text === (m.text || '')) {
+            existingDiv = pendingDiv;
+            existingDiv.dataset.msgId = m.id;
+            existingDiv.classList.remove('optimistic-pending');
+            existingDiv.style.opacity = '1';
           }
         }
 
-        // Sesli Mesaj (Gerçek Ses Oynatıcı)
-        if (m.voice && m.voice.dataUrl) {
-          const duration = m.voice.duration || 5;
-          const durMin = Math.floor(duration / 60);
-          const durSec = String(duration % 60).padStart(2, '0');
-          contentHtml = `
-            <div class="frp-chat-audio-player">
-              <button type="button" class="frp-audio-play-btn" title="Oynat / Durdur">▶️</button>
-              <div class="frp-audio-track">
-                <div class="frp-audio-progress-wrap">
-                  <div class="frp-audio-progress-bar"></div>
-                </div>
-                <div class="frp-audio-meta">
-                  <span class="frp-audio-time">0:00 / ${durMin}:${durSec}</span>
-                  <span>🎙️ Ses Kaydı</span>
-                </div>
-              </div>
-              <audio src="${m.voice.dataUrl}" preload="none" style="display:none;"></audio>
-            </div>
-          `;
-        }
-
-        // Reaksiyonlar HTML'i
-        let reactionsHtml = '';
-        if (m.reactions && Object.keys(m.reactions).length > 0) {
-          reactionsHtml = '<div class="frp-chat-reactions-row">';
-          Object.entries(m.reactions).forEach(([emoji, userIds]) => {
-            if (userIds && userIds.length > 0) {
-              const hasMy = userIds.includes(myId);
-              reactionsHtml += `<span class="frp-chat-reaction-pill ${hasMy ? 'active' : ''}">${emoji} ${userIds.length}</span>`;
-            }
-          });
-          reactionsHtml += '</div>';
-        }
-
-        // Mini Hover Reaksiyon ve Mesaj Geri Alma / Silme Çubuğu
-        const canDelete = isSelf || (currentAuthUser && currentAuthUser.role === 'admin');
-        const hoverReactionHtml = `
-          <div class="frp-chat-hover-bar">
-            <button type="button" class="btn-react" data-emoji="👍">👍</button>
-            <button type="button" class="btn-react" data-emoji="❤️">❤️</button>
-            <button type="button" class="btn-react" data-emoji="😂">😂</button>
-            <button type="button" class="btn-react" data-emoji="😮">😮</button>
-            <button type="button" class="btn-react" data-emoji="🔥">🔥</button>
-            ${canDelete ? `<button type="button" class="btn-delete-msg" title="Mesajı Sil / Geri Al" style="background:none;border:none;cursor:pointer;font-size:0.75rem;padding:1px 3px;color:#ef4444;">🗑️</button>` : ''}
-          </div>
-        `;
-
-        const senderLabel = isSelf ? '' : (m.senderName || (!isRoom ? (targetUser.fullName || targetUser.username) : 'Ekip Arkadaşı'));
-        msgDiv.innerHTML = `
-          ${hoverReactionHtml}
-          ${!isSelf ? `
-            <div class="frp-chat-sender-name">
-              <span>${escHtml(senderLabel)}</span>
-              ${!isRoom && !targetUser.isSelfNote && targetUser.department ? `<span class="frp-presence-dept-badge" style="font-size:0.58rem;padding:0 4px;font-weight:600;">${escHtml(targetUser.department)}</span>` : ''}
-            </div>
-          ` : ''}
-          <div class="frp-chat-bubble">${contentHtml}</div>
-          ${reactionsHtml}
-          <div class="frp-chat-msg-time">
-            <span>${timeStr}</span>
-            ${isSelf ? `<span class="frp-chat-tick ${m.isRead ? 'read' : ''}" title="${m.isRead ? 'Görüldü' : 'İtildi'}">✓✓</span>` : ''}
-          </div>
-        `;
-
-        // Reaksiyon butonları dinleyicileri
-        msgDiv.querySelectorAll('.btn-react').forEach(rbtn => {
-          rbtn.addEventListener('click', (ev) => {
-            ev.stopPropagation();
-            const emoji = rbtn.dataset.emoji;
-            fetch('/api/chat/react', {
-              method: 'POST',
-              headers: window.FrpAuth.getAuthHeaders ? window.FrpAuth.getAuthHeaders() : { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ messageId: m.id, emoji })
-            }).then(() => loadMessages()).catch(() => {});
-          });
-        });
-
-        // Mesaj Silme Butonu
-        const btnDel = msgDiv.querySelector('.btn-delete-msg');
-        if (btnDel) {
-          btnDel.addEventListener('click', (ev) => {
-            ev.stopPropagation();
-            fetch(`/api/chat/messages/${encodeURIComponent(m.id)}`, {
-              method: 'DELETE',
-              headers: window.FrpAuth.getAuthHeaders ? window.FrpAuth.getAuthHeaders() : {}
-            }).then(() => loadMessages()).catch(() => {});
-          });
-        }
-
-        // Ses Oynatıcı Bağlantısı
-        const audioPlayer = msgDiv.querySelector('.frp-chat-audio-player');
-        if (audioPlayer) {
-          const btnPlay = audioPlayer.querySelector('.frp-audio-play-btn');
-          const audioEl = audioPlayer.querySelector('audio');
-          const progBar = audioPlayer.querySelector('.frp-audio-progress-bar');
-          const timeSpan = audioPlayer.querySelector('.frp-audio-time');
-
-          btnPlay.addEventListener('click', (ev) => {
-            ev.stopPropagation();
-            if (audioEl.paused) {
-              document.querySelectorAll('audio').forEach(a => { if (a !== audioEl) a.pause(); });
-              audioEl.play().catch(() => {});
-              btnPlay.textContent = '⏸️';
+        if (existingDiv) {
+          // Mevcut öğeyi yerinde güncelle (isRead ve reaksiyonlar)
+          const tickEl = existingDiv.querySelector('.frp-chat-tick');
+          if (tickEl && isSelf) {
+            tickEl.classList.toggle('read', Boolean(m.isRead));
+            tickEl.title = m.isRead ? 'Görüldü' : 'İtildi';
+          }
+          const reactionsWrap = existingDiv.querySelector('.frp-chat-reactions-row');
+          if (m.reactions && Object.keys(m.reactions).length > 0) {
+            let reactionsHtml = '';
+            Object.entries(m.reactions).forEach(([emoji, userIds]) => {
+              if (userIds && userIds.length > 0) {
+                const hasMy = userIds.includes(myId);
+                reactionsHtml += `<span class="frp-chat-reaction-pill ${hasMy ? 'active' : ''}">${emoji} ${userIds.length}</span>`;
+              }
+            });
+            if (reactionsWrap) {
+              reactionsWrap.innerHTML = reactionsHtml;
             } else {
-              audioEl.pause();
-              btnPlay.textContent = '▶️';
+              const rDiv = document.createElement('div');
+              rDiv.className = 'frp-chat-reactions-row';
+              rDiv.innerHTML = reactionsHtml;
+              const timeEl = existingDiv.querySelector('.frp-chat-msg-time');
+              if (timeEl) existingDiv.insertBefore(rDiv, timeEl);
+              else existingDiv.appendChild(rDiv);
             }
-          });
-
-          audioEl.addEventListener('timeupdate', () => {
-            if (audioEl.duration) {
-              const pct = (audioEl.currentTime / audioEl.duration) * 100;
-              progBar.style.width = pct + '%';
-              const cMin = Math.floor(audioEl.currentTime / 60);
-              const cSec = String(Math.floor(audioEl.currentTime % 60)).padStart(2, '0');
-              const dMin = Math.floor(audioEl.duration / 60);
-              const dSec = String(Math.floor(audioEl.duration % 60)).padStart(2, '0');
-              timeSpan.textContent = `${cMin}:${cSec} / ${dMin}:${dSec}`;
-            }
-          });
-
-          audioEl.addEventListener('ended', () => {
-            btnPlay.textContent = '▶️';
-            progBar.style.width = '0%';
-          });
+          } else if (reactionsWrap) {
+            reactionsWrap.remove();
+          }
+          return;
         }
 
+        hasNewMessage = true;
+        const msgDiv = createMessageDiv(m, isSelf, myId);
         msgStream.appendChild(msgDiv);
       });
 
+      if (isInitialStream || (hasNewMessage && isNearBottom)) {
+        msgStream.scrollTop = msgStream.scrollHeight;
+      }
       isInitialStream = false;
-      msgStream.scrollTop = msgStream.scrollHeight;
     }
 
     if (input) setTimeout(() => input.focus(), 80);
