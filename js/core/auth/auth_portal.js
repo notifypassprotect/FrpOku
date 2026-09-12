@@ -12,6 +12,43 @@
  return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
  }
 
+  function getFrpLogoSvg(size = 48) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="${size}" height="${size}" style="flex-shrink:0;vertical-align:middle;filter:drop-shadow(0 6px 16px rgba(37,99,235,0.35));">
+      <defs>
+        <linearGradient id="frpPrism_${size}" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#38bdf8" />
+          <stop offset="40%" stop-color="#2563eb" />
+          <stop offset="85%" stop-color="#4f46e5" />
+          <stop offset="100%" stop-color="#7c3aed" />
+        </linearGradient>
+        <linearGradient id="frpFold_${size}" x1="0%" y1="100%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#0284c7" />
+          <stop offset="50%" stop-color="#38bdf8" />
+          <stop offset="100%" stop-color="#e0f2fe" />
+        </linearGradient>
+      </defs>
+      <rect x="4" y="4" width="120" height="120" rx="28" fill="#0b1120" stroke="rgba(56,189,248,0.3)" stroke-width="2.5" />
+      <circle cx="64" cy="40" r="44" fill="#38bdf8" opacity="0.16" />
+      <g>
+        <path d="M 34 26 L 76 26 L 94 44 L 94 98 A 6 6 0 0 1 88 104 L 40 104 A 6 6 0 0 1 34 98 Z" fill="url(#frpPrism_${size})" stroke="rgba(255,255,255,0.35)" stroke-width="1.5" />
+        <path d="M 76 26 L 76 40 A 4 4 0 0 0 80 44 L 94 44 Z" fill="url(#frpFold_${size})" />
+        <rect x="44" y="40" width="24" height="4.5" rx="2.25" fill="#ffffff" opacity="0.95" />
+        <rect x="44" y="52" width="40" height="3.5" rx="1.75" fill="#06b6d4" />
+        <rect x="44" y="61" width="34" height="3.5" rx="1.75" fill="#cbd5e1" opacity="0.8" />
+        <rect x="44" y="70" width="26" height="3.5" rx="1.75" fill="#94a3b8" opacity="0.7" />
+        <g transform="translate(44, 80)">
+          <rect x="0" y="8" width="6" height="10" rx="2" fill="#10b981" />
+          <rect x="9" y="3" width="6" height="15" rx="2" fill="#06b6d4" />
+          <rect x="18" y="0" width="6" height="18" rx="2" fill="#8b5cf6" />
+          <rect x="27" y="5" width="6" height="13" rx="2" fill="#38bdf8" />
+          <rect x="36" y="9" width="6" height="9" rx="2" fill="#a855f7" />
+        </g>
+        <circle cx="89" cy="40" r="2.5" fill="#ffffff" />
+      </g>
+    </svg>`;
+  }
+  window.getFrpLogoSvg = getFrpLogoSvg;
+
  function showLoginTransitionSplash(user, onComplete) {
  const splash = document.createElement('div');
  splash.id = 'loginTransitionSplash';
@@ -19,21 +56,20 @@
  position: fixed; inset: 0;
  background: radial-gradient(circle at 50% 40%, #1e293b, #090d16);
  z-index: 9999999; display: flex; align-items: center; justify-content: center;
- color: #fff; font-family: inherit; text-align: center; animation: fadeIn.25s ease-out;
+ color: #fff; font-family: inherit; text-align: center; animation: fadeIn .25s ease-out;
  `;
 
- const initials = escHtml((user.full_name || user.username || 'U').slice(0, 2).toUpperCase());
  splash.innerHTML = `
  <div style="display:flex;flex-direction:column;align-items:center;gap:1.2rem;max-width:380px;padding:2rem;">
- <div style="width:72px;height:72px;background:linear-gradient(135deg, #2563eb, #3b82f6);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;font-weight:900;color:#fff;box-shadow:0 8px 30px rgba(37,99,235,.4);">
- ${initials}
+ <div style="animation:pulse 2s infinite ease-in-out;">
+ ${getFrpLogoSvg(72)}
  </div>
  <div>
  <div style="font-size:1.4rem;font-weight:900;margin-bottom:.3rem;color:#f8fafc;">Hoş Geldiniz, ${escHtml(user.full_name || user.username)}</div>
- <div style="font-size:.85rem;color:#94a3b8;">Kurumsal Rapor Havuzunuz Hazırlanıyor...</div>
+ <div style="font-size:.85rem;color:#94a3b8;">Kurumsal Rapor Çalışma Alanınız Hazırlanıyor...</div>
  </div>
  <div style="width:240px;height:6px;background:rgba(255,255,255,0.1);border-radius:6px;overflow:hidden;position:relative;">
- <div style="position:absolute;top:0;left:0;bottom:0;width:60%;background:linear-gradient(90deg, #3b82f6, #8b5cf6);box-shadow:0 0 12px #3b82f6;border-radius:6px;animation:splashProgress 1.1s infinite ease-in-out;"></div>
+ <div style="position:absolute;top:0;left:0;bottom:0;width:60%;background:linear-gradient(90deg, #38bdf8, #8b5cf6);box-shadow:0 0 12px #38bdf8;border-radius:6px;animation:splashProgress 1.1s infinite ease-in-out;"></div>
  </div>
  </div>
  `;
@@ -112,57 +148,34 @@
         <div style="position:absolute;top:-60px;left:-60px;width:220px;height:220px;background:rgba(37,99,235,0.25);border-radius:50%;filter:blur(60px);pointer-events:none;"></div>
         <div style="position:absolute;bottom:-80px;right:-60px;width:260px;height:260px;background:rgba(99,102,241,0.22);border-radius:50%;filter:blur(70px);pointer-events:none;"></div>
 
-        <div style="position:relative;z-index:2;">
-          <div style="display:flex;align-items:center;gap:.8rem;margin-bottom:2rem;">
-            <div style="width:48px;height:48px;background:linear-gradient(135deg, #3b82f6, #6366f1);border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(59,130,246,0.35);">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-            </div>
-            <div>
-              <h1 style="font-size:1.5rem;font-weight:900;letter-spacing:-.02em;margin:0;color:#ffffff;">FrpOku</h1>
-              <p style="font-size:.78rem;color:#94a3b8;margin:0;font-weight:600;">FastReport Kurumsal Rapor Portalı</p>
-            </div>
+        <div style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;text-align:center;padding:1.6rem 0.6rem;">
+          <div style="margin-bottom:1.5rem;filter:drop-shadow(0 12px 28px rgba(37,99,235,0.45));">
+            ${getFrpLogoSvg(80)}
           </div>
+          <h1 style="font-size:1.65rem;font-weight:900;letter-spacing:-.03em;margin:0 0 .4rem;color:#ffffff;text-shadow:0 2px 12px rgba(0,0,0,0.35);">FrpOku Enterprise</h1>
+          <p style="font-size:.82rem;color:#94a3b8;margin:0 0 2.2rem;max-width:270px;line-height:1.5;font-weight:500;">
+            FastReport Raporlama, SQL Denetimi ve Kurumsal İş Birliği Platformu
+          </p>
 
-          <div style="display:flex;flex-direction:column;gap:1.15rem;margin-bottom:2rem;">
-            <div style="display:flex;align-items:flex-start;gap:.75rem;">
-              <div style="width:34px;height:34px;border-radius:10px;background:rgba(37,99,235,0.18);border:1px solid rgba(59,130,246,0.3);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">🔐</div>
-              <div>
-                <div style="font-size:.85rem;font-weight:800;color:#f8fafc;">4 Kademeli Acil Erişim Anahtarları</div>
-                <div style="font-size:.74rem;color:#94a3b8;line-height:1.4;">Yöneticiye veya e-postaya ulaşılamayan acil durumlarda şifrenizi tek tıkla kurtarma mimarisi.</div>
-              </div>
+          <div style="width:100%;display:flex;flex-direction:column;gap:.75rem;max-width:280px;text-align:left;">
+            <div style="display:flex;align-items:center;gap:.75rem;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:.6rem .85rem;border-radius:10px;">
+              <span style="font-size:1rem;color:#38bdf8;">⚡</span>
+              <span style="font-size:.78rem;color:#cbd5e1;font-weight:600;">Hızlı Rapor & SQL Analizi</span>
             </div>
-
-            <div style="display:flex;align-items:flex-start;gap:.75rem;">
-              <div style="width:34px;height:34px;border-radius:10px;background:rgba(16,185,129,0.18);border:1px solid rgba(16,185,129,0.3);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">👥</div>
-              <div>
-                <div style="font-size:.85rem;font-weight:800;color:#f8fafc;">Ekip Sohbeti & Grup Mesajlaşma</div>
-                <div style="font-size:.74rem;color:#94a3b8;line-height:1.4;">Çok kullanıcılı gruplar, gerçek ses kayıtları ve MSN titreşim (📳) destekli iletişim.</div>
-              </div>
+            <div style="display:flex;align-items:center;gap:.75rem;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:.6rem .85rem;border-radius:10px;">
+              <span style="font-size:1rem;color:#10b981;">🛡️</span>
+              <span style="font-size:.78rem;color:#cbd5e1;font-weight:600;">Çift Katmanlı Veri Güvenliği</span>
             </div>
-
-            <div style="display:flex;align-items:flex-start;gap:.75rem;">
-              <div style="width:34px;height:34px;border-radius:10px;background:rgba(245,158,11,0.18);border:1px solid rgba(245,158,11,0.3);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">🛡️</div>
-              <div>
-                <div style="font-size:.85rem;font-weight:800;color:#f8fafc;">3 Hatalı Girişte Captcha Koruması</div>
-                <div style="font-size:.74rem;color:#94a3b8;line-height:1.4;">Kaba kuvvet (brute-force) koruması ve son 3 şifrenin tekrarını engelleyen güvenlik protokolü.</div>
-              </div>
-            </div>
-
-            <div style="display:flex;align-items:flex-start;gap:.75rem;">
-              <div style="width:34px;height:34px;border-radius:10px;background:rgba(139,92,246,0.18);border:1px solid rgba(139,92,246,0.3);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">📊</div>
-              <div>
-                <div style="font-size:.85rem;font-weight:800;color:#f8fafc;">Canlı İstatistikler & PDF Reader</div>
-                <div style="font-size:.74rem;color:#94a3b8;line-height:1.4;">Kelime/karakter/okuma süresi sayaçları, 90° döndürme ve Paint Pro çizim araçları.</div>
-              </div>
+            <div style="display:flex;align-items:center;gap:.75rem;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:.6rem .85rem;border-radius:10px;">
+              <span style="font-size:1rem;color:#a855f7;">💬</span>
+              <span style="font-size:.78rem;color:#cbd5e1;font-weight:600;">Canlı Ekip İletişimi & Notlar</span>
             </div>
           </div>
         </div>
 
-        <div style="position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;padding-top:1.2rem;border-top:1px solid rgba(255,255,255,0.1);">
-          <span style="font-size:.72rem;color:#cbd5e1;font-weight:700;background:rgba(255,255,255,0.08);padding:3px 10px;border-radius:9999px;border:1px solid rgba(255,255,255,0.12);">
-            Kurumsal Güvenlik Sürümü v2.4
-          </span>
-          <span style="font-size:.72rem;color:#94a3b8;">%100 Yerel Veri Gizliliği</span>
+        <div style="position:relative;z-index:2;display:flex;align-items:center;justify-content:center;gap:.55rem;padding-top:1.2rem;border-top:1px solid rgba(255,255,255,0.08);">
+          <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 8px #10b981;"></span>
+          <span style="font-size:.74rem;color:#94a3b8;font-weight:600;">Uçtan Uca Şifreli Kurumsal Oturum</span>
         </div>
       </div>
 
@@ -237,28 +250,28 @@
               <input type="checkbox" id="loginRememberMe" ${localStorage.getItem(REMEMBER_KEY) !== '0' ? 'checked' : ''} style="width:15px;height:15px;accent-color:#2563eb;cursor:pointer;" />
               Beni Hatırla
             </label>
-            <a href="#" id="linkEmergencyRecover" style="font-size:.75rem;color:#4f46e5;font-weight:700;text-decoration:none;">
+            <a href="#" id="linkEmergencyRecover" style="font-size:.75rem;color:#4f46e5;font-weight:700;text-decoration:none;display:none;">
               🔐 Acil Kurtarma Anahtarı ile Sıfırla
             </a>
           </div>
 
-          <div id="loginCaptchaContainer" style="display:none;margin-bottom:.85rem;background:#f8fafc;border:1.5px solid #f59e0b;border-radius:10px;padding:.75rem;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem;">
-              <label style="font-size:.76rem;font-weight:700;color:#92400e;">
-                🛡️ Güvenlik Doğrulaması (Captcha)
+          <div id="loginCaptchaContainer" style="display:none;margin-bottom:.85rem;background:#fffbeb;border:1.5px solid #f59e0b;border-radius:10px;padding:.75rem .9rem;box-shadow:0 2px 8px rgba(245,158,11,0.12);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
+              <label style="font-size:.76rem;font-weight:800;color:#92400e;display:flex;align-items:center;gap:.35rem;">
+                <span>🛡️ Güvenlik Doğrulaması (Captcha)</span>
               </label>
-              <button type="button" id="btnRefreshCaptcha" title="Soruyu Yenile" style="background:none;border:none;cursor:pointer;font-size:.74rem;font-weight:700;color:#2563eb;">Yenile</button>
+              <button type="button" id="btnRefreshCaptcha" title="Soruyu Yenile" style="background:none;border:none;cursor:pointer;font-size:.74rem;font-weight:700;color:#2563eb;">🔄 Yenile</button>
             </div>
             <div style="display:flex;align-items:center;gap:.65rem;margin-bottom:.35rem;">
-              <span id="loginCaptchaQuestion" style="font-size:.95rem;font-weight:800;color:#1e293b;background:#e2e8f0;padding:.35rem .75rem;border-radius:6px;letter-spacing:1px;">?</span>
+              <span id="loginCaptchaQuestion" style="font-size:.95rem;font-weight:800;color:#1e293b;background:#f1f5f9;border:1px solid #cbd5e1;padding:.4rem .85rem;border-radius:8px;letter-spacing:1px;font-family:monospace;">?</span>
               <input type="text" id="loginCaptchaAnswer" placeholder="Sonucu yazın" style="
-                flex: 1; padding:.5rem .75rem; border-radius: 8px;
+                flex: 1; padding:.55rem .75rem; border-radius: 8px;
                 background: #ffffff; border: 1.5px solid #cbd5e1;
-                color: #0f172a; font-size:.84rem; outline: none; box-sizing: border-box;
+                color: #0f172a; font-size:.86rem; outline: none; box-sizing: border-box; font-weight:700;
               " />
               <input type="hidden" id="loginCaptchaToken" value="" />
             </div>
-            <div style="font-size:.7rem;color:#64748b;">3 hatalı denemede brute-force koruması devreye girer.</div>
+            <div style="font-size:.68rem;color:#b45309;font-weight:600;">Kaba kuvvet koruması: Devam etmek için matematik işlemini yanıtlayınız.</div>
           </div>
 
           <button type="submit" id="btnLoginSubmit" style="
@@ -572,7 +585,12 @@
 
   portal.querySelector('#tabLoginBtn').onclick = () => switchTab('login');
   portal.querySelector('#tabRegisterBtn').onclick = () => switchTab('register');
-  portal.querySelector('#linkForgotPassword').onclick = (e) => { e.preventDefault(); switchTab('forgot'); };
+  portal.querySelector('#linkForgotPassword').onclick = (e) => {
+    e.preventDefault();
+    const linkEmergency = portal.querySelector('#linkEmergencyRecover');
+    if (linkEmergency) linkEmergency.style.display = 'inline-block';
+    switchTab('forgot');
+  };
   portal.querySelector('#btnBackToLoginFromForgot').onclick = () => switchTab('login');
   portal.querySelector('#btnGoToRecFromForgot').onclick = () => switchTab('recovery');
   portal.querySelector('#linkEmergencyRecover').onclick = (e) => { e.preventDefault(); switchTab('recovery'); };
@@ -693,16 +711,19 @@
   const captchaTokenInput = portal.querySelector('#loginCaptchaToken');
   const btnRefreshCaptcha = portal.querySelector('#btnRefreshCaptcha');
 
+  let failedLoginAttempts = 0;
+
   async function loadCaptcha() {
     try {
       const res = await fetch('/api/auth/captcha');
       const data = await res.json();
-      if (data && data.token) {
-        captchaTokenInput.value = data.token;
+      const token = data?.captchaToken || data?.token;
+      if (data && token) {
+        captchaTokenInput.value = token;
         captchaQuestion.textContent = data.question;
         captchaAnswerInput.value = '';
         captchaContainer.style.display = 'block';
-        captchaAnswerInput.focus();
+        setTimeout(() => { if (captchaAnswerInput) captchaAnswerInput.focus(); }, 40);
       }
     } catch (e) {
       console.warn('Captcha yüklenemedi:', e);
@@ -763,7 +784,13 @@
         if (typeof window.toast === 'function') window.toast(`Hoş geldiniz, ${res.user.full_name || res.user.username}!`, 'success');
       });
     } else {
-      if (res.requireCaptcha || res.reason?.includes('Captcha')) {
+      failedLoginAttempts++;
+      const linkEmergency = portal.querySelector('#linkEmergencyRecover');
+      if (linkEmergency && (failedLoginAttempts >= 2 || res.requireCaptcha || res.failedAttempts >= 2)) {
+        linkEmergency.style.display = 'inline-block';
+      }
+
+      if (res.requireCaptcha || res.reason?.toLowerCase().includes('captcha')) {
         await loadCaptcha();
       }
       if (res.isFrozen) {

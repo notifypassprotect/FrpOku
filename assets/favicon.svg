@@ -1,16 +1,105 @@
-﻿<svg xmlns=http://www.w3.org/2000/svg viewBox=0 0 64 64 width=64 height=64>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
   <defs>
-    <linearGradient id=bgGrad x1=0% y1=0% x2=100% y2=100%>
-      <stop offset=0% style=stop-color:#2563eb;stop-opacity:1 />
-      <stop offset=100% style=stop-color:#6366f1;stop-opacity:1 />
+    <!-- Arka Plan Gradient: Derin Safir Lacivert -->
+    <linearGradient id="frpBgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="50%" stop-color="#1e1b4b" />
+      <stop offset="100%" stop-color="#090d16" />
     </linearGradient>
-    <linearGradient id=shineGrad x1=0% y1=0% x2=0% y2=100%>
-      <stop offset=0% style=stop-color:#ffffff;stop-opacity:0.18 />
-      <stop offset=100% style=stop-color:#ffffff;stop-opacity:0 />
+
+    <!-- Ana Prizma Gradient: Elektrik Safir & Neon Mavi -->
+    <linearGradient id="frpPrismGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="35%" stop-color="#2563eb" />
+      <stop offset="80%" stop-color="#4f46e5" />
+      <stop offset="100%" stop-color="#7c3aed" />
     </linearGradient>
+
+    <!-- Katlanmış Köşe Gradient -->
+    <linearGradient id="frpFoldGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0284c7" />
+      <stop offset="50%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#e0f2fe" />
+    </linearGradient>
+
+    <!-- Veri Çubukları Gradient -->
+    <linearGradient id="frpCyanGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#06b6d4" />
+      <stop offset="100%" stop-color="#38bdf8" />
+    </linearGradient>
+
+    <linearGradient id="frpEmeraldGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#34d399" />
+    </linearGradient>
+
+    <linearGradient id="frpVioletGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#8b5cf6" />
+      <stop offset="100%" stop-color="#c084fc" />
+    </linearGradient>
+
+    <!-- Çevre Parlama Filtresi -->
+    <filter id="frpGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <!-- Hafif İç Gölge -->
+    <filter id="frpDropShadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000000" flood-opacity="0.45" />
+    </filter>
   </defs>
-  <rect x=2 y=2 width=60 height=60 rx=15 ry=15 fill=url(#bgGrad) />
-  <rect x=2 y=2 width=60 height=32 rx=15 ry=15 fill=url(#shineGrad) />
-  <text x=32 y=41 text-anchor=middle font-family=Segoe UI,Arial,Helvetica,sans-serif font-size=22 font-weight=900 letter-spacing=-0.5 fill=#ffffff>FRP</text>
-  <rect x=22 y=44 width=20 height=2.5 rx=1.25 fill=rgba(255,255,255,0.5) />
+
+  <!-- Dış Çerçeve (Squircle Arka Plan) -->
+  <rect x="4" y="4" width="120" height="120" rx="30" ry="30" fill="url(#frpBgGrad)" stroke="rgba(56, 189, 248, 0.28)" stroke-width="2" filter="url(#frpDropShadow)" />
+
+  <!-- Dış Ambient Işık Halkası -->
+  <circle cx="64" cy="40" r="44" fill="#38bdf8" opacity="0.12" filter="url(#frpGlow)" />
+  <circle cx="84" cy="84" r="36" fill="#8b5cf6" opacity="0.10" filter="url(#frpGlow)" />
+
+  <!-- Ana Rapor Katmanı (3D Kağıt & Prizma Şekli) -->
+  <g filter="url(#frpDropShadow)">
+    <!-- Rapor Gövdesi -->
+    <path d="M 34 26 
+             L 76 26 
+             L 94 44 
+             L 94 98 
+             A 6 6 0 0 1 88 104 
+             L 40 104 
+             A 6 6 0 0 1 34 98 
+             Z" 
+          fill="url(#frpPrismGrad)" 
+          stroke="rgba(255,255,255,0.3)" 
+          stroke-width="1.5" />
+
+    <!-- Katlanan Sağ Üst Köşe (Origami Efekti) -->
+    <path d="M 76 26 
+             L 76 40 
+             A 4 4 0 0 0 80 44 
+             L 94 44 
+             Z" 
+          fill="url(#frpFoldGrad)" 
+          filter="url(#frpGlow)" />
+
+    <!-- Kağıt İçi Çizgiler ve Veri Dalgaları (FastReport İkonografisi) -->
+    <!-- Başlık Çizgisi -->
+    <rect x="44" y="40" width="24" height="4.5" rx="2.25" fill="#ffffff" opacity="0.95" />
+
+    <!-- Veri Analiz Çizgileri -->
+    <rect x="44" y="52" width="40" height="3.5" rx="1.75" fill="url(#frpCyanGrad)" />
+    <rect x="44" y="61" width="34" height="3.5" rx="1.75" fill="#cbd5e1" opacity="0.75" />
+    <rect x="44" y="70" width="26" height="3.5" rx="1.75" fill="#94a3b8" opacity="0.65" />
+
+    <!-- Canlı Dinamik Bar Grafiği (Raporlama Sembolü) -->
+    <g transform="translate(44, 80)">
+      <rect x="0" y="8" width="6" height="10" rx="2" fill="url(#frpEmeraldGrad)" />
+      <rect x="9" y="3" width="6" height="15" rx="2" fill="url(#frpCyanGrad)" />
+      <rect x="18" y="0" width="6" height="18" rx="2" fill="url(#frpVioletGrad)" />
+      <rect x="27" y="5" width="6" height="13" rx="2" fill="#38bdf8" />
+      <rect x="36" y="9" width="6" height="9" rx="2" fill="#a855f7" />
+    </g>
+
+    <!-- Neon Parlama Noktası -->
+    <circle cx="89" cy="40" r="2" fill="#ffffff" filter="url(#frpGlow)" />
+  </g>
 </svg>

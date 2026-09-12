@@ -4,6 +4,7 @@ data/users.json
 data/audit_logs.json
 data/store.json
 data/store.json.tmp
+data/user_settings.json
+data/*.json
 *.log
 .vscode/
-aaa.txt

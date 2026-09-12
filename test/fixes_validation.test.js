@@ -180,3 +180,45 @@ test('detail/app.js zengin not şablonları, sayaç ve Word modu tetikleyicisi b
   assert.match(appJs, /btnInsertDateStamp/);
 });
 
+test('assets/favicon.svg geçerli XML standartlarına ve yeni FrpOku vektörel tasarımına sahiptir', () => {
+  const svg = fs.readFileSync(path.join(__dirname, '..', 'assets', 'favicon.svg'), 'utf8');
+
+  assert.match(svg, /xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
+  assert.match(svg, /viewBox="0 0 128 128"/);
+  assert.match(svg, /frpPrismGrad/);
+  assert.match(svg, /frpFoldGrad/);
+});
+
+test('server.js captcha endpointi hem token hem de captchaToken döner', () => {
+  const serverJs = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+
+  assert.match(serverJs, /token:\s*c\.token,\s*captchaToken:\s*c\.token/);
+});
+
+test('auth_portal.js yeni FrpOku logosunu, acil kurtarma gizliliğini ve captcha çözümünü barındırır', () => {
+  const portalJs = fs.readFileSync(path.join(__dirname, '..', 'js', 'core', 'auth', 'auth_portal.js'), 'utf8');
+
+  assert.match(portalJs, /function getFrpLogoSvg\(/);
+  assert.match(portalJs, /id="linkEmergencyRecover"[^>]*display:\s*none/);
+  assert.match(portalJs, /data\?\.captchaToken\s*\|\|\s*data\?\.token/);
+});
+
+test('dashboard.html ve compare.html atıl complexity.js içermez ve dashboard favicon barındırır', () => {
+  const dashHtml = fs.readFileSync(path.join(__dirname, '..', 'dashboard.html'), 'utf8');
+  const compHtml = fs.readFileSync(path.join(__dirname, '..', 'compare.html'), 'utf8');
+
+  assert.equal(dashHtml.includes('complexity.js'), false, 'dashboard.html complexity.js içermemeli');
+  assert.equal(compHtml.includes('complexity.js'), false, 'compare.html complexity.js içermemeli');
+  assert.match(dashHtml, /assets\/favicon\.svg/, 'dashboard.html favicon içermeli');
+});
+
+test('yetim dosyalar ve aaa.txt kök dizinden temizlenmiştir', () => {
+  const rootDir = path.join(__dirname, '..');
+  assert.equal(fs.existsSync(path.join(rootDir, 'aaa.txt')), false, 'aaa.txt kökte olmamalı');
+  assert.equal(fs.existsSync(path.join(rootDir, 'js', 'detail', 'detail_helpers.js')), false, 'detail_helpers.js silinmiş olmalı');
+  assert.equal(fs.existsSync(path.join(rootDir, 'js', 'detail', 'detail_panels.js')), false, 'detail_panels.js silinmiş olmalı');
+  assert.equal(fs.existsSync(path.join(rootDir, 'js', 'analytics', 'complexity.js')), false, 'complexity.js silinmiş olmalı');
+  assert.equal(fs.existsSync(path.join(rootDir, 'docs', 'security-audit-notes.md')), true, 'docs/security-audit-notes.md mevcut olmalı');
+});
+
+

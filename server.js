@@ -621,7 +621,7 @@ app.post('/api/auth/register', authRateLimiter, async (req, res) => {
 // ── CAPTCHA GÜVENLİK DOĞRULAMA ROTASI ─────────────────────────
 app.get('/api/auth/captcha', authRateLimiter, (req, res) => {
   const c = generateCaptcha();
-  res.json({ success: true, question: c.question, captchaToken: c.token });
+  res.json({ success: true, question: c.question, token: c.token, captchaToken: c.token });
 });
 
 // ── 2. KULLANICI GİRİŞİ (Login) ──────────────────────────────
@@ -1862,7 +1862,17 @@ app.get('/api/settings', requireAuth, async (req, res) => {
 app.patch('/api/settings', apiWriteRateLimiter, requireAuth, async (req, res) => {
   const userId = String(req.authUser.id);
   const localMap = getUserSettingsFileMap();
-  const current = localMap[userId] || {};
+  let current = localMap[userId] || null;
+
+  if (!current && supabase) {
+    try {
+      const { data, error } = await supabase.from('user_settings').select('*').eq('id', userId).limit(1);
+      if (!error && data && data[0]) {
+        current = { ...data[0], customTags: data[0].custom_tags || [] };
+      }
+    } catch {}
+  }
+  current = current || {};
 
   try {
     const customTagsInput = req.body?.custom_tags ?? req.body?.customTags;
@@ -2337,6 +2347,8 @@ function getUnreadCountsForUser(userId) {
   for (const m of msgs) {
     const isIncoming = String(m.receiverId) === strUser;
     const isOutgoing = String(m.senderId) === strUser;
+    const time = new Date(m.createdAt || 0).getTime();
+
     if (isIncoming && !m.isRead) {
       const senderKey = String(m.senderId);
       counts[senderKey] = (counts[senderKey] || 0) + 1;
@@ -2344,11 +2356,22 @@ function getUnreadCountsForUser(userId) {
     }
     if (isIncoming || isOutgoing) {
       const peerId = isIncoming ? String(m.senderId) : String(m.receiverId);
-      if (peerId && peerId !== strUser) {
-        const time = new Date(m.createdAt || 0).getTime();
+      if (peerId) {
         if (!lastInteraction[peerId] || time > lastInteraction[peerId]) {
           lastInteraction[peerId] = time;
         }
+      }
+    }
+    if (m.roomId) {
+      const rId = String(m.roomId);
+      if (!lastInteraction[rId] || time > lastInteraction[rId]) {
+        lastInteraction[rId] = time;
+      }
+    }
+    if (m.groupId) {
+      const gId = String(m.groupId);
+      if (!lastInteraction[gId] || time > lastInteraction[gId]) {
+        lastInteraction[gId] = time;
       }
     }
   }
