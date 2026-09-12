@@ -16,11 +16,11 @@ window.FrpListModals = window.FrpListModals || {};
     const files = FrpStore.getAll ? FrpStore.getAll() : [];
     let usage = FrpStore.getParameterUsage ? FrpStore.getParameterUsage(files) : [];
 
-    // Eğer özet modundan dolayı sorgular bellekte değilse ve paramNames boşsa tüm raporları otomatik tara:
-    if ((!usage || usage.length === 0) && files.length > 0 && FrpStore.ensureFullReport) {
+    // Eğer bazı raporların sorgu veya parametre detayları bellekte eksikse, eksik olanları parti parti yükle:
+    if (files.length > 0 && FrpStore.ensureFullReport) {
       const filesNeedingLoad = files.filter(f => (!f.queries || f.queries.length === 0) && (!f.paramNames || f.paramNames.length === 0));
       if (filesNeedingLoad.length > 0) {
-        const batchSize = 15;
+        const batchSize = 25;
         for (let i = 0; i < filesNeedingLoad.length; i += batchSize) {
           const chunk = filesNeedingLoad.slice(i, i + batchSize);
           await Promise.all(chunk.map(f => FrpStore.ensureFullReport(f.id).catch(() => {})));
@@ -233,11 +233,11 @@ window.FrpListModals = window.FrpListModals || {};
     const files = FrpStore.getAll ? FrpStore.getAll() : [];
     let deps = FrpStore.getDependencyMap ? FrpStore.getDependencyMap(files) : [];
 
-    // Özet modunda tablolar çıkarılmadıysa otomatik tara:
-    if ((!deps || deps.length === 0) && files.length > 0 && FrpStore.ensureFullReport) {
+    // Raporların tablo/bağımlılık detayları bellekte eksikse otomatik tara:
+    if (files.length > 0 && FrpStore.ensureFullReport) {
       const filesNeedingLoad = files.filter(f => (!f.queries || f.queries.length === 0) && (!f.tableNames || f.tableNames.length === 0));
       if (filesNeedingLoad.length > 0) {
-        const batchSize = 15;
+        const batchSize = 25;
         for (let i = 0; i < filesNeedingLoad.length; i += batchSize) {
           const chunk = filesNeedingLoad.slice(i, i + batchSize);
           await Promise.all(chunk.map(f => FrpStore.ensureFullReport(f.id).catch(() => {})));
@@ -435,11 +435,11 @@ window.FrpListModals = window.FrpListModals || {};
     const files = FrpStore.getAll ? FrpStore.getAll() : [];
     let usage = FrpStore.getTableUsage ? FrpStore.getTableUsage(files) : [];
 
-    // Özet modunda tablolar çıkarılmadıysa otomatik tara:
-    if ((!usage || usage.length === 0) && files.length > 0 && FrpStore.ensureFullReport) {
+    // Özet modunda bazı raporların tabloları çıkarılmadıysa otomatik tara:
+    if (files.length > 0 && FrpStore.ensureFullReport) {
       const filesNeedingLoad = files.filter(f => (!f.queries || f.queries.length === 0) && (!f.tableNames || f.tableNames.length === 0) && (!f.datasets || f.datasets.length === 0));
       if (filesNeedingLoad.length > 0) {
-        const batchSize = 15;
+        const batchSize = 25;
         for (let i = 0; i < filesNeedingLoad.length; i += batchSize) {
           const chunk = filesNeedingLoad.slice(i, i + batchSize);
           await Promise.all(chunk.map(f => FrpStore.ensureFullReport(f.id).catch(() => {})));

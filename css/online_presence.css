@@ -722,22 +722,37 @@
   background: var(--bg-surface, #ffffff);
   border: 1px solid var(--border, #cbd5e1);
   border-radius: 20px;
-  padding: 2px 5px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  z-index: 10;
-  gap: 2px;
+  padding: 2px 6px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+  z-index: 25;
+  gap: 3px;
+  align-items: center;
+  pointer-events: auto;
 }
 
-.frp-chat-msg:hover .frp-chat-hover-bar {
-  display: flex;
+/* Hover köprüsü: Baloncuk ile çubuk arasındaki boşluğu kapatır, fare çıkınca kapanmasını önler */
+.frp-chat-hover-bar::after {
+  content: '';
+  position: absolute;
+  bottom: -12px;
+  left: -8px;
+  right: -8px;
+  height: 16px;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.frp-chat-msg:hover .frp-chat-hover-bar,
+.frp-chat-hover-bar:hover {
+  display: flex !important;
 }
 
 .frp-chat-msg.outgoing .frp-chat-hover-bar {
-  right: 0;
+  right: 4px;
 }
 
 .frp-chat-msg.incoming .frp-chat-hover-bar {
-  left: 0;
+  left: 4px;
 }
 
 .btn-react {

@@ -993,6 +993,7 @@
           ${!isRoom ? `<button type="button" class="frp-chat-btn-ctrl btn-nudge" title="Titreşim Gönder (📳 MSN Titret)">📳</button>` : ''}
           <button type="button" class="frp-chat-btn-ctrl btn-media-gallery" title="Paylaşılan Medya & Belgeler (İnovasyon)">📁</button>
           <button type="button" class="frp-chat-btn-ctrl btn-search" title="Sohbette Ara">🔍</button>
+          ${(!isRoom && !isGroup) || isAdmin ? `<button type="button" class="frp-chat-btn-ctrl btn-clear-chat" title="Sohbeti Sil / Temizle" style="color:#ef4444;">🗑️</button>` : ''}
           <button type="button" class="frp-chat-btn-ctrl btn-maximize" title="Ekranı Büyüt / Eski Boyut">⛶</button>
           <button type="button" class="frp-chat-btn-ctrl btn-minimize" title="Simge Durumuna Küçült">─</button>
           <button type="button" class="frp-chat-btn-ctrl btn-close" title="Kapat">✕</button>
@@ -1088,6 +1089,7 @@
     const btnClose = chatEl.querySelector('.btn-close');
     const btnMinimize = chatEl.querySelector('.btn-minimize');
     const btnMaximize = chatEl.querySelector('.btn-maximize');
+    const btnClearChat = chatEl.querySelector('.btn-clear-chat');
     const btnSearch = chatEl.querySelector('.btn-search');
     const searchBar = chatEl.querySelector('.frp-chat-search-bar');
     const searchInput = chatEl.querySelector('.frp-chat-search-input');
@@ -1249,6 +1251,33 @@
       chatEl.classList.remove('minimized');
       chatEl.classList.toggle('maximized');
     });
+
+    if (btnClearChat) {
+      btnClearChat.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const targetName = chatTitle || 'bu sohbetin';
+        const ok = window.confirm(`"${targetName}" sohbetinin tüm geçmişini silmek istediğinizden emin misiniz?\nBu işlem geri alınamaz.`);
+        if (!ok) return;
+
+        try {
+          const chatType = isRoom ? 'room' : (isGroup ? 'group' : 'peer');
+          const res = await fetch(`/api/chat/conversations/${encodeURIComponent(chatId)}?type=${chatType}`, {
+            method: 'DELETE',
+            headers: (window.FrpAuth && window.FrpAuth.getAuthHeaders) ? window.FrpAuth.getAuthHeaders() : {}
+          });
+          const data = await res.json().catch(() => ({}));
+          if (res.ok && data.success) {
+            if (typeof window.toast === 'function') window.toast('Sohbet geçmişi temizlendi.', 'success');
+            msgStream.innerHTML = '';
+            loadMessages();
+          } else {
+            if (typeof window.toast === 'function') window.toast(data.reason || 'Sohbet temizlenemedi.', 'error');
+          }
+        } catch (err) {
+          if (typeof window.toast === 'function') window.toast('Hata: ' + err.message, 'error');
+        }
+      });
+    }
 
     chatHeader.addEventListener('click', () => {
       if (chatEl.classList.contains('minimized')) {

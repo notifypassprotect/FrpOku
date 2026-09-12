@@ -380,31 +380,55 @@
 
         <!-- 3. ŞİFREMİ UNUTTUM -->
         <div id="authForgotPanel" style="display: none; text-align: left;">
-          <div style="text-align:center;margin-bottom:1.2rem;">
+          <div style="text-align:center;margin-bottom:1.1rem;">
             <div style="width:48px;height:48px;margin:0 auto .6rem;background:linear-gradient(135deg, #f59e0b, #d97706);border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
             </div>
             <div style="font-size: 1.1rem; font-weight: 800; color: #0f172a; margin-bottom:.3rem;">Şifre Sıfırlama</div>
-            <p style="font-size:.8rem; color: #475569; line-height: 1.45; margin: 0 auto;">
-              Şifre sıfırlama işlemleri güvenlik amacıyla <strong>Sistem Yöneticisi (Admin)</strong> veya <strong>Acil Kurtarma Anahtarı</strong> ile yapılmaktadır.
+            <p style="font-size:.78rem; color: #475569; line-height: 1.45; margin: 0 auto;">
+              E-posta doğrulaması, acil kurtarma anahtarı veya yönetici yardımı ile şifrenizi sıfırlayabilirsiniz.
             </p>
           </div>
 
-          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:1rem;margin-bottom:1.2rem;">
-            <div style="font-weight:700;font-size:.82rem;color:#0f172a;margin-bottom:.3rem;">Kurtarma Seçenekleri</div>
-            <ul style="margin:0;padding-left:1.1rem;font-size:.78rem;color:#64748b;line-height:1.5;">
-              <li>Eğer 4 haneli kurtarma anahtarınız varsa "Acil Kurtarma Anahtarı ile Sıfırla" seçeneğini kullanabilirsiniz.</li>
-              <li>Anahtarınız yoksa sistem yöneticinizle iletişime geçiniz.</li>
-            </ul>
+          <!-- ADIM 1: E-Posta Kodu Gönderme -->
+          <div id="forgotStep1" style="margin-bottom:.9rem;">
+            <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:.85rem;margin-bottom:.75rem;">
+              <div style="font-weight:800;font-size:.82rem;color:#1e40af;margin-bottom:.45rem;">📧 E-Posta ile Kod Alarak Sıfırla</div>
+              <div style="display:flex;gap:.5rem;align-items:center;">
+                <input type="text" id="forgotIdentifier" placeholder="Kullanıcı adı veya e-posta" style="flex:1;padding:.55rem .75rem;border-radius:8px;background:#ffffff;border:1.5px solid #bfdbfe;color:#0f172a;font-size:.83rem;outline:none;box-sizing:border-box;" />
+                <button type="button" id="btnSendForgotCode" style="padding:.55rem .85rem;border:none;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;font-size:.78rem;cursor:pointer;white-space:nowrap;flex-shrink:0;">Kod Gönder</button>
+              </div>
+              <div id="forgotCodeMsg" style="display:none;font-size:.72rem;color:#15803d;margin-top:.4rem;"></div>
+            </div>
+
+            <!-- ADIM 2: Kod + Yeni Şifre -->
+            <div id="forgotStep2" style="display:none;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:.85rem;margin-bottom:.75rem;">
+              <div style="font-weight:800;font-size:.82rem;color:#0f172a;margin-bottom:.45rem;">🔢 Doğrulama Kodunu Girin</div>
+              <div style="margin-bottom:.5rem;">
+                <input type="text" id="forgotCode" maxlength="6" placeholder="6 haneli kod" style="width:100%;padding:.55rem .75rem;border-radius:8px;background:#ffffff;border:1.5px solid #cbd5e1;color:#0f172a;font-size:1.1rem;font-family:monospace;font-weight:800;letter-spacing:6px;text-align:center;outline:none;box-sizing:border-box;" />
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.5rem;">
+                <input type="password" id="forgotNewPass" placeholder="Yeni şifre (min 6)" style="padding:.5rem .65rem;border-radius:8px;background:#fff;border:1.5px solid #cbd5e1;color:#0f172a;font-size:.83rem;outline:none;box-sizing:border-box;" />
+                <input type="password" id="forgotNewPassConf" placeholder="Tekrar girin" style="padding:.5rem .65rem;border-radius:8px;background:#fff;border:1.5px solid #cbd5e1;color:#0f172a;font-size:.83rem;outline:none;box-sizing:border-box;" />
+              </div>
+              <button type="button" id="btnApplyForgotCode" style="width:100%;padding:.65rem;border:none;border-radius:8px;background:#10b981;color:#fff;font-weight:700;font-size:.85rem;cursor:pointer;">✅ Şifreyi Sıfırla</button>
+              <div id="forgotCodeError" style="display:none;font-size:.72rem;color:#b91c1c;margin-top:.4rem;"></div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem;">
+              <div style="flex:1;height:1px;background:#e2e8f0;"></div>
+              <span style="font-size:.7rem;font-weight:700;color:#94a3b8;">VEYA</span>
+              <div style="flex:1;height:1px;background:#e2e8f0;"></div>
+            </div>
           </div>
 
           <button type="button" id="btnGoToRecFromForgot" style="
-            width: 100%; padding:.7rem; border: none; border-radius: 10px;
-            background: #4f46e5; color: #ffffff; font-weight: 700; font-size:.85rem; cursor: pointer; margin-bottom:.6rem;
+            width: 100%; padding:.65rem; border: none; border-radius: 10px;
+            background: #4f46e5; color: #ffffff; font-weight: 700; font-size:.82rem; cursor: pointer; margin-bottom:.5rem;
           ">🔐 Acil Kurtarma Anahtarı ile Sıfırla</button>
           <button type="button" id="btnBackToLoginFromForgot" style="
-            width: 100%; padding:.65rem; border: 1px solid #cbd5e1; border-radius: 10px;
-            background: #f1f5f9; color: #475569; font-weight: 700; font-size:.82rem; cursor: pointer;
+            width: 100%; padding:.6rem; border: 1px solid #cbd5e1; border-radius: 10px;
+            background: #f1f5f9; color: #475569; font-weight: 700; font-size:.8rem; cursor: pointer;
           ">← Giriş Ekranına Dön</button>
         </div>
 
@@ -554,6 +578,97 @@
   portal.querySelector('#linkEmergencyRecover').onclick = (e) => { e.preventDefault(); switchTab('recovery'); };
   portal.querySelector('#btnBackToLoginFromRec').onclick = () => switchTab('login');
   bindFooterLinks();
+
+  // ── E-Posta ile Şifre Sıfırlama Adım 1: Kod gönder
+  const btnSendForgotCode = portal.querySelector('#btnSendForgotCode');
+  if (btnSendForgotCode) {
+    btnSendForgotCode.onclick = async () => {
+      const ident = (portal.querySelector('#forgotIdentifier').value || '').trim();
+      const msgEl = portal.querySelector('#forgotCodeMsg');
+      const step2El = portal.querySelector('#forgotStep2');
+      if (!ident) { msgEl.style.display = 'block'; msgEl.style.color = '#b91c1c'; msgEl.textContent = 'Lütfen kullanıcı adı veya e-posta giriniz.'; return; }
+      btnSendForgotCode.disabled = true;
+      btnSendForgotCode.textContent = 'Gönderiliyor...';
+      try {
+        const r = await fetch('/api/auth/forgot-password-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier: ident })
+        });
+        const d = await r.json().catch(() => ({}));
+        if (r.ok && d.success) {
+          msgEl.style.display = 'block';
+          msgEl.style.color = '#15803d';
+          msgEl.textContent = d.message || 'Kod gönderildi. Lütfen e-postanızı kontrol edin.';
+          if (step2El) step2El.style.display = 'block';
+          portal.querySelector('#forgotCode')?.focus();
+        } else {
+          msgEl.style.display = 'block';
+          msgEl.style.color = '#b91c1c';
+          msgEl.textContent = d.reason || 'Kod gönderilemedi.';
+        }
+      } catch (err) {
+        msgEl.style.display = 'block';
+        msgEl.style.color = '#b91c1c';
+        msgEl.textContent = 'Bağlantı hatası: ' + err.message;
+      } finally {
+        btnSendForgotCode.disabled = false;
+        btnSendForgotCode.textContent = 'Kod Gönder';
+      }
+    };
+  }
+
+  // ── E-Posta ile Şifre Sıfırlama Adım 2: Kodu doğrula ve şifreyi güncelle
+  const btnApplyForgotCode = portal.querySelector('#btnApplyForgotCode');
+  if (btnApplyForgotCode) {
+    btnApplyForgotCode.onclick = async () => {
+      const ident = (portal.querySelector('#forgotIdentifier').value || '').trim();
+      const code = (portal.querySelector('#forgotCode').value || '').trim();
+      const newPass = portal.querySelector('#forgotNewPass').value;
+      const newPassConf = portal.querySelector('#forgotNewPassConf').value;
+      const errEl = portal.querySelector('#forgotCodeError');
+
+      errEl.style.display = 'none';
+      if (!code || code.length !== 6) { errEl.style.display = 'block'; errEl.textContent = '6 haneli kodu eksiksiz giriniz.'; return; }
+      if (!newPass || newPass.length < 6) { errEl.style.display = 'block'; errEl.textContent = 'Yeni şifreniz en az 6 karakter olmalıdır.'; return; }
+      if (newPass !== newPassConf) { errEl.style.display = 'block'; errEl.textContent = 'Şifreler eşleşmiyor.'; return; }
+
+      btnApplyForgotCode.disabled = true;
+      btnApplyForgotCode.textContent = 'Sıfırlanıyor...';
+      try {
+        const r = await fetch('/api/auth/reset-password-with-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier: ident, code, newPassword: newPass })
+        });
+        const d = await r.json().catch(() => ({}));
+        if (r.ok && d.success) {
+          if (d.token) {
+            if (window.FrpAuth && typeof window.FrpAuth.applyExternalSession === 'function') {
+              window.FrpAuth.applyExternalSession(d.token, d.user);
+            } else {
+              localStorage.setItem('frpoku_session', d.token);
+            }
+          }
+          portal.remove();
+          const appWrapEl = document.querySelector('.app-wrap');
+          if (appWrapEl) appWrapEl.style.display = 'flex';
+          if (typeof window.toast === 'function') window.toast('Şifreniz başarıyla sıfırlandı! Hoş geldiniz.', 'success');
+          if (typeof window.FrpAuth?.updateNavbarUserBadge === 'function') window.FrpAuth.updateNavbarUserBadge();
+          if (typeof window.refreshAll === 'function') window.refreshAll();
+        } else {
+          errEl.style.display = 'block';
+          errEl.textContent = d.reason || 'Kod doğrulanamadı. Kodu ve şifrenizi kontrol ediniz.';
+        }
+      } catch (err) {
+        errEl.style.display = 'block';
+        errEl.textContent = 'Bağlantı hatası: ' + err.message;
+      } finally {
+        btnApplyForgotCode.disabled = false;
+        btnApplyForgotCode.textContent = '✅ Şifreyi Sıfırla';
+      }
+    };
+  }
 
   const togglePass = portal.querySelector('#toggleLoginPass');
   const passInput = portal.querySelector('#loginPassword');

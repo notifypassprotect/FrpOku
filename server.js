@@ -564,6 +564,33 @@ app.post('/api/auth/register', authRateLimiter, async (req, res) => {
       }).catch(() => {});
     }
 
+    // Tüm sistem yöneticilerine (Admin) yeni kullanıcı başvurusunu e-posta ile bildir:
+    try {
+      let adminUsers = [];
+      if (supabase) {
+        const { data: admData } = await supabase.from('app_users').select('email, full_name, username').eq('role', 'admin');
+        if (admData) adminUsers = admData;
+      } else {
+        adminUsers = getLocalUsers().filter(u => u.role === 'admin');
+      }
+      adminUsers.forEach(adm => {
+        if (adm.email) {
+          mailer.sendNewUserPendingApproval({
+            to: adm.email,
+            adminName: adm.full_name || adm.username,
+            newUser: {
+              fullName: cleanName,
+              username: cleanUser,
+              email: cleanEmail,
+              department: cleanDepartment
+            }
+          }).catch(mErr => console.warn('Admin yeni başvuru e-posta uyarısı:', mErr.message));
+        }
+      });
+    } catch (admErr) {
+      console.warn('Admin kullanıcıları listeleme uyarısı:', admErr.message);
+    }
+
     res.json({
       success: true,
       pendingApproval: true,
@@ -823,6 +850,164 @@ app.post('/api/auth/recover-with-key', authRateLimiter, async (req, res) => {
   } catch (err) {
     console.error('Acil kurtarma hatası:', err.message);
     res.status(500).json({ success: false, reason: 'Kurtarma işlemi gerçekleştirilemedi.' });
+  }
+});
+
+// In-memory 6-haneli doğrulama kodu deposu
+const passwordResetVerificationCodes = new Map();
+
+function maskEmailAddress(email) {
+  if (!email || !email.includes('@')) return 'e-posta adresinize';
+  const [local, domain] = email.split('@');
+  if (local.length <= 2) return `${local[0]}***@${domain}`;
+  return `${local.slice(0, 2)}***${local.slice(-1)}@${domain}`;
+}
+
+// ── 2.5. E-POSTA İLE DOĞRULAMA KODU GÖNDERME (Self-Service Forgot Password) ──
+app.post('/api/auth/forgot-password-code', authRateLimiter, async (req, res) => {
+  const { identifier } = req.body || {};
+  const ident = String(identifier || '').trim().toLowerCase();
+
+  if (!ident) {
+    return res.status(400).json({ success: false, reason: 'Lütfen kullanıcı adınızı veya e-posta adresinizi giriniz.' });
+  }
+
+  try {
+    let user = null;
+    if (supabase) {
+      const { data, error } = await supabase.from('app_users').select('*').or(`username.eq.${ident},email.eq.${ident}`).limit(1);
+      if (error) throw error;
+      if (data && data.length) user = data[0];
+    } else {
+      const localUsers = getLocalUsers();
+      user = localUsers.find(u => (u.username || '').toLowerCase() === ident || (u.email || '').toLowerCase() === ident);
+    }
+
+    if (!user || !user.email) {
+      return res.status(400).json({
+        success: false,
+        reason: 'Bu hesap için tanımlı bir e-posta adresi bulunamadı. Lütfen sistem yöneticinizden şifrenizi sıfırlamasını talep ediniz veya acil kurtarma anahtarınızı kullanınız.'
+      });
+    }
+
+    // 6 haneli rastgele kod oluştur (100000 - 999999)
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 15 * 60 * 1000; // 15 dakika
+
+    passwordResetVerificationCodes.set(ident, {
+      code,
+      userId: user.id,
+      email: user.email,
+      username: user.username,
+      fullName: user.full_name,
+      expiresAt
+    });
+    passwordResetVerificationCodes.set(user.email.toLowerCase(), {
+      code,
+      userId: user.id,
+      email: user.email,
+      username: user.username,
+      fullName: user.full_name,
+      expiresAt
+    });
+
+    await mailer.sendSelfServiceResetCode({
+      to: user.email,
+      fullName: user.full_name || user.username,
+      username: user.username,
+      code,
+      expiresIn: '15'
+    });
+
+    res.json({
+      success: true,
+      message: `6 haneli şifre sıfırlama kodu ${maskEmailAddress(user.email)} adresine gönderildi.`,
+      maskedEmail: maskEmailAddress(user.email),
+      expiresInMinutes: 15
+    });
+  } catch (err) {
+    console.error('Şifre sıfırlama kodu hatası:', err.message);
+    res.status(500).json({ success: false, reason: 'Doğrulama kodu gönderilemedi. Lütfen daha sonra tekrar deneyiniz.' });
+  }
+});
+
+// ── 2.6. E-POSTA KODU İLE ŞİFRE SIFIRLAMA ────────────────────────
+app.post('/api/auth/reset-password-with-code', authRateLimiter, async (req, res) => {
+  const { identifier, code, newPassword } = req.body || {};
+  const ident = String(identifier || '').trim().toLowerCase();
+  const rawCode = String(code || '').trim();
+  const pass = String(newPassword || '');
+
+  if (!ident || !rawCode || !pass) {
+    return res.status(400).json({ success: false, reason: 'Kullanıcı adı/e-posta, 6 haneli kod ve yeni şifre gereklidir.' });
+  }
+
+  if (pass.length < 6 || pass.length > PASSWORD_MAX_LENGTH) {
+    return res.status(400).json({ success: false, reason: `Yeni şifreniz en az 6, en fazla ${PASSWORD_MAX_LENGTH} karakter olmalıdır.` });
+  }
+
+  const entry = passwordResetVerificationCodes.get(ident);
+  if (!entry || entry.code !== rawCode) {
+    return res.status(400).json({ success: false, reason: 'Girilen doğrulama kodu hatalı veya geçersiz!' });
+  }
+
+  if (Date.now() > entry.expiresAt) {
+    passwordResetVerificationCodes.delete(ident);
+    return res.status(400).json({ success: false, reason: 'Doğrulama kodunun 15 dakikalık kullanım süresi dolmuş. Lütfen yeni bir kod isteyiniz.' });
+  }
+
+  try {
+    const passwordHash = await hashPassword(pass);
+    const nowIso = new Date().toISOString();
+
+    const updatedUser = await updateUserById(entry.userId, {
+      password_hash: passwordHash,
+      password_changed_at: nowIso,
+      last_login: nowIso
+    });
+
+    if (!updatedUser) {
+      return res.status(404).json({ success: false, reason: 'Kullanıcı hesabı bulunamadı.' });
+    }
+
+    // Kodları ve başarısız giriş deneme sayacını temizle
+    passwordResetVerificationCodes.delete(ident);
+    if (entry.email) passwordResetVerificationCodes.delete(entry.email.toLowerCase());
+    const cleanU = (updatedUser.username || '').toLowerCase();
+    const cleanE = (updatedUser.email || '').toLowerCase();
+    for (const [key] of loginFailures.entries()) {
+      if (key.startsWith(cleanU + '_') || (cleanE && key.startsWith(cleanE + '_'))) {
+        loginFailures.delete(key);
+      }
+    }
+
+    await recordAuditLog({
+      userId: updatedUser.id,
+      username: updatedUser.username,
+      role: updatedUser.role,
+      action: 'PASSWORD_RESET_SELF_CODE',
+      target: updatedUser.username,
+      details: 'Kullanıcı e-posta doğrulama kodu ile şifresini sıfırladı.',
+      ip: req.ip
+    });
+
+    const token = signToken({
+      id: updatedUser.id,
+      username: updatedUser.username,
+      role: updatedUser.role,
+      department: updatedUser.department,
+      exp: Date.now() + 7 * 24 * 3600 * 1000
+    });
+
+    res.json({
+      success: true,
+      message: 'Şifreniz başarıyla sıfırlandı ve oturum açıldı.',
+      token,
+      user: updatedUser
+    });
+  } catch (err) {
+    console.error('Kod ile şifre sıfırlama hatası:', err.message);
+    res.status(500).json({ success: false, reason: 'Şifre güncellenemedi.' });
   }
 });
 
@@ -1108,8 +1293,40 @@ async function handleAdminPasswordReset(req, res) {
       password_changed_at: nowIso
     });
     if (!updatedUser) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
-    await recordAuditLog({ userId: req.adminUser.id, username: req.adminUser.username, role: 'admin', action: 'USER_PASSWORD_RESET', target: updatedUser.username, details: 'Yönetici tarafından parola sıfırlandı.', ip: req.ip });
-    res.json({ success: true, message: 'Kullanıcı şifresi başarıyla güncellendi.' });
+
+    // Kullanıcının varsa geçmiş hatalı denemelerden kaynaklı blokajını temizle:
+    const cleanU = (updatedUser.username || '').toLowerCase();
+    const cleanE = (updatedUser.email || '').toLowerCase();
+    for (const [key] of loginFailures.entries()) {
+      if (key.startsWith(cleanU + '_') || (cleanE && key.startsWith(cleanE + '_'))) {
+        loginFailures.delete(key);
+      }
+    }
+
+    // Kullanıcıya yeni geçici/atanan şifresini e-posta ile ilet:
+    if (updatedUser.email) {
+      mailer.sendPasswordResetByAdmin({
+        to: updatedUser.email,
+        fullName: updatedUser.full_name || updatedUser.username,
+        username: updatedUser.username,
+        newPassword
+      }).catch(mErr => console.warn('Admin şifre sıfırlama e-posta uyarısı:', mErr.message));
+    }
+
+    await recordAuditLog({
+      userId: req.adminUser.id,
+      username: req.adminUser.username,
+      role: 'admin',
+      action: 'USER_PASSWORD_RESET',
+      target: updatedUser.username,
+      details: `Yönetici tarafından parola sıfırlandı.${updatedUser.email ? ' Kullanıcıya e-posta iletildi.' : ''}`,
+      ip: req.ip
+    });
+
+    res.json({
+      success: true,
+      message: `"${updatedUser.full_name || updatedUser.username}" kullanıcısının şifresi başarıyla güncellendi.${updatedUser.email ? ' Yeni şifre kullanıcının e-postasına gönderildi.' : ''}`
+    });
   } catch (err) {
     console.warn('Yönetici parola sıfırlama hatası:', safeLogStr(err.message));
     res.status(503).json({ success: false, reason: 'Kullanıcı şifresi geçici olarak güncellenemedi.' });
@@ -2532,6 +2749,50 @@ app.delete('/api/chat/messages/:id', requireAuth, async (req, res) => {
     res.json({ success: true });
   } catch {
     res.status(500).json({ success: false, reason: 'Mesaj silinemedi.' });
+  }
+});
+
+// Chat: Tüm Sohbeti Temizle / Sil (Conversation Delete)
+app.delete('/api/chat/conversations/:id', requireAuth, async (req, res) => {
+  try {
+    const targetId = String(req.params.id || '');
+    const type = req.query.type || 'peer'; // 'peer', 'room', 'group'
+    const myId = String(req.authUser.id);
+    const isAdmin = req.authUser.role === 'admin';
+
+    const all = getChatMessages();
+    let toDeleteIds = [];
+
+    if (type === 'room') {
+      if (!isAdmin) {
+        return res.status(403).json({ success: false, reason: 'Yalnızca yöneticiler oda geçmişini silebilir.' });
+      }
+      toDeleteIds = all.filter(m => m.roomId === targetId).map(m => m.id);
+    } else if (type === 'group') {
+      if (!isAdmin) {
+        return res.status(403).json({ success: false, reason: 'Yalnızca yöneticiler grup geçmişini silebilir.' });
+      }
+      toDeleteIds = all.filter(m => m.groupId === targetId).map(m => m.id);
+    } else {
+      // 1-e-1 Özel Sohbet (Peer / DM)
+      toDeleteIds = all.filter(m => 
+        (String(m.senderId) === myId && String(m.receiverId) === targetId) ||
+        (String(m.senderId) === targetId && String(m.receiverId) === myId)
+      ).map(m => m.id);
+    }
+
+    if (toDeleteIds.length > 0) {
+      const deleteSet = new Set(toDeleteIds);
+      chatMessagesCache = all.filter(m => !deleteSet.has(m.id));
+      saveChatMessages();
+      if (supabase) {
+        supabase.from('chat_messages').delete().in('id', toDeleteIds).then(() => {}).catch(() => {});
+      }
+    }
+
+    res.json({ success: true, count: toDeleteIds.length });
+  } catch {
+    res.status(500).json({ success: false, reason: 'Sohbet geçmişi silinemedi.' });
   }
 });
 

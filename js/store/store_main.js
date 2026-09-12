@@ -501,13 +501,26 @@
     let index = files.findIndex(r => r.id === id || String(r.id) === strId || String(r.id) === decId);
     let item = index >= 0 ? files[index] : null;
 
-    const hasFullDetails = item && (item.rawXml || (Array.isArray(item.tree) && item.tree.length > 0) || (Array.isArray(item.pages) && item.pages.length > 0));
+    const hasFullDetails = item && (Boolean(item.rawXml) || (Array.isArray(item.pages) && item.pages.length > 0));
     if (hasFullDetails) return item;
 
     if (window.FrpCloud && typeof window.FrpCloud.getReport === 'function') {
       try {
         const full = await window.FrpCloud.getReport(id);
         if (full) {
+          if (full.rawXml && (!Array.isArray(full.pages) || full.pages.length === 0) && typeof parseFrp === 'function') {
+            try {
+              const parsed = parseFrp(full.rawXml);
+              if (parsed.pages) full.pages = parsed.pages;
+              if (parsed.dialogPages) full.dialogPages = parsed.dialogPages;
+              if (parsed.queries && parsed.queries.length > 0) full.queries = parsed.queries;
+              if (parsed.tree && parsed.tree.length > 0) full.tree = parsed.tree;
+              if (parsed.pascalScript) full.pascalScript = parsed.pascalScript;
+              if (parsed.datasets && parsed.datasets.length > 0) full.datasets = parsed.datasets;
+            } catch (pErr) {
+              console.warn('ensureFullReport parseFrp uyarısı:', pErr);
+            }
+          }
           if (index >= 0) {
             files[index] = { ...files[index], ...full };
             _memoryStore = files;

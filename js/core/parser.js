@@ -60,8 +60,13 @@ function getAttr(chunk, name) {
 }
 
 function findTagAttributes(xmlText, tagName) {
-  const safeTag = typeof escapeRegex === 'function' ? escapeRegex(tagName) : tagName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const rx = new RegExp(`<${safeTag}\\b`, 'g');
+  let rx;
+  if (tagName instanceof RegExp) {
+    rx = new RegExp(tagName.source, 'g');
+  } else {
+    const safeTag = typeof escapeRegex === 'function' ? escapeRegex(tagName) : tagName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    rx = new RegExp(`<${safeTag}\\b`, 'g');
+  }
   const chunks = [];
   let match;
 
@@ -114,7 +119,9 @@ function extractParamsFromSql(sql) {
   const cleanSql = noComments.replace(/'(?:''|[^'\r\n])*'/g, "''");
 
   const params = new Set();
-  const rx = /:([a-zA-Z_]\w*)/g;
+
+  // SQL Parametreleri: :PARAM, &PARAM, @PARAM
+  const rx = /[:&@]([a-zA-Z_]\w*)/g;
   let m;
   while ((m = rx.exec(cleanSql)) !== null) {
     // PostgreSQL ::type cast kontrolü
@@ -125,6 +132,17 @@ function extractParamsFromSql(sql) {
       params.add(':' + pName);
     }
   }
+
+  // Delphi FastReport Parametre / Değişken İfadeleri: <ParamName> (örn. <BinaIdList>, <BasTar>, <BitTar>)
+  const frRx = /<([a-zA-Z_]\w*)>/g;
+  let frm;
+  while ((frm = frRx.exec(cleanSql)) !== null) {
+    const pName = frm[1];
+    if (!DATE_FORMAT_TOKENS.has(pName.toUpperCase()) && !/^(FONT|COLOR|PAGE|DATE|TIME)$/i.test(pName)) {
+      params.add(':' + pName);
+    }
+  }
+
   return [...params].sort();
 }
 
@@ -198,20 +216,60 @@ function parseFrp(xmlText) {
   }
 
   // ── SQL QUERIES ─────────────────────────────────────────
-  const queryTags = [
-    ...findTagAttributes(xmlText, 'TfrxFOQuery'),
-    ...findTagAttributes(xmlText, 'TfrxQuery')
+  const queryTagNames = [
+    'TfrxADOQuery', 'TfrxIBXQuery', 'TfrxFDQuery', 'TfrxUniQuery',
+    'TfrxOracleQuery', 'TfrxBDEQuery', 'TfrxDBXQuery', 'TfrxFOQuery',
+    'TfrxQuery', 'TfrxCustomQuery', 'TfrxSQLQuery', 'TfrxADOTable'
   ];
+
+  const seenQueryNames = new Set();
+  const queryTags = [];
+  queryTagNames.forEach(tn => {
+    queryTags.push(...findTagAttributes(xmlText, tn));
+  });
+
+  // Ayrıca SQL.Text="..." veya SQL="..." içeren ancak farklı isimlendirilmiş veri etiketlerini de tara:
+  const genericQueryChunks = findTagAttributes(xmlText, /<Tfrx[A-Za-z0-9_]+/);
+  genericQueryChunks.forEach(chunk => {
+    if ((chunk.includes('SQL.Text=') || chunk.includes('SQL=')) && !queryTags.includes(chunk)) {
+      queryTags.push(chunk);
+    }
+  });
+
   for (const tag of queryTags) {
-    const attrs = tag.replace(/^<Tfrx(?:FOQuery|Query)\b\s*/, '').replace(/\s*\/?>$/, '');
+    const attrs = tag.replace(/^<Tfrx[A-Za-z0-9_]+\b\s*/, '').replace(/\s*\/?>$/, '');
     const name = getAttr(attrs, 'Name') || getAttr(attrs, 'UserName');
-    const sql  = getAttr(attrs, 'SQL.Text');
-    if (name && sql && sql.trim()) {
-      if (!result.queries.find(q => q.name === name)) {
+    const sql  = getAttr(attrs, 'SQL.Text') || getAttr(attrs, 'SQL');
+    if (name) {
+      const cleanName = name.trim();
+      if (!seenQueryNames.has(cleanName)) {
+        seenQueryNames.add(cleanName);
         result.queries.push({
-          name: name.trim(),
-          sql: sql.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
+          name: cleanName,
+          sql: (sql || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
         });
+      }
+    }
+  }
+
+  // PascalScript içerisindeki dinamik sorgu atamalarını da tara (örn. qn.SQL.Text := ..., qbine.SQL[5] := ...)
+  if (result.pascalScript) {
+    const scriptSqlRx = /\b([a-zA-Z_]\w*)\.SQL(?:\.Text|\[\d+\])?\s*[:+]=\s*(?:'([^'\r\n]+)'|StringReplace\([^,]+,\s*'[^']*',\s*'([^']*)'\))/gi;
+    let sMatch;
+    while ((sMatch = scriptSqlRx.exec(result.pascalScript)) !== null) {
+      const qName = sMatch[1].trim();
+      const rawFragment = sMatch[2] || sMatch[3] || '';
+      if (!seenQueryNames.has(qName)) {
+        seenQueryNames.add(qName);
+        result.queries.push({
+          name: qName,
+          sql: rawFragment
+        });
+      } else {
+        const existing = result.queries.find(q => q.name === qName);
+        if (existing && !existing.sql && rawFragment) {
+          existing.sql = rawFragment;
+        }
       }
     }
   }
@@ -227,7 +285,60 @@ function parseFrp(xmlText) {
   while ((dm = dsRx2.exec(xmlText)) !== null) {
     if (dm[1]) dsSet.add(dm[1]);
   }
-  result.datasets = [...dsSet].filter(d => d && d.length < 40).sort();
+  result.queries.forEach(q => { if (q.name) dsSet.add(q.name); });
+  result.datasets = [...dsSet].filter(d => d && d.length < 50).sort();
+
+  // ── PARAMETRELER & DEĞİŞKENLER (XML <Params> & <Variables> & SQL Parametreleri) ──
+  const allParams = new Set();
+  // 1. Sorgulardan parametreleri topla:
+  result.queries.forEach(q => {
+    if (q.sql) {
+      const extracted = extractParamsFromSql(q.sql);
+      extracted.forEach(p => allParams.add(p));
+    }
+  });
+
+  // 2. XML <Params> ve <Variables> bloklarından topla:
+  const paramBlockRx = /<(?:Params|Variables)\b[\s\S]*?<\/(?:Params|Variables)>/gi;
+  let pbMatch;
+  while ((pbMatch = paramBlockRx.exec(xmlText)) !== null) {
+    const block = pbMatch[0];
+    const itemRx = /<item\b([^>]*?)(?:\/>|>.*?<\/item>)/gi;
+    let itm;
+    while ((itm = itemRx.exec(block)) !== null) {
+      const pName = getAttr(itm[1], 'Name');
+      if (pName && !DATE_FORMAT_TOKENS.has(pName.toUpperCase()) && !/^(FONT|COLOR|PAGE|DATE|TIME)$/i.test(pName)) {
+        allParams.add(':' + pName.toUpperCase());
+      }
+    }
+  }
+  result.paramNames = [...allParams].sort();
+
+  // ── VERİTABANI TABLOLARI ─────────────────────────────────
+  const SQL_RESERVED = new Set([
+    'SELECT', 'WHERE', 'AND', 'OR', 'NOT', 'ON', 'DUAL', 'AS', 'SET', 'INTO', 'VALUES',
+    'FROM', 'JOIN', 'LEFT', 'RIGHT', 'INNER', 'OUTER', 'FULL', 'CROSS', 'GROUP', 'ORDER',
+    'HAVING', 'BY', 'UNION', 'ALL', 'WITH', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END',
+    'YEAR', 'MONTH', 'DAY', 'HOUR', 'MINUTE', 'SECOND', 'DATE', 'TIME', 'TIMESTAMP',
+    'TRUNC', 'SYSDATE', 'ROWNUM', 'LEVEL', 'TABLE', 'LATERAL', 'ROW', 'ROWS'
+  ]);
+  const tableSet = new Set();
+  result.queries.forEach(q => {
+    const sql = String(q.sql || '')
+      .replace(/--[^\n]*/g, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/'(?:''|[^'\r\n])*'/g, "''")
+      .replace(/\b(EXTRACT|SUBSTR|SUBSTRING|TRIM)\s*\([^)]*?\)/gi, '');
+    const rx = /\b(?:FROM|JOIN)\s+([a-zA-Z0-9_$.]+)/gi;
+    let tm;
+    while ((tm = rx.exec(sql)) !== null) {
+      let rawTable = tm[1].replace(/[()]/g, '').trim().toUpperCase().split('.')[0];
+      if (rawTable && !rawTable.startsWith('(') && !SQL_RESERVED.has(rawTable) && rawTable.length > 2 && !/^\d+$/.test(rawTable)) {
+        tableSet.add(rawTable);
+      }
+    }
+  });
+  result.tableNames = [...tableSet].sort();
 
   // ── RAPOR ELEMAN AĞACI & GÖRSEL TASARIM MODELİ ───────────
   result.pages = [];

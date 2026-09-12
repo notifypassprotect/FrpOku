@@ -10,13 +10,14 @@
     const usage = {};
 
     list.forEach(file => {
-      let foundQueries = false;
+      const fileParamSet = new Set();
+
       (file.queries || []).forEach(q => {
         if (!q || !q.sql) return;
-        foundQueries = true;
         const extractor = window.extractParamsFromSql || (() => []);
         const params = extractor(q.sql || '');
         params.forEach(param => {
+          fileParamSet.add(param);
           if (!usage[param]) usage[param] = [];
           usage[param].push({
             fileId: file.id,
@@ -27,20 +28,25 @@
         });
       });
 
-      // Hafifletilmiş özet modunda SQL sorguları bellekte yoksa paramNames kullan:
-      if (!foundQueries && Array.isArray(file.paramNames) && file.paramNames.length > 0) {
-        file.paramNames.forEach(p => {
-          const param = String(p || '').toUpperCase().trim();
-          if (!param) return;
+      // XML <Params>, <Variables> veya özet kayıtlarından gelen paramNames'i de dahil et:
+      const pList = Array.isArray(file.paramNames) ? file.paramNames : (Array.isArray(file.data?.paramNames) ? file.data.paramNames : []);
+      pList.forEach(p => {
+        let param = String(p || '').toUpperCase().trim();
+        if (!param) return;
+        if (!param.startsWith(':') && !param.startsWith('@') && !param.startsWith('&')) {
+          param = ':' + param;
+        }
+        if (!fileParamSet.has(param)) {
+          fileParamSet.add(param);
           if (!usage[param]) usage[param] = [];
           usage[param].push({
             fileId: file.id,
             fileName: file.name,
             reportName: (file.meta && file.meta.reportName) || file.name,
-            queryName: (Array.isArray(file.queryNames) && file.queryNames[0]) || 'Sorgu'
+            queryName: (Array.isArray(file.queryNames) && file.queryNames[0]) || 'Rapor Parametresi'
           });
-        });
-      }
+        }
+      });
     });
 
     return Object.entries(usage)

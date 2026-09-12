@@ -568,9 +568,17 @@ async function initSelectors() {
   }
 
   const params = new URLSearchParams(window.location.search);
-  const idA = params.get('file1');
-  const idB = params.get('file2');
-  const idC = params.get('file3') || '';
+  let idA = params.get('file1');
+  let idB = params.get('file2');
+  let idC = params.get('file3') || '';
+
+  const idsParam = params.get('ids');
+  if (idsParam) {
+    const splitIds = idsParam.split(',').map(s => s.trim()).filter(Boolean);
+    if (splitIds[0]) idA = splitIds[0];
+    if (splitIds[1]) idB = splitIds[1];
+    if (splitIds[2]) idC = splitIds[2];
+  }
 
   // Doğrudan URL parametrelerinden yükle, yoksa ilk iki raporu seç
   fileA = (idA && FrpStore.getById(idA)) || files[0];
@@ -579,9 +587,12 @@ async function initSelectors() {
 
   if (FrpStore.ensureFullReport) {
     const promises = [];
-    if (fileA && fileA.id) promises.push(FrpStore.ensureFullReport(fileA.id).then(f => { if (f) fileA = f; }));
-    if (fileB && fileB.id) promises.push(FrpStore.ensureFullReport(fileB.id).then(f => { if (f) fileB = f; }));
-    if (fileC && fileC.id) promises.push(FrpStore.ensureFullReport(fileC.id).then(f => { if (f) fileC = f; }));
+    const targetIdA = idA || fileA?.id;
+    const targetIdB = idB || fileB?.id;
+    const targetIdC = idC || fileC?.id;
+    if (targetIdA) promises.push(FrpStore.ensureFullReport(targetIdA).then(f => { if (f) fileA = f; }));
+    if (targetIdB) promises.push(FrpStore.ensureFullReport(targetIdB).then(f => { if (f) fileB = f; }));
+    if (targetIdC) promises.push(FrpStore.ensureFullReport(targetIdC).then(f => { if (f) fileC = f; }));
     await Promise.allSettled(promises);
   }
 
