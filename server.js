@@ -795,6 +795,7 @@ app.get('/api/admin/mail/status', adminRateLimiter, requireAdmin, async (req, re
   } catch (e) {}
   const status = mailer.getStatus();
   const verification = status.ready ? await mailer.verify() : { ok: false, status: status.enabled ? 'not_configured' : 'disabled' };
+  const stats = mailer.getMailStats ? mailer.getMailStats() : null;
   res.json({
     success: true,
     mail: {
@@ -802,7 +803,15 @@ app.get('/api/admin/mail/status', adminRateLimiter, requireAdmin, async (req, re
       verified: verification.ok,
       verifyStatus: verification.status,
       error: verification.error || null
-    }
+    },
+    stats
+  });
+});
+
+app.get('/api/admin/mail/stats', adminRateLimiter, requireAdmin, (req, res) => {
+  res.json({
+    success: true,
+    stats: mailer.getMailStats ? mailer.getMailStats() : null
   });
 });
 

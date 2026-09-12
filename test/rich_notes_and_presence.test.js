@@ -69,3 +69,49 @@ test('image_annotator.js ve rich_note_editor.js dosyalarında inline event bulun
   assert.doesNotMatch(editor, inlineEvent);
   assert.doesNotMatch(presence, inlineEvent);
 });
+
+test('session_auth query parametresindeki tokeni okuyabilir', () => {
+  const { readBearerToken } = require('../lib/session_auth');
+  const reqWithQuery = { headers: {}, query: { token: 'sample-jwt-token' } };
+  const reqWithHeader = { headers: { authorization: 'Bearer header-jwt-token' }, query: { token: 'sample-jwt-token' } };
+  const reqEmpty = { headers: {}, query: {} };
+
+  assert.equal(readBearerToken(reqWithQuery), 'sample-jwt-token');
+  assert.equal(readBearerToken(reqWithHeader), 'header-jwt-token');
+  assert.equal(readBearerToken(reqEmpty), '');
+});
+
+test('mailer getMailStats doğru istatistik ve geçmiş kaydı tutar', async () => {
+  const { createMailer } = require('../lib/mailer');
+  const mailer = createMailer({
+    env: {
+      MAIL_ENABLED: 'true',
+      MAIL_PROVIDER: 'brevo',
+      BREVO_API_KEY: 'test-key',
+      BREVO_FROM_EMAIL: 'test@example.com'
+    },
+    fetchImpl: async () => ({
+      ok: true,
+      json: async () => ({ messageId: 'msg-123' })
+    })
+  });
+
+  const statsBefore = mailer.getMailStats();
+  assert.equal(typeof statsBefore.total, 'number');
+  assert.equal(Array.isArray(statsBefore.history), true);
+
+  await mailer.sendAccountApproved({ to: 'user@example.com', fullName: 'Ali Veli', username: 'aliveli' });
+
+  const statsAfter = mailer.getMailStats();
+  assert.equal(statsAfter.total >= 1, true);
+  assert.equal(statsAfter.successful >= 1, true);
+  assert.equal(statsAfter.byType.accountApproved >= 1, true);
+  assert.equal(statsAfter.history.length >= 1, true);
+  assert.equal(statsAfter.history[0].recipient, 'user@example.com');
+});
+
+test('auth_admin_modal.js dosyasında native prompt ve confirm çağrısı bulunmaz', () => {
+  const adminModal = fs.readFileSync(path.join(root, 'js', 'core', 'auth', 'auth_admin_modal.js'), 'utf8');
+  assert.doesNotMatch(adminModal, /(?<!showAdminCustom)prompt\s*\(/);
+  assert.doesNotMatch(adminModal, /(?<!showAdminCustom)confirm\s*\(/);
+});

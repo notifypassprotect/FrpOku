@@ -21,8 +21,92 @@
     return size.toFixed(1) + ' ' + units[i];
   }
 
-  // Dosya Önizleme Modalı (Resimler ve PDF'ler için)
-  function openAttachmentPreview(att) {
+  // Güvenli kimlik doğrulamalı medya/dosya URL'i üretici (Blob veya token parametresi)
+  async function getAuthenticatedMediaUrl(rawUrl) {
+    if (!rawUrl) return '';
+    if (rawUrl.startsWith('data:') || rawUrl.startsWith('blob:')) return rawUrl;
+
+    const token = (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function')
+      ? window.FrpAuth.getAuthHeaders()?.Authorization?.replace(/^Bearer\s+/i, '')
+      : (localStorage.getItem('frpoku_auth_token') || sessionStorage.getItem('frpoku_auth_token') || '');
+
+    try {
+      const fetchUrl = token ? (rawUrl + (rawUrl.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token)) : rawUrl;
+      const headers = (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') ? window.FrpAuth.getAuthHeaders() : {};
+      const res = await fetch(fetchUrl, { headers });
+      if (res.ok) {
+        const blob = await res.blob();
+        return URL.createObjectURL(blob);
+      }
+    } catch {}
+
+    return token ? (rawUrl + (rawUrl.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token)) : rawUrl;
+  }
+
+  // Güvenli dosya indirme
+  async function downloadAttachment(att) {
+    try {
+      if (typeof window.toast === 'function') window.toast(`"${att.name}" indiriliyor...`, 'info');
+      const blobUrl = await getAuthenticatedMediaUrl(att.url);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = att.name || 'dosya';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => {
+        if (blobUrl.startsWith('blob:')) URL.revokeObjectURL(blobUrl);
+      }, 30000);
+    } catch {
+      window.open(att.url, '_blank');
+    }
+  }
+
+  // Modern Tehlike & Onay Modalı
+  function showModernConfirmDialog({ title, message, confirmText = 'Evet, Sil', cancelText = 'Vazgeç', isDanger = true, onConfirm }) {
+    const existing = document.getElementById('frpModernConfirmOverlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'frpModernConfirmOverlay';
+    overlay.className = 'modal-overlay';
+    overlay.style.cssText = `
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(8px);
+      z-index: 200050; display: flex; align-items: center; justify-content: center; padding: 1rem; animation: fadeIn .15s ease-out;
+    `;
+
+    overlay.innerHTML = `
+      <div class="modal" style="max-width: 440px; width: 92vw; padding: 1.6rem; border-radius: 18px; background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); box-shadow: 0 25px 60px rgba(0,0,0,0.4);">
+        <div style="display: flex; align-items: center; gap: 0.85rem; margin-bottom: 0.9rem;">
+          <div style="width: 44px; height: 44px; border-radius: 12px; background: ${isDanger ? '#fee2e2' : 'rgba(37,99,235,0.1)'}; color: ${isDanger ? '#ef4444' : 'var(--accent,#2563eb)'}; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0;">
+            ${isDanger ? '⚠️' : 'ℹ️'}
+          </div>
+          <div>
+            <div style="font-size: 1.1rem; font-weight: 800; color: var(--text-primary, #0f172a);">${escHtml(title)}</div>
+            ${isDanger ? `<div style="font-size: 0.76rem; color: #ef4444; font-weight: 700;">Bu işlem geri alınamaz</div>` : ''}
+          </div>
+        </div>
+        <div style="font-size: 0.88rem; color: var(--text-secondary, #475569); line-height: 1.6; margin-bottom: 1.5rem;">
+          ${message}
+        </div>
+        <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.65rem;">
+          <button type="button" id="btnModernCancel" class="btn btn-sm btn-ghost" style="padding: 0.5rem 1.1rem; font-weight: 700;">${escHtml(cancelText)}</button>
+          <button type="button" id="btnModernConfirm" class="btn btn-sm" style="padding: 0.5rem 1.4rem; font-weight: 800; background: ${isDanger ? '#ef4444' : 'var(--accent,#2563eb)'}; color: #ffffff; border: none; border-radius: 8px;">${escHtml(confirmText)}</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    const closeDialog = () => overlay.remove();
+    overlay.querySelector('#btnModernCancel').addEventListener('click', closeDialog);
+    overlay.querySelector('#btnModernConfirm').addEventListener('click', () => {
+      closeDialog();
+      if (typeof onConfirm === 'function') onConfirm();
+    });
+  }
+
+  // Modern Dosya Önizleme Modalı (Resimler ve PDF'ler için)
+  async function openAttachmentPreview(att) {
     const existing = document.getElementById('frpAttPreviewOverlay');
     if (existing) existing.remove();
 
@@ -38,39 +122,62 @@
     `;
 
     overlay.innerHTML = `
-      <div style="background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); border-radius: 16px; width: 90vw; max-width: 960px; height: 85vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.4);">
+      <div style="background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); border-radius: 18px; width: 92vw; max-width: 980px; height: 86vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.45);">
         <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1.25rem; border-bottom: 1px solid var(--border-light, #e2e8f0); background: var(--bg-card, #f8fafc);">
-          <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-primary, #0f172a); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70vw;">
-            ${escHtml(att.name)} (${formatFileSize(att.size)})
+          <div style="font-weight: 800; font-size: 0.98rem; color: var(--text-primary, #0f172a); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 65vw;">
+            ${escHtml(att.name)} <span style="font-size: 0.78rem; color: var(--text-muted, #64748b); font-weight: 500;">(${formatFileSize(att.size)})</span>
           </div>
-          <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <a href="${att.url}" download="${escHtml(att.name)}" class="btn btn-sm btn-primary" style="padding: 0.35rem 0.9rem; font-size: 0.8rem; text-decoration: none; font-weight: 700;">⬇️ İndir</a>
-            <button type="button" id="btnAttPreviewClose" class="btn btn-sm btn-ghost" style="font-size: 1.2rem; width: 32px; height: 32px; padding: 0;">✕</button>
+          <div style="display: flex; align-items: center; gap: 0.6rem;">
+            <button type="button" id="btnAttDownloadAction" class="btn btn-sm btn-primary" style="padding: 0.4rem 1rem; font-size: 0.82rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.35rem;">
+              <span>⬇️ İndir</span>
+            </button>
+            <button type="button" id="btnAttPreviewClose" style="width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--border, #cbd5e1); background: var(--bg-surface, #ffffff); color: var(--text-muted, #64748b); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;" title="Kapat">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
           </div>
         </div>
-        <div style="flex: 1; overflow: auto; display: flex; align-items: center; justify-content: center; background: #0f172a; padding: 1rem;">
-          ${isImage ? `
-            <img src="${att.url}" alt="${escHtml(att.name)}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);" />
-          ` : (isPdf ? `
-            <iframe src="${att.url}" style="width: 100%; height: 100%; border: none; border-radius: 8px; background: #ffffff;"></iframe>
-          ` : `
-            <div style="text-align: center; color: #94a3b8; padding: 2rem;">
-              <div style="font-size: 3rem; margin-bottom: 1rem;">📄</div>
-              <div style="font-size: 1.1rem; font-weight: 700; color: #ffffff; margin-bottom: 0.5rem;">Bu dosya türü için doğrudan önizleme desteklenmiyor.</div>
-              <div>Dosyayı bilgisayarınıza indirerek görüntüleyebilirsiniz.</div>
-              <div style="margin-top: 1.5rem;">
-                <a href="${att.url}" download="${escHtml(att.name)}" class="btn btn-primary" style="text-decoration: none;">⬇️ Dosyayı İndir</a>
-              </div>
-            </div>
-          `)}
+        <div id="attPreviewBody" style="flex: 1; overflow: auto; display: flex; align-items: center; justify-content: center; background: #0f172a; padding: 1rem;">
+          <div style="color: #94a3b8; font-size: 0.9rem; font-weight: 600;">Belge hazırlanıyor...</div>
         </div>
       </div>
     `;
 
     document.body.appendChild(overlay);
+
     const close = () => overlay.remove();
     overlay.querySelector('#btnAttPreviewClose').addEventListener('click', close);
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    overlay.querySelector('#btnAttDownloadAction').addEventListener('click', () => downloadAttachment(att));
+
+    // Arka plan tıklamasında mouse sürükleme koruması
+    let isMouseDownOnBackdrop = false;
+    overlay.addEventListener('mousedown', (e) => {
+      isMouseDownOnBackdrop = (e.target === overlay);
+    });
+    overlay.addEventListener('mouseup', (e) => {
+      if (isMouseDownOnBackdrop && e.target === overlay) {
+        close();
+      }
+      isMouseDownOnBackdrop = false;
+    });
+
+    const previewBody = overlay.querySelector('#attPreviewBody');
+    const mediaUrl = await getAuthenticatedMediaUrl(att.url);
+
+    if (isImage) {
+      previewBody.innerHTML = `<img src="${mediaUrl}" alt="${escHtml(att.name)}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);" />`;
+    } else if (isPdf) {
+      previewBody.innerHTML = `<iframe src="${mediaUrl}" style="width: 100%; height: 100%; border: none; border-radius: 8px; background: #ffffff;"></iframe>`;
+    } else {
+      previewBody.innerHTML = `
+        <div style="text-align: center; color: #94a3b8; padding: 2.5rem 1rem;">
+          <div style="font-size: 3.5rem; margin-bottom: 1rem;">📄</div>
+          <div style="font-size: 1.15rem; font-weight: 800; color: #ffffff; margin-bottom: 0.5rem;">Bu dosya türü için doğrudan önizleme desteklenmiyor.</div>
+          <div style="font-size: 0.88rem; margin-bottom: 1.5rem;">Dosyayı bilgisayarınıza indirerek görüntüleyebilirsiniz.</div>
+          <button type="button" id="btnDownloadUnsupported" class="btn btn-primary" style="padding: 0.55rem 1.4rem; font-weight: 700;">⬇️ Dosyayı İndir</button>
+        </div>
+      `;
+      previewBody.querySelector('#btnDownloadUnsupported')?.addEventListener('click', () => downloadAttachment(att));
+    }
   }
 
   async function openRichNoteModal(fileId) {
@@ -101,33 +208,36 @@
     `;
 
     overlay.innerHTML = `
-      <div class="modal" style="width: 94vw; max-width: 1200px; height: 88vh; max-height: 950px; background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); border-radius: 20px; box-shadow: 0 25px 60px rgba(0,0,0,0.35); display: flex; flex-direction: column; overflow: hidden;">
+      <div class="modal" style="width: 95vw; max-width: 1220px; height: 90vh; max-height: 980px; background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); border-radius: 20px; box-shadow: 0 25px 60px rgba(0,0,0,0.35); display: flex; flex-direction: column; overflow: hidden;">
         
         <!-- MODAL BAŞLIĞI -->
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-light, #e2e8f0); background: var(--bg-card, #f8fafc);">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.6rem; border-bottom: 1px solid var(--border-light, #e2e8f0); background: var(--bg-card, #f8fafc);">
           <div style="display: flex; align-items: center; gap: 0.85rem;">
-            <div style="width: 42px; height: 42px; border-radius: 12px; background: linear-gradient(135deg, rgba(37,99,235,0.15), rgba(99,102,241,0.15)); color: var(--accent, #2563eb); display: flex; align-items: center; justify-content: center;">
+            <div style="width: 42px; height: 42px; border-radius: 12px; background: linear-gradient(135deg, rgba(37,99,235,0.15), rgba(99,102,241,0.15)); color: var(--accent, #2563eb); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
             </div>
             <div>
-              <div style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary, #0f172a); display: flex; align-items: center; gap: 0.5rem;">
+              <div style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary, #0f172a); display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                 <span>Rapor Zengin Notu & Belgeler</span>
                 <span style="font-size: 0.72rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 9999px; background: rgba(37,99,235,0.12); color: var(--accent, #2563eb);">Word Modu & Ekler</span>
               </div>
-              <div style="font-size: 0.82rem; color: var(--text-muted, #64748b); max-width: 600px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              <div style="font-size: 0.82rem; color: var(--text-muted, #64748b); max-width: 600px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;">
                 ${escHtml(reportName)}
               </div>
             </div>
           </div>
 
-          <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <span id="noteSaveStatus" style="font-size: 0.78rem; color: var(--text-muted, #64748b); font-weight: 600;"></span>
-            <button type="button" id="btnRichNoteClose" class="btn btn-sm btn-ghost" style="font-size: 1.3rem; width: 36px; height: 36px; padding: 0; border-radius: 50%;">✕</button>
+          <div style="display: flex; align-items: center; gap: 0.85rem;">
+            <span id="noteSaveStatus" style="font-size: 0.8rem; color: var(--text-muted, #64748b); font-weight: 600;"></span>
+            <!-- ÇIKIŞ / KAPAT BUTONU (HİZALI VE MODERN) -->
+            <button type="button" id="btnRichNoteClose" style="width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--border, #cbd5e1); background: var(--bg-surface, #ffffff); color: var(--text-muted, #64748b); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; padding: 0;" title="Pencereyi Kapat">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
           </div>
         </div>
 
         <!-- WORD BENZERİ ARAÇ ÇUBUĞU (RIBBON TOOLBAR) -->
-        <div class="rich-editor-toolbar" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.25rem; border-bottom: 1px solid var(--border-light, #e2e8f0); background: var(--bg-surface, #ffffff); flex-wrap: wrap;">
+        <div class="rich-editor-toolbar" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.4rem; border-bottom: 1px solid var(--border-light, #e2e8f0); background: var(--bg-surface, #ffffff); flex-wrap: wrap;">
           
           <!-- Metin Boyutu / Başlık Dropdown -->
           <select id="tbFormatBlock" style="padding: 0.35rem 0.6rem; border-radius: 8px; border: 1px solid var(--border, #cbd5e1); font-size: 0.82rem; background: var(--bg-card); color: var(--text-primary); cursor: pointer; font-weight: 600;">
@@ -152,13 +262,13 @@
           <div style="width: 1px; height: 22px; background: var(--border-light, #e2e8f0); margin: 0 0.2rem;"></div>
 
           <!-- Renk ve Vurgu -->
-          <div style="display: flex; align-items: center; gap: 0.3rem;">
+          <div style="display: flex; align-items: center; gap: 0.35rem;">
             <label style="display: flex; align-items: center; gap: 0.2rem; cursor: pointer;" title="Metin Rengi">
-              <span style="font-size: 0.82rem; font-weight: 700; color: #ef4444;">A</span>
+              <span style="font-size: 0.85rem; font-weight: 800; color: #ef4444;">A</span>
               <input type="color" id="tbTextColor" value="#0f172a" style="width: 24px; height: 24px; padding: 0; border: none; background: none; cursor: pointer;" />
             </label>
             <label style="display: flex; align-items: center; gap: 0.2rem; cursor: pointer;" title="Arka Plan Vurgu Rengi">
-              <span style="font-size: 0.82rem; background: #fef08a; padding: 0 3px; border-radius: 3px; font-weight: 700; color: #0f172a;">H</span>
+              <span style="font-size: 0.82rem; background: #fef08a; padding: 0 3px; border-radius: 3px; font-weight: 800; color: #0f172a;">H</span>
               <input type="color" id="tbBgColor" value="#fef08a" style="width: 24px; height: 24px; padding: 0; border: none; background: none; cursor: pointer;" />
             </label>
           </div>
@@ -196,12 +306,12 @@
           
           <!-- EDİTÖR ÇALIŞMA ALANI -->
           <div style="flex: 1; overflow-y: auto; padding: 2rem 3rem; background: var(--bg-card, #f8fafc); display: flex; justify-content: center;">
-            <div id="richNoteContent" contenteditable="true" style="width: 100%; max-width: 850px; min-height: 480px; background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); border-radius: 12px; padding: 2rem 2.5rem; outline: none; font-family: inherit; font-size: 0.95rem; line-height: 1.7; color: var(--text-primary, #0f172a); box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
-              ${currentNoteHtml || '<p>Bu rapora ait detaylı notları, açıklamaları ve resimleri buraya ekleyebilirsiniz...</p>'}
+            <div id="richNoteContent" contenteditable="true" style="width: 100%; max-width: 850px; min-height: 500px; background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); border-radius: 12px; padding: 2rem 2.5rem; outline: none; font-family: inherit; font-size: 0.95rem; line-height: 1.75; color: var(--text-primary, #0f172a); box-shadow: 0 4px 20px rgba(0,0,0,0.06);">
+              ${currentNoteHtml || '<p>Bu rapora ait detaylı notları, açıklamaları ve belgeleri buraya ekleyebilirsiniz...</p>'}
             </div>
           </div>
 
-          <!-- SAĞ / ALT EKLER BÖLÜMÜ (ATTACHMENT TRAY) -->
+          <!-- SAĞ EKLER BÖLÜMÜ (ATTACHMENT TRAY) -->
           <div id="richNoteAttachmentsSidebar" style="width: 320px; border-left: 1px solid var(--border-light, #e2e8f0); background: var(--bg-surface, #ffffff); display: flex; flex-direction: column; overflow: hidden;">
             <div style="padding: 0.85rem 1rem; border-bottom: 1px solid var(--border-light, #e2e8f0); background: var(--bg-card, #f8fafc); display: flex; align-items: center; justify-content: space-between;">
               <div style="font-size: 0.88rem; font-weight: 800; color: var(--text-primary, #0f172a); display: flex; align-items: center; gap: 0.4rem;">
@@ -212,18 +322,18 @@
 
             <!-- EKLER LİSTESİ -->
             <div id="richNoteAttachmentsList" style="flex: 1; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.6rem;">
-              <!-- Javascript ile dinamik doldurulur -->
+              <!-- Dinamik olarak doldurulur -->
             </div>
 
             <!-- SÜRÜKLE BIRAK BİLGİLENDİRMESİ -->
             <div style="padding: 0.75rem; border-top: 1px solid var(--border-light, #e2e8f0); background: var(--bg-card, #f8fafc); font-size: 0.75rem; color: var(--text-muted, #64748b); text-align: center;">
-              💡 Resimleri doğrudan <strong>Ctrl+V</strong> ile yapıştırabilir veya bu alana sürükleyip bırakabilirsiniz.
+              💡 Resimleri doğrudan <strong>Ctrl+V</strong> ile yapıştırabilir veya bu alana sürükleyebilirsiniz.
             </div>
           </div>
         </div>
 
         <!-- FOOTER (KAYDET, SİL, KAPAT BUTONLARI) -->
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.9rem 1.5rem; border-top: 1px solid var(--border-light, #e2e8f0); background: var(--bg-surface, #ffffff);">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.9rem 1.6rem; border-top: 1px solid var(--border-light, #e2e8f0); background: var(--bg-surface, #ffffff);">
           <div>
             ${currentNoteText ? `
               <button type="button" id="btnRichNoteDelete" class="btn btn-sm btn-ghost" style="color: #ef4444; font-weight: 700;">Tüm Notu Sil</button>
@@ -231,8 +341,8 @@
           </div>
 
           <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <button type="button" id="btnRichNoteCancel" class="btn btn-sm btn-ghost" style="padding: 0.5rem 1.2rem;">Kapat</button>
-            <button type="button" id="btnRichNoteSave" class="btn btn-sm btn-primary" style="padding: 0.5rem 1.8rem; font-weight: 700; font-size: 0.9rem; background: #2563eb;">Kaydet & Eşitle</button>
+            <button type="button" id="btnRichNoteCancel" class="btn btn-sm btn-ghost" style="padding: 0.5rem 1.2rem; font-weight: 700;">Kapat</button>
+            <button type="button" id="btnRichNoteSave" class="btn btn-sm btn-primary" style="padding: 0.5rem 1.8rem; font-weight: 800; font-size: 0.9rem; background: #2563eb;">Kaydet & Eşitle</button>
           </div>
         </div>
       </div>
@@ -245,6 +355,23 @@
     const attCountBadge = overlay.querySelector('#attCountBadge');
     const fileInput = overlay.querySelector('#inputAttachFile');
     const saveStatus = overlay.querySelector('#noteSaveStatus');
+
+    // ── GÜVENLİ PENCERE KAPATMA (MOUSE SÜRÜKLEME KORUMASI) ──
+    // Metin seçimi sırasında farenin dışarı kayması pencereyi ASLA kapatmaz!
+    const close = () => overlay.remove();
+    overlay.querySelector('#btnRichNoteClose').addEventListener('click', close);
+    overlay.querySelector('#btnRichNoteCancel').addEventListener('click', close);
+
+    let isMouseDownOnBackdrop = false;
+    overlay.addEventListener('mousedown', (e) => {
+      isMouseDownOnBackdrop = (e.target === overlay);
+    });
+    overlay.addEventListener('mouseup', (e) => {
+      if (isMouseDownOnBackdrop && e.target === overlay) {
+        close();
+      }
+      isMouseDownOnBackdrop = false;
+    });
 
     function renderAttachments() {
       attCountBadge.textContent = attachments.length;
@@ -287,7 +414,7 @@
               <button type="button" class="btn btn-sm btn-ghost btn-att-annotate" data-idx="${idx}" style="font-size: 0.72rem; padding: 0.2rem 0.45rem; color: var(--accent, #2563eb); font-weight: 700;" title="Görsel üzerine daire, ok ve çizim yap">✏️ İşaretle</button>
             ` : ''}
             <button type="button" class="btn btn-sm btn-ghost btn-att-preview" data-idx="${idx}" style="font-size: 0.72rem; padding: 0.2rem 0.45rem;" title="Önizle">👁️ Önizle</button>
-            <a href="${att.url}" download="${escHtml(att.name)}" class="btn btn-sm btn-ghost" style="font-size: 0.72rem; padding: 0.2rem 0.45rem; text-decoration: none;" title="İndir">⬇️ İndir</a>
+            <button type="button" class="btn btn-sm btn-ghost btn-att-download" data-idx="${idx}" style="font-size: 0.72rem; padding: 0.2rem 0.45rem;" title="İndir">⬇️ İndir</button>
             <button type="button" class="btn btn-sm btn-ghost btn-att-delete" data-idx="${idx}" style="font-size: 0.72rem; padding: 0.2rem 0.45rem; color: #ef4444;" title="Sil">✕</button>
           </div>
         `;
@@ -301,7 +428,6 @@
                 imageUrl: att.url,
                 imageName: att.name,
                 onSave: (annotatedDataUrl) => {
-                  // İşaretlenmiş yeni görseli ek olarak güncelle
                   attachments[idx] = {
                     ...attachments[idx],
                     url: annotatedDataUrl,
@@ -320,11 +446,25 @@
           btnPreview.addEventListener('click', () => openAttachmentPreview(att));
         }
 
+        const btnDownload = card.querySelector('.btn-att-download');
+        if (btnDownload) {
+          btnDownload.addEventListener('click', () => downloadAttachment(att));
+        }
+
         const btnDelete = card.querySelector('.btn-att-delete');
         if (btnDelete) {
           btnDelete.addEventListener('click', () => {
-            attachments.splice(idx, 1);
-            renderAttachments();
+            showModernConfirmDialog({
+              title: 'Eki Kaldır',
+              message: `<strong>${escHtml(att.name)}</strong> adlı ek bu rapordan kaldırılacak. Devam etmek istiyor musunuz?`,
+              confirmText: 'Eki Kaldır',
+              isDanger: true,
+              onConfirm: () => {
+                attachments.splice(idx, 1);
+                renderAttachments();
+                if (typeof window.toast === 'function') window.toast('Ek kaldırıldı.', 'info');
+              }
+            });
           });
         }
 
@@ -386,7 +526,7 @@
       if (url) formatDoc('createLink', url);
     });
 
-    // Dosya Ekleme İşleyicisi (Ek yükleme & base64 okuma)
+    // Dosya Ekleme İşleyicisi
     const btnAddAttachment = overlay.querySelector('#btnAddAttachment');
     btnAddAttachment.addEventListener('click', () => fileInput.click());
 
@@ -400,13 +540,12 @@
 
     async function processUploadedFile(fileObj) {
       if (fileObj.size > 15 * 1024 * 1024) {
-        alert(`${fileObj.name} dosyası 15 MB sınırını aşıyor.`);
+        if (typeof window.toast === 'function') window.toast(`${fileObj.name} dosyası 15 MB sınırını aşıyor.`, 'error');
         return;
       }
 
       saveStatus.textContent = 'Dosya yükleniyor...';
 
-      // Dosyayı sunucuya yüklemeyi dene
       const reader = new FileReader();
       reader.onload = async (ev) => {
         const base64Data = ev.target.result;
@@ -425,7 +564,6 @@
           if (data && data.success && data.attachment) {
             attachments.push(data.attachment);
           } else {
-            // Sunucu yoksa veya hata verirse yerel dataUrl olarak ekle
             attachments.push({
               id: 'att_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
               name: fileObj.name,
@@ -466,33 +604,34 @@
       }
     });
 
-    const close = () => overlay.remove();
-    overlay.querySelector('#btnRichNoteClose').addEventListener('click', close);
-    overlay.querySelector('#btnRichNoteCancel').addEventListener('click', close);
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
-
-    // Not Silme
+    // Modern "Tüm Notu Sil" Butonu
     const btnDelete = overlay.querySelector('#btnRichNoteDelete');
     if (btnDelete) {
-      btnDelete.addEventListener('click', async () => {
-        if (confirm('Bu rapora ait tüm not ve ekleri silmek istediğinize emin misiniz?')) {
-          saveStatus.textContent = 'Siliniyor...';
-          try {
-            await fetch(`/api/reports/${encodeURIComponent(fileId)}/note`, {
-              method: 'PATCH',
-              headers: window.FrpAuth ? window.FrpAuth.getAuthHeaders() : { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userNote: '', noteHtml: '', attachments: [] })
-            });
-          } catch {}
+      btnDelete.addEventListener('click', () => {
+        showModernConfirmDialog({
+          title: 'Tüm Notu ve Belgeleri Sil',
+          message: 'Bu rapora ait tüm zengin metin notları ve ekli belgeler <strong>kalıcı olarak silinecektir</strong>. Bu işlem geri alınamaz.',
+          confirmText: 'Evet, Kalıcı Olarak Sil',
+          isDanger: true,
+          onConfirm: async () => {
+            saveStatus.textContent = 'Siliniyor...';
+            try {
+              await fetch(`/api/reports/${encodeURIComponent(fileId)}/note`, {
+                method: 'PATCH',
+                headers: window.FrpAuth ? window.FrpAuth.getAuthHeaders() : { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userNote: '', noteHtml: '', attachments: [] })
+              });
+            } catch {}
 
-          if (window.FrpStore && typeof window.FrpStore.updateNote === 'function') {
-            await window.FrpStore.updateNote(fileId, '', { noteHtml: '', attachments: [] });
+            if (window.FrpStore && typeof window.FrpStore.updateNote === 'function') {
+              await window.FrpStore.updateNote(fileId, '', { noteHtml: '', attachments: [] });
+            }
+
+            if (typeof window.toast === 'function') window.toast('Rapor notları ve ekleri silindi.', 'info');
+            if (typeof window.refreshAll === 'function') window.refreshAll();
+            close();
           }
-
-          if (typeof window.toast === 'function') window.toast('Rapor notları silindi.', 'info');
-          if (typeof window.refreshAll === 'function') window.refreshAll();
-          close();
-        }
+        });
       });
     }
 
@@ -507,7 +646,6 @@
       const plainText = editor.innerText.trim();
 
       try {
-        // 1. Sunucu API rotasını güncelle
         const authHeaders = window.FrpAuth && window.FrpAuth.getAuthHeaders ? window.FrpAuth.getAuthHeaders() : { 'Content-Type': 'application/json' };
         await fetch(`/api/reports/${encodeURIComponent(fileId)}/note`, {
           method: 'PATCH',
@@ -522,7 +660,6 @@
         console.warn('Sunucu not güncelleme hatası:', err);
       }
 
-      // 2. Yerel Depoyu ve İstemci Durumunu Güncelle
       if (window.FrpStore && typeof window.FrpStore.updateNote === 'function') {
         await window.FrpStore.updateNote(fileId, plainText, { noteHtml, attachments });
       }
@@ -540,7 +677,6 @@
     open: openRichNoteModal
   };
 
-  // Mevcut modal çağrısını yeni zengin editöre yönlendir
   if (!window.FrpListModals) window.FrpListModals = {};
   window.FrpListModals.openReportNoteModal = openRichNoteModal;
   window.openReportNoteModal = openRichNoteModal;
