@@ -555,17 +555,15 @@ function openReportPickerForDiff(slot) {
 }
 
 async function initSelectors() {
-  const files = FrpStore.getAll();
-  if (files.length < 2) {
+  const showLoadError = (title, detail) => {
     document.body.innerHTML = `
       <div style="display:flex;height:100vh;align-items:center;justify-content:center;flex-direction:column;gap:1.25rem;background:var(--bg-body);color:var(--text-primary);font-family:var(--font);">
         <div style="width:48px;height:48px;margin:0 auto;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(239,68,68,0.1);color:#ef4444;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></div>
-        <div style="font-size:1.1rem;font-weight:800;">Karşılaştırma için en az 2 rapor gerekli.</div>
-        <div style="font-size:.88rem;color:var(--text-muted);">Sistemde <strong>${files.length}</strong> rapor yüklü. En az 2 rapor yükleyin.</div>
+        <div style="font-size:1.1rem;font-weight:800;">${esc(title)}</div>
+        <div style="font-size:.88rem;color:var(--text-muted);">${esc(detail)}</div>
         <button class="btn btn-primary" data-compare-action="open-index">← Ana Sayfaya Dön</button>
       </div>`;
-    return;
-  }
+  };
 
   const params = new URLSearchParams(window.location.search);
   let idA = params.get('file1');
@@ -580,20 +578,43 @@ async function initSelectors() {
     if (splitIds[2]) idC = splitIds[2];
   }
 
-  // Doğrudan URL parametrelerinden yükle, yoksa ilk iki raporu seç
-  fileA = (idA && FrpStore.getById(idA)) || files[0];
-  fileB = (idB && FrpStore.getById(idB)) || (files.length > 1 ? files[1] : files[0]);
-  fileC = idC ? (FrpStore.getById(idC) || null) : null;
+  const files = FrpStore.getAll();
+  const resolveReport = async (requestedId, fallback) => {
+    const target = requestedId ? FrpStore.getById(requestedId) : fallback;
+    const targetId = requestedId || target?.id;
+    if (!targetId) return null;
+    if (typeof FrpStore.ensureFullReport === 'function') {
+      const full = await FrpStore.ensureFullReport(targetId);
+      if (full) return full;
+    }
+    return requestedId ? FrpStore.getById(requestedId) : target;
+  };
 
-  if (FrpStore.ensureFullReport) {
-    const promises = [];
-    const targetIdA = idA || fileA?.id;
-    const targetIdB = idB || fileB?.id;
-    const targetIdC = idC || fileC?.id;
-    if (targetIdA) promises.push(FrpStore.ensureFullReport(targetIdA).then(f => { if (f) fileA = f; }));
-    if (targetIdB) promises.push(FrpStore.ensureFullReport(targetIdB).then(f => { if (f) fileB = f; }));
-    if (targetIdC) promises.push(FrpStore.ensureFullReport(targetIdC).then(f => { if (f) fileC = f; }));
-    await Promise.allSettled(promises);
+  [fileA, fileB, fileC] = await Promise.all([
+    resolveReport(idA, files[0] || null),
+    resolveReport(idB, files[1] || null),
+    idC ? resolveReport(idC, null) : Promise.resolve(null)
+  ]);
+
+  const missingRequestedIds = [
+    idA && !fileA ? idA : null,
+    idB && !fileB ? idB : null,
+    idC && !fileC ? idC : null
+  ].filter(Boolean);
+  if (missingRequestedIds.length > 0) {
+    showLoadError(
+      'Rapor bulunamadı veya erişim yetkiniz yok.',
+      `İstenen rapor yüklenemedi: ${missingRequestedIds.join(', ')}`
+    );
+    return;
+  }
+
+  if (!fileA || !fileB) {
+    showLoadError(
+      'Karşılaştırma için en az 2 rapor gerekli.',
+      `Sistemde ${files.length} rapor yüklü. En az 2 rapor yükleyin.`
+    );
+    return;
   }
 
   // Picker buton bağlantıları

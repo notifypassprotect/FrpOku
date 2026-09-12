@@ -103,6 +103,14 @@ test('detail ve indirme dosyalarında ensureFullReport entegrasyonu vardır', ()
   assert.match(listActionsCode, /ensureFullReport/);
 });
 
+test('karşılaştırma URL raporlarını fallback seçmeden önce tam içerikle çözümler', () => {
+  const compareCode = fs.readFileSync(path.join(__dirname, '../js/compare/compare.js'), 'utf8');
+  assert.match(compareCode, /const resolveReport = async \(requestedId, fallback\)/);
+  assert.match(compareCode, /\[fileA, fileB, fileC\] = await Promise\.all/);
+  assert.match(compareCode, /Rapor bulunamadı veya erişim yetkiniz yok\./);
+  assert.doesNotMatch(compareCode, /\(idA && FrpStore\.getById\(idA\)\) \|\| files\[0\]/);
+});
+
 test('buildOwnedReportRow hafifletilmiş güncellemede mevcut rawXml, pages ve tree verilerini korur', () => {
   const { buildOwnedReportRow } = require('../lib/report_access');
   const existing = {
@@ -146,5 +154,4 @@ test('list_actions.js indirme fonksiyonlarında const re-assignment hatası bulu
   assert.doesNotMatch(listActionsCode, /const\s+file\s*=\s*FrpStore\.getById\(id\);[\s\S]*?file\s*=\s*await/);
   assert.doesNotMatch(listActionsCode, /const\s+file\s*=\s*selectedList\[i\];[\s\S]*?file\s*=\s*await/);
 });
-
 
