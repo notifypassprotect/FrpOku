@@ -904,6 +904,13 @@
         if (appWrap) appWrap.style.display = 'flex';
         if (typeof window.FrpAuth?.updateNavbarUserBadge === 'function') window.FrpAuth.updateNavbarUserBadge();
         if (typeof window.FrpAuth?.setupAdminFeatures === 'function') window.FrpAuth.setupAdminFeatures();
+        if (window.FrpStore && typeof window.FrpStore.clearSessionCache === 'function') {
+          window.FrpStore.clearSessionCache();
+        }
+        if (window.FrpStore && typeof window.FrpStore.refreshFromCloud === 'function') {
+          await window.FrpStore.refreshFromCloud();
+        }
+        if (typeof window.refreshAll === 'function') window.refreshAll();
         if (typeof window.toast === 'function') window.toast('Şifreniz başarıyla sıfırlandı ve oturum açıldı!', 'success');
       });
     } else {

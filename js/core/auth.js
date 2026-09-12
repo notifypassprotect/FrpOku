@@ -57,14 +57,11 @@
       });
       const data = await res.json();
       if (data && data.success && data.user) {
-        if (data.token) {
-          data.user.token = data.token;
-          try { localStorage.setItem('frpoku_auth_token', data.token); } catch (e) {}
-        }
         if (rememberMe) localStorage.setItem(SAVED_IDENTIFIER_KEY, ident);
         else localStorage.removeItem(SAVED_IDENTIFIER_KEY);
-        setSession(data.user, rememberMe);
-        return { success: true, user: data.user };
+        const sessionUser = applyExternalSession(data.token, data.user, rememberMe);
+        if (!sessionUser) return { success: false, reason: 'Güvenli oturum oluşturulamadı.' };
+        return { success: true, user: sessionUser };
       }
       return data;
     } catch (err) {
@@ -430,12 +427,9 @@
       });
       const data = await res.json();
       if (data && data.success && data.user) {
-        if (data.token) {
-          data.user.token = data.token;
-          try { localStorage.setItem('frpoku_auth_token', data.token); } catch (e) {}
-        }
-        setSession(data.user, true);
-        return { success: true, user: data.user };
+        const sessionUser = applyExternalSession(data.token, data.user, true);
+        if (!sessionUser) return { success: false, reason: 'Güvenli oturum oluşturulamadı.' };
+        return { success: true, user: sessionUser };
       }
       return data;
     } catch (err) {

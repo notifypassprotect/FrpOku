@@ -97,3 +97,13 @@ test('kod ile şifre sıfırlama güvenli oturum kurar ve raporları yeniden yü
   assert.match(resetRoute, /user: safeUser/);
   assert.doesNotMatch(resetRoute, /user: updatedUser/);
 });
+
+test('normal giriş ve kurtarma anahtarı aynı güvenli oturum yolunu kullanır', () => {
+  const authContent = fs.readFileSync(path.join(__dirname, '../js/core/auth.js'), 'utf8');
+  const portalContent = fs.readFileSync(path.join(__dirname, '../js/core/auth/auth_portal.js'), 'utf8');
+  const calls = authContent.match(/applyExternalSession\(data\.token, data\.user/g) || [];
+  assert.ok(calls.length >= 2, 'Giriş ve kurtarma akışları ortak oturum kurmalıdır');
+  const recoveryUi = portalContent.slice(portalContent.indexOf("portal.querySelector('#authRecoveryPanel')"), portalContent.indexOf('function showUserDropdown'));
+  assert.match(recoveryUi, /clearSessionCache/);
+  assert.match(recoveryUi, /refreshFromCloud/);
+});
