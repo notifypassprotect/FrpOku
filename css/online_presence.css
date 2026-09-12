@@ -460,11 +460,153 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.6rem 0.9rem;
+  gap: 0.5rem;
+  padding: 0.55rem 0.85rem;
   background: var(--bg-card, #f8fafc);
   border-top: 1px solid var(--border-light, #e2e8f0);
   font-size: 0.72rem;
   color: var(--text-muted, #64748b);
+}
+
+.frp-presence-notif-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.55rem;
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 20px;
+  color: var(--text-primary, #0f172a);
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.frp-presence-notif-btn:hover {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: var(--accent, #2563eb);
+  color: var(--accent, #2563eb);
+}
+
+.frp-notif-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #cbd5e1;
+}
+
+.frp-notif-status-dot.granted {
+  background: #10b981;
+  box-shadow: 0 0 5px #10b981;
+}
+
+.frp-notif-status-dot.denied {
+  background: #ef4444;
+}
+
+/* ── GRUP BİLGİSİ VE ÜYE YÖNETİMİ ÇEKMECESİ ── */
+.frp-group-info-drawer {
+  display: none;
+  flex-direction: column;
+  position: absolute;
+  top: 48px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-surface, #ffffff);
+  z-index: 1000;
+  padding: 0.9rem;
+  overflow-y: auto;
+  animation: fadeIn 0.18s ease-out;
+}
+
+.frp-group-info-drawer.open {
+  display: flex;
+}
+
+.frp-group-info-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-light, #e2e8f0);
+  padding-bottom: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.frp-group-info-title {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--text-primary, #0f172a);
+}
+
+.frp-group-member-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  background: var(--bg-card, #f8fafc);
+  border: 1px solid var(--border-light, #e2e8f0);
+  margin-bottom: 0.4rem;
+}
+
+.frp-group-role-badge {
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.frp-group-role-badge.admin {
+  background: rgba(245, 158, 11, 0.15);
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.frp-group-role-badge.member {
+  background: rgba(100, 116, 139, 0.1);
+  color: #64748b;
+}
+
+.frp-btn-kick-member {
+  background: none;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.frp-btn-kick-member:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.frp-btn-leave-group {
+  margin-top: 1rem;
+  width: 100%;
+  padding: 0.6rem;
+  border-radius: 8px;
+  border: 1.5px solid #ef4444;
+  background: rgba(239, 68, 68, 0.06);
+  color: #ef4444;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  transition: all 0.15s;
+}
+
+.frp-btn-leave-group:hover {
+  background: #ef4444;
+  color: #ffffff;
 }
 
 /* ============================================================
@@ -474,8 +616,9 @@
 .frp-chat-window {
   position: fixed;
   bottom: 0;
-  width: 335px;
-  height: 450px;
+  width: 350px;
+  height: 560px;
+  max-height: 86vh;
   background: var(--bg-surface, #ffffff);
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
@@ -492,10 +635,10 @@
 }
 
 .frp-chat-window.maximized {
-  width: 580px !important;
-  height: 680px !important;
+  width: 600px !important;
+  height: 720px !important;
   max-width: 95vw;
-  max-height: 88vh;
+  max-height: 90vh;
   box-shadow: 0 -15px 50px rgba(0, 0, 0, 0.3);
 }
 
@@ -853,31 +996,35 @@
 }
 
 /* ── HOVER REAKSIYON ÇUBUĞU ── */
+.frp-chat-msg:hover {
+  z-index: 60 !important;
+}
+
 .frp-chat-hover-bar {
   display: none;
   position: absolute;
-  top: -24px;
+  top: -20px;
   background: var(--bg-surface, #ffffff);
   border: 1px solid var(--border, #cbd5e1);
   border-radius: 20px;
-  padding: 2px 6px;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.18);
-  z-index: 25;
-  gap: 3px;
+  padding: 2px 7px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.22);
+  z-index: 80 !important;
+  gap: 4px;
   align-items: center;
   pointer-events: auto;
 }
 
-/* Hover köprüsü: Baloncuk ile çubuk arasındaki boşluğu kapatır, fare çıkınca kapanmasını önler */
+/* Hover köprüsü: Baloncuk ile çubuk arasındaki ufak boşluğu kapatır, tıklamaları engellemez */
 .frp-chat-hover-bar::after {
   content: '';
   position: absolute;
-  bottom: -12px;
-  left: -8px;
-  right: -8px;
-  height: 16px;
+  bottom: -4px;
+  left: 0;
+  right: 0;
+  height: 6px;
   background: transparent;
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 .frp-chat-msg:hover .frp-chat-hover-bar,
@@ -886,24 +1033,47 @@
 }
 
 .frp-chat-msg.outgoing .frp-chat-hover-bar {
-  right: 4px;
+  right: 6px;
 }
 
 .frp-chat-msg.incoming .frp-chat-hover-bar {
-  left: 4px;
+  left: 6px;
 }
 
 .btn-react {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 0.85rem;
-  padding: 1px 3px;
-  transition: transform 0.15s;
+  font-size: 0.95rem;
+  padding: 2px 4px;
+  line-height: 1;
+  transition: transform 0.12s ease;
+  user-select: none;
 }
 
 .btn-react:hover {
-  transform: scale(1.3);
+  transform: scale(1.35);
+}
+
+.btn-react:active {
+  transform: scale(0.9);
+}
+
+.btn-delete-msg {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.82rem;
+  padding: 2px 4px;
+  line-height: 1;
+  color: #ef4444;
+  opacity: 0.75;
+  transition: all 0.15s ease;
+}
+
+.btn-delete-msg:hover {
+  opacity: 1;
+  transform: scale(1.25);
 }
 
 .frp-chat-reactions-row {
@@ -1492,7 +1662,7 @@
 }
 
 .msn-shaking {
-  animation: msnNudgeShake 0.65s cubic-bezier(0.36, 0.07, 0.19, 0.97) both !important;
+  animation: msnNudgeShake 1.2s cubic-bezier(0.36, 0.07, 0.19, 0.97) both !important;
 }
 
 .btn-nudge-action {

@@ -465,8 +465,11 @@
 
         <!-- FOOTER -->
         <div class="frp-presence-footer">
-          <span>FRP Kurumsal İletişim Ağı</span>
-          <span style="font-size:0.85rem;cursor:pointer;" id="btnDesktopNotifOpt" title="Masaüstü Bildirimlerini Aç">🔔</span>
+          <span>FRP Kurumsal İletişim</span>
+          <button type="button" class="frp-presence-notif-btn" id="btnDesktopNotifOpt" title="Masaüstü Bildirim Ayarları">
+            <span class="frp-notif-status-dot" id="frpNotifStatusDot"></span>
+            <span id="frpNotifStatusText">Bildirimleri Aç</span>
+          </button>
         </div>
       </div>
     `;
@@ -483,6 +486,28 @@
     const tabs = dockEl.querySelectorAll('.frp-presence-tab');
     const btnNotif = dockEl.querySelector('#btnDesktopNotifOpt');
 
+    function updateNotifBtnUI() {
+      if (!btnNotif) return;
+      const dot = btnNotif.querySelector('#frpNotifStatusDot');
+      const text = btnNotif.querySelector('#frpNotifStatusText');
+      if (!('Notification' in window)) {
+        if (dot) dot.className = 'frp-notif-status-dot';
+        if (text) text.textContent = 'Desteklenmiyor';
+        return;
+      }
+      if (Notification.permission === 'granted') {
+        if (dot) dot.className = 'frp-notif-status-dot granted';
+        if (text) text.textContent = '🔔 Bildirim: Açık';
+      } else if (Notification.permission === 'denied') {
+        if (dot) dot.className = 'frp-notif-status-dot denied';
+        if (text) text.textContent = '🔕 Bildirim: Engellendi';
+      } else {
+        if (dot) dot.className = 'frp-notif-status-dot';
+        if (text) text.textContent = '🔔 Bildirimleri Aç';
+      }
+    }
+    updateNotifBtnUI();
+
     pill.addEventListener('click', () => {
       isPanelOpen = true;
       panel.classList.add('open');
@@ -491,6 +516,7 @@
       else if (currentTab === 'groups') renderGroups();
       else if (currentTab === 'rooms') renderRooms();
       updateSelfStatusUI();
+      updateNotifBtnUI();
     });
 
     btnClose.addEventListener('click', () => {
@@ -537,9 +563,40 @@
       });
     });
 
-    btnNotif.addEventListener('click', () => {
-      requestDesktopNotification();
-      if (typeof window.toast === 'function') window.toast('Masaüstü bildirim izinleri kontrol edildi.', 'info');
+    btnNotif.addEventListener('click', async () => {
+      if (!('Notification' in window)) {
+        if (typeof window.toast === 'function') window.toast('Bu tarayıcı masaüstü bildirimlerini desteklemiyor.', 'warning');
+        return;
+      }
+      if (Notification.permission === 'granted') {
+        if (typeof window.toast === 'function') {
+          window.toast('✓ Masaüstü bildirimleri aktif! Yeni mesaj veya titreşim geldiğinde anlık bildirim alırsınız.', 'success');
+        }
+      } else if (Notification.permission === 'denied') {
+        if (typeof window.showConfirmDialog === 'function') {
+          window.showConfirmDialog({
+            title: 'Masaüstü Bildirim İzni Engellenmiş',
+            message: 'Tarayıcınız bu web sitesi için bildirimleri engellemiş görünüyor.<br><br><b>Nasıl Açılır?</b><br>1. Tarayıcı adres çubuğunun solundaki kilit veya ayar simgesine tıklayın.<br>2. <b>Bildirimler</b> iznini <b>İzin Ver</b> olarak ayarlayıp sayfayı yenileyin.',
+            confirmText: 'Anladım',
+            cancelText: 'Kapat',
+            isDanger: false
+          });
+        } else if (typeof window.toast === 'function') {
+          window.toast('Bildirim izni engellenmiş. Adres çubuğundaki kilit simgesinden izin veriniz.', 'warning');
+        }
+      } else {
+        try {
+          const perm = await Notification.requestPermission();
+          updateNotifBtnUI();
+          if (perm === 'granted') {
+            if (typeof window.toast === 'function') window.toast('Masaüstü bildirimleri başarıyla etkinleştirildi! 🎉', 'success');
+          } else {
+            if (typeof window.toast === 'function') window.toast('Bildirim izni onaylanmadı.', 'info');
+          }
+        } catch {
+          updateNotifBtnUI();
+        }
+      }
     });
 
     if (currentAuthUser) {
@@ -675,10 +732,18 @@
       const name = u.fullName || u.username || 'Kullanıcı';
       const initials = getCleanInitials(u.fullName, u.username);
       const gradient = getAvatarGradient(name);
+      let userAvatarInner = '';
+      if (u.avatar && (u.avatar.startsWith('data:image/') || u.avatar.startsWith('http'))) {
+        userAvatarInner = `<img src="${u.avatar}" alt="Avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
+      } else if (u.avatar && u.avatar.length <= 4 && u.avatar.trim()) {
+        userAvatarInner = `<span style="font-size:1.15rem;display:flex;align-items:center;justify-content:center;width:100%;height:100%;">${u.avatar}</span>`;
+      } else {
+        userAvatarInner = `<span style="font-size:0.85rem;font-weight:800;color:#ffffff;">${escHtml(initials)}</span>`;
+      }
 
       li.innerHTML = `
         <div class="frp-presence-avatar-wrap">
-          <div class="frp-presence-avatar" style="background: ${gradient}; font-size: 0.85rem; font-weight: 800; color: #ffffff;">${escHtml(initials)}</div>
+          <div class="frp-presence-avatar" style="background: ${gradient}; overflow:hidden; display:flex; align-items:center; justify-content:center;">${userAvatarInner}</div>
           <span class="frp-presence-status-dot ${statusClass}"></span>
         </div>
         <div class="frp-presence-info">
@@ -996,6 +1061,15 @@
           ? 'linear-gradient(135deg, #059669, #10b981)'
           : (targetUser.isSelfNote ? 'linear-gradient(135deg, #2563eb, #6366f1)' : getAvatarGradient(chatTitle)));
 
+    let userAvatarInner = '';
+    if (targetUser && targetUser.avatar && (targetUser.avatar.startsWith('data:image/') || targetUser.avatar.startsWith('http'))) {
+      userAvatarInner = `<img src="${targetUser.avatar}" alt="Avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
+    } else if (targetUser && targetUser.avatar && targetUser.avatar.length <= 4 && targetUser.avatar.trim()) {
+      userAvatarInner = `<span style="font-size:1.15rem;display:flex;align-items:center;justify-content:center;width:100%;height:100%;">${targetUser.avatar}</span>`;
+    } else {
+      userAvatarInner = `<span style="font-size:${isRoom || isGroup || targetUser?.isSelfNote ? '1rem' : '0.82rem'}; font-weight:800; color:#ffffff;">${escHtml(userInitials)}</span>`;
+    }
+
     const isReadOnlyRoom = isRoom && !isAdmin;
 
     chatEl.innerHTML = `
@@ -1003,7 +1077,7 @@
       <div class="frp-chat-header">
         <div class="frp-chat-header-user">
           <div class="frp-chat-avatar-wrap">
-            <div class="frp-chat-avatar" style="background: ${avatarBg}; font-size: ${isRoom || isGroup || targetUser?.isSelfNote ? '1rem' : '0.82rem'}; font-weight: 800; color: #ffffff;">${escHtml(userInitials)}</div>
+            <div class="frp-chat-avatar" style="background: ${avatarBg}; overflow:hidden; display:flex; align-items:center; justify-content:center;">${userAvatarInner}</div>
             ${(!isRoom && !isGroup) ? `<span class="frp-chat-status-dot ${userStatus === 'online' ? 'frp-online-pulse' : ''}" style="background-color: ${statusDotColor};"></span>` : ''}
           </div>
           <div class="frp-chat-header-text">
@@ -1016,6 +1090,7 @@
           </div>
         </div>
         <div class="frp-chat-header-controls">
+          ${isGroup ? `<button type="button" class="frp-chat-btn-ctrl btn-group-info" title="Grup Bilgisi & Katılımcılar">👥</button>` : ''}
           ${!isRoom ? `<button type="button" class="frp-chat-btn-ctrl btn-nudge" title="Titreşim Gönder (📳 MSN Titret)">📳</button>` : ''}
           <button type="button" class="frp-chat-btn-ctrl btn-media-gallery" title="Paylaşılan Medya & Belgeler (İnovasyon)">📁</button>
           <button type="button" class="frp-chat-btn-ctrl btn-search" title="Sohbette Ara">🔍</button>
@@ -1025,6 +1100,29 @@
           <button type="button" class="frp-chat-btn-ctrl btn-close" title="Kapat">✕</button>
         </div>
       </div>
+
+      <!-- GRUP BİLGİSİ VE ÜYE YÖNETİM ÇEKMECESİ -->
+      ${isGroup ? `
+        <div class="frp-group-info-drawer" id="frpGroupInfoDrawer">
+          <div class="frp-group-info-header">
+            <span class="frp-group-info-title">👥 Grup Detayı & Üyeler</span>
+            <button type="button" class="frp-chat-btn-ctrl btn-group-info-close">✕</button>
+          </div>
+          <div style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:0.65rem;">
+            <div style="background:var(--bg-card, #f8fafc); border:1px solid var(--border-light, #e2e8f0); border-radius:10px; padding:0.65rem; font-size:0.75rem;">
+              <div style="font-weight:800; color:var(--text-primary); font-size:0.85rem;">${escHtml(chatTitle)}</div>
+              <div style="color:var(--text-muted); font-size:0.7rem; margin-top:2px;">Kurucu: <b>${escHtml(group.createdByName || 'Ekip')}</b></div>
+            </div>
+            <div style="font-size:0.72rem; font-weight:800; color:var(--text-secondary); margin-top:0.2rem;">Grup Katılımcıları</div>
+            <div id="frpGroupMembersListWrap">
+              <div style="text-align:center; padding:1.5rem; color:var(--text-muted); font-size:0.75rem;">Üyeler yükleniyor...</div>
+            </div>
+            <button type="button" class="frp-btn-leave-group" id="btnLeaveGroupAction">
+              🚪 Bu Gruptan Ayrıl
+            </button>
+          </div>
+        </div>
+      ` : ''}
 
       <!-- PAYLAŞILAN MEDYA ÇEKMECESİ (İNOVASYON 4) -->
       <div class="frp-chat-media-drawer" style="display: none;">
@@ -1125,6 +1223,11 @@
     const btnMinimize = chatEl.querySelector('.btn-minimize');
     const btnMaximize = chatEl.querySelector('.btn-maximize');
     const btnClearChat = chatEl.querySelector('.btn-clear-chat');
+    const btnGroupInfo = chatEl.querySelector('.btn-group-info');
+    const groupInfoDrawer = chatEl.querySelector('#frpGroupInfoDrawer');
+    const btnGroupInfoClose = chatEl.querySelector('.btn-group-info-close');
+    const btnLeaveGroup = chatEl.querySelector('#btnLeaveGroupAction');
+    const groupMembersWrap = chatEl.querySelector('#frpGroupMembersListWrap');
     const btnSearch = chatEl.querySelector('.btn-search');
     const searchBar = chatEl.querySelector('.frp-chat-search-bar');
     const searchInput = chatEl.querySelector('.frp-chat-search-input');
@@ -1173,13 +1276,13 @@
       }).then(async (res) => {
         const data = await res.json();
         if (res.ok && data.success) {
-          // Yerel sallanma ve ses
+          // Yerel sallanma ve ses (1.2 saniye zengin titreşim)
           chatEl.classList.remove('msn-shaking');
           void chatEl.offsetWidth;
           chatEl.classList.add('msn-shaking');
-          setTimeout(() => chatEl.classList.remove('msn-shaking'), 700);
+          setTimeout(() => chatEl.classList.remove('msn-shaking'), 1200);
           playMsnNudgeSound();
-          if (navigator.vibrate) navigator.vibrate([100, 50, 150]);
+          if (navigator.vibrate) navigator.vibrate([250, 100, 350, 100, 450]);
 
           let remainSec = 15;
           const updateBtn = () => {
@@ -1223,6 +1326,179 @@
 
     if (btnNudgeHeader) btnNudgeHeader.addEventListener('click', triggerNudge);
     if (btnNudgeAction) btnNudgeAction.addEventListener('click', triggerNudge);
+
+    // Grup Detayı ve Üyeleri
+    async function loadGroupDetails() {
+      if (!isGroup || !groupMembersWrap) return;
+      groupMembersWrap.innerHTML = '<div style="text-align:center; padding:1.2rem; color:var(--text-muted); font-size:0.75rem;">Üyeler taranıyor...</div>';
+      try {
+        const res = await fetch(`/api/chat/groups/${encodeURIComponent(chatId)}/details`, {
+          headers: window.FrpAuth.getAuthHeaders ? window.FrpAuth.getAuthHeaders() : {}
+        });
+        const data = await res.json();
+        if (res.ok && data && data.success && data.group) {
+          const g = data.group;
+          const members = g.members || [];
+          const isMeAdmin = String(g.createdBy) === myId || isAdmin;
+
+          if (members.length === 0) {
+            groupMembersWrap.innerHTML = '<div style="text-align:center; padding:1rem; color:var(--text-muted); font-size:0.75rem;">Katılımcı bulunamadı.</div>';
+            return;
+          }
+
+          groupMembersWrap.innerHTML = '';
+          members.forEach(mem => {
+            const memDiv = document.createElement('div');
+            memDiv.className = 'frp-group-member-card';
+
+            const isThisCreator = String(mem.id) === String(g.createdBy);
+            const isSelf = String(mem.id) === myId;
+            const initials = getCleanInitials(mem.fullName, mem.username);
+            const gradient = getAvatarGradient(mem.fullName || mem.username);
+
+            let memAvatar = '';
+            if (mem.avatar && (mem.avatar.startsWith('data:image/') || mem.avatar.startsWith('http'))) {
+              memAvatar = `<img src="${mem.avatar}" alt="Avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
+            } else if (mem.avatar && mem.avatar.length <= 4 && mem.avatar.trim()) {
+              memAvatar = `<span>${mem.avatar}</span>`;
+            } else {
+              memAvatar = `<span>${escHtml(initials)}</span>`;
+            }
+
+            memDiv.innerHTML = `
+              <div style="display:flex; align-items:center; gap:0.55rem; min-width:0;">
+                <div class="frp-presence-avatar" style="width:28px; height:28px; border-radius:50%; background:${gradient}; display:flex; align-items:center; justify-content:center; font-size:0.72rem; font-weight:800; color:#fff; flex-shrink:0; overflow:hidden;">
+                  ${memAvatar}
+                </div>
+                <div style="min-width:0;">
+                  <div style="font-size:0.76rem; font-weight:700; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                    ${escHtml(mem.fullName || mem.username)} ${isSelf ? '<b>(Siz)</b>' : ''}
+                  </div>
+                  <div style="font-size:0.65rem; color:var(--text-muted);">
+                    @${escHtml(mem.username)} ${mem.department ? '· ' + escHtml(mem.department) : ''}
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
+                <span class="frp-group-role-badge ${isThisCreator ? 'admin' : 'member'}">
+                  ${isThisCreator ? '👑 Yönetici' : 'Üye'}
+                </span>
+                ${(isMeAdmin && !isSelf && !isThisCreator) ? `
+                  <button type="button" class="frp-btn-kick-member" data-user-id="${escHtml(String(mem.id))}" data-user-name="${escHtml(mem.fullName || mem.username)}" title="Gruptan Çıkar">
+                    ✕ Çıkar
+                  </button>
+                ` : ''}
+              </div>
+            `;
+
+            const btnKick = memDiv.querySelector('.frp-btn-kick-member');
+            if (btnKick) {
+              btnKick.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const uId = btnKick.dataset.userId;
+                const uName = btnKick.dataset.userName;
+                const doKick = async () => {
+                  try {
+                    const kickRes = await fetch(`/api/chat/groups/${encodeURIComponent(chatId)}/members/${encodeURIComponent(uId)}`, {
+                      method: 'DELETE',
+                      headers: window.FrpAuth.getAuthHeaders ? window.FrpAuth.getAuthHeaders() : {}
+                    });
+                    const kData = await kickRes.json().catch(() => ({}));
+                    if (kickRes.ok && kData.success) {
+                      if (typeof window.toast === 'function') window.toast(`"${uName}" gruptan çıkarıldı.`, 'success');
+                      loadGroupDetails();
+                      fetchChatGroups();
+                    } else {
+                      if (typeof window.toast === 'function') window.toast(kData.reason || 'Üye çıkarılamadı.', 'error');
+                    }
+                  } catch (err) {
+                    if (typeof window.toast === 'function') window.toast('Hata: ' + err.message, 'error');
+                  }
+                };
+
+                if (typeof window.showConfirmDialog === 'function') {
+                  window.showConfirmDialog({
+                    title: 'Üyeyi Gruptan Çıkar',
+                    message: `<b>"${escHtml(uName)}"</b> kullanıcısını bu gruptan çıkarmak istediğinizden emin misiniz?`,
+                    confirmText: 'Evet, Çıkar',
+                    cancelText: 'Vazgeç',
+                    isDanger: true,
+                    onConfirm: doKick
+                  });
+                } else {
+                  doKick();
+                }
+              });
+            }
+
+            groupMembersWrap.appendChild(memDiv);
+          });
+        }
+      } catch (err) {
+        groupMembersWrap.innerHTML = '<div style="text-align:center; padding:1rem; color:var(--text-muted); font-size:0.75rem;">Detaylar yüklenemedi.</div>';
+      }
+    }
+
+    if (btnGroupInfo) {
+      btnGroupInfo.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!groupInfoDrawer) return;
+        const isOpen = groupInfoDrawer.classList.contains('open');
+        if (isOpen) {
+          groupInfoDrawer.classList.remove('open');
+        } else {
+          groupInfoDrawer.classList.add('open');
+          loadGroupDetails();
+        }
+      });
+    }
+
+    if (btnGroupInfoClose) {
+      btnGroupInfoClose.addEventListener('click', (e) => {
+        e.stopPropagation();
+        groupInfoDrawer?.classList.remove('open');
+      });
+    }
+
+    if (btnLeaveGroup) {
+      btnLeaveGroup.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const doLeave = async () => {
+          try {
+            const res = await fetch(`/api/chat/groups/${encodeURIComponent(chatId)}/leave`, {
+              method: 'POST',
+              headers: window.FrpAuth.getAuthHeaders ? window.FrpAuth.getAuthHeaders() : {}
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.success) {
+              if (typeof window.toast === 'function') window.toast(`"${chatTitle}" grubundan ayrıldınız.`, 'success');
+              clearInterval(pollTimer);
+              chatEl.remove();
+              activeChatWindows.delete(chatId);
+              realignChatWindows();
+              fetchChatGroups();
+            } else {
+              if (typeof window.toast === 'function') window.toast(data.reason || 'Gruptan ayrılamadı.', 'error');
+            }
+          } catch (err) {
+            if (typeof window.toast === 'function') window.toast('Hata: ' + err.message, 'error');
+          }
+        };
+
+        if (typeof window.showConfirmDialog === 'function') {
+          window.showConfirmDialog({
+            title: 'Gruptan Ayrıl',
+            message: `<b>"${escHtml(chatTitle)}"</b> grubundan ayrılmak istediğinizden emin misiniz?<br><span style="font-size:0.75rem;color:var(--text-muted);">Grup mesajlarını artık alamayacaksınız.</span>`,
+            confirmText: 'Evet, Gruptan Ayrıl',
+            cancelText: 'Vazgeç',
+            isDanger: true,
+            onConfirm: doLeave
+          });
+        } else {
+          doLeave();
+        }
+      });
+    }
 
     // Pencere Takibi ve Otomatik Polling (Her 2.5 saniyede bir yeni mesajları sorgula)
     let currentMessages = [];
@@ -1310,28 +1586,40 @@
     });
 
     if (btnClearChat) {
-      btnClearChat.addEventListener('click', async (e) => {
+      btnClearChat.addEventListener('click', (e) => {
         e.stopPropagation();
         const targetName = chatTitle || 'bu sohbetin';
-        const ok = window.confirm(`"${targetName}" sohbetinin tüm geçmişini silmek istediğinizden emin misiniz?\nBu işlem geri alınamaz.`);
-        if (!ok) return;
-
-        try {
-          const chatType = isRoom ? 'room' : (isGroup ? 'group' : 'peer');
-          const res = await fetch(`/api/chat/conversations/${encodeURIComponent(chatId)}?type=${chatType}`, {
-            method: 'DELETE',
-            headers: (window.FrpAuth && window.FrpAuth.getAuthHeaders) ? window.FrpAuth.getAuthHeaders() : {}
-          });
-          const data = await res.json().catch(() => ({}));
-          if (res.ok && data.success) {
-            if (typeof window.toast === 'function') window.toast('Sohbet geçmişi temizlendi.', 'success');
-            msgStream.innerHTML = '';
-            loadMessages();
-          } else {
-            if (typeof window.toast === 'function') window.toast(data.reason || 'Sohbet temizlenemedi.', 'error');
+        const doClear = async () => {
+          try {
+            const chatType = isRoom ? 'room' : (isGroup ? 'group' : 'peer');
+            const res = await fetch(`/api/chat/conversations/${encodeURIComponent(chatId)}?type=${chatType}`, {
+              method: 'DELETE',
+              headers: (window.FrpAuth && window.FrpAuth.getAuthHeaders) ? window.FrpAuth.getAuthHeaders() : {}
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.success) {
+              if (typeof window.toast === 'function') window.toast('Sohbet geçmişi temizlendi.', 'success');
+              msgStream.innerHTML = '';
+              loadMessages();
+            } else {
+              if (typeof window.toast === 'function') window.toast(data.reason || 'Sohbet temizlenemedi.', 'error');
+            }
+          } catch (err) {
+            if (typeof window.toast === 'function') window.toast('Hata: ' + err.message, 'error');
           }
-        } catch (err) {
-          if (typeof window.toast === 'function') window.toast('Hata: ' + err.message, 'error');
+        };
+
+        if (typeof window.showConfirmDialog === 'function') {
+          window.showConfirmDialog({
+            title: 'Sohbet Geçmişini Temizle',
+            message: `<b>"${escHtml(targetName)}"</b> sohbetinin tüm mesaj geçmişini silmek istediğinizden emin misiniz?<br><span style="font-size:0.75rem;color:var(--text-muted);">Bu işlem geri alınamaz. Devam etmek istiyor musunuz?</span>`,
+            confirmText: 'Evet, Tümünü Sil',
+            cancelText: 'Vazgeç',
+            isDanger: true,
+            onConfirm: doClear
+          });
+        } else {
+          doClear();
         }
       });
     }
@@ -1728,42 +2016,91 @@
       });
     }
 
-    // Ses Oynatıcı Bağlayıcı (WebM Duration Fallback & Seeking & Equalizer)
+    // Ses Oynatıcı Bağlayıcı (WebM Duration Fallback & Seeking & Equalizer & Fallback Audio)
     function bindAudioPlayer(audioPlayer, m) {
       const btnPlay = audioPlayer.querySelector('.frp-audio-play-btn');
       const audioEl = audioPlayer.querySelector('audio');
       const progBar = audioPlayer.querySelector('.frp-audio-progress-bar');
       const timeSpan = audioPlayer.querySelector('.frp-audio-time');
       const track = audioPlayer.querySelector('.frp-audio-track');
-      const fallbackDuration = (m.voice && m.voice.duration > 0) ? m.voice.duration : 5;
+      const fallbackDuration = (m.voice && m.voice.duration > 0) ? m.voice.duration : 10;
 
       function getEffectiveDuration() {
         return (isFinite(audioEl.duration) && audioEl.duration > 0) ? audioEl.duration : fallbackDuration;
       }
 
-      btnPlay.addEventListener('click', (ev) => {
-        ev.stopPropagation();
+      let standaloneAudio = null;
+
+      const togglePlay = () => {
+        if (standaloneAudio && !standaloneAudio.paused) {
+          standaloneAudio.pause();
+          btnPlay.textContent = '▶️';
+          audioPlayer.classList.remove('playing');
+          return;
+        }
+
         if (audioEl.paused) {
           document.querySelectorAll('audio').forEach(a => { if (a !== audioEl) a.pause(); });
-          const p = audioEl.play();
-          if (p && typeof p.then === 'function') {
-            p.then(() => {
+          try {
+            const p = audioEl.play();
+            if (p && typeof p.then === 'function') {
+              p.then(() => {
+                btnPlay.textContent = '⏸️';
+                audioPlayer.classList.add('playing');
+              }).catch(err => {
+                console.warn('Audio play() hatası, doğrudan Audio nesnesi ile deneniyor:', err);
+                try {
+                  if (!standaloneAudio) {
+                    standaloneAudio = new Audio(audioEl.src);
+                    standaloneAudio.ontimeupdate = () => {
+                      const dur = getEffectiveDuration();
+                      if (dur > 0) {
+                        const cur = standaloneAudio.currentTime || 0;
+                        const pct = Math.min(100, Math.max(0, (cur / dur) * 100));
+                        progBar.style.width = pct + '%';
+                        const cMin = Math.floor(cur / 60);
+                        const cSec = String(Math.floor(cur % 60)).padStart(2, '0');
+                        const dMin = Math.floor(dur / 60);
+                        const dSec = String(Math.floor(dur % 60)).padStart(2, '0');
+                        timeSpan.textContent = `${cMin}:${cSec} / ${dMin}:${dSec}`;
+                      }
+                    };
+                    standaloneAudio.onended = () => {
+                      btnPlay.textContent = '▶️';
+                      audioPlayer.classList.remove('playing');
+                      progBar.style.width = '0%';
+                    };
+                  }
+                  standaloneAudio.play().then(() => {
+                    btnPlay.textContent = '⏸️';
+                    audioPlayer.classList.add('playing');
+                  }).catch(() => {
+                    btnPlay.textContent = '▶️';
+                    audioPlayer.classList.remove('playing');
+                  });
+                } catch {
+                  btnPlay.textContent = '▶️';
+                  audioPlayer.classList.remove('playing');
+                }
+              });
+            } else {
               btnPlay.textContent = '⏸️';
               audioPlayer.classList.add('playing');
-            }).catch(err => {
-              console.warn('Ses oynatma hatası:', err);
-              btnPlay.textContent = '▶️';
-              audioPlayer.classList.remove('playing');
-            });
-          } else {
-            btnPlay.textContent = '⏸️';
-            audioPlayer.classList.add('playing');
+            }
+          } catch {
+            btnPlay.textContent = '▶️';
+            audioPlayer.classList.remove('playing');
           }
         } else {
           audioEl.pause();
           btnPlay.textContent = '▶️';
           audioPlayer.classList.remove('playing');
         }
+      };
+
+      btnPlay.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        togglePlay();
       });
 
       if (track) {
@@ -1773,7 +2110,8 @@
           const clickX = Math.max(0, Math.min(ev.clientX - rect.left, rect.width));
           const pct = clickX / (rect.width || 1);
           const targetDuration = getEffectiveDuration();
-          audioEl.currentTime = pct * targetDuration;
+          if (standaloneAudio) standaloneAudio.currentTime = pct * targetDuration;
+          else audioEl.currentTime = pct * targetDuration;
           progBar.style.width = (pct * 100) + '%';
         });
       }
@@ -1823,9 +2161,9 @@
         chatEl.classList.remove('msn-shaking');
         void chatEl.offsetWidth;
         chatEl.classList.add('msn-shaking');
-        setTimeout(() => chatEl.classList.remove('msn-shaking'), 700);
+        setTimeout(() => chatEl.classList.remove('msn-shaking'), 1200);
         playMsnNudgeSound();
-        if (navigator.vibrate) navigator.vibrate([120, 60, 180]);
+        if (navigator.vibrate) navigator.vibrate([250, 100, 350, 100, 450]);
       }
 
       const time = new Date(m.createdAt || Date.now());
@@ -1833,7 +2171,12 @@
 
       let contentHtml = escHtml(m.text || '');
 
-      if (m.attachment && m.attachment.dataUrl) {
+      const isAudioAttachment = m.attachment && m.attachment.dataUrl && (
+        (m.attachment.type || '').startsWith('audio/') ||
+        /\.(mp3|wav|m4a|ogg|aac|flac|opus|webm)$/i.test(m.attachment.name || '')
+      );
+
+      if (m.attachment && m.attachment.dataUrl && !isAudioAttachment) {
         if ((m.attachment.type || '').startsWith('image/')) {
           contentHtml += `
             <div style="margin-top: 6px; border-radius: 8px; overflow: hidden; max-width: 220px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
@@ -1842,17 +2185,22 @@
           `;
         } else {
           contentHtml += `
-            <div style="margin-top: 6px; padding: 5px 9px; background: rgba(0,0,0,0.08); border-radius: 8px; font-size: 0.74rem; display: flex; align-items: center; gap: 6px; cursor: pointer;">
-              <span>📄</span> <span>${escHtml(m.attachment.name || 'Belge')}</span>
-            </div>
+            <a href="${m.attachment.dataUrl}" download="${escHtml(m.attachment.name || 'dosya')}" target="_blank" style="text-decoration:none;color:inherit;display:block;">
+              <div style="margin-top: 6px; padding: 6px 10px; background: rgba(0,0,0,0.08); border-radius: 8px; font-size: 0.74rem; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: background 0.15s;">
+                <span>📄</span> <span style="text-decoration:underline;">${escHtml(m.attachment.name || 'Belge')}</span> <span>⬇️</span>
+              </div>
+            </a>
           `;
         }
       }
 
-      if (m.voice && m.voice.dataUrl) {
-        const duration = (m.voice.duration && m.voice.duration > 0) ? m.voice.duration : 5;
+      const hasVoiceOrAudio = (m.voice && m.voice.dataUrl) || (isAudioAttachment && m.attachment.dataUrl);
+      if (hasVoiceOrAudio) {
+        const audioSrc = (m.voice && m.voice.dataUrl) ? m.voice.dataUrl : m.attachment.dataUrl;
+        const duration = (m.voice && m.voice.duration && m.voice.duration > 0) ? m.voice.duration : 10;
         const durMin = Math.floor(duration / 60);
         const durSec = String(duration % 60).padStart(2, '0');
+        const audioTitle = (m.voice ? '🎙️ Ses Kaydı' : `🎵 ${escHtml(m.attachment.name || 'Ses Dosyası')}`);
         contentHtml = `
           <div class="frp-chat-audio-player">
             <button type="button" class="frp-audio-play-btn" title="Oynat / Durdur">▶️</button>
@@ -1862,13 +2210,13 @@
               </div>
               <div class="frp-audio-meta">
                 <span class="frp-audio-time">0:00 / ${durMin}:${durSec}</span>
-                <span>🎙️ Ses Kaydı</span>
+                <span style="max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${audioTitle}</span>
               </div>
             </div>
             <div class="frp-audio-wave-bars">
               <span></span><span></span><span></span><span></span><span></span>
             </div>
-            <audio src="${m.voice.dataUrl}" preload="metadata" style="display:none;"></audio>
+            <audio src="${audioSrc}" preload="metadata" style="display:none;"></audio>
           </div>
         `;
       }
@@ -1894,7 +2242,7 @@
           <button type="button" class="btn-react" data-emoji="😂">😂</button>
           <button type="button" class="btn-react" data-emoji="😮">😮</button>
           <button type="button" class="btn-react" data-emoji="🔥">🔥</button>
-          ${canDelete ? `<button type="button" class="btn-delete-msg" title="Mesajı Sil / Geri Al" style="background:none;border:none;cursor:pointer;font-size:0.75rem;padding:1px 3px;color:#ef4444;">🗑️</button>` : ''}
+          ${canDelete ? `<button type="button" class="btn-delete-msg" title="Mesajı Sil / Geri Al">🗑️</button>` : ''}
         </div>
       `;
 
@@ -1911,7 +2259,7 @@
         ${reactionsHtml}
         <div class="frp-chat-msg-time">
           <span>${timeStr}</span>
-          ${isSelf ? `<span class="frp-chat-tick ${m.isRead ? 'read' : ''}" title="${m.isRead ? 'Görüldü' : 'İtildi'}">✓✓</span>` : ''}
+          ${isSelf ? `<span class="frp-chat-tick ${m.isRead ? 'read' : ''}" title="${m.isRead ? 'Görüldü' : 'İletildi'}">✓✓</span>` : ''}
         </div>
       `;
 
@@ -1920,6 +2268,35 @@
         rbtn.addEventListener('click', (ev) => {
           ev.stopPropagation();
           const emoji = rbtn.dataset.emoji;
+
+          // Anında iyimser reaksiyon güncellemesi
+          let reactionsWrap = msgDiv.querySelector('.frp-chat-reactions-row');
+          if (!reactionsWrap) {
+            reactionsWrap = document.createElement('div');
+            reactionsWrap.className = 'frp-chat-reactions-row';
+            const timeEl = msgDiv.querySelector('.frp-chat-msg-time');
+            if (timeEl) msgDiv.insertBefore(reactionsWrap, timeEl);
+            else msgDiv.appendChild(reactionsWrap);
+          }
+          const pill = Array.from(reactionsWrap.querySelectorAll('.frp-chat-reaction-pill')).find(p => p.textContent.includes(emoji));
+          if (pill) {
+            const isActive = pill.classList.contains('active');
+            const curCount = parseInt(pill.textContent.replace(emoji, '').trim(), 10) || 1;
+            if (isActive) {
+              pill.classList.remove('active');
+              if (curCount <= 1) pill.remove();
+              else pill.textContent = `${emoji} ${curCount - 1}`;
+            } else {
+              pill.classList.add('active');
+              pill.textContent = `${emoji} ${curCount + 1}`;
+            }
+          } else {
+            const newPill = document.createElement('span');
+            newPill.className = 'frp-chat-reaction-pill active';
+            newPill.textContent = `${emoji} 1`;
+            reactionsWrap.appendChild(newPill);
+          }
+
           fetch('/api/chat/react', {
             method: 'POST',
             headers: window.FrpAuth.getAuthHeaders ? window.FrpAuth.getAuthHeaders() : { 'Content-Type': 'application/json' },
@@ -1932,10 +2309,18 @@
       if (btnDel) {
         btnDel.addEventListener('click', (ev) => {
           ev.stopPropagation();
+          // Anında iyimser silme (gecikmesiz DOM kaldırımı)
+          msgDiv.style.transition = 'all 0.22s cubic-bezier(0.4, 0, 0.2, 1)';
+          msgDiv.style.opacity = '0';
+          msgDiv.style.transform = 'scale(0.85)';
+          setTimeout(() => {
+            if (msgDiv.parentNode) msgDiv.remove();
+          }, 220);
+
           fetch(`/api/chat/messages/${encodeURIComponent(m.id)}`, {
             method: 'DELETE',
             headers: window.FrpAuth.getAuthHeaders ? window.FrpAuth.getAuthHeaders() : {}
-          }).then(() => loadMessages()).catch(() => {});
+          }).then(() => loadMessages()).catch(() => loadMessages());
         });
       }
 
@@ -1986,7 +2371,7 @@
           const tickEl = existingDiv.querySelector('.frp-chat-tick');
           if (tickEl && isSelf) {
             tickEl.classList.toggle('read', Boolean(m.isRead));
-            tickEl.title = m.isRead ? 'Görüldü' : 'İtildi';
+            tickEl.title = m.isRead ? 'Görüldü' : 'İletildi';
           }
           const reactionsWrap = existingDiv.querySelector('.frp-chat-reactions-row');
           if (m.reactions && Object.keys(m.reactions).length > 0) {

@@ -141,7 +141,8 @@ window.openSettingsModal = function(initialTab = 'appearance') {
     username: authUser?.username || liveProfile.username || '',
     phone: authUser?.phone || liveProfile.phone || '',
     email: authUser?.email || liveProfile.email || '',
-    department: authUser?.department || liveProfile.department || ''
+    department: authUser?.department || liveProfile.department || '',
+    avatar: liveProfile.avatar || authUser?.avatar || ''
   };
 
   const overlay = document.createElement('div');
@@ -327,7 +328,8 @@ window.openSettingsModal = function(initialTab = 'appearance') {
               name: `${stagedProfile.firstName || ''} ${stagedProfile.lastName || ''}`.trim(),
               phone: stagedProfile.phone,
               department: stagedProfile.department,
-              email_chat_digest: stagedProfile.emailChatDigest
+              email_chat_digest: stagedProfile.emailChatDigest,
+              avatar: stagedProfile.avatar
             }),
             new Promise(res => setTimeout(res, 800))
           ]).catch(() => {});

@@ -1475,19 +1475,25 @@ app.post('/api/auth/change-password', authRateLimiter, requireAuth, async (req, 
 });
 
 app.post('/api/auth/update-profile', authRateLimiter, requireAuth, async (req, res) => {
-  const { fullName, phone, department, email, username, emailChatDigest, email_chat_digest } = req.body;
+  const { fullName, name, phone, department, email, username, emailChatDigest, email_chat_digest, avatar } = req.body;
   const userId = req.authUser.id;
 
   try {
     const updates = {};
-    if (fullName !== undefined) {
-      if (!isValidText(fullName, { min: 2, max: 120 })) return res.status(400).json({ success: false, reason: 'Ad soyad 2-120 karakter arasında olmalıdır.' });
-      updates.full_name = normalizeText(fullName);
+    const targetName = fullName !== undefined ? fullName : name;
+    if (targetName !== undefined) {
+      if (!isValidText(targetName, { min: 2, max: 120 })) return res.status(400).json({ success: false, reason: 'Ad soyad 2-120 karakter arasında olmalıdır.' });
+      updates.full_name = normalizeText(targetName);
     }
     if (phone !== undefined) updates.phone = normalizePhone(phone);
     if (department !== undefined) {
       if (!isValidText(department, { min: 1, max: 120 })) return res.status(400).json({ success: false, reason: 'Bölüm 1-120 karakter arasında olmalıdır.' });
       updates.department = normalizeText(department);
+    }
+    if (avatar !== undefined) {
+      if (typeof avatar === 'string' && avatar.length <= 600000) {
+        updates.avatar = avatar;
+      }
     }
     if (email !== undefined) return res.status(409).json({ success: false, reason: 'E-posta adresi doğrulama kodu kullanılmadan değiştirilemez.' });
     if (username !== undefined) {
@@ -1511,14 +1517,21 @@ app.post('/api/auth/update-profile', authRateLimiter, requireAuth, async (req, r
         if (result.error) throw result.error;
         if (result.data?.length) return res.status(409).json({ success: false, reason: 'Bu kullanıcı adı zaten kullanımda.' });
       }
-      const { error } = await supabase.from('app_users').update(updates).eq('id', userId);
+      let updatePayload = { ...updates };
+      const { error } = await supabase.from('app_users').update(updatePayload).eq('id', userId);
       if (error) {
+        let hasStripped = false;
         if (String(error.message || '').includes('email_chat_digest')) {
-          delete updates.email_chat_digest;
-          if (Object.keys(updates).length > 0) {
-            await supabase.from('app_users').update(updates).eq('id', userId);
-          }
-        } else {
+          delete updatePayload.email_chat_digest;
+          hasStripped = true;
+        }
+        if (String(error.message || '').includes('avatar')) {
+          delete updatePayload.avatar;
+          hasStripped = true;
+        }
+        if (hasStripped && Object.keys(updatePayload).length > 0) {
+          await supabase.from('app_users').update(updatePayload).eq('id', userId);
+        } else if (!hasStripped) {
           throw error;
         }
       }
@@ -2554,6 +2567,88 @@ app.post('/api/chat/groups', requireAuth, async (req, res) => {
     res.json({ success: true, group: newGroup });
   } catch {
     res.status(500).json({ success: false, reason: 'Grup oluşturulamadı.' });
+  }
+});
+
+app.get('/api/chat/groups/:id/details', requireAuth, async (req, res) => {
+  try {
+    const groupId = req.params.id;
+    const groups = getChatGroups();
+    const group = groups.find(g => g.id === groupId);
+    if (!group) return res.status(404).json({ success: false, reason: 'Grup bulunamadı.' });
+
+    const allUsers = await getAllUsersWithPresence();
+    const memberIds = new Set((group.memberUserIds || []).map(String));
+    const members = allUsers.filter(u => memberIds.has(String(u.id))).map(u => ({
+      ...u,
+      isCreator: String(u.id) === String(group.createdBy),
+      isAdmin: String(u.id) === String(group.createdBy) || (Array.isArray(group.admins) && group.admins.map(String).includes(String(u.id)))
+    }));
+
+    res.json({
+      success: true,
+      group: {
+        ...group,
+        members
+      }
+    });
+  } catch {
+    res.status(500).json({ success: false, reason: 'Grup detayları alınamadı.' });
+  }
+});
+
+app.post('/api/chat/groups/:id/leave', requireAuth, async (req, res) => {
+  try {
+    const groupId = req.params.id;
+    const myId = String(req.authUser.id);
+    const groups = getChatGroups();
+    const group = groups.find(g => g.id === groupId);
+    if (!group) return res.status(404).json({ success: false, reason: 'Grup bulunamadı.' });
+
+    group.memberUserIds = (group.memberUserIds || []).map(String).filter(id => id !== myId);
+    if (group.memberUserIds.length === 0) {
+      const idx = groups.findIndex(g => g.id === groupId);
+      if (idx !== -1) groups.splice(idx, 1);
+    } else if (String(group.createdBy) === myId) {
+      group.createdBy = group.memberUserIds[0];
+      const remainingUser = (await getAllUsersWithPresence()).find(u => String(u.id) === group.createdBy);
+      if (remainingUser) {
+        group.createdByName = remainingUser.fullName || remainingUser.username;
+      }
+    }
+
+    saveChatGroups();
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ success: false, reason: 'Gruptan ayrılamadı.' });
+  }
+});
+
+app.delete('/api/chat/groups/:id/members/:userId', requireAuth, async (req, res) => {
+  try {
+    const groupId = req.params.id;
+    const targetUserId = String(req.params.userId);
+    const myId = String(req.authUser.id);
+    const groups = getChatGroups();
+    const group = groups.find(g => g.id === groupId);
+    if (!group) return res.status(404).json({ success: false, reason: 'Grup bulunamadı.' });
+
+    const isGroupAdmin = String(group.createdBy) === myId || (Array.isArray(group.admins) && group.admins.map(String).includes(myId));
+    const isSysAdmin = req.authUser.role === 'admin';
+
+    if (!isGroupAdmin && !isSysAdmin) {
+      return res.status(403).json({ success: false, reason: 'Yalnızca grup yöneticisi üyeleri gruptan çıkarabilir.' });
+    }
+
+    if (String(group.createdBy) === targetUserId && !isSysAdmin) {
+      return res.status(400).json({ success: false, reason: 'Grup kurucusu gruptan çıkarılamaz.' });
+    }
+
+    group.memberUserIds = (group.memberUserIds || []).map(String).filter(id => id !== targetUserId);
+    saveChatGroups();
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ success: false, reason: 'Üye gruptan çıkarılamadı.' });
   }
 });
 

@@ -50,12 +50,121 @@ window.FrpSettingsTabs.profile = {
     const protocol = typeof window !== 'undefined' && window.location ? window.location.protocol.replace(':', '').toUpperCase() : 'HTTP';
     const clientIp = window.FrpAudit ? window.FrpAudit.getClientIp() : '127.0.0.1';
 
+    const getInitials = () => {
+      const f = (stagedProfile.firstName || '').trim();
+      const l = (stagedProfile.lastName || '').trim();
+      const u = (stagedProfile.username || 'U').trim();
+      if (f && l) return (f[0] + l[0]).toLocaleUpperCase('tr-TR');
+      if (f) return f.slice(0, 2).toLocaleUpperCase('tr-TR');
+      return u.slice(0, 2).toLocaleUpperCase('tr-TR');
+    };
+
+    const curAvatar = stagedProfile.avatar || '';
+    let avatarPreviewInnerHtml = '';
+    let avatarStatusText = 'Varsayılan Baş Harfler';
+    if (curAvatar.startsWith('data:image/') || curAvatar.startsWith('http')) {
+      avatarPreviewInnerHtml = `<img src="${escHtml(curAvatar)}" alt="Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
+      avatarStatusText = 'Özel Fotoğraf Yüklendi';
+    } else if (curAvatar.trim()) {
+      avatarPreviewInnerHtml = `<span style="font-size:2.3rem;line-height:1;">${escHtml(curAvatar)}</span>`;
+      avatarStatusText = `Yönetici Avatarı (${escHtml(curAvatar)})`;
+    } else {
+      avatarPreviewInnerHtml = `<span>${escHtml(getInitials())}</span>`;
+    }
+
+    const PRESET_AVATARS = ['🦊', '🦁', '🐺', '🦅', '🚀', '⚡', '👑', '💻', '👔', '🧑‍💻', '👩‍💼', '🎨', '🛡️', '🎯', '💎', '🌟'];
+    const presetButtonsHtml = PRESET_AVATARS.map(emoji => `
+      <button type="button" class="btn-preset-avatar ${curAvatar === emoji ? 'active' : ''}" data-emoji="${emoji}" style="width:38px;height:38px;border-radius:50%;border:${curAvatar === emoji ? '2.5px solid var(--accent, #2563eb)' : '1px solid var(--border, #cbd5e1)'};background:${curAvatar === emoji ? 'rgba(37,99,235,0.14)' : 'var(--bg-surface, #ffffff)'};cursor:pointer;font-size:1.2rem;display:inline-flex;align-items:center;justify-content:center;transition:transform 0.15s, border-color 0.15s;padding:0;" title="${emoji}">
+        ${emoji}
+      </button>
+    `).join('');
+
     return `
       <div style="display:flex;flex-direction:column;gap:1.25rem;">
         <div>
           <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">Kullanıcı & Cihaz Profili</div>
           <div style="font-size:.78rem;color:var(--text-muted);margin-top:.2rem;">
             Oturum güvenliği, yetkilendirme ve sunucu ortamı için kayıtlı profil bilgileri.
+          </div>
+        </div>
+
+        <!-- Profil Resmi & Avatar Yönetim Kartı -->
+        <div class="settings-card" style="display:flex; flex-direction:column; gap:1rem; border:1.5px solid var(--border); background:var(--bg-surface); padding:1.2rem; border-radius:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-light); padding-bottom:.5rem;">
+            <div>
+              <div style="font-weight:800; font-size:.95rem; color:var(--text-primary); display:flex; align-items:center; gap:.45rem;">
+                <span>🖼️</span> Profil Resmi & Avatar Seçimi
+              </div>
+              <div style="font-size:.74rem; color:var(--text-muted); margin-top:2px;">
+                Kişisel fotoğrafınızı yükleyip ölçeklendirin veya hazır kurumsal avatarlardan birini seçin.
+              </div>
+            </div>
+            <span class="badge badge-purple" style="font-size:.7rem; font-weight:700;">Görünüm & Kimlik</span>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:1.6rem; flex-wrap:wrap;">
+            <!-- Canlı Yuvarlak Önizleme -->
+            <div style="display:flex; flex-direction:column; align-items:center; gap:.45rem;">
+              <div id="profAvatarPreviewWrap" style="width:82px; height:82px; border-radius:50%; border:3px solid var(--accent, #2563eb); box-shadow:0 8px 22px rgba(37,99,235,0.25); overflow:hidden; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg, #3b82f6, #6366f1); color:#ffffff; font-weight:800; font-size:1.85rem; user-select:none; flex-shrink:0;">
+                ${avatarPreviewInnerHtml}
+              </div>
+              <span id="profAvatarStatusLabel" style="font-size:.72rem; font-weight:700; color:var(--text-muted); text-align:center;">
+                ${avatarStatusText}
+              </span>
+            </div>
+
+            <!-- Butonlar ve Hazır Avatarlar -->
+            <div style="display:flex; flex-direction:column; gap:.75rem; flex:1; min-width:240px;">
+              <div style="display:flex; gap:.65rem; flex-wrap:wrap; align-items:center;">
+                <input type="file" id="profAvatarFileInput" accept="image/png, image/jpeg, image/webp, image/gif" style="display:none;" />
+                <button type="button" id="btnUploadCustomAvatar" class="btn btn-sm btn-primary" style="font-weight:800; padding:.5rem 1.15rem; border-radius:9px; display:inline-flex; align-items:center; gap:.45rem; box-shadow:0 4px 12px rgba(37,99,235,0.25);">
+                  <span>📸</span> Fotoğraf Yükle & Düzenle
+                </button>
+                <button type="button" id="btnResetAvatarInitials" class="btn btn-sm btn-ghost" style="font-weight:700; padding:.5rem 1rem; border-radius:9px; border:1px solid var(--border);">
+                  ✨ Baş Harflere Sıfırla
+                </button>
+              </div>
+
+              <!-- Hazır Yönetici Avatarları -->
+              <div>
+                <div style="font-size:.74rem; font-weight:700; color:var(--text-secondary); margin-bottom:.4rem;">
+                  Veya Hazır Yönetici & Ekip Avatarlarından Birini Seçin:
+                </div>
+                <div style="display:flex; gap:.5rem; flex-wrap:wrap;" id="profPresetAvatarsWrap">
+                  ${presetButtonsHtml}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- İnteraktif Görsel Düzenleme / Kırpma / Ölçekleme Alanı -->
+          <div id="profAvatarCropSection" style="display:none; margin-top:.35rem; padding:1.1rem; border-radius:12px; background:var(--bg-raised, #f8fafc); border:1.5px dashed var(--accent, #2563eb); animation:fadeIn .2s ease-out;">
+            <div style="font-weight:800; font-size:.85rem; color:var(--text-primary); margin-bottom:.6rem; display:flex; align-items:center; gap:.4rem;">
+              <span>✂️</span> Fotoğrafınızı Konumlandırın & Ölçekleyin
+            </div>
+            <div style="display:flex; gap:1.4rem; align-items:center; flex-wrap:wrap;">
+              <div style="position:relative; width:130px; height:130px; flex-shrink:0;">
+                <canvas id="profAvatarCanvas" width="256" height="256" style="width:130px; height:130px; border-radius:50%; border:3px solid var(--accent, #2563eb); background:#0f172a; box-shadow:0 6px 18px rgba(0,0,0,0.2); display:block;"></canvas>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:.65rem; flex:1; min-width:210px;">
+                <label style="font-size:.74rem; font-weight:700; color:var(--text-secondary); display:flex; justify-content:space-between;">
+                  <span>Ölçek / Yakınlaştırma</span>
+                  <span id="profZoomVal" style="color:var(--accent); font-weight:800;">1.0x</span>
+                </label>
+                <input type="range" id="profAvatarZoom" min="0.8" max="3" step="0.05" value="1" style="width:100%; accent-color:var(--accent); cursor:pointer;" />
+                <div style="font-size:.7rem; color:var(--text-muted); line-height:1.4;">
+                  💡 Resim otomatik olarak kare oranına optimize edilir ve yüksek çözünürlüklü avatar olarak kaydedilir.
+                </div>
+                <div style="display:flex; gap:.65rem; margin-top:.2rem;">
+                  <button type="button" id="btnApplyCroppedAvatar" class="btn btn-sm btn-primary" style="font-weight:800; padding:.45rem 1.25rem;">
+                    ✓ Bu Resmi Kullan
+                  </button>
+                  <button type="button" id="btnCancelCropAvatar" class="btn btn-sm btn-ghost" style="font-weight:700; padding:.45rem 1rem;">
+                    Vazgeç
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -254,6 +363,159 @@ window.FrpSettingsTabs.profile = {
     bindInput('#profFirstName', 'firstName');
     bindInput('#profLastName', 'lastName');
     bindInput('#profUsername', 'username');
+
+    // ── AVATAR VE PROFİL RESMİ YÖNETİMİ ──
+    const avatarPreviewWrap = overlay.querySelector('#profAvatarPreviewWrap');
+    const avatarStatusLabel = overlay.querySelector('#profAvatarStatusLabel');
+    const presetBtns = overlay.querySelectorAll('.btn-preset-avatar');
+    const fileInput = overlay.querySelector('#profAvatarFileInput');
+    const btnUpload = overlay.querySelector('#btnUploadCustomAvatar');
+    const btnReset = overlay.querySelector('#btnResetAvatarInitials');
+    const cropSection = overlay.querySelector('#profAvatarCropSection');
+    const canvas = overlay.querySelector('#profAvatarCanvas');
+    const zoomInput = overlay.querySelector('#profAvatarZoom');
+    const zoomVal = overlay.querySelector('#profZoomVal');
+    const btnApplyCrop = overlay.querySelector('#btnApplyCroppedAvatar');
+    const btnCancelCrop = overlay.querySelector('#btnCancelCropAvatar');
+
+    const getInitials = () => {
+      const f = (stagedProfile.firstName || '').trim();
+      const l = (stagedProfile.lastName || '').trim();
+      const u = (stagedProfile.username || 'U').trim();
+      if (f && l) return (f[0] + l[0]).toLocaleUpperCase('tr-TR');
+      if (f) return f.slice(0, 2).toLocaleUpperCase('tr-TR');
+      return u.slice(0, 2).toLocaleUpperCase('tr-TR');
+    };
+
+    const updateAvatarUI = (avatarVal) => {
+      if (!avatarPreviewWrap) return;
+      if (avatarVal && (avatarVal.startsWith('data:image/') || avatarVal.startsWith('http'))) {
+        avatarPreviewWrap.innerHTML = `<img src="${avatarVal}" alt="Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
+        if (avatarStatusLabel) avatarStatusLabel.textContent = 'Özel Fotoğraf Yüklendi';
+      } else if (avatarVal && avatarVal.trim()) {
+        avatarPreviewWrap.innerHTML = `<span style="font-size:2.3rem;line-height:1;">${avatarVal}</span>`;
+        if (avatarStatusLabel) avatarStatusLabel.textContent = `Yönetici Avatarı (${avatarVal})`;
+      } else {
+        avatarPreviewWrap.innerHTML = `<span>${getInitials()}</span>`;
+        if (avatarStatusLabel) avatarStatusLabel.textContent = 'Varsayılan Baş Harfler';
+      }
+    };
+
+    presetBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const emoji = btn.dataset.emoji;
+        stagedProfile.avatar = emoji;
+        presetBtns.forEach(b => {
+          const isActive = b.dataset.emoji === emoji;
+          b.style.borderColor = isActive ? 'var(--accent, #2563eb)' : 'var(--border, #cbd5e1)';
+          b.style.borderWidth = isActive ? '2.5px' : '1px';
+          b.style.background = isActive ? 'rgba(37,99,235,0.14)' : 'var(--bg-surface, #ffffff)';
+        });
+        updateAvatarUI(emoji);
+        if (cropSection) cropSection.style.display = 'none';
+        markDirty();
+      });
+    });
+
+    btnReset?.addEventListener('click', () => {
+      stagedProfile.avatar = '';
+      presetBtns.forEach(b => {
+        b.style.borderColor = 'var(--border, #cbd5e1)';
+        b.style.borderWidth = '1px';
+        b.style.background = 'var(--bg-surface, #ffffff)';
+      });
+      updateAvatarUI('');
+      if (cropSection) cropSection.style.display = 'none';
+      markDirty();
+      if (typeof safeToast === 'function') safeToast('Profil resmi baş harflere sıfırlandı.', 'info');
+    });
+
+    btnUpload?.addEventListener('click', () => {
+      fileInput?.click();
+    });
+
+    let currentLoadedImg = null;
+    const drawToCanvas = () => {
+      if (!canvas || !currentLoadedImg) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      const zoom = parseFloat(zoomInput?.value || '1');
+      const imgW = currentLoadedImg.width;
+      const imgH = currentLoadedImg.height;
+
+      // Fit to cover square
+      const minDim = Math.min(imgW, imgH);
+      const cropW = (minDim / zoom);
+      const cropH = (minDim / zoom);
+      const startX = (imgW - cropW) / 2;
+      const startY = (imgH - cropH) / 2;
+
+      ctx.save();
+      // Circular clipping
+      ctx.beginPath();
+      ctx.arc(w / 2, h / 2, w / 2, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+
+      ctx.drawImage(currentLoadedImg, startX, startY, cropW, cropH, 0, 0, w, h);
+      ctx.restore();
+    };
+
+    fileInput?.addEventListener('change', () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        if (typeof safeToast === 'function') safeToast('Lütfen geçerli bir görsel dosyası seçin.', 'warning');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          currentLoadedImg = img;
+          if (cropSection) cropSection.style.display = 'block';
+          if (zoomInput) zoomInput.value = '1';
+          if (zoomVal) zoomVal.textContent = '1.0x';
+          drawToCanvas();
+          canvas?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+      fileInput.value = '';
+    });
+
+    zoomInput?.addEventListener('input', (e) => {
+      if (zoomVal) zoomVal.textContent = parseFloat(e.target.value).toFixed(1) + 'x';
+      drawToCanvas();
+    });
+
+    btnApplyCrop?.addEventListener('click', () => {
+      if (!canvas || !currentLoadedImg) return;
+      try {
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        stagedProfile.avatar = dataUrl;
+        presetBtns.forEach(b => {
+          b.style.borderColor = 'var(--border, #cbd5e1)';
+          b.style.borderWidth = '1px';
+          b.style.background = 'var(--bg-surface, #ffffff)';
+        });
+        updateAvatarUI(dataUrl);
+        if (cropSection) cropSection.style.display = 'none';
+        markDirty();
+        if (typeof safeToast === 'function') safeToast('Özel profil fotoğrafı seçildi. Değişiklikleri kaydetmeyi unutmayın.', 'success');
+      } catch (err) {
+        if (typeof safeToast === 'function') safeToast('Fotoğraf işlenemedi: ' + err.message, 'error');
+      }
+    });
+
+    btnCancelCrop?.addEventListener('click', () => {
+      if (cropSection) cropSection.style.display = 'none';
+      currentLoadedImg = null;
+    });
 
     const cbDigest = overlay.querySelector('#cbChatEmailDigest');
     if (cbDigest) {

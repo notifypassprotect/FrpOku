@@ -166,3 +166,51 @@ test('image_annotator.js içinde Filigran, Çıkartmalar, Şekil Dolgusu ve İnc
   assert.doesNotMatch(annotator, /\s+on(?:click|change|input|keydown|keyup|submit|load|error)\s*=/i);
 });
 
+test('online_presence.js modern onay modali, anlasilir bildirim butonu, ses calici ve iletildi duzeltmesini icerir', () => {
+  const presence = fs.readFileSync(path.join(root, 'js', 'core', 'online_presence.js'), 'utf8');
+  // 'İtildi' yazım yanlışı giderildi mi?
+  assert.doesNotMatch(presence, /['"]İtildi['"]/);
+  assert.match(presence, /['"]İletildi['"]/);
+
+  // Modern showConfirmDialog sohbet silme kontrolü
+  assert.match(presence, /showConfirmDialog\s*\(/);
+  assert.doesNotMatch(presence, /window\.confirm\s*\(/);
+
+  // Bildirim açıklayıcı durum butonu
+  assert.match(presence, /frp-presence-notif-btn/);
+  assert.match(presence, /updateNotifBtnUI/);
+
+  // Ses dosyası ve ses kaydı desteği
+  assert.match(presence, /bindAudioPlayer/);
+  assert.match(presence, /audioSrc/);
+
+  // Grup WhatsApp detay & ayrılma/yönetici özellikleri
+  assert.match(presence, /frp-group-info-drawer/);
+  assert.match(presence, /\/api\/chat\/groups\/.*\/details/);
+  assert.match(presence, /\/api\/chat\/groups\/.*\/leave/);
+
+  // Titreme süresi
+  assert.match(presence, /1200/);
+
+  // CSP inline handler denetimi
+  assert.doesNotMatch(presence, /\s+on(?:click|change|input|keydown|keyup|submit|load|error)\s*=/i);
+});
+
+test('server.js dosyasinda grup yonetimi, uyeyi cikarma, gruptan ayrilma ve profil avatar destegi bulunur', () => {
+  const serverSource = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+  assert.match(serverSource, /\/api\/chat\/groups\/:id\/details/);
+  assert.match(serverSource, /\/api\/chat\/groups\/:id\/leave/);
+  assert.match(serverSource, /app\.delete\('\/api\/chat\/groups\/:id\/members\/:userId'/);
+  assert.match(serverSource, /updates\.avatar\s*=/);
+});
+
+test('profile_tab.js avatar kirpma, zoom, hazir yonetici avatarlari ve bas harflere sifirlama icerir', () => {
+  const profileTab = fs.readFileSync(path.join(root, 'js', 'settings', 'tabs', 'profile_tab.js'), 'utf8');
+  assert.match(profileTab, /btn-preset-avatar/);
+  assert.match(profileTab, /profAvatarZoom/);
+  assert.match(profileTab, /profAvatarCanvas/);
+  assert.match(profileTab, /btnResetAvatarInitials/);
+  assert.doesNotMatch(profileTab, /\s+on(?:click|change|input|keydown|keyup|submit|load|error)\s*=/i);
+});
+
+
