@@ -564,18 +564,19 @@ app.post('/api/auth/register', authRateLimiter, async (req, res) => {
       }).catch(() => {});
     }
 
-    // Tüm sistem yöneticilerine (Admin) yeni kullanıcı başvurusunu e-posta ile bildir:
+    let adminNotification = { attempted: 0, sent: 0, failed: 0 };
     try {
       let adminUsers = [];
       if (supabase) {
-        const { data: admData } = await supabase.from('app_users').select('email, full_name, username').eq('role', 'admin');
+        const { data: admData, error: admError } = await supabase.from('app_users').select('email, full_name, username').eq('role', 'admin').eq('is_active', true);
+        if (admError) throw admError;
         if (admData) adminUsers = admData;
       } else {
-        adminUsers = getLocalUsers().filter(u => u.role === 'admin');
+        adminUsers = getLocalUsers().filter(u => u.role === 'admin' && u.is_active !== false && u.is_frozen !== true);
       }
-      adminUsers.forEach(adm => {
-        if (adm.email) {
-          mailer.sendNewUserPendingApproval({
+      const uniqueAdmins = Array.from(new Map(adminUsers.filter(adm => isValidEmail(normalizeEmail(adm.email))).map(adm => [normalizeEmail(adm.email), adm])).values());
+      const results = await Promise.all(uniqueAdmins.map(adm =>
+        mailer.sendAdminNewRegistrationNotification({
             to: adm.email,
             adminName: adm.full_name || adm.username,
             newUser: {
@@ -584,17 +585,23 @@ app.post('/api/auth/register', authRateLimiter, async (req, res) => {
               email: cleanEmail,
               department: cleanDepartment
             }
-          }).catch(mErr => console.warn('Admin yeni başvuru e-posta uyarısı:', mErr.message));
-        }
-      });
+        })
+      ));
+      adminNotification = {
+        attempted: results.length,
+        sent: results.filter(result => result.sent).length,
+        failed: results.filter(result => !result.sent).length
+      };
     } catch (admErr) {
       console.warn('Admin kullanıcıları listeleme uyarısı:', admErr.message);
+      adminNotification.failed += 1;
     }
 
     res.json({
       success: true,
       pendingApproval: true,
       recoveryKeys: rawRecoveryKeys,
+      notification: { admins: adminNotification },
       message: 'Kayıt başvurunuz başarıyla alınmıştır. Sistem yöneticisi (Admin) onayladıktan sonra hesabınız açılacak ve giriş yapabileceksiniz.',
       user: {
         id: newRecord.id,

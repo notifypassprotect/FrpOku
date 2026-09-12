@@ -128,3 +128,13 @@ test('e-posta değişikliği yalnızca gönderilmiş kodla yapılır ve kod erke
   const confirmRoute = serverContent.slice(serverContent.indexOf("app.post('/api/auth/confirm-email-change'"), serverContent.indexOf('// ── ADMİN: KULLANICIYI KALICI SİL'));
   assert.ok(confirmRoute.lastIndexOf('pendingEmailVerifications.delete(userId)') > confirmRoute.indexOf("update({ email: newEmail })"));
 });
+
+test('yeni kayıt bildirimi yalnızca aktif ve benzersiz admin adreslerine gönderilir', () => {
+  const serverContent = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
+  const mailerContent = fs.readFileSync(path.join(__dirname, '../lib/mailer.js'), 'utf8');
+  const registerRoute = serverContent.slice(serverContent.indexOf("app.post('/api/auth/register'"), serverContent.indexOf('// ── CAPTCHA'));
+  assert.match(registerRoute, /\.eq\('role', 'admin'\)\.eq\('is_active', true\)/);
+  assert.match(registerRoute, /new Map\(adminUsers\.filter/);
+  assert.match(registerRoute, /await Promise\.all\(uniqueAdmins\.map/);
+  assert.match(mailerContent, /sendAdminNewRegistrationNotification/);
+});
