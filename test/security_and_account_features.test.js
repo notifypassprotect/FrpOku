@@ -114,3 +114,17 @@ test('Supabase şeması kimlik kurtarma ve e-posta tercih alanlarını içerir',
   assert.match(migration, /add column if not exists previous_password_hashes jsonb not null default '\[\]'::jsonb/i);
   assert.match(migration, /add column if not exists email_chat_digest boolean not null default true/i);
 });
+
+test('e-posta değişikliği yalnızca gönderilmiş kodla yapılır ve kod erken silinmez', () => {
+  const authContent = fs.readFileSync(path.join(__dirname, '../js/core/auth.js'), 'utf8');
+  const serverContent = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
+  assert.match(authContent, /E-posta adresi yalnızca mevcut şifre ve doğrulama kodu ile güncellenebilir/);
+  assert.doesNotMatch(authContent.slice(authContent.indexOf('async function updateEmail'), authContent.indexOf('async function updateProfile')), /updateSession/);
+  const directRoute = serverContent.slice(serverContent.indexOf("app.post('/api/auth/change-email'"), serverContent.indexOf('// ── RAPOR DEPOLAMA'));
+  assert.match(directRoute, /res\.status\(409\)/);
+  const requestRoute = serverContent.slice(serverContent.indexOf("app.post('/api/auth/request-email-change'"), serverContent.indexOf("app.post('/api/auth/confirm-email-change'"));
+  assert.match(requestRoute, /if \(!mailResult\.sent\)/);
+  assert.match(requestRoute, /crypto\.randomInt\(100000, 1000000\)/);
+  const confirmRoute = serverContent.slice(serverContent.indexOf("app.post('/api/auth/confirm-email-change'"), serverContent.indexOf('// ── ADMİN: KULLANICIYI KALICI SİL'));
+  assert.ok(confirmRoute.lastIndexOf('pendingEmailVerifications.delete(userId)') > confirmRoute.indexOf("update({ email: newEmail })"));
+});

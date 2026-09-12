@@ -377,25 +377,7 @@
  }
 
  async function updateEmail(newEmail) {
- const user = getSession();
- if (!user ||!user.id) return { success: false, reason: 'Oturum bulunamadı.' };
- try {
- const res = await fetch('/api/auth/update-profile', {
- method: 'POST',
- headers: getAuthHeaders(),
- body: JSON.stringify({ userId: user.id, email: newEmail })
- });
- const data = await res.json();
- if (data && data.success) {
- user.email = newEmail;
- updateSession({ email: newEmail });
- }
- return data;
- } catch (e) {
- user.email = newEmail;
- updateSession({ email: newEmail });
- return { success: true };
- }
+ return { success: false, reason: 'E-posta adresi yalnızca mevcut şifre ve doğrulama kodu ile güncellenebilir.', email: newEmail };
  }
 
  async function updateProfile(updates) {
@@ -413,8 +395,7 @@
  }
  return data;
  } catch (e) {
- updateSession(updates);
- return { success: true };
+ return { success: false, reason: 'Profil servisine ulaşılamadı: ' + e.message };
  }
  }
 

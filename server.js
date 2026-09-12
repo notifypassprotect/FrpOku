@@ -892,7 +892,7 @@ app.post('/api/auth/forgot-password-code', authRateLimiter, async (req, res) => 
     }
 
     // 6 haneli rastgele kod oluştur (100000 - 999999)
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const code = crypto.randomInt(100000, 1000000).toString();
     const expiresAt = Date.now() + 15 * 60 * 1000; // 15 dakika
 
     passwordResetVerificationCodes.set(ident, {
@@ -1477,11 +1477,7 @@ app.post('/api/auth/update-profile', authRateLimiter, requireAuth, async (req, r
       if (!isValidText(department, { min: 1, max: 120 })) return res.status(400).json({ success: false, reason: 'Bölüm 1-120 karakter arasında olmalıdır.' });
       updates.department = normalizeText(department);
     }
-    if (email !== undefined) {
-      const cleanEmail = normalizeEmail(email);
-      if (!isValidEmail(cleanEmail)) return res.status(400).json({ success: false, reason: 'Geçerli bir e-posta adresi giriniz.' });
-      updates.email = cleanEmail;
-    }
+    if (email !== undefined) return res.status(409).json({ success: false, reason: 'E-posta adresi doğrulama kodu kullanılmadan değiştirilemez.' });
     if (username !== undefined) {
       const cleanUsername = normalizeUsername(username);
       if (!isValidUsername(cleanUsername)) return res.status(400).json({ success: false, reason: 'Geçerli bir kullanıcı adı giriniz.' });
@@ -1626,48 +1622,8 @@ app.get('/api/admin/audit-logs', adminRateLimiter, requireAdmin, async (req, res
 app.post('/api/admin/change-username', adminRateLimiter, requireAdmin, handleAdminUsernameChange);
 
 // ── 12. E-POSTA DEĞİŞTİRME ────────────────────────────────────
-app.post('/api/auth/change-email', authRateLimiter, requireAuth, async (req, res) => {
-  const { newEmail } = req.body;
-  const userId = req.authUser.id;
-  const cleanEmail = normalizeEmail(newEmail);
-
-  if (!isValidEmail(cleanEmail)) {
-    return res.status(400).json({ success: false, reason: 'Geçerli bir e-posta adresi giriniz.' });
-  }
-
-  try {
-    if (supabase) {
-      const existing = await supabase.from('app_users').select('id').eq('email', cleanEmail).neq('id', userId).limit(1);
-      if (existing.error) throw existing.error;
-      if (existing.data?.length) return res.status(409).json({ success: false, reason: `'${cleanEmail}' e-posta adresi zaten kullanımda.` });
-      const update = await supabase.from('app_users').update({ email: cleanEmail }).eq('id', userId);
-      if (update.error) throw update.error;
-    } else {
-      const localUsers = getLocalUsers();
-      if (localUsers.some(u => u.id !== userId && normalizeEmail(u.email) === cleanEmail)) {
-        return res.status(409).json({ success: false, reason: `'${cleanEmail}' e-posta adresi zaten kullanımda.` });
-      }
-      const idx = localUsers.findIndex(u => u.id === userId);
-      if (idx === -1) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
-      localUsers[idx].email = cleanEmail;
-      saveLocalUsers(localUsers);
-    }
-
-    await recordAuditLog({
-      userId,
-      username: req.authUser.username,
-      role: req.authUser.role,
-      action: 'EMAIL_CHANGE',
-      target: cleanEmail,
-      details: `E-posta adresi güncellendi: ${cleanEmail}`,
-      ip: req.ip
-    });
-
-    res.json({ success: true, email: cleanEmail });
-  } catch (err) {
-    console.warn('E-posta güncelleme hatası:', safeLogStr(err.message));
-    res.status(503).json({ success: false, reason: 'E-posta adresi geçici olarak güncellenemedi.' });
-  }
+app.post('/api/auth/change-email', authRateLimiter, requireAuth, (req, res) => {
+  res.status(409).json({ success: false, reason: 'E-posta adresi yalnızca mevcut şifre ve 6 haneli doğrulama kodu ile güncellenebilir.' });
 });
 
 // ── RAPOR DEPOLAMA VE YÖNETİM ENDPOINTLERİ ──────────────────
@@ -3174,7 +3130,8 @@ app.post('/api/auth/request-email-change', authRateLimiter, requireAuth, async (
     // Başka kullanıcıda kayıtlı mı kontrolü
     if (supabase) {
       const { data: existing, error } = await supabase.from('app_users').select('id').eq('email', cleanEmail).neq('id', user.id).limit(1);
-      if (!error && existing?.length) {
+      if (error) throw error;
+      if (existing?.length) {
         return res.status(409).json({ success: false, reason: 'Bu e-posta adresi başka bir kullanıcı tarafından kullanılmaktadır.' });
       }
     } else {
@@ -3184,7 +3141,7 @@ app.post('/api/auth/request-email-change', authRateLimiter, requireAuth, async (
       }
     }
 
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const code = crypto.randomInt(100000, 1000000).toString();
     const expiresAt = Date.now() + 15 * 60 * 1000;
 
     pendingEmailVerifications.set(user.id, {
@@ -3201,6 +3158,24 @@ app.post('/api/auth/request-email-change', authRateLimiter, requireAuth, async (
       code,
       expiresIn: '15'
     });
+
+    if (!mailResult.sent) {
+      pendingEmailVerifications.delete(user.id);
+      await recordAuditLog({
+        userId: user.id,
+        username: user.username,
+        role: user.role,
+        action: 'EMAIL_CHANGE_CODE_FAILED',
+        target: cleanEmail,
+        details: `Doğrulama kodu gönderilemedi (Durum: ${mailResult.status})`,
+        ip: req.ip
+      });
+      return res.status(503).json({
+        success: false,
+        reason: mailResult.error || mailResult.reason || 'Doğrulama kodu e-posta adresine gönderilemedi.',
+        notification: { email: { sent: false, status: mailResult.status } }
+      });
+    }
 
     await recordAuditLog({
       userId: user.id,
@@ -3239,30 +3214,31 @@ app.post('/api/auth/confirm-email-change', authRateLimiter, requireAuth, async (
   }
 
   const { newEmail, oldEmail } = pending;
-  pendingEmailVerifications.delete(userId);
-
   try {
     if (supabase) {
+      const existing = await supabase.from('app_users').select('id').eq('email', newEmail).neq('id', userId).limit(1);
+      if (existing.error) throw existing.error;
+      if (existing.data?.length) return res.status(409).json({ success: false, reason: 'Bu e-posta adresi başka bir kullanıcı tarafından kullanılmaktadır.' });
       const { error } = await supabase.from('app_users').update({ email: newEmail }).eq('id', userId);
       if (error) throw error;
     } else {
       const local = getLocalUsers();
-      const idx = local.findIndex(u => u.id === userId);
-      if (idx !== -1) {
-        local[idx].email = newEmail;
-        saveLocalUsers(local);
+      if (local.some(u => String(u.id) !== String(userId) && normalizeEmail(u.email) === newEmail)) {
+        return res.status(409).json({ success: false, reason: 'Bu e-posta adresi başka bir kullanıcı tarafından kullanılmaktadır.' });
       }
+      const idx = local.findIndex(u => u.id === userId);
+      if (idx === -1) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
+      local[idx].email = newEmail;
+      saveLocalUsers(local);
     }
+    pendingEmailVerifications.delete(userId);
 
-    // Eski e-posta adresine güvenlik uyarısı gönder
-    if (oldEmail && oldEmail !== newEmail) {
-      mailer.sendEmailChangedNotice({
-        to: oldEmail,
-        fullName: req.authUser.full_name || req.authUser.username,
-        newEmail,
-        ip: req.ip
-      }).catch(() => {});
-    }
+    const noticeResult = await mailer.sendEmailChangedNotice({
+      to: oldEmail && oldEmail !== newEmail ? oldEmail : '',
+      fullName: req.authUser.full_name || req.authUser.username,
+      newEmail,
+      ip: req.ip
+    });
 
     await recordAuditLog({
       userId,
@@ -3274,7 +3250,14 @@ app.post('/api/auth/confirm-email-change', authRateLimiter, requireAuth, async (
       ip: req.ip
     });
 
-    res.json({ success: true, email: newEmail, message: 'E-posta adresiniz başarıyla güncellendi.' });
+    res.json({
+      success: true,
+      email: newEmail,
+      message: noticeResult.sent
+        ? 'E-posta adresiniz güncellendi; eski adresinize güvenlik bildirimi gönderildi.'
+        : 'E-posta adresiniz başarıyla güncellendi.',
+      notification: { email: { sent: noticeResult.sent, status: noticeResult.status } }
+    });
   } catch (err) {
     console.warn('E-posta onaylama hatası:', safeLogStr(err.message));
     res.status(503).json({ success: false, reason: 'E-posta adresi güncellenirken sunucu hatası oluştu.' });
