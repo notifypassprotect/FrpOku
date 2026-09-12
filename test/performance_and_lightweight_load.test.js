@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const { reportRowToClient, reportRowToSummaryClient } = require('../lib/report_access');
+const { parseFrp } = require('../js/core/parser');
 
 test('reportRowToSummaryClient devasa XML ve sayfa verilerini ayıklar ancak tüm liste alanlarını eksiksiz korur', () => {
   const fullRow = {
@@ -111,6 +112,32 @@ test('karşılaştırma URL raporlarını fallback seçmeden önce tam içerikle
   assert.doesNotMatch(compareCode, /\(idA && FrpStore\.getById\(idA\)\) \|\| files\[0\]/);
 });
 
+test('FRP parser iç içe SQL, TfrxParamItem ve şemalı tablo adlarını eksiksiz ayrıştırır', () => {
+  const parsed = parseFrp(`
+    <TfrxReport ReportOptions.Name="Parser Test">
+      <TfrxADOQuery Name="HastaSorgu">
+        <SQL.Text><![CDATA[
+          WITH Secim AS (SELECT ID FROM APP.SECIMLER)
+          SELECT * FROM "HASTANE"."HASTALAR" h
+          JOIN [ORTAK].[BIRIMLER] b ON b.ID = h.BIRIM_ID
+          JOIN Secim s ON s.ID = h.ID
+          WHERE h.ID = :HastaId
+        ]]></SQL.Text>
+        <Params>
+          <TfrxParamItem Name="HastaId" />
+          <TfrxParamItem Name="BaslangicTarihi" />
+        </Params>
+      </TfrxADOQuery>
+      <TfrxParamItem Name="RaporDonemi" />
+    </TfrxReport>
+  `);
+
+  assert.equal(parsed.queries.length, 1);
+  assert.match(parsed.queries[0].sql, /JOIN \[ORTAK\]\.\[BIRIMLER\]/);
+  assert.deepEqual(parsed.paramNames, [':BASLANGICTARIHI', ':HASTAID', ':RAPORDONEMI']);
+  assert.deepEqual(parsed.tableNames, ['APP.SECIMLER', 'HASTANE.HASTALAR', 'ORTAK.BIRIMLER']);
+});
+
 test('buildOwnedReportRow hafifletilmiş güncellemede mevcut rawXml, pages ve tree verilerini korur', () => {
   const { buildOwnedReportRow } = require('../lib/report_access');
   const existing = {
@@ -154,4 +181,3 @@ test('list_actions.js indirme fonksiyonlarında const re-assignment hatası bulu
   assert.doesNotMatch(listActionsCode, /const\s+file\s*=\s*FrpStore\.getById\(id\);[\s\S]*?file\s*=\s*await/);
   assert.doesNotMatch(listActionsCode, /const\s+file\s*=\s*selectedList\[i\];[\s\S]*?file\s*=\s*await/);
 });
-

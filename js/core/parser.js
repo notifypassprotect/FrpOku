@@ -52,7 +52,7 @@ function getAttr(chunk, name) {
   const escaped = typeof escapeRegex === 'function' ? escapeRegex(name) : name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const rx = new RegExp(
     '(?:^|\\s)' + escaped + "\\s*=\\s*(?:\"((?:[^\"\\\\]|\\\\.)*?)\"|'((?:[^'\\\\]|\\\\.)*?)')",
-    's'
+    'is'
   );
   const m = chunk.match(rx);
   const value = m ? (m[1] ?? m[2]) : null;
@@ -144,6 +144,31 @@ function extractParamsFromSql(sql) {
   }
 
   return [...params].sort();
+}
+
+function extractSqlFromElementBody(body) {
+  if (!body) return '';
+  const sqlNode = body.match(/<(?:SQL\.Text|SQL)\b[^>]*>([\s\S]*?)<\/(?:SQL\.Text|SQL)\s*>/i);
+  if (!sqlNode) return '';
+
+  let content = sqlNode[1];
+  const itemValues = [];
+  const itemRx = /<item\b([^>]*)>([\s\S]*?)<\/item\s*>|<item\b([^>]*)\/>/gi;
+  let itemMatch;
+  while ((itemMatch = itemRx.exec(content)) !== null) {
+    const attrs = itemMatch[1] || itemMatch[3] || '';
+    const attrValue = getAttr(attrs, 'Text') || getAttr(attrs, 'Value');
+    const textValue = (itemMatch[2] || '').replace(/^\s*<!\[CDATA\[|\]\]>\s*$/g, '');
+    const value = attrValue || textValue;
+    if (value.trim()) itemValues.push(decodeHtmlEntities(value.trim()));
+  }
+  if (itemValues.length > 0) return itemValues.join('\n');
+
+  content = content
+    .replace(/^\s*<!\[CDATA\[/, '')
+    .replace(/\]\]>\s*$/, '')
+    .replace(/<[^>]+>/g, '');
+  return decodeHtmlEntities(content).replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
 }
 
 function parseFrp(xmlText) {
@@ -252,6 +277,23 @@ function parseFrp(xmlText) {
     }
   }
 
+  // Bazı FRP sürümleri SQL'i attribute yerine <SQL.Text>, <SQL> veya <item> düğümlerinde saklar.
+  const nestedQueryRx = /<(Tfrx[A-Za-z0-9_]*(?:Query|Table))\b([^>]*)>([\s\S]*?)<\/\1\s*>/gi;
+  let nestedQuery;
+  while ((nestedQuery = nestedQueryRx.exec(xmlText)) !== null) {
+    const attrs = nestedQuery[2] || '';
+    const cleanName = (getAttr(attrs, 'Name') || getAttr(attrs, 'UserName') || '').trim();
+    if (!cleanName) continue;
+    const nestedSql = extractSqlFromElementBody(nestedQuery[3]);
+    const existing = result.queries.find(q => q.name.toLowerCase() === cleanName.toLowerCase());
+    if (existing) {
+      if (!existing.sql && nestedSql) existing.sql = nestedSql;
+    } else {
+      seenQueryNames.add(cleanName);
+      result.queries.push({ name: cleanName, sql: nestedSql });
+    }
+  }
+
   // PascalScript içerisindeki dinamik sorgu atamalarını da tara (örn. qn.SQL.Text := ..., qbine.SQL[5] := ...)
   if (result.pascalScript) {
     const scriptSqlRx = /\b([a-zA-Z_]\w*)\.SQL(?:\.Text|\[\d+\])?\s*[:+]=\s*(?:'([^'\r\n]+)'|StringReplace\([^,]+,\s*'[^']*',\s*'([^']*)'\))/gi;
@@ -294,7 +336,7 @@ function parseFrp(xmlText) {
   result.queries.forEach(q => {
     if (q.sql) {
       const extracted = extractParamsFromSql(q.sql);
-      extracted.forEach(p => allParams.add(p));
+      extracted.forEach(p => allParams.add(':' + p.replace(/^:/, '').toUpperCase()));
     }
   });
 
@@ -312,6 +354,19 @@ function parseFrp(xmlText) {
       }
     }
   }
+
+
+  // FastReport'ın nesne tabanlı parametre biçimleri blok dışında da bulunabilir.
+  const paramTagNames = ['TfrxParamItem', 'TfrxParameter', 'TfrxVariable'];
+  paramTagNames.forEach(tagName => {
+    findTagAttributes(xmlText, tagName).forEach(tag => {
+      const attrs = tag.replace(new RegExp(`^<${tagName}\\b\\s*`, 'i'), '').replace(/\s*\/?>$/, '');
+      const pName = getAttr(attrs, 'Name') || getAttr(attrs, 'UserName');
+      if (pName && !DATE_FORMAT_TOKENS.has(pName.toUpperCase()) && !/^(FONT|COLOR|PAGE|DATE|TIME)$/i.test(pName)) {
+        allParams.add(':' + pName.toUpperCase());
+      }
+    });
+  });
   result.paramNames = [...allParams].sort();
 
   // ── VERİTABANI TABLOLARI ─────────────────────────────────
@@ -329,11 +384,17 @@ function parseFrp(xmlText) {
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/'(?:''|[^'\r\n])*'/g, "''")
       .replace(/\b(EXTRACT|SUBSTR|SUBSTRING|TRIM)\s*\([^)]*?\)/gi, '');
-    const rx = /\b(?:FROM|JOIN)\s+([a-zA-Z0-9_$.]+)/gi;
+    const cteNames = new Set();
+    const cteRx = /(?:\bWITH|,)\s*([a-zA-Z_$][\w$]*)\s+AS\s*\(/gi;
+    let cteMatch;
+    while ((cteMatch = cteRx.exec(sql)) !== null) cteNames.add(cteMatch[1].toUpperCase());
+
+    const rx = /\b(?:FROM|JOIN)\s+((?:["`\[]?[a-zA-Z0-9_$]+["`\]]?)(?:\s*\.\s*["`\[]?[a-zA-Z0-9_$]+["`\]]?)*)/gi;
     let tm;
     while ((tm = rx.exec(sql)) !== null) {
-      let rawTable = tm[1].replace(/[()]/g, '').trim().toUpperCase().split('.')[0];
-      if (rawTable && !rawTable.startsWith('(') && !SQL_RESERVED.has(rawTable) && rawTable.length > 2 && !/^\d+$/.test(rawTable)) {
+      const rawTable = tm[1].replace(/["`\[\]\s]/g, '').trim().toUpperCase();
+      const unqualifiedName = rawTable.split('.').pop();
+      if (rawTable && !SQL_RESERVED.has(rawTable) && !SQL_RESERVED.has(unqualifiedName) && !cteNames.has(rawTable) && rawTable.length > 2 && !/^\d+$/.test(rawTable)) {
         tableSet.add(rawTable);
       }
     }
