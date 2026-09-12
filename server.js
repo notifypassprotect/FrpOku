@@ -2045,6 +2045,11 @@ app.get('/api/chat/messages', requireAuth, async (req, res) => {
       matched = matched.filter(m => new Date(m.createdAt).getTime() > since);
     }
 
+    const mediaOnly = req.query.mediaOnly === 'true';
+    if (mediaOnly) {
+      matched = matched.filter(m => !!m.attachment);
+    }
+
     // Okundu işaretleme (Bana gelen okunmamış mesajları okundu yap)
     if (peerId) {
       matched.forEach(m => {
@@ -2115,7 +2120,168 @@ app.post('/api/chat/react', requireAuth, async (req, res) => {
     saveChatMessages();
     res.json({ success: true, reactions: msg.reactions });
   } catch {
-    res.status(500).json({ success: false, reason: 'Reaksiyon kaydedilemedi.' });
+    res.status(500).json({ success: false, reason: 'Reaksiyon verilemedi.' });
+  }
+});
+
+// Chat: Mesaj Silme (Geri Çekme)
+app.delete('/api/chat/messages/:id', requireAuth, async (req, res) => {
+  try {
+    const all = getChatMessages();
+    const idx = all.findIndex(m => m.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ success: false, reason: 'Mesaj bulunamadı.' });
+    const msg = all[idx];
+    const myId = String(req.authUser.id);
+    if (String(msg.senderId) !== myId && req.authUser.role !== 'admin') {
+      return res.status(403).json({ success: false, reason: 'Yalnızca kendi mesajınızı silebilirsiniz.' });
+    }
+    all.splice(idx, 1);
+    saveChatMessages();
+    if (supabase) {
+      supabase.from('chat_messages').delete().eq('id', req.params.id).then(() => {}).catch(() => {});
+    }
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ success: false, reason: 'Mesaj silinemedi.' });
+  }
+});
+
+// ── DEPARTMAN ODALARI YÖNETİMİ ──────────────────
+const CHAT_ROOMS_STORE_PATH = path.join(__dirname, 'data', 'chat_rooms.json');
+let chatRoomsCache = null;
+
+function getChatRooms() {
+  if (chatRoomsCache !== null) return chatRoomsCache;
+  try {
+    if (fs.existsSync(CHAT_ROOMS_STORE_PATH)) {
+      chatRoomsCache = JSON.parse(fs.readFileSync(CHAT_ROOMS_STORE_PATH, 'utf8'));
+    } else {
+      chatRoomsCache = [
+        { id: 'room_general', name: 'Genel Ekip Duyuruları', icon: '📢', description: 'Tüm birimler ortak iletişim ve duyuru kanalı', isAllUsers: true, memberUserIds: [] },
+        { id: 'room_ops', name: 'Operasyon & Saha', icon: '⚙️', description: 'Raporlama ve saha operasyon koordinasyonu', isAllUsers: true, memberUserIds: [] },
+        { id: 'room_finance', name: 'Muhasebe & Finans', icon: '📊', description: 'Mali tablolar ve mutabakat kanalı', isAllUsers: true, memberUserIds: [] }
+      ];
+      saveChatRooms();
+    }
+  } catch {
+    chatRoomsCache = [];
+  }
+  return chatRoomsCache;
+}
+
+function saveChatRooms() {
+  try {
+    const dir = path.dirname(CHAT_ROOMS_STORE_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(CHAT_ROOMS_STORE_PATH, JSON.stringify(chatRoomsCache, null, 2), 'utf8');
+  } catch {}
+}
+
+app.get('/api/chat/rooms', requireAuth, async (req, res) => {
+  try {
+    const rooms = getChatRooms();
+    const myId = String(req.authUser.id);
+    const isAdmin = req.authUser.role === 'admin';
+    const filtered = rooms.filter(r => {
+      if (isAdmin || r.isAllUsers) return true;
+      return Array.isArray(r.memberUserIds) && r.memberUserIds.map(String).includes(myId);
+    });
+    res.json({ success: true, rooms: filtered });
+  } catch {
+    res.status(500).json({ success: false, reason: 'Odalar alınamadı.' });
+  }
+});
+
+app.post('/api/chat/rooms', requireAuth, async (req, res) => {
+  try {
+    if (req.authUser.role !== 'admin') {
+      return res.status(403).json({ success: false, reason: 'Yalnızca yöneticiler oda oluşturabilir.' });
+    }
+    const { name, icon, description, isAllUsers, memberUserIds } = req.body || {};
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, reason: 'Oda adı zorunludur.' });
+    }
+    const rooms = getChatRooms();
+    const id = 'room_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+    const newRoom = {
+      id,
+      name: name.trim(),
+      icon: (icon || '📢').trim(),
+      description: (description || '').trim(),
+      isAllUsers: Boolean(isAllUsers),
+      memberUserIds: Array.isArray(memberUserIds) ? memberUserIds.map(String) : [],
+      createdBy: String(req.authUser.id),
+      createdAt: new Date().toISOString()
+    };
+    rooms.push(newRoom);
+    saveChatRooms();
+    if (supabase) {
+      supabase.from('chat_rooms').insert({
+        id: newRoom.id,
+        name: newRoom.name,
+        icon: newRoom.icon,
+        description: newRoom.description,
+        is_all_users: newRoom.isAllUsers,
+        member_user_ids: newRoom.memberUserIds,
+        created_by: req.authUser.id
+      }).then(() => {}).catch(() => {});
+    }
+    res.json({ success: true, room: newRoom });
+  } catch {
+    res.status(500).json({ success: false, reason: 'Oda oluşturulamadı.' });
+  }
+});
+
+app.put('/api/chat/rooms/:id', requireAuth, async (req, res) => {
+  try {
+    if (req.authUser.role !== 'admin') {
+      return res.status(403).json({ success: false, reason: 'Yalnızca yöneticiler odayı düzenleyebilir.' });
+    }
+    const rooms = getChatRooms();
+    const room = rooms.find(r => r.id === req.params.id);
+    if (!room) return res.status(404).json({ success: false, reason: 'Oda bulunamadı.' });
+
+    const { name, icon, description, isAllUsers, memberUserIds } = req.body || {};
+    if (name) room.name = name.trim();
+    if (icon) room.icon = icon.trim();
+    if (description !== undefined) room.description = String(description).trim();
+    if (isAllUsers !== undefined) room.isAllUsers = Boolean(isAllUsers);
+    if (Array.isArray(memberUserIds)) room.memberUserIds = memberUserIds.map(String);
+
+    saveChatRooms();
+    if (supabase) {
+      supabase.from('chat_rooms').update({
+        name: room.name,
+        icon: room.icon,
+        description: room.description,
+        is_all_users: room.isAllUsers,
+        member_user_ids: room.memberUserIds,
+        updated_at: new Date().toISOString()
+      }).eq('id', room.id).then(() => {}).catch(() => {});
+    }
+    res.json({ success: true, room });
+  } catch {
+    res.status(500).json({ success: false, reason: 'Oda güncellenemedi.' });
+  }
+});
+
+app.delete('/api/chat/rooms/:id', requireAuth, async (req, res) => {
+  try {
+    if (req.authUser.role !== 'admin') {
+      return res.status(403).json({ success: false, reason: 'Yalnızca yöneticiler odayı silebilir.' });
+    }
+    const rooms = getChatRooms();
+    const idx = rooms.findIndex(r => r.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ success: false, reason: 'Oda bulunamadı.' });
+
+    rooms.splice(idx, 1);
+    saveChatRooms();
+    if (supabase) {
+      supabase.from('chat_rooms').delete().eq('id', req.params.id).then(() => {}).catch(() => {});
+    }
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ success: false, reason: 'Oda silinemedi.' });
   }
 });
 

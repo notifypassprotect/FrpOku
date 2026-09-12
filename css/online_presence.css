@@ -447,21 +447,29 @@
 .frp-chat-window {
   position: fixed;
   bottom: 0;
-  width: 330px;
-  height: 440px;
+  width: 335px;
+  height: 450px;
   background: var(--bg-surface, #ffffff);
-  border-top-left-radius: 14px;
-  border-top-right-radius: 14px;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
   border: 1px solid var(--border, #cbd5e1);
   border-bottom: none;
-  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.16), 0 0 1px 1px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 -10px 35px rgba(0, 0, 0, 0.18), 0 0 1px 1px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
   z-index: 100001;
   overflow: hidden;
   font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
   animation: chatPopUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  transition: height 0.2s ease, width 0.2s ease;
+  transition: right 0.25s cubic-bezier(0.16, 1, 0.3, 1), height 0.2s ease, width 0.2s ease, max-width 0.2s ease;
+}
+
+.frp-chat-window.maximized {
+  width: 580px !important;
+  height: 680px !important;
+  max-width: 95vw;
+  max-height: 88vh;
+  box-shadow: 0 -15px 50px rgba(0, 0, 0, 0.3);
 }
 
 @keyframes chatPopUp {
@@ -470,7 +478,7 @@
 }
 
 .frp-chat-window.minimized {
-  height: 48px;
+  height: 48px !important;
 }
 
 .frp-chat-window.minimized .frp-chat-body,
@@ -902,4 +910,186 @@
 .frp-chat-send-btn:hover {
   background: #1d4ed8;
   transform: scale(1.05);
+}
+
+/* ── INSTAGRAM DM MESAJ BUBBLE & TİKLER ── */
+.frp-chat-msg.outgoing .frp-chat-bubble {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #9333ea 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.22);
+}
+
+.frp-chat-tick {
+  font-size: 0.72rem;
+  letter-spacing: -1px;
+}
+
+.frp-chat-tick.read {
+  color: #38bdf8 !important;
+  font-weight: 800;
+}
+
+/* ── GERÇEK SES KAYDI VE OYNATICI (HTML5 AUDIO) ── */
+.frp-chat-audio-player {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 175px;
+  padding: 0.2rem 0.1rem;
+}
+
+.frp-audio-play-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.25);
+  color: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.75rem;
+  transition: transform 0.12s;
+  flex-shrink: 0;
+}
+
+.frp-chat-msg.incoming .frp-audio-play-btn {
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--accent, #2563eb);
+}
+
+.frp-audio-play-btn:hover {
+  transform: scale(1.1);
+}
+
+.frp-audio-track {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.frp-audio-progress-wrap {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 2px;
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.frp-chat-msg.incoming .frp-audio-progress-wrap {
+  background: var(--border-light, #cbd5e1);
+}
+
+.frp-audio-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: #ffffff;
+  border-radius: 2px;
+  transition: width 0.1s linear;
+}
+
+.frp-chat-msg.incoming .frp-audio-progress-bar {
+  background: var(--accent, #2563eb);
+}
+
+.frp-audio-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.65rem;
+  opacity: 0.85;
+}
+
+/* ── PAYLAŞILAN MEDYA & BELGE ÇEKMECESİ (İNOVASYON 4) ── */
+.frp-chat-media-drawer {
+  position: absolute;
+  inset: 48px 0 0 0;
+  background: var(--bg-surface, #ffffff);
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  animation: drawerSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+  box-shadow: -5px 0 20px rgba(0,0,0,0.1);
+}
+
+@keyframes drawerSlideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.frp-chat-media-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid var(--border-light, #e2e8f0);
+  background: var(--bg-card, #f8fafc);
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.frp-chat-media-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 0.75rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.frp-chat-media-item {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-light, #e2e8f0);
+  cursor: pointer;
+  position: relative;
+  background: var(--bg-card, #f8fafc);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.12s;
+}
+
+.frp-chat-media-item:hover {
+  transform: scale(1.04);
+  border-color: var(--accent, #2563eb);
+}
+
+.frp-chat-media-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ── MOBİL UYARLAMA (BOTTOM SHEET) ── */
+@media (max-width: 640px) {
+  .frp-presence-dock {
+    right: 12px;
+    bottom: 12px;
+  }
+  .frp-presence-panel {
+    width: calc(100vw - 24px);
+    max-height: 80vh;
+  }
+  .frp-chat-window {
+    width: 100vw !important;
+    right: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    height: 85vh !important;
+    max-width: 100vw !important;
+    border-radius: 20px 20px 0 0 !important;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.35) !important;
+  }
+  .frp-chat-window.minimized {
+    height: 52px !important;
+  }
 }

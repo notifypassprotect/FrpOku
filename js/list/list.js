@@ -1331,9 +1331,14 @@ function initListPage() {
           if (tag && tag.trim()) applyTag(tag.trim());
         }
       });
-    } else {
-      const tag = prompt('Seçili raporlara eklenecek etiketi girin:');
-      if (tag && tag.trim()) applyTag(tag.trim());
+    } else if (typeof window.showPromptModal === 'function') {
+      window.showPromptModal({
+        title: 'Toplu Etiket Ekle',
+        placeholder: 'Örn: Muhasebe, Önemli, Stok...',
+        onConfirm: (tag) => {
+          if (tag && tag.trim()) applyTag(tag.trim());
+        }
+      });
     }
   });
 

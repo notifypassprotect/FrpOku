@@ -1897,19 +1897,27 @@ function esc(str) {
  e.stopPropagation();
  if (!isDesignEditing ||!selectedItem || currentMode!== 'designer') return;
  const oldText = selectedItem.text || selectedItem.caption || '';
- 
- let newText = null;
- if (typeof window.showPromptModal === 'function') {
- newText = await window.showPromptModal({
+      let newText = null;
+      if (typeof window.showPromptModal === 'function') {
+        newText = await window.showPromptModal({
+          title: `"${selectedItem.name}" Metnini Düzenle`,
+          message: 'Memo bileşeni metnini veya alan ifadesini düzenleyin:',
+          defaultValue: oldText,
+          isTextarea: true,
+          badge: ''
+        });
+      } else if (typeof window.showPromptDialog === 'function') {
+        newText = await new Promise(resolve => {
+          window.showPromptDialog({
  title: `"${selectedItem.name}" Metnini Düzenle`,
  message: 'Memo bileşeni metnini veya alan ifadesini düzenleyin:',
  defaultValue: oldText,
- isTextarea: true,
- badge: ''
+ onConfirm: resolve
  });
  } else {
- newText = prompt(`"${selectedItem.name}" metnini düzenleyin:`, oldText);
+ resolve(oldText);
  }
+ });
 
  if (newText!== null && newText!== oldText) {
  pushUndoState();

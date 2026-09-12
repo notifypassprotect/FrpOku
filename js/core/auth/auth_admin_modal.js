@@ -216,28 +216,32 @@
 
  <!-- Sekmeler -->
  <div class="admin-modal-tabs">
- <button type="button" id="tabAdminPending" class="admin-tab-btn ${initialTab === 'pending' ? 'active' : ''}">
- <span> Onay Bekleyenler</span>
- <span id="adminPendingTabBadge" class="badge badge-red" style="font-size:.72rem;padding:.15rem .45rem;">...</span>
- </button>
- <button type="button" id="tabAdminAll" class="admin-tab-btn ${initialTab === 'all' ? 'active' : ''}">
- <span> Tüm Kullanıcılar</span>
- <span id="adminAllTabBadge" class="badge badge-blue" style="font-size:.72rem;padding:.15rem .45rem;">...</span>
- </button>
- <button type="button" id="tabAdminMail" class="admin-tab-btn ${initialTab === 'mail' ? 'active' : ''}">
- <span> E-posta Altyapısı & İstatistik</span>
- </button>
- </div>
+      <button type="button" id="tabAdminPending" class="admin-tab-btn ${initialTab === 'pending' ? 'active' : ''}">
+        <span>⏳ Onay Bekleyenler</span>
+        <span id="adminPendingTabBadge" class="badge badge-red" style="font-size:.72rem;padding:.15rem .45rem;">...</span>
+      </button>
+      <button type="button" id="tabAdminAll" class="admin-tab-btn ${initialTab === 'all' ? 'active' : ''}">
+        <span>👥 Tüm Kullanıcılar</span>
+        <span id="adminAllTabBadge" class="badge badge-blue" style="font-size:.72rem;padding:.15rem .45rem;">...</span>
+      </button>
+      <button type="button" id="tabAdminRooms" class="admin-tab-btn ${initialTab === 'rooms' ? 'active' : ''}">
+        <span>🏢 Odalar & Kanallar</span>
+        <span id="adminRoomsTabBadge" class="badge" style="font-size:.72rem;padding:.15rem .45rem;background:rgba(147,51,234,0.12);color:#9333ea;">...</span>
+      </button>
+      <button type="button" id="tabAdminMail" class="admin-tab-btn ${initialTab === 'mail' ? 'active' : ''}">
+        <span>✉️ E-posta & Sistem Sağlığı</span>
+      </button>
+    </div>
 
- <!-- İçerik Alanı -->
- <div class="admin-modal-body" id="adminModalBody">
- <div style="text-align:center;padding:3rem;color:var(--text-muted,#64748b);">
- <div class="splash-spinner" style="margin-bottom:1rem;"></div>
- <div>Kullanıcı listesi yükleniyor...</div>
- </div>
- </div>
- </div>
- `;
+    <!-- İçerik Alanı -->
+    <div class="admin-modal-body" id="adminModalBody">
+      <div style="text-align:center;padding:3rem;color:var(--text-muted,#64748b);">
+        <div class="splash-spinner" style="margin-bottom:1rem;"></div>
+        <div>Kullanıcı listesi yükleniyor...</div>
+      </div>
+    </div>
+  </div>
+  `;
 
  document.body.appendChild(overlay);
 
@@ -257,10 +261,11 @@
 
  const tabPending = overlay.querySelector('#tabAdminPending');
  const tabAll = overlay.querySelector('#tabAdminAll');
+ const tabRooms = overlay.querySelector('#tabAdminRooms');
  const tabMail = overlay.querySelector('#tabAdminMail');
 
  const activateTab = activeTab => {
- [tabPending, tabAll, tabMail].forEach(tab => tab.classList.toggle('active', tab === activeTab));
+ [tabPending, tabAll, tabRooms, tabMail].forEach(tab => tab && tab.classList.toggle('active', tab === activeTab));
  };
 
  tabPending.onclick = () => {
@@ -271,6 +276,11 @@
  tabAll.onclick = () => {
  activateTab(tabAll);
  renderAllUsersTab();
+ };
+
+ tabRooms.onclick = () => {
+ activateTab(tabRooms);
+ renderRoomsTab();
  };
 
  tabMail.onclick = () => {
@@ -724,7 +734,7 @@
  throw new Error(data.reason || 'Onaylanamadı');
  }
  } catch (err) {
- alert('Onaylanırken hata: ' + err.message);
+ if (typeof window.toast === 'function') window.toast('Onaylanırken hata: ' + err.message, 'error');
  }
  };
  });
@@ -753,10 +763,10 @@
               if (typeof window.toast === 'function') window.toast(`"${uName}" başvurusu reddedildi.`, 'info');
               renderPendingTab();
             } else {
-              alert(data.reason || 'Başvuru reddedilemedi.');
+              if (typeof window.toast === 'function') window.toast(data.reason || 'Başvuru reddedilemedi.', 'error');
             }
           } catch (e) {
-            alert('Hata: ' + e.message);
+            if (typeof window.toast === 'function') window.toast('Hata: ' + e.message, 'error');
           }
         }
       });
@@ -905,10 +915,10 @@
               if (typeof window.toast === 'function') window.toast(`Kullanıcı adı @${newName} olarak güncellendi!`, 'success');
               renderAllUsersTab();
             } else {
-              alert(data.reason || 'Kullanıcı adı güncellenemedi.');
+              if (typeof window.toast === 'function') window.toast(data.reason || 'Kullanıcı adı güncellenemedi.', 'error');
             }
           } catch (e) {
-            alert('Hata oluştu: ' + e.message);
+            if (typeof window.toast === 'function') window.toast('Hata oluştu: ' + e.message, 'error');
           }
         }
       });
@@ -938,10 +948,10 @@
             if (data.success) {
               if (typeof window.toast === 'function') window.toast(`"${uName}" şifresi başarıyla güncellendi!`, 'success');
             } else {
-              alert(data.reason || 'Şifre güncellenemedi.');
+              if (typeof window.toast === 'function') window.toast(data.reason || 'Şifre güncellenemedi.', 'error');
             }
           } catch (e) {
-            alert('Hata: ' + e.message);
+            if (typeof window.toast === 'function') window.toast('Hata: ' + e.message, 'error');
           }
         }
       });
@@ -976,11 +986,11 @@
               }
               renderAllUsersTab();
             } else {
-              alert(data.reason || 'İşlem başarısız.');
+              if (typeof window.toast === 'function') window.toast(data.reason || 'İşlem başarısız.', 'error');
               btn.disabled = false;
             }
           } catch (e) {
-            alert('Hata: ' + e.message);
+            if (typeof window.toast === 'function') window.toast('Hata: ' + e.message, 'error');
             btn.disabled = false;
           }
         }
@@ -1015,45 +1025,368 @@
               }
               renderAllUsersTab();
             } else {
-              alert(data.reason || 'Kullanıcı silinemedi.');
+              if (typeof window.toast === 'function') window.toast(data.reason || 'Kullanıcı silinemedi.', 'error');
               btn.disabled = false;
             }
           } catch (e) {
-            alert('Hata: ' + e.message);
+            if (typeof window.toast === 'function') window.toast('Hata: ' + e.message, 'error');
             btn.disabled = false;
           }
         }
       });
     };
   });
- }
+  }
 
- // Modal açıldığında her iki sekmenin sayaçlarını arka planda çek
- async function updateTabBadges() {
- const headers = (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function')? window.FrpAuth.getAuthHeaders(): {};
- try {
- const [pendingRes, allRes] = await Promise.all([
- fetch('/api/admin/pending-users', { headers }),
- fetch('/api/admin/all-users', { headers })
- ]);
- const pendingData = await pendingRes.json();
- const allData = await allRes.json();
- const badgePending = overlay.querySelector('#adminPendingTabBadge');
- const badgeAll = overlay.querySelector('#adminAllTabBadge');
- if (badgePending && pendingData.success && Array.isArray(pendingData.users)) {
- badgePending.textContent = pendingData.users.length;
- }
- if (badgeAll && allData.success && Array.isArray(allData.users)) {
- badgeAll.textContent = allData.users.length;
- }
- } catch (e) {}
- }
+  // ── Sekme 4: Departman Odaları & Kanallar ──
+  async function renderRoomsTab() {
+    const body = overlay.querySelector('#adminModalBody');
+    body.innerHTML = `
+      <div style="text-align:center;padding:2.5rem;color:var(--text-muted,#64748b);">
+        <div class="splash-spinner" style="margin-bottom:1rem;"></div>
+        <div>Sohbet odaları ve kanallar yükleniyor...</div>
+      </div>
+    `;
 
- updateTabBadges();
+    const headers = (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') ? window.FrpAuth.getAuthHeaders() : {};
+    let rooms = [];
+    let allUsers = [];
+    try {
+      const [roomsRes, usersRes] = await Promise.all([
+        fetch('/api/chat/rooms', { headers }),
+        fetch('/api/admin/all-users', { headers })
+      ]);
+      const roomsData = await roomsRes.json();
+      const usersData = await usersRes.json();
+      if (roomsData && roomsData.success && Array.isArray(roomsData.rooms)) {
+        rooms = roomsData.rooms;
+      }
+      if (usersData && usersData.success && Array.isArray(usersData.users)) {
+        allUsers = usersData.users;
+      }
+    } catch (err) {
+      body.innerHTML = `<div style="text-align:center;padding:2.5rem;color:#ef4444;font-weight:700;">Odalar yüklenirken hata oluştu: ${escHtml(err.message)}</div>`;
+      return;
+    }
 
- if (initialTab === 'all') renderAllUsersTab();
- else if (initialTab === 'mail') renderMailTab();
- else renderPendingTab();
+    const badgeRooms = overlay.querySelector('#adminRoomsTabBadge');
+    if (badgeRooms) badgeRooms.textContent = rooms.length;
+
+    let html = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem;flex-wrap:wrap;gap:.8rem;">
+        <div>
+          <div style="font-size:1.05rem;font-weight:800;color:var(--text-primary,#0f172a);">Departman Odaları & Grup Kanalları</div>
+          <div style="font-size:.78rem;color:var(--text-muted,#64748b);margin-top:.2rem;">Sohbet panelindeki genel ve departmana özel odaları buradan yönetebilirsiniz.</div>
+        </div>
+        <button type="button" id="btnAdminCreateRoom" class="btn btn-primary" style="display:inline-flex;align-items:center;gap:.4rem;font-weight:700;padding:.5rem 1rem;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span>Yeni Oda / Kanal Oluştur</span>
+        </button>
+      </div>
+
+      <div class="admin-card-grid" id="roomsListGrid">
+    `;
+
+    if (rooms.length === 0) {
+      html += `
+        <div style="text-align:center;padding:3rem 1rem;background:var(--bg-card,#f8fafc);border-radius:14px;border:1px dashed var(--border,#cbd5e1);">
+          <div style="font-size:2rem;margin-bottom:.5rem;">🏢</div>
+          <div style="font-size:1.05rem;font-weight:800;color:var(--text-primary,#0f172a);">Henüz Tanımlı Bir Oda Yok</div>
+          <div style="font-size:.82rem;color:var(--text-muted,#64748b);margin-top:.3rem;">Yukarıdaki "Yeni Oda / Kanal Oluştur" butonuna tıklayarak ilk odayı ekleyebilirsiniz.</div>
+        </div>
+      `;
+    } else {
+      rooms.forEach(room => {
+        const isAll = room.is_all_users !== false;
+        const memberCount = Array.isArray(room.member_user_ids) ? room.member_user_ids.length : 0;
+        const accessBadge = isAll
+          ? `<span class="badge badge-green" style="font-size:.72rem;padding:.2rem .5rem;">👥 Tüm Kullanıcılar (Genel)</span>`
+          : `<span class="badge badge-blue" style="font-size:.72rem;padding:.2rem .5rem;">🔒 ${memberCount} Özel Seçili Üye</span>`;
+
+        html += `
+          <div class="admin-user-card" style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border:1px solid var(--border,#e2e8f0);border-radius:12px;background:var(--bg-surface,#fff);">
+            <div style="display:flex;align-items:center;gap:.9rem;min-width:0;flex:1;">
+              <div style="width:44px;height:44px;border-radius:12px;background:rgba(37,99,235,0.08);display:flex;align-items:center;justify-content:center;font-size:1.45rem;flex-shrink:0;">
+                ${escHtml(room.icon || '🏢')}
+              </div>
+              <div style="min-width:0;flex:1;">
+                <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">
+                  <span style="font-weight:800;font-size:.98rem;color:var(--text-primary,#0f172a);">${escHtml(room.name)}</span>
+                  ${accessBadge}
+                </div>
+                <div style="font-size:.8rem;color:var(--text-secondary,#475569);margin-top:.2rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                  ${escHtml(room.description || 'Açıklama belirtilmedi.')}
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:.5rem;margin-left:1rem;flex-shrink:0;">
+              <button type="button" class="btn btn-sm btn-secondary btn-edit-room" data-id="${room.id}" style="padding:.4rem .75rem;font-weight:700;">
+                ✏️ Düzenle
+              </button>
+              <button type="button" class="btn btn-sm btn-ghost btn-delete-room" data-id="${room.id}" data-name="${escHtml(room.name)}" style="color:#ef4444;padding:.4rem .75rem;font-weight:700;">
+                🗑️ Sil
+              </button>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    html += `</div>`;
+    body.innerHTML = html;
+
+    body.querySelector('#btnAdminCreateRoom')?.addEventListener('click', () => {
+      openRoomModal(null, allUsers);
+    });
+
+    body.querySelectorAll('.btn-edit-room').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const rId = btn.getAttribute('data-id');
+        const roomToEdit = rooms.find(r => String(r.id) === String(rId));
+        if (roomToEdit) openRoomModal(roomToEdit, allUsers);
+      });
+    });
+
+    body.querySelectorAll('.btn-delete-room').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const rId = btn.getAttribute('data-id');
+        const rName = btn.getAttribute('data-name');
+        showAdminCustomConfirm({
+          title: 'Odayı / Kanalı Sil',
+          message: `"${rName}" adlı sohbet odasını ve bu odaya ait mesajları silmek istediğinizden emin misiniz?`,
+          details: 'DİKKAT: Bu işlem geri alınamaz. Kullanıcıların sohbet panelinden bu oda kaldırılacaktır.',
+          confirmText: 'Evet, Odayı Sil',
+          cancelText: 'Vazgeç',
+          isDanger: true,
+          onConfirm: async () => {
+            try {
+              const delRes = await fetch(`/api/chat/rooms/${rId}`, {
+                method: 'DELETE',
+                headers: (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') ? window.FrpAuth.getAuthHeaders() : {}
+              });
+              const delData = await delRes.json();
+              if (delData && delData.success) {
+                if (typeof window.toast === 'function') window.toast(`"${rName}" odası başarıyla silindi.`, 'success');
+                renderRoomsTab();
+                if (window.FrpPresence && typeof window.FrpPresence.refresh === 'function') {
+                  window.FrpPresence.refresh();
+                }
+              } else {
+                if (typeof window.toast === 'function') window.toast(delData?.reason || 'Oda silinemedi.', 'error');
+              }
+            } catch (err) {
+              if (typeof window.toast === 'function') window.toast('Hata: ' + err.message, 'error');
+            }
+          }
+        });
+      });
+    });
+  }
+
+  // Oda Oluşturma / Düzenleme Modalı
+  function openRoomModal(existingRoom = null, allUsers = []) {
+    const isEdit = !!existingRoom;
+    const modalOverlay = document.createElement('div');
+    modalOverlay.className = 'modal-overlay';
+    modalOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.65);backdrop-filter:blur(6px);z-index:200010;display:flex;align-items:center;justify-content:center;padding:1rem;animation:fadeIn .15s ease-out;';
+
+    const defaultIcon = existingRoom ? existingRoom.icon : '🏢';
+    const isAllUsers = existingRoom ? (existingRoom.is_all_users !== false) : true;
+    const selectedUserIds = new Set(existingRoom && Array.isArray(existingRoom.member_user_ids) ? existingRoom.member_user_ids.map(String) : []);
+
+    modalOverlay.innerHTML = `
+      <div class="modal" style="max-width:520px;width:95vw;max-height:90vh;display:flex;flex-direction:column;padding:1.6rem;border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,.4);border:1px solid var(--border,#cbd5e1);background:var(--bg-surface,#ffffff);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem;border-bottom:1px solid var(--border,#e2e8f0);padding-bottom:.8rem;">
+          <div style="font-size:1.15rem;font-weight:900;color:var(--text-primary,#0f172a);">
+            ${isEdit ? '🏢 Odayı Düzenle' : '🏢 Yeni Oda / Departman Kanalı'}
+          </div>
+          <button type="button" id="btnCloseRoomModal" style="border:none;background:rgba(148,163,184,0.15);width:32px;height:32px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;">✕</button>
+        </div>
+
+        <div style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:1rem;padding-right:.3rem;">
+          <div>
+            <label style="font-size:.82rem;font-weight:800;color:var(--text-primary,#0f172a);display:block;margin-bottom:.35rem;">Oda / Kanal Adı *</label>
+            <input type="text" id="tbRoomName" class="master-search-input" value="${escHtml(existingRoom?.name || '')}" placeholder="Örn: Muhasebe & Finans" style="width:100%;font-size:.9rem;padding:.55rem .8rem;" />
+          </div>
+
+          <div>
+            <label style="font-size:.82rem;font-weight:800;color:var(--text-primary,#0f172a);display:block;margin-bottom:.35rem;">Simge / Emoji</label>
+            <div style="display:flex;align-items:center;gap:.6rem;">
+              <input type="text" id="tbRoomIcon" class="master-search-input" value="${escHtml(defaultIcon)}" style="width:70px;text-align:center;font-size:1.2rem;padding:.4rem;" />
+              <div style="display:flex;gap:.3rem;flex-wrap:wrap;">
+                ${['🏢', '📢', '💼', '💻', '📊', '🛠️', '🎯', '🚀', '💬'].map(e => `
+                  <button type="button" class="btn-emoji-pick" data-emoji="${e}" style="border:1px solid var(--border,#e2e8f0);background:var(--bg-card,#f8fafc);border-radius:8px;padding:.3rem .5rem;cursor:pointer;font-size:1rem;">${e}</button>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label style="font-size:.82rem;font-weight:800;color:var(--text-primary,#0f172a);display:block;margin-bottom:.35rem;">Açıklama</label>
+            <input type="text" id="tbRoomDesc" class="master-search-input" value="${escHtml(existingRoom?.description || '')}" placeholder="Örn: Fatura ve finans ekibi koordinasyon kanalı" style="width:100%;font-size:.88rem;padding:.55rem .8rem;" />
+          </div>
+
+          <div style="background:var(--bg-card,#f8fafc);border:1px solid var(--border,#e2e8f0);border-radius:12px;padding:.9rem;">
+            <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer;font-size:.88rem;font-weight:800;color:var(--text-primary,#0f172a);">
+              <input type="checkbox" id="cbRoomAllUsers" ${isAllUsers ? 'checked' : ''} style="width:18px;height:18px;accent-color:var(--accent,#2563eb);cursor:pointer;" />
+              <span>Tüm Kullanıcılar Erişebilsin (Şirket Geneli Kanal)</span>
+            </label>
+            <div style="font-size:.76rem;color:var(--text-muted,#64748b);margin-top:.3rem;margin-left:1.75rem;">
+              İşaretli olduğunda tüm çalışanlar bu kanalı görebilir ve mesaj yazabilir.
+            </div>
+
+            <div id="roomMemberSelectorArea" style="margin-top:.9rem;display:${isAllUsers ? 'none' : 'block'};border-top:1px solid var(--border,#e2e8f0);padding-top:.8rem;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;">
+                <label style="font-size:.8rem;font-weight:800;color:var(--text-primary,#0f172a);">Odaya Dahil Edilecek Kullanıcılar:</label>
+                <span id="selectedCountBadge" style="font-size:.74rem;color:var(--accent,#2563eb);font-weight:700;">${selectedUserIds.size} kullanıcı seçildi</span>
+              </div>
+              <div style="max-height:160px;overflow-y:auto;border:1px solid var(--border,#e2e8f0);border-radius:8px;background:#fff;padding:.4rem;">
+                ${allUsers.length === 0 ? '<div style="font-size:.78rem;color:var(--text-muted,#64748b);padding:.5rem;text-align:center;">Kayıtlı kullanıcı bulunamadı.</div>' : allUsers.map(u => {
+                  const checked = selectedUserIds.has(String(u.id)) ? 'checked' : '';
+                  return `
+                    <label style="display:flex;align-items:center;gap:.6rem;padding:.35rem .5rem;border-radius:6px;cursor:pointer;transition:background .15s;font-size:.82rem;" onmouseover="this.style.background='var(--bg-card,#f8fafc)'" onmouseout="this.style.background='transparent'">
+                      <input type="checkbox" class="cb-room-user" data-user-id="${u.id}" ${checked} style="width:16px;height:16px;accent-color:var(--accent,#2563eb);cursor:pointer;" />
+                      <span style="font-weight:700;color:var(--text-primary,#0f172a);">${escHtml(u.full_name || u.username)}</span>
+                      <span style="color:var(--text-muted,#64748b);font-size:.75rem;">(@${escHtml(u.username)})</span>
+                      ${u.department ? `<span class="badge" style="margin-left:auto;font-size:.68rem;background:rgba(37,99,235,0.08);color:#2563eb;">${escHtml(u.department)}</span>` : ''}
+                    </label>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:flex-end;gap:.75rem;margin-top:1.2rem;border-top:1px solid var(--border,#e2e8f0);padding-top:.8rem;">
+          <button type="button" class="btn btn-ghost" id="btnCancelRoomModal" style="font-weight:700;">İptal</button>
+          <button type="button" class="btn btn-primary" id="btnSaveRoomModal" style="font-weight:800;padding:.5rem 1.4rem;">
+            ${isEdit ? 'Değişiklikleri Kaydet' : 'Odayı Oluştur'}
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modalOverlay);
+
+    const close = () => modalOverlay.remove();
+    modalOverlay.querySelector('#btnCloseRoomModal').onclick = close;
+    modalOverlay.querySelector('#btnCancelRoomModal').onclick = close;
+
+    modalOverlay.querySelectorAll('.btn-emoji-pick').forEach(b => {
+      b.onclick = () => {
+        const inp = modalOverlay.querySelector('#tbRoomIcon');
+        if (inp) inp.value = b.getAttribute('data-emoji');
+      };
+    });
+
+    const cbAll = modalOverlay.querySelector('#cbRoomAllUsers');
+    const memberArea = modalOverlay.querySelector('#roomMemberSelectorArea');
+    const countBadge = modalOverlay.querySelector('#selectedCountBadge');
+
+    cbAll.onchange = () => {
+      memberArea.style.display = cbAll.checked ? 'none' : 'block';
+    };
+
+    modalOverlay.querySelectorAll('.cb-room-user').forEach(cb => {
+      cb.onchange = () => {
+        const uId = cb.getAttribute('data-user-id');
+        if (cb.checked) selectedUserIds.add(String(uId));
+        else selectedUserIds.delete(String(uId));
+        if (countBadge) countBadge.textContent = `${selectedUserIds.size} kullanıcı seçildi`;
+      };
+    });
+
+    modalOverlay.querySelector('#btnSaveRoomModal').onclick = async () => {
+      const name = (modalOverlay.querySelector('#tbRoomName')?.value || '').trim();
+      const icon = (modalOverlay.querySelector('#tbRoomIcon')?.value || '').trim() || '🏢';
+      const description = (modalOverlay.querySelector('#tbRoomDesc')?.value || '').trim();
+      const is_all_users = cbAll ? cbAll.checked : true;
+      const member_user_ids = is_all_users ? [] : Array.from(selectedUserIds);
+
+      if (!name) {
+        if (typeof window.toast === 'function') window.toast('Lütfen oda adını belirtin.', 'warning');
+        return;
+      }
+
+      const saveBtn = modalOverlay.querySelector('#btnSaveRoomModal');
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Kaydediliyor...';
+
+      try {
+        const headers = {
+          'Content-Type': 'application/json',
+          ...((window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') ? window.FrpAuth.getAuthHeaders() : {})
+        };
+
+        let res;
+        if (isEdit) {
+          res = await fetch(`/api/chat/rooms/${existingRoom.id}`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify({ name, icon, description, is_all_users, member_user_ids })
+          });
+        } else {
+          res = await fetch('/api/chat/rooms', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ name, icon, description, is_all_users, member_user_ids })
+          });
+        }
+
+        const data = await res.json();
+        if (data && data.success) {
+          if (typeof window.toast === 'function') window.toast(`"${name}" odası başarıyla kaydedildi!`, 'success');
+          close();
+          renderRoomsTab();
+          if (window.FrpPresence && typeof window.FrpPresence.refresh === 'function') {
+            window.FrpPresence.refresh();
+          }
+        } else {
+          if (typeof window.toast === 'function') window.toast(data?.reason || 'Oda kaydedilemedi.', 'error');
+          saveBtn.disabled = false;
+          saveBtn.textContent = isEdit ? 'Değişiklikleri Kaydet' : 'Odayı Oluştur';
+        }
+      } catch (err) {
+        if (typeof window.toast === 'function') window.toast('Hata: ' + err.message, 'error');
+        saveBtn.disabled = false;
+        saveBtn.textContent = isEdit ? 'Değişiklikleri Kaydet' : 'Odayı Oluştur';
+      }
+    };
+  }
+
+  // Modal açıldığında sekmelerin sayaçlarını arka planda çek
+  async function updateTabBadges() {
+    const headers = (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') ? window.FrpAuth.getAuthHeaders() : {};
+    try {
+      const [pendingRes, allRes, roomsRes] = await Promise.all([
+        fetch('/api/admin/pending-users', { headers }),
+        fetch('/api/admin/all-users', { headers }),
+        fetch('/api/chat/rooms', { headers })
+      ]);
+      const pendingData = await pendingRes.json();
+      const allData = await allRes.json();
+      const roomsData = await roomsRes.json();
+      const badgePending = overlay.querySelector('#adminPendingTabBadge');
+      const badgeAll = overlay.querySelector('#adminAllTabBadge');
+      const badgeRooms = overlay.querySelector('#adminRoomsTabBadge');
+      if (badgePending && pendingData.success && Array.isArray(pendingData.users)) {
+        badgePending.textContent = pendingData.users.length;
+      }
+      if (badgeAll && allData.success && Array.isArray(allData.users)) {
+        badgeAll.textContent = allData.users.length;
+      }
+      if (badgeRooms && roomsData.success && Array.isArray(roomsData.rooms)) {
+        badgeRooms.textContent = roomsData.rooms.length;
+      }
+    } catch (e) {}
+  }
+
+  updateTabBadges();
+
+  if (initialTab === 'all') renderAllUsersTab();
+  else if (initialTab === 'mail') renderMailTab();
+  else if (initialTab === 'rooms') renderRoomsTab();
+  else renderPendingTab();
  }
 
  window.showAdminApprovalModal = showAdminApprovalModal;

@@ -21,20 +21,39 @@
     `;
 
     overlay.innerHTML = `
-      <div style="background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); border-radius: 18px; width: 97vw; max-width: 1340px; height: 93vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.5);">
+      <style>
+        .annotator-tool-btn.active {
+          background: var(--accent, #2563eb) !important;
+          color: #ffffff !important;
+          border-color: var(--accent, #2563eb) !important;
+        }
+        .annotator-color-dot {
+          transition: transform 0.12s, box-shadow 0.12s;
+        }
+        .annotator-color-dot.active {
+          box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px var(--accent, #2563eb) !important;
+          transform: scale(1.2);
+          z-index: 2;
+        }
+        .annotator-custom-color-wrap.active {
+          box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px var(--accent, #2563eb) !important;
+          border-radius: 6px;
+        }
+      </style>
+      <div style="background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); border-radius: 18px; width: 97vw; max-width: 1380px; height: 93vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.5);">
         
         <!-- 1. ÜST BAŞLIK BARI -->
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.65rem 1.25rem; border-bottom: 1px solid var(--border-light, #e2e8f0); background: var(--bg-card, #f8fafc);">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.65rem 1.25rem; border-bottom: 1px solid var(--border-light, #e2e8f0); background: var(--bg-card, #f8fafc); gap: 0.5rem; flex-wrap: wrap;">
           <div style="display: flex; align-items: center; gap: 0.65rem;">
-            <div style="width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, rgba(37,99,235,0.15), rgba(99,102,241,0.15)); color: var(--accent, #2563eb); display: flex; align-items: center; justify-content: center;">
+            <div style="width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, rgba(37,99,235,0.15), rgba(99,102,241,0.15)); color: var(--accent, #2563eb); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
             </div>
             <div>
               <div style="font-size: 0.96rem; font-weight: 800; color: var(--text-primary, #0f172a); display: flex; align-items: center; gap: 0.45rem;">
-                <span>Görsel Paint Pro & İşaretleme Editörü</span>
+                <span>Görsel Paint Pro & KVKK İşaretleme</span>
                 <span id="annotatorImgDimensions" style="font-size: 0.72rem; color: var(--text-muted, #64748b); background: var(--bg-surface, #fff); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border-light, #e2e8f0);">Yükleniyor...</span>
               </div>
-              <div style="font-size: 0.75rem; color: var(--text-muted, #64748b); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 400px;">${escHtml(imageName)}</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted, #64748b); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 360px;">${escHtml(imageName)}</div>
             </div>
           </div>
 
@@ -42,9 +61,9 @@
           <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
             <!-- Zoom Araçları -->
             <div style="display: flex; align-items: center; background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); border-radius: 8px; padding: 0.15rem 0.35rem; gap: 0.2rem;">
-              <button type="button" id="btnZoomOut" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.45rem; font-size: 0.85rem;" title="Uzaklaştır">➖</button>
+              <button type="button" id="btnZoomOut" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.45rem; font-size: 0.85rem;" title="Uzaklaştır (Ctrl + -)">➖</button>
               <span id="annotatorZoomBadge" style="font-size: 0.75rem; font-weight: 800; min-width: 42px; text-align: center; color: var(--text-primary, #0f172a);">%100</span>
-              <button type="button" id="btnZoomIn" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.45rem; font-size: 0.85rem;" title="Yakınlaştır">➕</button>
+              <button type="button" id="btnZoomIn" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.45rem; font-size: 0.85rem;" title="Yakınlaştır (Ctrl + +)">➕</button>
               <button type="button" id="btnZoom100" class="btn btn-sm btn-ghost" style="font-size: 0.72rem; padding: 0.2rem 0.45rem; font-weight: 700;" title="Gerçek Boyut (%100)">1:1</button>
               <button type="button" id="btnZoomFit" class="btn btn-sm btn-ghost" style="font-size: 0.72rem; padding: 0.2rem 0.45rem; font-weight: 700;" title="Ekrana Sığdır">Sığdır</button>
             </div>
@@ -56,38 +75,44 @@
         </div>
 
         <!-- 2. PROFESYONEL PAINT ARAÇ ÇUBUĞU (TOOLBAR) -->
-        <div style="display: flex; align-items: center; gap: 0.55rem; padding: 0.5rem 1.1rem; border-bottom: 1px solid var(--border-light, #e2e8f0); background: var(--bg-surface, #ffffff); flex-wrap: wrap; font-size: 0.8rem;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 1.1rem; border-bottom: 1px solid var(--border-light, #e2e8f0); background: var(--bg-surface, #ffffff); flex-wrap: wrap; font-size: 0.8rem;">
           
-          <!-- Çizim, İşaretleme & Şekil Araçları -->
-          <div style="display: flex; align-items: center; gap: 0.2rem; background: var(--bg-card, #f8fafc); padding: 0.2rem 0.35rem; border-radius: 8px; border: 1px solid var(--border, #cbd5e1);">
-            <button type="button" id="toolPan" class="btn btn-sm annotator-tool-btn" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; font-weight: 700;" title="Kaydırma / El Aracı">✋ El</button>
-            <button type="button" id="toolPen" class="btn btn-sm annotator-tool-btn active" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; font-weight: 700;" title="Serbest Çizim Kalemi">✏️ Kalem</button>
-            <button type="button" id="toolHighlighter" class="btn btn-sm annotator-tool-btn" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; font-weight: 700;" title="Fosforlu Vurgu">🖍️ Vurgu</button>
-            <button type="button" id="toolLine" class="btn btn-sm annotator-tool-btn" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; font-weight: 700;" title="Düz Çizgi">📏 Çizgi</button>
-            <button type="button" id="toolArrow" class="btn btn-sm annotator-tool-btn" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; font-weight: 700;" title="Yön Oku">➡️ Ok</button>
-            <button type="button" id="toolDoubleArrow" class="btn btn-sm annotator-tool-btn" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; font-weight: 700;" title="Çift Yönlü Ok">↔️ Çift Ok</button>
-            <button type="button" id="toolCircle" class="btn btn-sm annotator-tool-btn" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; font-weight: 700;" title="Çember / Daire">⭕ Daire</button>
-            <button type="button" id="toolRect" class="btn btn-sm annotator-tool-btn" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; font-weight: 700;" title="Dikdörtgen Kutu">⬛ Kutu</button>
-            <button type="button" id="toolFilledRect" class="btn btn-sm annotator-tool-btn" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; font-weight: 700;" title="Dolu Dikdörtgen">🟩 Dolu Kutu</button>
-            <button type="button" id="toolStar" class="btn btn-sm annotator-tool-btn" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; font-weight: 700;" title="Yıldız">⭐ Yıldız</button>
-            <button type="button" id="toolCallout" class="btn btn-sm annotator-tool-btn" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; font-weight: 700;" title="Konuşma Balonu">💬 Balon</button>
-            <button type="button" id="toolText" class="btn btn-sm annotator-tool-btn" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; font-weight: 700;" title="Yazı / Metin Ekle">🔤 Metin</button>
-            <button type="button" id="toolStep" class="btn btn-sm annotator-tool-btn" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; font-weight: 700; color: #2563eb;" title="Adım Rozeti Ekle (1, 2, 3...)">🔢 Adım <span id="annotatorStepNum">①</span></button>
-            <button type="button" id="toolMosaic" class="btn btn-sm annotator-tool-btn" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; font-weight: 700; color: #7c3aed;" title="Hassas Bilgileri Sansürle (Mozaik / Blur)">🔲 Sansür</button>
-            <button type="button" id="toolCrop" class="btn btn-sm annotator-tool-btn" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; font-weight: 700; color: #ea580c;" title="Alanı Seçip Kırp">✂️ Kırp</button>
-            <button type="button" id="toolEraser" class="btn btn-sm annotator-tool-btn" style="padding: 0.25rem 0.45rem; font-size: 0.75rem; font-weight: 700;" title="Silgi">🧽 Silgi</button>
+          <!-- Temel Çizim & Şekiller -->
+          <div style="display: flex; align-items: center; gap: 0.15rem; background: var(--bg-card, #f8fafc); padding: 0.15rem 0.3rem; border-radius: 8px; border: 1px solid var(--border, #cbd5e1); flex-wrap: wrap;">
+            <button type="button" id="toolPan" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Kaydırma / El Aracı">✋ El</button>
+            <button type="button" id="toolPen" class="btn btn-sm annotator-tool-btn active" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Serbest Çizim Kalemi">✏️ Kalem</button>
+            <button type="button" id="toolHighlighter" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Fosforlu Vurgu">🖍️ Vurgu</button>
+            <button type="button" id="toolLine" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Düz Çizgi (Shift ile 45° kilit)">📏 Çizgi</button>
+            <button type="button" id="toolArrow" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Yön Oku (Shift ile 45° kilit)">➡️ Ok</button>
+            <button type="button" id="toolDoubleArrow" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Çift Yönlü Ok">↔️ Çift Ok</button>
+            <button type="button" id="toolCircle" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Çember / Daire (Shift ile tam daire)">⭕ Daire</button>
+            <button type="button" id="toolRect" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Dikdörtgen Kutu (Shift ile kare)">⬛ Kutu</button>
+            <button type="button" id="toolFilledRect" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Dolu Dikdörtgen">🟩 Dolu Kutu</button>
+            <button type="button" id="toolStar" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Yıldız">⭐ Yıldız</button>
+            <button type="button" id="toolCallout" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Konuşma Balonu">💬 Balon</button>
+            <button type="button" id="toolText" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Modern Metin / Not Ekle">🔤 Metin</button>
+            <button type="button" id="toolStep" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700; color: #2563eb;" title="Adım Rozeti Ekle (1, 2, 3...)">🔢 Adım <span id="annotatorStepNum">①</span></button>
+            <button type="button" id="toolEraser" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Silgi">🧽 Silgi</button>
           </div>
 
-          <div style="width: 1px; height: 20px; background: var(--border-light, #e2e8f0);"></div>
+          <!-- KVKK Sansür, Spotlight & Büyüteç Grubu -->
+          <div style="display: flex; align-items: center; gap: 0.15rem; background: rgba(99,102,241,0.08); padding: 0.15rem 0.3rem; border-radius: 8px; border: 1px solid rgba(99,102,241,0.25); flex-wrap: wrap;">
+            <button type="button" id="toolBlur" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.45rem; font-size: 0.75rem; font-weight: 800; color: #4338ca;" title="Buzlu Cam (KVKK yumuşak gizleme)">🌫️ Buzlu Cam</button>
+            <button type="button" id="toolRedact" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.45rem; font-size: 0.75rem; font-weight: 800; color: #0f172a;" title="Karartma Bandı (Tam Sansür)">⬛ Karartma</button>
+            <button type="button" id="toolMosaic" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.45rem; font-size: 0.75rem; font-weight: 700; color: #7c3aed;" title="Pikselli Mozaik">🔲 Mozaik</button>
+            <button type="button" id="toolSpotlight" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.45rem; font-size: 0.75rem; font-weight: 800; color: #0284c7;" title="Spot Işığı (İlgili alanı öne çıkar, çevreyi karart)">🔦 Spot Işığı</button>
+            <button type="button" id="toolMagnifier" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.45rem; font-size: 0.75rem; font-weight: 800; color: #b45309;" title="Büyüteç (Seçilen noktayı 2x büyüterek vurgular)">🔍 Büyüteç</button>
+            <button type="button" id="toolCrop" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.45rem; font-size: 0.75rem; font-weight: 700; color: #ea580c;" title="Alanı Seçip Kırp">✂️ Kırp</button>
+          </div>
 
-          <!-- Döndürme, Aynalama & Filtreler -->
+          <!-- Döndürme & Filtreler -->
           <div style="display: flex; align-items: center; gap: 0.2rem;">
-            <button type="button" id="btnRotateRight" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.4rem;" title="90° Sağa Döndür">↷ 90°</button>
-            <button type="button" id="btnRotateLeft" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.4rem;" title="90° Sola Döndür">↶ 90°</button>
-            <button type="button" id="btnFlipH" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.4rem;" title="Yatay Aynala">🪞 Yatay</button>
-            <button type="button" id="btnFlipV" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.4rem;" title="Dikey Aynala">🪞 Dikey</button>
+            <button type="button" id="btnRotateRight" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.35rem;" title="90° Sağa Döndür">↷ 90°</button>
+            <button type="button" id="btnRotateLeft" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.35rem;" title="90° Sola Döndür">↶ 90°</button>
+            <button type="button" id="btnFlipH" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.35rem;" title="Yatay Aynala">🪞 Yatay</button>
+            <button type="button" id="btnFlipV" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.35rem;" title="Dikey Aynala">🪞 Dikey</button>
             
-            <select id="selFilter" style="padding: 0.25rem 0.45rem; font-size: 0.74rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-surface); cursor: pointer;" title="Görsel Filtresi">
+            <select id="selFilter" style="padding: 0.25rem 0.4rem; font-size: 0.74rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-surface); cursor: pointer;" title="Görsel Filtresi">
               <option value="none">Filtre: Normal</option>
               <option value="brightness">✨ Aydınlık</option>
               <option value="contrast">🌓 Kontrast</option>
@@ -96,43 +121,40 @@
             </select>
           </div>
 
-          <div style="width: 1px; height: 20px; background: var(--border-light, #e2e8f0);"></div>
-
-          <!-- Renk Paleti -->
-          <div style="display: flex; align-items: center; gap: 0.3rem;">
-            <button type="button" class="annotator-color-dot active" data-color="#ef4444" style="background: #ef4444; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #ffffff; box-shadow: 0 0 0 2px var(--accent, #2563eb); cursor: pointer;" title="Kırmızı"></button>
-            <button type="button" class="annotator-color-dot" data-color="#f59e0b" style="background: #f59e0b; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #ffffff; box-shadow: 0 0 0 1px #cbd5e1; cursor: pointer;" title="Turuncu"></button>
-            <button type="button" class="annotator-color-dot" data-color="#10b981" style="background: #10b981; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #ffffff; box-shadow: 0 0 0 1px #cbd5e1; cursor: pointer;" title="Yeşil"></button>
-            <button type="button" class="annotator-color-dot" data-color="#2563eb" style="background: #2563eb; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #ffffff; box-shadow: 0 0 0 1px #cbd5e1; cursor: pointer;" title="Mavi"></button>
-            <button type="button" class="annotator-color-dot" data-color="#8b5cf6" style="background: #8b5cf6; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #ffffff; box-shadow: 0 0 0 1px #cbd5e1; cursor: pointer;" title="Mor"></button>
-            <button type="button" class="annotator-color-dot" data-color="#0f172a" style="background: #0f172a; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #ffffff; box-shadow: 0 0 0 1px #cbd5e1; cursor: pointer;" title="Siyah"></button>
+          <!-- Renk Paleti (Aktif Halka Destekli) -->
+          <div id="annotatorPaletteWrap" style="display: flex; align-items: center; gap: 0.3rem;">
+            <button type="button" class="annotator-color-dot active" data-color="#ef4444" style="background: #ef4444; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #ffffff; cursor: pointer;" title="Kırmızı"></button>
+            <button type="button" class="annotator-color-dot" data-color="#f59e0b" style="background: #f59e0b; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #ffffff; cursor: pointer;" title="Turuncu"></button>
+            <button type="button" class="annotator-color-dot" data-color="#10b981" style="background: #10b981; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #ffffff; cursor: pointer;" title="Yeşil"></button>
+            <button type="button" class="annotator-color-dot" data-color="#2563eb" style="background: #2563eb; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #ffffff; cursor: pointer;" title="Mavi"></button>
+            <button type="button" class="annotator-color-dot" data-color="#8b5cf6" style="background: #8b5cf6; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #ffffff; cursor: pointer;" title="Mor"></button>
+            <button type="button" class="annotator-color-dot" data-color="#0f172a" style="background: #0f172a; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #ffffff; cursor: pointer;" title="Siyah"></button>
             <button type="button" class="annotator-color-dot" data-color="#ffffff" style="background: #ffffff; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #cbd5e1; cursor: pointer;" title="Beyaz"></button>
-            <label style="display: flex; align-items: center; margin-left: 1px; cursor: pointer;" title="Özel Renk Seç">
+            <label id="annotatorCustomColorWrap" class="annotator-custom-color-wrap" style="display: flex; align-items: center; cursor: pointer; padding: 1px; border-radius: 6px;" title="Özel Renk Seç">
               <input type="color" id="annotatorCustomColor" value="#ef4444" style="width: 22px; height: 22px; padding: 0; border: none; background: none; cursor: pointer;" />
             </label>
           </div>
 
-          <div style="width: 1px; height: 20px; background: var(--border-light, #e2e8f0);"></div>
-
           <!-- Çizgi / Fırça Kalınlığı -->
-          <div style="display: flex; align-items: center; gap: 0.2rem;">
-            <button type="button" class="annotator-size-btn" data-size="2" style="padding: 0.2rem 0.4rem; font-size: 0.72rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-surface); cursor: pointer;">2px</button>
-            <button type="button" class="annotator-size-btn" data-size="4" style="padding: 0.2rem 0.4rem; font-size: 0.72rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-surface); cursor: pointer;">4px</button>
-            <button type="button" class="annotator-size-btn active" data-size="8" style="padding: 0.2rem 0.4rem; font-size: 0.72rem; border: 1px solid var(--accent, #2563eb); border-radius: 6px; background: var(--accent, #2563eb); color: #fff; font-weight: 700; cursor: pointer;">8px</button>
-            <button type="button" class="annotator-size-btn" data-size="14" style="padding: 0.2rem 0.4rem; font-size: 0.72rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-surface); cursor: pointer;">14px</button>
-            <button type="button" class="annotator-size-btn" data-size="24" style="padding: 0.2rem 0.4rem; font-size: 0.72rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-surface); cursor: pointer;">24px</button>
+          <div style="display: flex; align-items: center; gap: 0.15rem;">
+            <button type="button" class="annotator-size-btn" data-size="2" style="padding: 0.2rem 0.35rem; font-size: 0.72rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-surface); cursor: pointer;">2px</button>
+            <button type="button" class="annotator-size-btn" data-size="4" style="padding: 0.2rem 0.35rem; font-size: 0.72rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-surface); cursor: pointer;">4px</button>
+            <button type="button" class="annotator-size-btn active" data-size="8" style="padding: 0.2rem 0.35rem; font-size: 0.72rem; border: 1px solid var(--accent, #2563eb); border-radius: 6px; background: var(--accent, #2563eb); color: #fff; font-weight: 700; cursor: pointer;">8px</button>
+            <button type="button" class="annotator-size-btn" data-size="14" style="padding: 0.2rem 0.35rem; font-size: 0.72rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-surface); cursor: pointer;">14px</button>
+            <button type="button" class="annotator-size-btn" data-size="24" style="padding: 0.2rem 0.35rem; font-size: 0.72rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-surface); cursor: pointer;">24px</button>
           </div>
 
-          <!-- Geçmiş Butonları -->
-          <div style="margin-left: auto; display: flex; align-items: center; gap: 0.25rem;">
-            <button type="button" id="annotatorBtnUndo" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.45rem; font-size: 0.76rem;" title="Geri Al (Ctrl+Z)">↩️ Geri Al</button>
-            <button type="button" id="annotatorBtnRedo" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.45rem; font-size: 0.76rem;" title="Yinele (Ctrl+Y)">↪️ Yinele</button>
-            <button type="button" id="annotatorBtnClear" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.45rem; font-size: 0.76rem; color: #ef4444;" title="Çizimleri Sıfırla">🗑️ Temizle</button>
+          <!-- Geri Al, Yinele, Orijinale Sıfırla & Temizle -->
+          <div style="margin-left: auto; display: flex; align-items: center; gap: 0.2rem;">
+            <button type="button" id="annotatorBtnUndo" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.4rem; font-size: 0.75rem;" title="Geri Al (Ctrl+Z)">↩️ Geri Al</button>
+            <button type="button" id="annotatorBtnRedo" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.4rem; font-size: 0.75rem;" title="Yinele (Ctrl+Y)">↪️ Yinele</button>
+            <button type="button" id="annotatorBtnRevert" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; color: #d97706; font-weight: 700;" title="Tüm Değişiklikleri Sıfırla (Orijinal Belgeye Dön)">⏪ Orijinale Sıfırla</button>
+            <button type="button" id="annotatorBtnClear" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; color: #ef4444;" title="Çizimleri Sıfırla">🗑️ Temizle</button>
           </div>
         </div>
 
         <!-- 3. TUVAL ÇALIŞMA ALANI (VIEWPORT) -->
-        <div id="annotatorViewport" style="flex: 1; overflow: auto; background: #0f172a; display: flex; align-items: center; justify-content: center; position: relative; cursor: crosshair; user-select: none;">
+        <div id="annotatorViewport" style="flex: 1; overflow: auto; background: #0b1120; display: flex; align-items: center; justify-content: center; position: relative; cursor: crosshair; user-select: none;">
           <div id="annotatorCanvasWrapper" style="display: inline-block; box-shadow: 0 10px 40px rgba(0,0,0,0.6); transition: transform 0.05s ease-out; position: relative;">
             <canvas id="annotatorCanvas" style="display: block; background: #ffffff;"></canvas>
             <canvas id="annotatorOverlayCanvas" style="position: absolute; inset: 0; pointer-events: none;"></canvas>
@@ -171,6 +193,7 @@
 
     const undoHistory = [];
     const redoHistory = [];
+    let initialState = null;
 
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -183,6 +206,7 @@
       ctx.drawImage(img, 0, 0);
 
       dimBadge.textContent = `${canvas.width} × ${canvas.height} px`;
+      initialState = ctx.getImageData(0, 0, canvas.width, canvas.height);
       saveState();
       fitToViewport();
     };
@@ -198,6 +222,7 @@
       ctx.fillStyle = '#ef4444';
       ctx.font = 'bold 20px sans-serif';
       ctx.fillText('Görsel yüklenirken bir sorun oluştu.', 50, 300);
+      initialState = ctx.getImageData(0, 0, canvas.width, canvas.height);
       saveState();
     };
     img.src = imageUrl;
@@ -283,6 +308,21 @@
       }
     }
 
+    function revertToOriginal() {
+      if (!initialState) return;
+      canvas.width = initialState.width;
+      canvas.height = initialState.height;
+      overlayCanvas.width = initialState.width;
+      overlayCanvas.height = initialState.height;
+      ctx.putImageData(initialState, 0, 0);
+      dimBadge.textContent = `${canvas.width} × ${canvas.height} px`;
+      undoHistory.length = 0;
+      redoHistory.length = 0;
+      saveState();
+      fitToViewport();
+      if (typeof window.toast === 'function') window.toast('Görsel orijinal haline sıfırlandı.', 'info');
+    }
+
     // Koordinat hesaplama (CSS zoom ölçeği hesaba katılır)
     function getCanvasCoords(e) {
       const rect = canvas.getBoundingClientRect();
@@ -311,8 +351,8 @@
 
       canvas.width = tempCanvas.width;
       canvas.height = tempCanvas.height;
-      overlayCanvas.width = canvas.width;
-      overlayCanvas.height = canvas.height;
+      overlayCanvas.width = tempCanvas.width;
+      overlayCanvas.height = tempCanvas.height;
       ctx.drawImage(tempCanvas, 0, 0);
       dimBadge.textContent = `${canvas.width} × ${canvas.height} px`;
       saveState();
@@ -327,8 +367,8 @@
       const tempCtx = tempCanvas.getContext('2d');
       tempCtx.drawImage(canvas, 0, 0);
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.save();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (horizontal) {
         ctx.translate(canvas.width, 0);
         ctx.scale(-1, 1);
@@ -337,6 +377,103 @@
         ctx.scale(1, -1);
       }
       ctx.drawImage(tempCanvas, 0, 0);
+      ctx.restore();
+      saveState();
+    }
+
+    // KVKK BUZLU CAM SANSRÜ (GAUSSIAN / FROSTED BLUR)
+    function blurRegion(x, y, w, h, blurPx = 10) {
+      const rx = Math.round(Math.max(0, Math.min(x, canvas.width - 1)));
+      const ry = Math.round(Math.max(0, Math.min(y, canvas.height - 1)));
+      const rw = Math.round(Math.min(w, canvas.width - rx));
+      const rh = Math.round(Math.min(h, canvas.height - ry));
+      if (rw <= 0 || rh <= 0) return;
+
+      const temp = document.createElement('canvas');
+      temp.width = rw;
+      temp.height = rh;
+      const tctx = temp.getContext('2d');
+      tctx.filter = `blur(${blurPx}px)`;
+      tctx.drawImage(canvas, rx, ry, rw, rh, 0, 0, rw, rh);
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(rx, ry, rw, rh);
+      ctx.clip();
+      ctx.drawImage(temp, rx, ry);
+      // Buzlu cam yarı saydam beyaz vurgu ve kenarlık
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+      ctx.fillRect(rx, ry, rw, rh);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(rx, ry, rw, rh);
+      ctx.restore();
+    }
+
+    // KVKK KARARTMA BANDI (REDACT BAR)
+    function redactRegion(x, y, w, h) {
+      const rx = Math.round(Math.max(0, Math.min(x, canvas.width - 1)));
+      const ry = Math.round(Math.max(0, Math.min(y, canvas.height - 1)));
+      const rw = Math.round(Math.min(w, canvas.width - rx));
+      const rh = Math.round(Math.min(h, canvas.height - ry));
+      if (rw <= 0 || rh <= 0) return;
+
+      ctx.save();
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(rx, ry, rw, rh);
+      ctx.restore();
+    }
+
+    // İNOVASYON 2: SPOTLIGHT (ODAK IŞIĞI)
+    function drawSpotlight(context, sx, sy, w, h) {
+      const rx = Math.min(sx, sx + w);
+      const ry = Math.min(sy, sy + h);
+      const rw = Math.abs(w);
+      const rh = Math.abs(h);
+      if (rw <= 0 || rh <= 0) return;
+
+      context.save();
+      context.fillStyle = 'rgba(15, 23, 42, 0.65)';
+      context.beginPath();
+      context.rect(0, 0, canvas.width, canvas.height);
+      context.rect(rx, ry, rw, rh);
+      context.fill('evenodd');
+
+      context.strokeStyle = '#38bdf8';
+      context.lineWidth = 2;
+      context.strokeRect(rx, ry, rw, rh);
+      context.restore();
+    }
+
+    // İNOVASYON 2: BÜYÜTEÇ DAMGASI (LOUPE MAGNIFIER 2X)
+    function stampLoupeMagnifier(cx, cy, radius = 55, zoom = 2.0) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.save();
+      ctx.clip();
+      const sourceW = (radius * 2) / zoom;
+      const sourceH = (radius * 2) / zoom;
+      const sourceX = cx - sourceW / 2;
+      const sourceY = cy - sourceH / 2;
+      ctx.drawImage(canvas, sourceX, sourceY, sourceW, sourceH, cx - radius, cy - radius, radius * 2, radius * 2);
+      ctx.restore();
+
+      // Beyaz halka ve gölge
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 4;
+      ctx.shadowColor = 'rgba(0,0,0,0.5)';
+      ctx.shadowBlur = 10;
+      ctx.stroke();
+
+      // Dış halka
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius + 2, 0, Math.PI * 2);
+      ctx.strokeStyle = currentColor || '#2563eb';
+      ctx.lineWidth = 2;
+      ctx.stroke();
       ctx.restore();
       saveState();
     }
@@ -388,6 +525,34 @@
       saveState();
       fitToViewport();
       setActiveTool('pen');
+    }
+
+    // SHIFT-SNAP AÇI VE ORAN KİLİT HESAPLAYICI
+    function applyShiftSnap(sx, sy, rawX, rawY, tool) {
+      let x = rawX;
+      let y = rawY;
+      let w = x - sx;
+      let h = y - sy;
+
+      if (tool === 'line' || tool === 'arrow' || tool === 'doubleArrow') {
+        const dx = x - sx;
+        const dy = y - sy;
+        const angle = Math.atan2(dy, dx);
+        const dist = Math.hypot(dx, dy);
+        const step = Math.PI / 4; // 45°
+        const snappedAngle = Math.round(angle / step) * step;
+        x = sx + dist * Math.cos(snappedAngle);
+        y = sy + dist * Math.sin(snappedAngle);
+        w = x - sx;
+        h = y - sy;
+      } else if (tool === 'rect' || tool === 'filledRect' || tool === 'circle' || tool === 'star' || tool === 'blur' || tool === 'redact' || tool === 'mosaic' || tool === 'crop' || tool === 'spotlight') {
+        const side = Math.max(Math.abs(w), Math.abs(h));
+        w = (w < 0 ? -side : side);
+        h = (h < 0 ? -side : side);
+        x = sx + w;
+        y = sy + h;
+      }
+      return { x, y, w, h };
     }
 
     // OK ÇİZİMİ
@@ -449,7 +614,7 @@
       context.lineTo(x + w, y + h - r);
       context.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
       context.lineTo(x + 40, y + h);
-      context.lineTo(x + 20, y + h + 20); // kuyruk
+      context.lineTo(x + 20, y + h + 20);
       context.lineTo(x + 25, y + h);
       context.lineTo(x + r, y + h);
       context.quadraticCurveTo(x, y + h, x, y + h - r);
@@ -481,6 +646,65 @@
       stepCount++;
       stepNumBadge.textContent = `(${stepCount})`;
       saveState();
+    }
+
+    // MODERN METİN MODALI
+    function showAnnotatorTextModal({ onAdd }) {
+      const existing = document.getElementById('frpAnnotatorTextModal');
+      if (existing) existing.remove();
+
+      const mOverlay = document.createElement('div');
+      mOverlay.id = 'frpAnnotatorTextModal';
+      mOverlay.className = 'modal-overlay';
+      mOverlay.style.cssText = `
+        position: fixed; inset: 0; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(6px);
+        z-index: 200080; display: flex; align-items: center; justify-content: center; padding: 1rem;
+      `;
+      mOverlay.innerHTML = `
+        <div class="modal" style="max-width: 440px; width: 92vw; padding: 1.4rem; border-radius: 16px; background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); box-shadow: 0 20px 50px rgba(0,0,0,0.35);">
+          <div style="font-size: 1rem; font-weight: 800; color: var(--text-primary, #0f172a); margin-bottom: 0.85rem; display: flex; align-items: center; gap: 0.45rem;">
+            <span>🔤</span>
+            <span>Görsele Metin Ekle</span>
+          </div>
+          <div style="margin-bottom: 1rem;">
+            <label style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--text-secondary, #475569); margin-bottom: 0.35rem;">Yazılacak Açıklama / Metin</label>
+            <textarea id="annotatorTextInput" rows="3" placeholder="Örn: Bu alandaki tutar incelenmeli..." style="width: 100%; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border, #cbd5e1); font-size: 0.88rem; background: var(--bg-card); color: var(--text-primary); font-family: inherit; resize: vertical;"></textarea>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 1.25rem;">
+            <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; color: var(--text-secondary); cursor: pointer;">
+              <input type="checkbox" id="annotatorTextBold" checked style="accent-color: var(--accent, #2563eb);" />
+              <span>Kalın (Bold)</span>
+            </label>
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+              <span style="font-size: 0.78rem; color: var(--text-muted);">Boyut:</span>
+              <select id="annotatorTextFontSize" style="padding: 0.25rem 0.45rem; border-radius: 6px; border: 1px solid var(--border); font-size: 0.78rem; background: var(--bg-card); color: var(--text-primary);">
+                <option value="16">16px Küçük</option>
+                <option value="22" selected>22px Standart</option>
+                <option value="32">32px Büyük</option>
+                <option value="44">44px Çok Büyük</option>
+              </select>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.6rem;">
+            <button type="button" id="btnTextModalCancel" class="btn btn-sm btn-ghost">Vazgeç</button>
+            <button type="button" id="btnTextModalAdd" class="btn btn-sm btn-primary" style="font-weight: 800; padding: 0.4rem 1.2rem;">Metni Ekle</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(mOverlay);
+      const input = mOverlay.querySelector('#annotatorTextInput');
+      input.focus();
+
+      const close = () => mOverlay.remove();
+      mOverlay.querySelector('#btnTextModalCancel').addEventListener('click', close);
+      mOverlay.querySelector('#btnTextModalAdd').addEventListener('click', () => {
+        const text = input.value.trim();
+        if (!text) return;
+        const isBold = mOverlay.querySelector('#annotatorTextBold').checked;
+        const fSize = parseInt(mOverlay.querySelector('#annotatorTextFontSize').value, 10) || 22;
+        close();
+        onAdd({ text, isBold, fSize });
+      });
     }
 
     // FİLTRE UYGULAMA
@@ -541,16 +765,24 @@
         return;
       }
 
+      if (activeTool === 'magnifier') {
+        stampLoupeMagnifier(x, y, 55, 2.0);
+        return;
+      }
+
       if (activeTool === 'text') {
-        const text = window.prompt('Görsel üzerine eklenecek metni girin:');
-        if (text) {
-          ctx.save();
-          ctx.fillStyle = currentColor;
-          ctx.font = `bold ${Math.max(16, currentLineWidth * 2.8)}px sans-serif`;
-          ctx.fillText(text, x, y);
-          ctx.restore();
-          saveState();
-        }
+        showAnnotatorTextModal({
+          onAdd: ({ text, isBold, fSize }) => {
+            ctx.save();
+            ctx.fillStyle = currentColor;
+            ctx.font = `${isBold ? 'bold ' : ''}${fSize}px sans-serif`;
+            ctx.shadowColor = 'rgba(0,0,0,0.5)';
+            ctx.shadowBlur = 4;
+            ctx.fillText(text, x, y);
+            ctx.restore();
+            saveState();
+          }
+        });
         return;
       }
 
@@ -586,11 +818,29 @@
         return;
       }
 
-      if (!isDrawing) return;
-      const { x, y } = getCanvasCoords(e);
+      const rawCoords = getCanvasCoords(e);
+      let { x, y, w, h } = e.shiftKey
+        ? applyShiftSnap(startX, startY, rawCoords.x, rawCoords.y, activeTool)
+        : { x: rawCoords.x, y: rawCoords.y, w: rawCoords.x - startX, h: rawCoords.y - startY };
+
+      if (!isDrawing) {
+        if (activeTool === 'magnifier') {
+          // Büyüteç önizleme dairesi
+          oCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+          oCtx.save();
+          oCtx.beginPath();
+          oCtx.arc(x, y, 55, 0, Math.PI * 2);
+          oCtx.strokeStyle = '#38bdf8';
+          oCtx.lineWidth = 2;
+          oCtx.setLineDash([4, 4]);
+          oCtx.stroke();
+          oCtx.restore();
+        }
+        return;
+      }
 
       if (activeTool === 'pen' || activeTool === 'highlighter' || activeTool === 'eraser') {
-        ctx.lineTo(x, y);
+        ctx.lineTo(rawCoords.x, rawCoords.y);
         ctx.stroke();
         return;
       }
@@ -603,9 +853,6 @@
       oCtx.fillStyle = currentColor;
       oCtx.lineCap = 'round';
       oCtx.lineJoin = 'round';
-
-      const w = x - startX;
-      const h = y - startY;
 
       if (activeTool === 'line') {
         oCtx.beginPath();
@@ -629,12 +876,15 @@
         drawStar(oCtx, startX, startY, 5, radius, radius * 0.5);
       } else if (activeTool === 'callout') {
         drawCallout(oCtx, startX, startY, w, h);
-      } else if (activeTool === 'crop' || activeTool === 'mosaic') {
-        oCtx.strokeStyle = activeTool === 'crop' ? '#ea580c' : '#7c3aed';
+      } else if (activeTool === 'spotlight') {
+        drawSpotlight(oCtx, startX, startY, w, h);
+      } else if (activeTool === 'crop' || activeTool === 'mosaic' || activeTool === 'blur' || activeTool === 'redact') {
+        const color = activeTool === 'crop' ? '#ea580c' : (activeTool === 'blur' ? '#4338ca' : (activeTool === 'redact' ? '#0f172a' : '#7c3aed'));
+        oCtx.strokeStyle = color;
         oCtx.lineWidth = 2;
         oCtx.setLineDash([6, 6]);
         oCtx.strokeRect(startX, startY, w, h);
-        oCtx.fillStyle = activeTool === 'crop' ? 'rgba(234, 88, 12, 0.15)' : 'rgba(124, 58, 237, 0.2)';
+        oCtx.fillStyle = activeTool === 'redact' ? 'rgba(15, 23, 42, 0.5)' : (activeTool === 'blur' ? 'rgba(99, 102, 241, 0.25)' : (activeTool === 'crop' ? 'rgba(234, 88, 12, 0.15)' : 'rgba(124, 58, 237, 0.2)'));
         oCtx.fillRect(startX, startY, w, h);
       }
       oCtx.restore();
@@ -650,9 +900,10 @@
       isDrawing = false;
       oCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
-      const { x, y } = getCanvasCoords(e);
-      const w = x - startX;
-      const h = y - startY;
+      const rawCoords = getCanvasCoords(e);
+      let { x, y, w, h } = e.shiftKey
+        ? applyShiftSnap(startX, startY, rawCoords.x, rawCoords.y, activeTool)
+        : { x: rawCoords.x, y: rawCoords.y, w: rawCoords.x - startX, h: rawCoords.y - startY };
 
       ctx.save();
       ctx.lineWidth = currentLineWidth;
@@ -683,6 +934,20 @@
         drawStar(ctx, startX, startY, 5, radius, radius * 0.5);
       } else if (activeTool === 'callout') {
         drawCallout(ctx, startX, startY, w, h);
+      } else if (activeTool === 'blur') {
+        const rx = Math.min(startX, x);
+        const ry = Math.min(startY, y);
+        const rw = Math.abs(w);
+        const rh = Math.abs(h);
+        blurRegion(rx, ry, rw, rh, 10);
+      } else if (activeTool === 'redact') {
+        const rx = Math.min(startX, x);
+        const ry = Math.min(startY, y);
+        const rw = Math.abs(w);
+        const rh = Math.abs(h);
+        redactRegion(rx, ry, rw, rh);
+      } else if (activeTool === 'spotlight') {
+        drawSpotlight(ctx, startX, startY, w, h);
       } else if (activeTool === 'mosaic') {
         const rx = Math.min(startX, x);
         const ry = Math.min(startY, y);
@@ -717,6 +982,8 @@
         viewport.style.cursor = 'grab';
       } else if (tool === 'crop') {
         viewport.style.cursor = 'cell';
+      } else if (tool === 'magnifier') {
+        viewport.style.cursor = 'zoom-in';
       } else {
         viewport.style.cursor = 'crosshair';
       }
@@ -736,7 +1003,11 @@
       toolCallout: 'callout',
       toolText: 'text',
       toolStep: 'step',
+      toolBlur: 'blur',
+      toolRedact: 'redact',
       toolMosaic: 'mosaic',
+      toolSpotlight: 'spotlight',
+      toolMagnifier: 'magnifier',
       toolCrop: 'crop',
       toolEraser: 'eraser'
     };
@@ -745,19 +1016,30 @@
       overlay.querySelector(`#${btnId}`)?.addEventListener('click', () => setActiveTool(toolName));
     });
 
-    // Renk Seçimi
+    // Renk Seçimi (Aktif halka düzeltmesi)
+    const customColorWrap = overlay.querySelector('#annotatorCustomColorWrap');
     overlay.querySelectorAll('.annotator-color-dot').forEach(btn => {
       btn.addEventListener('click', () => {
         overlay.querySelectorAll('.annotator-color-dot').forEach(b => b.classList.remove('active'));
+        if (customColorWrap) customColorWrap.classList.remove('active');
         btn.classList.add('active');
         currentColor = btn.dataset.color;
       });
     });
 
-    overlay.querySelector('#annotatorCustomColor').addEventListener('input', (e) => {
-      currentColor = e.target.value;
-      overlay.querySelectorAll('.annotator-color-dot').forEach(b => b.classList.remove('active'));
-    });
+    const customColorInput = overlay.querySelector('#annotatorCustomColor');
+    if (customColorInput) {
+      customColorInput.addEventListener('input', (e) => {
+        currentColor = e.target.value;
+        overlay.querySelectorAll('.annotator-color-dot').forEach(b => b.classList.remove('active'));
+        if (customColorWrap) customColorWrap.classList.add('active');
+      });
+      customColorInput.addEventListener('click', () => {
+        currentColor = customColorInput.value;
+        overlay.querySelectorAll('.annotator-color-dot').forEach(b => b.classList.remove('active'));
+        if (customColorWrap) customColorWrap.classList.add('active');
+      });
+    }
 
     // Kalınlık Seçimi
     overlay.querySelectorAll('.annotator-size-btn').forEach(btn => {
@@ -779,10 +1061,36 @@
     // Geçmiş Butonları
     overlay.querySelector('#annotatorBtnUndo').addEventListener('click', undo);
     overlay.querySelector('#annotatorBtnRedo').addEventListener('click', redo);
+    overlay.querySelector('#annotatorBtnRevert')?.addEventListener('click', revertToOriginal);
     overlay.querySelector('#annotatorBtnClear').addEventListener('click', clearAll);
 
+    // Klavye Kısayolları (Ctrl+Z, Ctrl+Y, Zoom)
+    const handleKeyDown = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) {
+        e.preventDefault();
+        redo();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) {
+        e.preventDefault();
+        setZoom(zoomLevel + 0.2);
+      } else if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+        e.preventDefault();
+        setZoom(zoomLevel - 0.2);
+      } else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+        e.preventDefault();
+        setZoom(1.0);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
     // Kapat / Vazgeç Butonu
-    const closeAnnotator = () => overlay.remove();
+    const closeAnnotator = () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      overlay.remove();
+    };
     overlay.querySelector('#annotatorBtnCancel').addEventListener('click', closeAnnotator);
 
     // Doğrudan İndirme (PNG)
@@ -795,7 +1103,7 @@
         link.click();
         link.remove();
       } catch (err) {
-        alert('Görsel indirilemedi.');
+        if (typeof window.toast === 'function') window.toast('Görsel indirilemedi.', 'error');
       }
     });
 
@@ -808,7 +1116,7 @@
         }
         closeAnnotator();
       } catch (err) {
-        alert('İşaretlenmiş görsel kaydedilemedi.');
+        if (typeof window.toast === 'function') window.toast('İşaretlenmiş görsel kaydedilemedi.', 'error');
       }
     });
   }

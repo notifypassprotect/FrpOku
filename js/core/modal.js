@@ -263,6 +263,7 @@ function showPromptDialog({
   message = '',
   defaultValue = '',
   placeholder = '',
+  inputType = 'text',
   confirmText = 'Kaydet',
   cancelText = 'İptal',
   onConfirm = () => {}
@@ -276,7 +277,7 @@ function showPromptDialog({
       <div style="font-size:1.08rem;font-weight:800;color:var(--text-primary);margin-bottom:.3rem;">${escModalHtml(title)}</div>
       ${message ? `<div style="font-size:.78rem;color:var(--text-muted);margin-bottom:.8rem;">${message}</div>` : ''}
       <div style="margin-bottom:1.2rem;">
-        <input type="text" id="customPromptInput" class="master-search-input" style="width:100%;font-size:.88rem;" value="${escModalHtml(defaultValue)}" placeholder="${escModalHtml(placeholder)}" />
+        <input type="${escModalHtml(inputType)}" id="customPromptInput" class="master-search-input" style="width:100%;font-size:.88rem;" value="${escModalHtml(defaultValue)}" placeholder="${escModalHtml(placeholder)}" />
       </div>
       <div style="display:flex;align-items:center;justify-content:flex-end;gap:.65rem;">
         <button type="button" class="btn btn-sm btn-ghost btn-cancel-prompt" style="padding:.45rem 1rem;font-weight:700;">

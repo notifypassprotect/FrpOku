@@ -105,7 +105,7 @@
     });
   }
 
-  // Modern Dosya Önizleme Modalı (Resimler ve PDF'ler için)
+  // Modern Dosya Önizleme Modalı (Resimler için Zoom/Pan Motoru ve PDF'ler için)
   async function openAttachmentPreview(att) {
     const existing = document.getElementById('frpAttPreviewOverlay');
     if (existing) existing.remove();
@@ -117,18 +117,31 @@
     overlay.id = 'frpAttPreviewOverlay';
     overlay.className = 'modal-overlay';
     overlay.style.cssText = `
-      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px);
-      z-index: 100020; display: flex; align-items: center; justify-content: center; padding: 1.5rem;
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(10px);
+      z-index: 100020; display: flex; align-items: center; justify-content: center; padding: 1.25rem;
     `;
 
     overlay.innerHTML = `
-      <div style="background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); border-radius: 18px; width: 92vw; max-width: 980px; height: 86vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.45);">
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1.25rem; border-bottom: 1px solid var(--border-light, #e2e8f0); background: var(--bg-card, #f8fafc);">
-          <div style="font-weight: 800; font-size: 0.98rem; color: var(--text-primary, #0f172a); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 65vw;">
-            ${escHtml(att.name)} <span style="font-size: 0.78rem; color: var(--text-muted, #64748b); font-weight: 500;">(${formatFileSize(att.size)})</span>
+      <div style="background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); border-radius: 18px; width: 94vw; max-width: 1050px; height: 88vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 65px rgba(0,0,0,0.5);">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border-light, #e2e8f0); background: var(--bg-card, #f8fafc); flex-wrap: wrap; gap: 0.5rem;">
+          <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-primary, #0f172a); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 45vw;">
+            ${escHtml(att.name)} <span style="font-size: 0.76rem; color: var(--text-muted, #64748b); font-weight: 500;">(${formatFileSize(att.size)})</span>
           </div>
-          <div style="display: flex; align-items: center; gap: 0.6rem;">
-            <button type="button" id="btnAttDownloadAction" class="btn btn-sm btn-primary" style="padding: 0.4rem 1rem; font-size: 0.82rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.35rem;">
+          
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            ${isImage ? `
+              <!-- Zoom & Görsel Kontrolleri -->
+              <div style="display: flex; align-items: center; background: var(--bg-surface, #fff); border: 1px solid var(--border, #cbd5e1); border-radius: 8px; padding: 0.15rem 0.35rem; gap: 0.2rem;">
+                <button type="button" id="btnPrevZoomOut" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.45rem; font-size: 0.85rem;" title="Uzaklaştır">➖</button>
+                <span id="prevZoomBadge" style="font-size: 0.75rem; font-weight: 800; min-width: 44px; text-align: center; color: var(--text-primary, #0f172a);">%100</span>
+                <button type="button" id="btnPrevZoomIn" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.45rem; font-size: 0.85rem;" title="Yakınlaştır">➕</button>
+                <button type="button" id="btnPrevZoom100" class="btn btn-sm btn-ghost" style="font-size: 0.72rem; padding: 0.2rem 0.4rem; font-weight: 700;" title="Gerçek Boyut (%100)">1:1</button>
+                <button type="button" id="btnPrevZoomFit" class="btn btn-sm btn-ghost" style="font-size: 0.72rem; padding: 0.2rem 0.45rem; font-weight: 700;" title="Ekrana Sığdır">Sığdır</button>
+                <button type="button" id="btnPrevRotate" class="btn btn-sm btn-ghost" style="font-size: 0.74rem; padding: 0.2rem 0.4rem;" title="90° Döndür">↷</button>
+              </div>
+            ` : ''}
+
+            <button type="button" id="btnAttDownloadAction" class="btn btn-sm btn-primary" style="padding: 0.4rem 0.95rem; font-size: 0.82rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.35rem;">
               <span>⬇️ İndir</span>
             </button>
             <button type="button" id="btnAttPreviewClose" style="width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--border, #cbd5e1); background: var(--bg-surface, #ffffff); color: var(--text-muted, #64748b); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;" title="Kapat">
@@ -136,7 +149,8 @@
             </button>
           </div>
         </div>
-        <div id="attPreviewBody" style="flex: 1; overflow: auto; display: flex; align-items: center; justify-content: center; background: #0f172a; padding: 1rem;">
+
+        <div id="attPreviewBody" style="flex: 1; overflow: auto; display: flex; align-items: center; justify-content: center; background: #0b1120; padding: 1.5rem; position: relative;">
           <div style="color: #94a3b8; font-size: 0.9rem; font-weight: 600;">Belge hazırlanıyor...</div>
         </div>
       </div>
@@ -148,7 +162,6 @@
     overlay.querySelector('#btnAttPreviewClose').addEventListener('click', close);
     overlay.querySelector('#btnAttDownloadAction').addEventListener('click', () => downloadAttachment(att));
 
-    // Arka plan tıklamasında mouse sürükleme koruması
     let isMouseDownOnBackdrop = false;
     overlay.addEventListener('mousedown', (e) => {
       isMouseDownOnBackdrop = (e.target === overlay);
@@ -164,7 +177,99 @@
     const mediaUrl = await getAuthenticatedMediaUrl(att.url);
 
     if (isImage) {
-      previewBody.innerHTML = `<img src="${mediaUrl}" alt="${escHtml(att.name)}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);" />`;
+      previewBody.innerHTML = `
+        <div id="prevImgContainer" style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; overflow: auto; cursor: grab; user-select: none;">
+          <img id="prevImgElement" src="${mediaUrl}" alt="${escHtml(att.name)}" style="transform-origin: center center; transition: transform 0.08s ease-out; image-rendering: high-quality; box-shadow: 0 15px 45px rgba(0,0,0,0.65); border-radius: 6px; max-width: 100%; max-height: 100%; object-fit: contain;" />
+        </div>
+      `;
+
+      const imgEl = previewBody.querySelector('#prevImgElement');
+      const container = previewBody.querySelector('#prevImgContainer');
+      const zoomBadge = overlay.querySelector('#prevZoomBadge');
+
+      let currentZoom = 1.0;
+      let currentRotation = 0;
+      let isPanning = false;
+      let startX = 0, startY = 0;
+      let scrollLeft = 0, scrollTop = 0;
+
+      function updateImgTransform() {
+        imgEl.style.transform = `scale(${currentZoom}) rotate(${currentRotation}deg)`;
+        if (zoomBadge) zoomBadge.textContent = `%${Math.round(currentZoom * 100)}`;
+      }
+
+      function setPreviewZoom(val) {
+        currentZoom = Math.max(0.15, Math.min(5.0, val));
+        updateImgTransform();
+      }
+
+      function fitPreviewToScreen() {
+        currentZoom = 1.0;
+        currentRotation = 0;
+        imgEl.style.maxWidth = '100%';
+        imgEl.style.maxHeight = '100%';
+        updateImgTransform();
+      }
+
+      overlay.querySelector('#btnPrevZoomIn')?.addEventListener('click', () => {
+        imgEl.style.maxWidth = 'none';
+        imgEl.style.maxHeight = 'none';
+        setPreviewZoom(currentZoom + 0.25);
+      });
+
+      overlay.querySelector('#btnPrevZoomOut')?.addEventListener('click', () => {
+        setPreviewZoom(currentZoom - 0.25);
+      });
+
+      overlay.querySelector('#btnPrevZoom100')?.addEventListener('click', () => {
+        imgEl.style.maxWidth = 'none';
+        imgEl.style.maxHeight = 'none';
+        setPreviewZoom(1.0);
+      });
+
+      overlay.querySelector('#btnPrevZoomFit')?.addEventListener('click', fitPreviewToScreen);
+
+      overlay.querySelector('#btnPrevRotate')?.addEventListener('click', () => {
+        currentRotation = (currentRotation + 90) % 360;
+        updateImgTransform();
+      });
+
+      // Mouse Wheel Zoom
+      container.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        imgEl.style.maxWidth = 'none';
+        imgEl.style.maxHeight = 'none';
+        const delta = e.deltaY < 0 ? 0.15 : -0.15;
+        setPreviewZoom(currentZoom + delta);
+      }, { passive: false });
+
+      // Mouse Drag Panning
+      container.addEventListener('mousedown', (e) => {
+        if (e.target === container || e.target === imgEl) {
+          isPanning = true;
+          container.style.cursor = 'grabbing';
+          startX = e.clientX;
+          startY = e.clientY;
+          scrollLeft = container.scrollLeft;
+          scrollTop = container.scrollTop;
+        }
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isPanning) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        container.scrollLeft = scrollLeft - dx;
+        container.scrollTop = scrollTop - dy;
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (isPanning) {
+          isPanning = false;
+          container.style.cursor = 'grab';
+        }
+      });
+
     } else if (isPdf) {
       previewBody.innerHTML = `
         <div style="width: 100%; height: 100%; display: flex; flex-direction: column; background: #1e293b; border-radius: 8px; overflow: hidden;">
@@ -204,6 +309,97 @@
     }
   }
 
+  // Modern Link Ekleme / Düzenleme Modalı
+  function showModernLinkModal({ initialUrl = '', initialText = '', onSave }) {
+    const existing = document.getElementById('frpModernLinkOverlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'frpModernLinkOverlay';
+    overlay.className = 'modal-overlay';
+    overlay.style.cssText = `
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(8px);
+      z-index: 200060; display: flex; align-items: center; justify-content: center; padding: 1rem;
+    `;
+
+    overlay.innerHTML = `
+      <div class="modal" style="max-width: 480px; width: 94vw; padding: 1.5rem; border-radius: 18px; background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); box-shadow: 0 25px 60px rgba(0,0,0,0.4);">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
+          <div style="font-size: 1.1rem; font-weight: 800; color: var(--text-primary, #0f172a); display: flex; align-items: center; gap: 0.5rem;">
+            <span>🔗</span>
+            <span>${initialUrl ? 'Bağlantıyı Düzenle' : 'Bağlantı (Link) Ekle'}</span>
+          </div>
+          <button type="button" id="btnLinkModalClose" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.5rem; font-size: 1rem;">✕</button>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem;">
+          <div>
+            <label style="display: block; font-size: 0.8rem; font-weight: 700; color: var(--text-secondary, #475569); margin-bottom: 0.35rem;">
+              Web / Belge Adresi (URL) *
+            </label>
+            <input type="text" id="inputModalLinkUrl" value="${escHtml(initialUrl)}" placeholder="https://ornek.com/dosya veya www.google.com" style="width: 100%; padding: 0.6rem 0.8rem; border-radius: 8px; border: 1px solid var(--border, #cbd5e1); font-size: 0.88rem; background: var(--bg-card, #f8fafc); color: var(--text-primary, #0f172a);" />
+          </div>
+
+          <div>
+            <label style="display: block; font-size: 0.8rem; font-weight: 700; color: var(--text-secondary, #475569); margin-bottom: 0.35rem;">
+              Görüntülenecek Metin
+            </label>
+            <input type="text" id="inputModalLinkText" value="${escHtml(initialText)}" placeholder="Örn: İlgili Rapor / Sözleşme Belgesi" style="width: 100%; padding: 0.6rem 0.8rem; border-radius: 8px; border: 1px solid var(--border, #cbd5e1); font-size: 0.88rem; background: var(--bg-card, #f8fafc); color: var(--text-primary, #0f172a);" />
+          </div>
+
+          <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 0.25rem;">
+            <label style="display: flex; align-items: center; gap: 0.45rem; font-size: 0.82rem; color: var(--text-secondary, #475569); cursor: pointer;">
+              <input type="checkbox" id="chkModalLinkTarget" checked style="accent-color: var(--accent, #2563eb);" />
+              <span>Yeni sekmede açılsın (target="_blank")</span>
+            </label>
+            <button type="button" id="btnModalLinkTest" class="btn btn-sm btn-ghost" style="font-size: 0.76rem; color: var(--accent, #2563eb); font-weight: 700;">↗️ Test Et</button>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.65rem;">
+          <button type="button" id="btnModalLinkCancel" class="btn btn-sm btn-ghost" style="padding: 0.5rem 1.1rem; font-weight: 700;">Vazgeç</button>
+          <button type="button" id="btnModalLinkApply" class="btn btn-sm btn-primary" style="padding: 0.5rem 1.4rem; font-weight: 800;">${initialUrl ? 'Güncelle' : 'Ekle'}</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const closeDialog = () => overlay.remove();
+    overlay.querySelector('#btnLinkModalClose').addEventListener('click', closeDialog);
+    overlay.querySelector('#btnModalLinkCancel').addEventListener('click', closeDialog);
+
+    const inputUrl = overlay.querySelector('#inputModalLinkUrl');
+    const inputText = overlay.querySelector('#inputModalLinkText');
+    const chkTarget = overlay.querySelector('#chkModalLinkTarget');
+
+    inputUrl.focus();
+
+    overlay.querySelector('#btnModalLinkTest').addEventListener('click', () => {
+      let raw = inputUrl.value.trim();
+      if (!raw) return;
+      if (!/^https?:\/\//i.test(raw) && !raw.startsWith('/') && !raw.startsWith('mailto:')) {
+        raw = 'https://' + raw;
+      }
+      window.open(raw, '_blank');
+    });
+
+    overlay.querySelector('#btnModalLinkApply').addEventListener('click', () => {
+      let raw = inputUrl.value.trim();
+      if (!raw) {
+        inputUrl.focus();
+        return;
+      }
+      if (!/^https?:\/\//i.test(raw) && !raw.startsWith('/') && !raw.startsWith('mailto:')) {
+        raw = 'https://' + raw;
+      }
+      const text = inputText.value.trim() || raw;
+      const targetBlank = chkTarget.checked;
+      closeDialog();
+      if (typeof onSave === 'function') onSave({ url: raw, text, targetBlank });
+    });
+  }
+
   async function openRichNoteModal(fileId) {
     if (!fileId) return;
     const file = (window.FrpStore && window.FrpStore.getById ? window.FrpStore.getById(fileId) : null);
@@ -232,10 +428,10 @@
     `;
 
     overlay.innerHTML = `
-      <div class="modal" style="width: 95vw; max-width: 1220px; height: 90vh; max-height: 980px; background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); border-radius: 20px; box-shadow: 0 25px 60px rgba(0,0,0,0.35); display: flex; flex-direction: column; overflow: hidden;">
+      <div class="modal" style="width: 95vw; max-width: 1240px; height: 90vh; max-height: 980px; background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); border-radius: 20px; box-shadow: 0 25px 60px rgba(0,0,0,0.35); display: flex; flex-direction: column; overflow: hidden;">
         
         <!-- MODAL BAŞLIĞI -->
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.6rem; border-bottom: 1px solid var(--border-light, #e2e8f0); background: var(--bg-card, #f8fafc);">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.95rem 1.6rem; border-bottom: 1px solid var(--border-light, #e2e8f0); background: var(--bg-card, #f8fafc);">
           <div style="display: flex; align-items: center; gap: 0.85rem;">
             <div style="width: 42px; height: 42px; border-radius: 12px; background: linear-gradient(135deg, rgba(37,99,235,0.15), rgba(99,102,241,0.15)); color: var(--accent, #2563eb); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
@@ -253,7 +449,6 @@
 
           <div style="display: flex; align-items: center; gap: 0.85rem;">
             <span id="noteSaveStatus" style="font-size: 0.8rem; color: var(--text-muted, #64748b); font-weight: 600;"></span>
-            <!-- ÇIKIŞ / KAPAT BUTONU (HİZALI VE MODERN) -->
             <button type="button" id="btnRichNoteClose" style="width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--border, #cbd5e1); background: var(--bg-surface, #ffffff); color: var(--text-muted, #64748b); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; padding: 0;" title="Pencereyi Kapat">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
@@ -271,26 +466,44 @@
 
           <div style="width: 1px; height: 20px; background: var(--border-light, #e2e8f0); margin: 0 0.15rem;"></div>
 
-          <!-- Yazı Tipi & Başlık & Boyut & Satır Aralığı -->
-          <div style="display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap;">
-            <select id="tbFontName" style="padding: 0.3rem 0.45rem; border-radius: 7px; border: 1px solid var(--border, #cbd5e1); font-size: 0.78rem; background: var(--bg-card); color: var(--text-primary); cursor: pointer; max-width: 125px;" title="Yazı Tipi">
+          <!-- 25+ Yazı Tipi & Başlık & Boyut & Satır Aralığı -->
+          <div style="display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap;">
+            <select id="tbFontName" style="padding: 0.3rem 0.45rem; border-radius: 7px; border: 1px solid var(--border, #cbd5e1); font-size: 0.78rem; background: var(--bg-card); color: var(--text-primary); cursor: pointer; max-width: 140px;" title="Yazı Tipi">
               <option value="inherit">Yazı Tipi</option>
-              <option value="Inter, sans-serif">Inter</option>
-              <option value="Roboto, sans-serif">Roboto</option>
-              <option value="'Open Sans', sans-serif">Open Sans</option>
-              <option value="Montserrat, sans-serif">Montserrat</option>
-              <option value="Poppins, sans-serif">Poppins</option>
-              <option value="Arial, sans-serif">Arial</option>
-              <option value="'Segoe UI', sans-serif">Segoe UI</option>
-              <option value="Tahoma, sans-serif">Tahoma</option>
-              <option value="Verdana, sans-serif">Verdana</option>
-              <option value="Georgia, serif">Georgia</option>
-              <option value="Garamond, serif">Garamond</option>
-              <option value="'Times New Roman', serif">Times New Roman</option>
-              <option value="'Courier New', monospace">Courier New</option>
-              <option value="Consolas, monospace">Consolas</option>
-              <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
-              <option value="Impact, sans-serif">Impact</option>
+              <optgroup label="Modern Sans-Serif">
+                <option value="Inter, sans-serif">Inter</option>
+                <option value="Roboto, sans-serif">Roboto</option>
+                <option value="'Open Sans', sans-serif">Open Sans</option>
+                <option value="Montserrat, sans-serif">Montserrat</option>
+                <option value="Poppins, sans-serif">Poppins</option>
+                <option value="Lato, sans-serif">Lato</option>
+                <option value="Nunito, sans-serif">Nunito</option>
+                <option value="Ubuntu, sans-serif">Ubuntu</option>
+                <option value="Raleway, sans-serif">Raleway</option>
+                <option value="Cabin, sans-serif">Cabin</option>
+                <option value="Arial, sans-serif">Arial</option>
+                <option value="'Segoe UI', sans-serif">Segoe UI</option>
+                <option value="Tahoma, sans-serif">Tahoma</option>
+                <option value="Verdana, sans-serif">Verdana</option>
+                <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+                <option value="'Century Gothic', sans-serif">Century Gothic</option>
+              </optgroup>
+              <optgroup label="Serif & Kurumsal">
+                <option value="Georgia, serif">Georgia</option>
+                <option value="Garamond, serif">Garamond</option>
+                <option value="'Times New Roman', serif">Times New Roman</option>
+                <option value="'Playfair Display', serif">Playfair Display</option>
+                <option value="Merriweather, serif">Merriweather</option>
+                <option value="Palatino, serif">Palatino</option>
+              </optgroup>
+              <optgroup label="Yazılımcı / Monospace & Özel">
+                <option value="Consolas, monospace">Consolas</option>
+                <option value="'Courier New', monospace">Courier New</option>
+                <option value="'Fira Code', monospace">Fira Code</option>
+                <option value="'JetBrains Mono', monospace">JetBrains Mono</option>
+                <option value="Impact, sans-serif">Impact</option>
+                <option value="Oswald, sans-serif">Oswald</option>
+              </optgroup>
             </select>
 
             <select id="tbFormatBlock" style="padding: 0.3rem 0.45rem; border-radius: 7px; border: 1px solid var(--border, #cbd5e1); font-size: 0.78rem; background: var(--bg-card); color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Stil">
@@ -302,28 +515,15 @@
               <option value="blockquote">Alıntı</option>
             </select>
 
-            <select id="tbFontSize" style="padding: 0.3rem 0.45rem; border-radius: 7px; border: 1px solid var(--border, #cbd5e1); font-size: 0.78rem; background: var(--bg-card); color: var(--text-primary); cursor: pointer; width: 78px;" title="Yazı Boyutu">
-              <option value="14px">14px</option>
-              <option value="8px">8px</option>
-              <option value="9px">9px</option>
-              <option value="10px">10px</option>
-              <option value="11px">11px</option>
-              <option value="12px">12px</option>
-              <option value="13px">13px</option>
-              <option value="15px">15px</option>
-              <option value="16px">16px</option>
-              <option value="18px">18px</option>
-              <option value="20px">20px</option>
-              <option value="22px">22px</option>
-              <option value="24px">24px</option>
-              <option value="28px">28px</option>
-              <option value="32px">32px</option>
-              <option value="36px">36px</option>
-              <option value="42px">42px</option>
-              <option value="48px">48px</option>
-              <option value="60px">60px</option>
-              <option value="72px">72px</option>
-            </select>
+            <!-- Elle Düzenlenebilir Yazı Boyutu & Adım Butonları -->
+            <div style="display: flex; align-items: center; border: 1px solid var(--border, #cbd5e1); border-radius: 7px; background: var(--bg-card); overflow: hidden;" title="Yazı Boyutu (px)">
+              <input type="number" id="tbFontSizeNum" min="6" max="144" value="14" style="width: 42px; padding: 0.28rem 0.25rem; border: none; background: transparent; font-size: 0.78rem; text-align: center; color: var(--text-primary); font-weight: 700; outline: none;" />
+              <span style="font-size: 0.68rem; color: var(--text-muted, #64748b); padding-right: 3px;">px</span>
+              <div style="display: flex; flex-direction: column; border-left: 1px solid var(--border-light, #e2e8f0);">
+                <button type="button" id="tbFontSizeInc" style="border: none; background: none; font-size: 0.55rem; padding: 1px 4px; line-height: 1; cursor: pointer; color: var(--text-secondary);" title="Büyüt">▲</button>
+                <button type="button" id="tbFontSizeDec" style="border: none; background: none; font-size: 0.55rem; padding: 1px 4px; line-height: 1; cursor: pointer; color: var(--text-secondary);" title="Küçült">▼</button>
+              </div>
+            </div>
 
             <select id="tbLineHeight" style="padding: 0.3rem 0.45rem; border-radius: 7px; border: 1px solid var(--border, #cbd5e1); font-size: 0.78rem; background: var(--bg-card); color: var(--text-primary); cursor: pointer;" title="Satır Aralığı (Line Height)">
               <option value="1.75">Satır: 1.75</option>
@@ -636,9 +836,30 @@
       editor.focus();
     }
 
-    overlay.querySelector('#tbFontSize')?.addEventListener('change', (e) => {
-      applyPixelFontSize(e.target.value);
-    });
+    const fontSizeInput = overlay.querySelector('#tbFontSizeNum');
+    if (fontSizeInput) {
+      fontSizeInput.addEventListener('change', () => {
+        let val = parseInt(fontSizeInput.value, 10);
+        if (isNaN(val) || val < 6) val = 6;
+        if (val > 144) val = 144;
+        fontSizeInput.value = val;
+        applyPixelFontSize(val + 'px');
+      });
+
+      overlay.querySelector('#tbFontSizeInc')?.addEventListener('click', () => {
+        let val = (parseInt(fontSizeInput.value, 10) || 14) + 1;
+        if (val > 144) val = 144;
+        fontSizeInput.value = val;
+        applyPixelFontSize(val + 'px');
+      });
+
+      overlay.querySelector('#tbFontSizeDec')?.addEventListener('click', () => {
+        let val = (parseInt(fontSizeInput.value, 10) || 14) - 1;
+        if (val < 6) val = 6;
+        fontSizeInput.value = val;
+        applyPixelFontSize(val + 'px');
+      });
+    }
 
     overlay.querySelector('#tbLineHeight')?.addEventListener('change', (e) => {
       editor.style.lineHeight = e.target.value;
@@ -712,9 +933,120 @@
       formatDoc('insertHTML', tableHtml);
     });
 
+    // Modern Link Modalı & Editör İçi Tıklanabilir Bağlantı Çubuğu
+    let savedRange = null;
+    function saveSelection() {
+      const sel = window.getSelection();
+      if (sel.rangeCount > 0) savedRange = sel.getRangeAt(0).cloneRange();
+    }
+    function restoreSelection() {
+      if (savedRange) {
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(savedRange);
+      }
+    }
+
     overlay.querySelector('#tbLink').addEventListener('click', () => {
-      const url = prompt('Bağlantı adresi (URL) giriniz:');
-      if (url) formatDoc('createLink', url);
+      saveSelection();
+      const sel = window.getSelection();
+      const selectedText = sel ? sel.toString().trim() : '';
+
+      showModernLinkModal({
+        initialUrl: '',
+        initialText: selectedText,
+        onSave: ({ url, text, targetBlank }) => {
+          restoreSelection();
+          editor.focus();
+          const targetAttr = targetBlank ? ' target="_blank" rel="noopener noreferrer"' : '';
+          const linkHtml = `<a href="${escHtml(url)}"${targetAttr} style="color: #2563eb; text-decoration: underline; font-weight: 600;">${escHtml(text)}</a>`;
+          document.execCommand('insertHTML', false, linkHtml);
+        }
+      });
+    });
+
+    // Editör İçi Link Araç Çubuğu (Linke tıklandığında Aç / Düzenle / Kaldır popover'ı)
+    let activeLinkTooltip = null;
+    function removeLinkTooltip() {
+      if (activeLinkTooltip) {
+        activeLinkTooltip.remove();
+        activeLinkTooltip = null;
+      }
+    }
+
+    editor.addEventListener('click', (e) => {
+      const linkEl = e.target.closest('a');
+      removeLinkTooltip();
+      if (!linkEl) return;
+
+      e.preventDefault(); // Editör içinde doğrudan sayfa yenilenmesini engeller
+
+      const rect = linkEl.getBoundingClientRect();
+      const tip = document.createElement('div');
+      tip.id = 'frpEditorLinkTooltip';
+      tip.style.cssText = `
+        position: fixed; top: ${rect.top - 42}px; left: ${Math.max(10, rect.left)}px;
+        z-index: 200050; display: flex; align-items: center; gap: 0.35rem;
+        background: #0f172a; color: #ffffff; padding: 0.35rem 0.65rem; border-radius: 8px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.4); font-size: 0.76rem; font-weight: 600;
+        animation: fadeIn 0.15s ease-out;
+      `;
+
+      const hrefDisplay = linkEl.getAttribute('href') || '';
+      tip.innerHTML = `
+        <span style="color: #93c5fd; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">🔗 ${escHtml(hrefDisplay)}</span>
+        <button type="button" id="btnTipOpen" class="btn btn-sm" style="padding: 0.15rem 0.45rem; font-size: 0.72rem; background: #2563eb; color: #ffffff; border: none; border-radius: 4px; cursor: pointer;">↗️ Aç</button>
+        <button type="button" id="btnTipEdit" class="btn btn-sm btn-ghost" style="padding: 0.15rem 0.45rem; font-size: 0.72rem; color: #f8fafc; cursor: pointer;">✏️ Düzenle</button>
+        <button type="button" id="btnTipRemove" class="btn btn-sm btn-ghost" style="padding: 0.15rem 0.45rem; font-size: 0.72rem; color: #ef4444; cursor: pointer;">🗑️ Kaldır</button>
+      `;
+
+      document.body.appendChild(tip);
+      activeLinkTooltip = tip;
+
+      tip.querySelector('#btnTipOpen').addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        window.open(linkEl.href, '_blank', 'noopener,noreferrer');
+        removeLinkTooltip();
+      });
+
+      tip.querySelector('#btnTipEdit').addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        removeLinkTooltip();
+        showModernLinkModal({
+          initialUrl: linkEl.getAttribute('href') || '',
+          initialText: linkEl.textContent || '',
+          onSave: ({ url, text, targetBlank }) => {
+            linkEl.setAttribute('href', url);
+            linkEl.textContent = text;
+            if (targetBlank) {
+              linkEl.setAttribute('target', '_blank');
+              linkEl.setAttribute('rel', 'noopener noreferrer');
+            } else {
+              linkEl.removeAttribute('target');
+              linkEl.removeAttribute('rel');
+            }
+          }
+        });
+      });
+
+      tip.querySelector('#btnTipRemove').addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        linkEl.replaceWith(document.createTextNode(linkEl.textContent));
+        removeLinkTooltip();
+      });
+    });
+
+    document.addEventListener('selectionchange', () => {
+      const sel = window.getSelection();
+      if (!sel || !sel.anchorNode || !editor.contains(sel.anchorNode)) {
+        removeLinkTooltip();
+      }
+    });
+
+    overlay.addEventListener('mousedown', (e) => {
+      if (activeLinkTooltip && !activeLinkTooltip.contains(e.target) && !e.target.closest('a')) {
+        removeLinkTooltip();
+      }
     });
 
     // Dosya Ekleme İşleyicisi

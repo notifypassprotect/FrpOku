@@ -164,18 +164,33 @@ window.FrpSettingsTabs.storage = {
     });
 
     overlay.querySelector('#btnActionResetAll')?.addEventListener('click', () => {
-      const promptPass = prompt('DİKKAT: Tüm yüklenen raporları ve veritabanını temizlemek üzeresiniz!\n\nİşlemi onaylamak için lütfen hesap şifrenizi giriniz:');
-      if (!promptPass) return;
-
-      fetch('/api/auth/verify-password', {
-        method: 'POST',
-        headers: window.FrpAuth?.getAuthHeaders() || { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: promptPass })
-      }).then(r => r.json()).then(res => {
-        if (!res.success || !res.verified) {
-          alert('Hata: Girdiğiniz şifre hatalı! İşlem iptal edildi.');
-          return;
+      const askPass = () => {
+        if (typeof window.showPromptDialog === 'function') {
+          window.showPromptDialog({
+            title: 'Veritabanı Sıfırlama Güvenlik Doğrulaması',
+            message: 'DİKKAT: Tüm yüklenen raporları ve veritabanını temizlemek üzeresiniz! İşlemi onaylamak için lütfen hesap şifrenizi giriniz:',
+            placeholder: 'Hesap şifreniz...',
+            inputType: 'password',
+            confirmText: 'Şifreyi Doğrula',
+            cancelText: 'Vazgeç',
+            onConfirm: (promptPass) => {
+              if (!promptPass) return;
+              verifyAndReset(promptPass);
+            }
+          });
         }
+      };
+
+      const verifyAndReset = (promptPass) => {
+        fetch('/api/auth/verify-password', {
+          method: 'POST',
+          headers: window.FrpAuth?.getAuthHeaders() || { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: promptPass })
+        }).then(r => r.json()).then(res => {
+          if (!res.success || !res.verified) {
+            safeToast('Hata: Girdiğiniz şifre hatalı! İşlem iptal edildi.', 'error');
+            return;
+          }
 
         window.showConfirmDialog({
           title: 'Tüm Verileri Sıfırla',
@@ -203,6 +218,9 @@ window.FrpSettingsTabs.storage = {
       }).catch(() => {
         safeToast('Şifre doğrulanırken hata oluştu.', 'error');
       });
-    });
+    };
+
+    askPass();
+  });
   }
 };
