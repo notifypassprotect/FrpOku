@@ -215,6 +215,24 @@ test('sendSecurityAlert şüpheli giriş uyarısı oluşturur', async () => {
   assert.match(sentMessage.html, /hacker/);
 });
 
+test('yönetici parola sıfırlama bildirimi açık parola içermez', async () => {
+  let sentMessage = null;
+  const mailer = createMailer({
+    env: { MAIL_ENABLED: 'true', SMTP_HOST: 'smtp.example.com', SMTP_USER: 'sender@example.com', SMTP_PASS: 'secret', SMTP_FROM: 'FrpOku <sender@example.com>' },
+    transporter: { sendMail: async message => { sentMessage = message; return { messageId: 'reset-1' }; } }
+  });
+  const result = await mailer.sendPasswordResetByAdmin({
+    to: 'user@example.com',
+    fullName: 'Test Kullanıcı',
+    username: 'testuser',
+    newPassword: 'ASLA-MAILDE-OLMAMALI'
+  });
+  assert.equal(result.sent, true);
+  assert.doesNotMatch(sentMessage.text, /ASLA-MAILDE-OLMAMALI/);
+  assert.doesNotMatch(sentMessage.html, /ASLA-MAILDE-OLMAMALI/);
+  assert.match(sentMessage.text, /güvenli bir iletişim kanalı/i);
+});
+
 test('mailer kaynak kodu SMTP bağlantısını sınırlı sürede sonlandırır ve Gmail uygulama şifresi boşluklarını temizler', () => {
   const fs = require('node:fs');
   const path = require('node:path');

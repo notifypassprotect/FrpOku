@@ -422,8 +422,10 @@ window.FrpSettingsTabs.profile = {
         if (btn) { btn.disabled = false; btn.textContent = 'Şifremi Güncelle'; }
 
         if (res.success) {
-          showAlert('Şifreniz başarıyla değiştirildi.', 'success');
-          safeToast('Şifreniz başarıyla güncellendi.', 'success');
+          const mailFailed = res.notification?.email?.sent === false;
+          const message = res.message || 'Şifreniz başarıyla değiştirildi.';
+          showAlert(message, mailFailed ? 'warning' : 'success');
+          safeToast(message, mailFailed ? 'warning' : 'success');
           if (oldPassEl) oldPassEl.value = '';
           if (newPassEl) newPassEl.value = '';
           if (confirmPassEl) confirmPassEl.value = '';

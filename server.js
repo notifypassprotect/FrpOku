@@ -1309,15 +1309,12 @@ async function handleAdminPasswordReset(req, res) {
       }
     }
 
-    // Kullanıcıya yeni geçici/atanan şifresini e-posta ile ilet:
-    if (updatedUser.email) {
-      mailer.sendPasswordResetByAdmin({
-        to: updatedUser.email,
-        fullName: updatedUser.full_name || updatedUser.username,
-        username: updatedUser.username,
-        newPassword
-      }).catch(mErr => console.warn('Admin şifre sıfırlama e-posta uyarısı:', mErr.message));
-    }
+    const mailResult = await mailer.sendPasswordResetByAdmin({
+      to: updatedUser.email,
+      fullName: updatedUser.full_name || updatedUser.username,
+      username: updatedUser.username,
+      timestamp: nowIso
+    });
 
     await recordAuditLog({
       userId: req.adminUser.id,
@@ -1325,13 +1322,16 @@ async function handleAdminPasswordReset(req, res) {
       role: 'admin',
       action: 'USER_PASSWORD_RESET',
       target: updatedUser.username,
-      details: `Yönetici tarafından parola sıfırlandı.${updatedUser.email ? ' Kullanıcıya e-posta iletildi.' : ''}`,
+      details: `Yönetici tarafından parola sıfırlandı. Bildirim durumu: ${mailResult.status}`,
       ip: req.ip
     });
 
     res.json({
       success: true,
-      message: `"${updatedUser.full_name || updatedUser.username}" kullanıcısının şifresi başarıyla güncellendi.${updatedUser.email ? ' Yeni şifre kullanıcının e-postasına gönderildi.' : ''}`
+      message: mailResult.sent
+        ? `"${updatedUser.full_name || updatedUser.username}" kullanıcısının şifresi güncellendi ve güvenlik bildirimi gönderildi.`
+        : `"${updatedUser.full_name || updatedUser.username}" kullanıcısının şifresi güncellendi; ancak güvenlik bildirimi gönderilemedi.`,
+      notification: { email: { sent: mailResult.sent, status: mailResult.status } }
     });
   } catch (err) {
     console.warn('Yönetici parola sıfırlama hatası:', safeLogStr(err.message));
@@ -1446,16 +1446,21 @@ app.post('/api/auth/change-password', authRateLimiter, requireAuth, async (req, 
       iat: Date.now()
     });
 
-        if (user.email) {
-      mailer.sendPasswordChanged({
-        to: user.email,
-        fullName: user.full_name || user.username,
-        username: user.username,
-        ip: req.ip,
-        timestamp: nowIso
-      }).catch(() => {});
-    }
-    res.json({ success: true, message: 'Şifreniz başarıyla değiştirildi.', token: newToken });
+    const mailResult = await mailer.sendPasswordChanged({
+      to: user.email,
+      fullName: user.full_name || user.username,
+      username: user.username,
+      ip: req.ip,
+      timestamp: nowIso
+    });
+    res.json({
+      success: true,
+      message: mailResult.sent
+        ? 'Şifreniz değiştirildi ve güvenlik bildirimi e-posta adresinize gönderildi.'
+        : 'Şifreniz değiştirildi; ancak güvenlik bildirimi gönderilemedi.',
+      token: newToken,
+      notification: { email: { sent: mailResult.sent, status: mailResult.status } }
+    });
   } catch (err) {
     console.warn('Şifre güncelleme hatası:', safeLogStr(err.message));
     res.status(503).json({ success: false, reason: 'Şifre geçici olarak güncellenemedi.' });

@@ -927,7 +927,8 @@
             });
             const data = await res.json();
             if (data.success) {
-              if (typeof window.toast === 'function') window.toast(`"${uName}" şifresi başarıyla güncellendi!`, 'success');
+              const mailFailed = data.notification?.email?.sent === false;
+              if (typeof window.toast === 'function') window.toast(data.message || `"${uName}" şifresi başarıyla güncellendi!`, mailFailed ? 'warning' : 'success');
             } else {
               if (typeof window.toast === 'function') window.toast(data.reason || 'Şifre güncellenemedi.', 'error');
             }
