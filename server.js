@@ -1883,6 +1883,50 @@ async function getAllUsersWithPresence() {
   });
 }
 
+// ── GERÇEK ZAMANLI SOHBET & MESAJLAŞMA SİSTEMİ ──────────────────
+const CHAT_STORE_PATH = path.join(__dirname, 'data', 'chat_messages.json');
+let chatMessagesCache = null;
+
+function getChatMessages() {
+  if (chatMessagesCache !== null) return chatMessagesCache;
+  try {
+    if (fs.existsSync(CHAT_STORE_PATH)) {
+      chatMessagesCache = JSON.parse(fs.readFileSync(CHAT_STORE_PATH, 'utf8'));
+    } else {
+      chatMessagesCache = [];
+    }
+  } catch {
+    chatMessagesCache = [];
+  }
+  return chatMessagesCache;
+}
+
+function saveChatMessages() {
+  try {
+    const dir = path.dirname(CHAT_STORE_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    if (chatMessagesCache.length > 3000) {
+      chatMessagesCache = chatMessagesCache.slice(-3000);
+    }
+    fs.writeFileSync(CHAT_STORE_PATH, JSON.stringify(chatMessagesCache, null, 2), 'utf8');
+  } catch {}
+}
+
+function getUnreadCountsForUser(userId) {
+  const msgs = getChatMessages();
+  const counts = {};
+  let total = 0;
+  const strUser = String(userId);
+  for (const m of msgs) {
+    if (String(m.receiverId) === strUser && !m.isRead) {
+      const senderKey = String(m.senderId);
+      counts[senderKey] = (counts[senderKey] || 0) + 1;
+      total++;
+    }
+  }
+  return { bySender: counts, total };
+}
+
 app.post('/api/presence/heartbeat', requireAuth, async (req, res) => {
   try {
     const customStatus = req.body?.customStatus || 'online';
@@ -1891,7 +1935,8 @@ app.post('/api/presence/heartbeat', requireAuth, async (req, res) => {
       supabase.from('app_users').update({ last_seen: new Date().toISOString(), is_online: customStatus !== 'invisible' }).eq('id', req.authUser.id).then(() => {}).catch(() => {});
     }
     const users = await getAllUsersWithPresence();
-    res.json({ success: true, users });
+    const unread = getUnreadCountsForUser(req.authUser.id);
+    res.json({ success: true, users, unreadCounts: unread });
   } catch (err) {
     res.status(500).json({ success: false, reason: 'Presence güncellenemedi.' });
   }
@@ -1900,7 +1945,8 @@ app.post('/api/presence/heartbeat', requireAuth, async (req, res) => {
 app.get('/api/presence/users', requireAuth, async (req, res) => {
   try {
     const users = await getAllUsersWithPresence();
-    res.json({ success: true, users });
+    const unread = getUnreadCountsForUser(req.authUser.id);
+    res.json({ success: true, users, unreadCounts: unread });
   } catch (err) {
     res.status(500).json({ success: false, reason: 'Kullanıcılar alınamadı.' });
   }
@@ -1918,6 +1964,158 @@ app.post('/api/presence/offline', async (req, res) => {
     res.json({ success: true });
   } catch {
     res.json({ success: true });
+  }
+});
+
+// Chat: Mesaj Gönderme
+app.post('/api/chat/send', requireAuth, async (req, res) => {
+  try {
+    const { receiverId, roomId, text, attachment, voice } = req.body || {};
+    if (!text && !attachment && !voice) {
+      return res.status(400).json({ success: false, reason: 'Mesaj içeriği boş olamaz.' });
+    }
+    if (!receiverId && !roomId) {
+      return res.status(400).json({ success: false, reason: 'Alıcı veya oda belirtilmelidir.' });
+    }
+
+    const messages = getChatMessages();
+    const newMsg = {
+      id: 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      senderId: String(req.authUser.id),
+      senderName: req.authUser.full_name || req.authUser.username,
+      senderUsername: req.authUser.username,
+      senderAvatar: req.authUser.avatar || (req.authUser.username ? req.authUser.username[0].toUpperCase() : 'U'),
+      receiverId: receiverId ? String(receiverId) : null,
+      roomId: roomId ? String(roomId) : null,
+      text: String(text || '').trim(),
+      attachment: attachment || null,
+      voice: voice || null,
+      reactions: {},
+      isRead: false,
+      readAt: null,
+      createdAt: new Date().toISOString()
+    };
+
+    messages.push(newMsg);
+    saveChatMessages();
+
+    // Supabase yedekleme (varsa)
+    if (supabase) {
+      supabase.from('chat_messages').insert({
+        sender_id: req.authUser.id,
+        receiver_id: receiverId || null,
+        room_id: roomId || null,
+        text: newMsg.text,
+        attachment: newMsg.attachment,
+        voice: newMsg.voice,
+        reactions: newMsg.reactions
+      }).then(() => {}).catch(() => {});
+    }
+
+    res.json({ success: true, message: newMsg });
+  } catch (err) {
+    res.status(500).json({ success: false, reason: 'Mesaj gönderilemedi.' });
+  }
+});
+
+// Chat: Mesajları Listeleme
+app.get('/api/chat/messages', requireAuth, async (req, res) => {
+  try {
+    const peerId = req.query.peerId ? String(req.query.peerId) : null;
+    const roomId = req.query.roomId ? String(req.query.roomId) : null;
+    const since = req.query.since ? new Date(req.query.since).getTime() : 0;
+    const myId = String(req.authUser.id);
+
+    const all = getChatMessages();
+    let changed = false;
+
+    let matched = all.filter(m => {
+      if (roomId) {
+        return m.roomId === roomId;
+      }
+      if (peerId) {
+        const isMeToPeer = (String(m.senderId) === myId && String(m.receiverId) === peerId);
+        const isPeerToMe = (String(m.senderId) === peerId && String(m.receiverId) === myId);
+        return isMeToPeer || isPeerToMe;
+      }
+      return false;
+    });
+
+    if (since > 0) {
+      matched = matched.filter(m => new Date(m.createdAt).getTime() > since);
+    }
+
+    // Okundu işaretleme (Bana gelen okunmamış mesajları okundu yap)
+    if (peerId) {
+      matched.forEach(m => {
+        if (String(m.senderId) === peerId && String(m.receiverId) === myId && !m.isRead) {
+          m.isRead = true;
+          m.readAt = new Date().toISOString();
+          changed = true;
+        }
+      });
+      if (changed) {
+        saveChatMessages();
+      }
+    }
+
+    res.json({ success: true, messages: matched.slice(-100) });
+  } catch (err) {
+    res.status(500).json({ success: false, reason: 'Mesajlar alınamadı.' });
+  }
+});
+
+// Chat: Mesajları Okundu İşaretleme
+app.post('/api/chat/mark-read', requireAuth, async (req, res) => {
+  try {
+    const peerId = req.body?.peerId ? String(req.body.peerId) : null;
+    const myId = String(req.authUser.id);
+    if (!peerId) return res.json({ success: true });
+
+    const all = getChatMessages();
+    let changed = false;
+    all.forEach(m => {
+      if (String(m.senderId) === peerId && String(m.receiverId) === myId && !m.isRead) {
+        m.isRead = true;
+        m.readAt = new Date().toISOString();
+        changed = true;
+      }
+    });
+
+    if (changed) saveChatMessages();
+    res.json({ success: true });
+  } catch {
+    res.json({ success: true });
+  }
+});
+
+// Chat: Reaksiyon Ekleme / Kaldırma
+app.post('/api/chat/react', requireAuth, async (req, res) => {
+  try {
+    const { messageId, emoji } = req.body || {};
+    if (!messageId || !emoji) return res.status(400).json({ success: false });
+
+    const all = getChatMessages();
+    const msg = all.find(m => m.id === messageId);
+    if (!msg) return res.status(404).json({ success: false, reason: 'Mesaj bulunamadı.' });
+
+    if (!msg.reactions) msg.reactions = {};
+    const myId = String(req.authUser.id);
+    const existing = msg.reactions[emoji] || [];
+
+    if (existing.includes(myId)) {
+      // Kaldır
+      msg.reactions[emoji] = existing.filter(id => id !== myId);
+      if (msg.reactions[emoji].length === 0) delete msg.reactions[emoji];
+    } else {
+      // Ekle
+      msg.reactions[emoji] = [...existing, myId];
+    }
+
+    saveChatMessages();
+    res.json({ success: true, reactions: msg.reactions });
+  } catch {
+    res.status(500).json({ success: false, reason: 'Reaksiyon kaydedilemedi.' });
   }
 });
 

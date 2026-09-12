@@ -271,45 +271,79 @@
 
           <div style="width: 1px; height: 20px; background: var(--border-light, #e2e8f0); margin: 0 0.15rem;"></div>
 
-          <!-- Yazı Tipi & Başlık & Boyut -->
-          <div style="display: flex; align-items: center; gap: 0.3rem;">
-            <select id="tbFontName" style="padding: 0.3rem 0.5rem; border-radius: 7px; border: 1px solid var(--border, #cbd5e1); font-size: 0.8rem; background: var(--bg-card); color: var(--text-primary); cursor: pointer; max-width: 120px;" title="Yazı Tipi">
+          <!-- Yazı Tipi & Başlık & Boyut & Satır Aralığı -->
+          <div style="display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap;">
+            <select id="tbFontName" style="padding: 0.3rem 0.45rem; border-radius: 7px; border: 1px solid var(--border, #cbd5e1); font-size: 0.78rem; background: var(--bg-card); color: var(--text-primary); cursor: pointer; max-width: 125px;" title="Yazı Tipi">
               <option value="inherit">Yazı Tipi</option>
-              <option value="Arial">Arial</option>
-              <option value="'Segoe UI'">Segoe UI</option>
-              <option value="Georgia">Georgia</option>
-              <option value="'Courier New'">Courier New</option>
-              <option value="'Trebuchet MS'">Trebuchet</option>
+              <option value="Inter, sans-serif">Inter</option>
+              <option value="Roboto, sans-serif">Roboto</option>
+              <option value="'Open Sans', sans-serif">Open Sans</option>
+              <option value="Montserrat, sans-serif">Montserrat</option>
+              <option value="Poppins, sans-serif">Poppins</option>
+              <option value="Arial, sans-serif">Arial</option>
+              <option value="'Segoe UI', sans-serif">Segoe UI</option>
+              <option value="Tahoma, sans-serif">Tahoma</option>
+              <option value="Verdana, sans-serif">Verdana</option>
+              <option value="Georgia, serif">Georgia</option>
+              <option value="Garamond, serif">Garamond</option>
+              <option value="'Times New Roman', serif">Times New Roman</option>
+              <option value="'Courier New', monospace">Courier New</option>
+              <option value="Consolas, monospace">Consolas</option>
+              <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+              <option value="Impact, sans-serif">Impact</option>
             </select>
 
-            <select id="tbFormatBlock" style="padding: 0.3rem 0.5rem; border-radius: 7px; border: 1px solid var(--border, #cbd5e1); font-size: 0.8rem; background: var(--bg-card); color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Stil">
+            <select id="tbFormatBlock" style="padding: 0.3rem 0.45rem; border-radius: 7px; border: 1px solid var(--border, #cbd5e1); font-size: 0.78rem; background: var(--bg-card); color: var(--text-primary); cursor: pointer; font-weight: 600;" title="Stil">
               <option value="p">Normal Metin</option>
               <option value="h1">Başlık 1</option>
               <option value="h2">Başlık 2</option>
               <option value="h3">Başlık 3</option>
-              <option value="pre">Kod</option>
+              <option value="pre">Kod Bloğu</option>
               <option value="blockquote">Alıntı</option>
             </select>
 
-            <select id="tbFontSize" style="padding: 0.3rem 0.5rem; border-radius: 7px; border: 1px solid var(--border, #cbd5e1); font-size: 0.8rem; background: var(--bg-card); color: var(--text-primary); cursor: pointer;" title="Yazı Boyutu">
-              <option value="3">14px (Normal)</option>
-              <option value="1">10px</option>
-              <option value="2">12px</option>
-              <option value="4">16px</option>
-              <option value="5">18px</option>
-              <option value="6">24px</option>
-              <option value="7">32px</option>
+            <select id="tbFontSize" style="padding: 0.3rem 0.45rem; border-radius: 7px; border: 1px solid var(--border, #cbd5e1); font-size: 0.78rem; background: var(--bg-card); color: var(--text-primary); cursor: pointer; width: 78px;" title="Yazı Boyutu">
+              <option value="14px">14px</option>
+              <option value="8px">8px</option>
+              <option value="9px">9px</option>
+              <option value="10px">10px</option>
+              <option value="11px">11px</option>
+              <option value="12px">12px</option>
+              <option value="13px">13px</option>
+              <option value="15px">15px</option>
+              <option value="16px">16px</option>
+              <option value="18px">18px</option>
+              <option value="20px">20px</option>
+              <option value="22px">22px</option>
+              <option value="24px">24px</option>
+              <option value="28px">28px</option>
+              <option value="32px">32px</option>
+              <option value="36px">36px</option>
+              <option value="42px">42px</option>
+              <option value="48px">48px</option>
+              <option value="60px">60px</option>
+              <option value="72px">72px</option>
+            </select>
+
+            <select id="tbLineHeight" style="padding: 0.3rem 0.45rem; border-radius: 7px; border: 1px solid var(--border, #cbd5e1); font-size: 0.78rem; background: var(--bg-card); color: var(--text-primary); cursor: pointer;" title="Satır Aralığı (Line Height)">
+              <option value="1.75">Satır: 1.75</option>
+              <option value="1.0">1.0 Sıkışık</option>
+              <option value="1.15">1.15 Standart</option>
+              <option value="1.5">1.5 Geniş</option>
+              <option value="2.0">2.0 Çift</option>
             </select>
           </div>
 
           <div style="width: 1px; height: 20px; background: var(--border-light, #e2e8f0); margin: 0 0.15rem;"></div>
 
-          <!-- Temel Biçimlendirme -->
+          <!-- Temel Biçimlendirme & Alt/Üst Simge -->
           <div style="display: flex; align-items: center; gap: 0.15rem;">
-            <button type="button" id="tbBold" class="btn btn-sm btn-ghost" style="font-weight: 800; min-width: 28px; padding: 0.25rem 0.45rem;" title="Kalın (Ctrl+B)">B</button>
-            <button type="button" id="tbItalic" class="btn btn-sm btn-ghost" style="font-style: italic; min-width: 28px; padding: 0.25rem 0.45rem;" title="İtalik (Ctrl+I)">I</button>
-            <button type="button" id="tbUnderline" class="btn btn-sm btn-ghost" style="text-decoration: underline; min-width: 28px; padding: 0.25rem 0.45rem;" title="Altı Çizili (Ctrl+U)">U</button>
-            <button type="button" id="tbStrike" class="btn btn-sm btn-ghost" style="text-decoration: line-through; min-width: 28px; padding: 0.25rem 0.45rem;" title="Üstü Çizili">S</button>
+            <button type="button" id="tbBold" class="btn btn-sm btn-ghost" style="font-weight: 800; min-width: 26px; padding: 0.25rem 0.4rem;" title="Kalın (Ctrl+B)">B</button>
+            <button type="button" id="tbItalic" class="btn btn-sm btn-ghost" style="font-style: italic; min-width: 26px; padding: 0.25rem 0.4rem;" title="İtalik (Ctrl+I)">I</button>
+            <button type="button" id="tbUnderline" class="btn btn-sm btn-ghost" style="text-decoration: underline; min-width: 26px; padding: 0.25rem 0.4rem;" title="Altı Çizili (Ctrl+U)">U</button>
+            <button type="button" id="tbStrike" class="btn btn-sm btn-ghost" style="text-decoration: line-through; min-width: 26px; padding: 0.25rem 0.4rem;" title="Üstü Çizili">S</button>
+            <button type="button" id="tbSub" class="btn btn-sm btn-ghost" style="min-width: 26px; padding: 0.25rem 0.4rem; font-size: 0.75rem;" title="Alt Simge (x₂)">x₂</button>
+            <button type="button" id="tbSup" class="btn btn-sm btn-ghost" style="min-width: 26px; padding: 0.25rem 0.4rem; font-size: 0.75rem;" title="Üst Simge (x²)">x²</button>
           </div>
 
           <div style="width: 1px; height: 20px; background: var(--border-light, #e2e8f0); margin: 0 0.15rem;"></div>
@@ -330,22 +364,29 @@
 
           <!-- Listeler ve Hizalama -->
           <div style="display: flex; align-items: center; gap: 0.15rem;">
-            <button type="button" id="tbUl" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.45rem;" title="Madde İmli Liste">• Liste</button>
-            <button type="button" id="tbOl" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.45rem;" title="Numaralı Liste">1. Liste</button>
-            <button type="button" id="tbAlignLeft" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.45rem;" title="Sola Hizala">⇤</button>
-            <button type="button" id="tbAlignCenter" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.45rem;" title="Ortala">≡</button>
-            <button type="button" id="tbAlignRight" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.45rem;" title="Sağa Hizala">⇥</button>
-            <button type="button" id="tbAlignJustify" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.45rem;" title="İki Yana Yasla">☵</button>
+            <button type="button" id="tbUl" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Madde İmli Liste">• Liste</button>
+            <button type="button" id="tbOl" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Numaralı Liste">1. Liste</button>
+            <button type="button" id="tbAlignLeft" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.35rem;" title="Sola Hizala">⇤</button>
+            <button type="button" id="tbAlignCenter" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.35rem;" title="Ortala">≡</button>
+            <button type="button" id="tbAlignRight" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.35rem;" title="Sağa Hizala">⇥</button>
+            <button type="button" id="tbAlignJustify" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.35rem;" title="İki Yana Yasla">☵</button>
           </div>
 
           <div style="width: 1px; height: 20px; background: var(--border-light, #e2e8f0); margin: 0 0.15rem;"></div>
 
-          <!-- Tablo, Link, Çizgi, Biçim Temizle -->
+          <!-- Vurgu Kutusu, Tablo, Link, Çizgi, Temizle -->
           <div style="display: flex; align-items: center; gap: 0.2rem;">
-            <button type="button" id="tbTable" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.45rem;" title="Tablo Ekle">▦ Tablo</button>
-            <button type="button" id="tbLink" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.45rem;" title="Bağlantı (Link) Ekle">🔗 Link</button>
-            <button type="button" id="tbHr" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.45rem;" title="Yatay Çizgi Ekle">― Çizgi</button>
-            <button type="button" id="tbClearFormat" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.45rem; color: #ef4444;" title="Biçimlendirmeyi Temizle">🧹</button>
+            <select id="tbCallout" style="padding: 0.3rem 0.45rem; border-radius: 7px; border: 1px solid var(--border, #cbd5e1); font-size: 0.78rem; background: var(--bg-card); color: var(--text-primary); cursor: pointer;" title="Vurgu Kutusu Ekle">
+              <option value="">💡 Vurgu Kutusu</option>
+              <option value="info">ℹ️ Bilgi Kutusu</option>
+              <option value="warning">⚠️ Uyarı Kutusu</option>
+              <option value="success">✅ Başarı Kutusu</option>
+              <option value="danger">❌ Kritik Hata</option>
+            </select>
+            <button type="button" id="tbTable" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Tablo Ekle">▦ Tablo</button>
+            <button type="button" id="tbLink" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Bağlantı (Link) Ekle">🔗 Link</button>
+            <button type="button" id="tbHr" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Yatay Çizgi Ekle">― Çizgi</button>
+            <button type="button" id="tbClearFormat" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem; color: #ef4444;" title="Biçimlendirmeyi Temizle">🧹</button>
           </div>
 
           <!-- Medya & Ek Ekleme Butonları -->
@@ -585,8 +626,22 @@
       formatDoc('formatBlock', e.target.value);
     });
 
+    function applyPixelFontSize(sizePx) {
+      document.execCommand('fontSize', false, '7');
+      const fontElements = editor.querySelectorAll('font[size="7"]');
+      fontElements.forEach(el => {
+        el.removeAttribute('size');
+        el.style.fontSize = sizePx;
+      });
+      editor.focus();
+    }
+
     overlay.querySelector('#tbFontSize')?.addEventListener('change', (e) => {
-      formatDoc('fontSize', e.target.value);
+      applyPixelFontSize(e.target.value);
+    });
+
+    overlay.querySelector('#tbLineHeight')?.addEventListener('change', (e) => {
+      editor.style.lineHeight = e.target.value;
     });
 
     overlay.querySelector('#tbUndo')?.addEventListener('click', () => formatDoc('undo'));
@@ -596,6 +651,31 @@
     overlay.querySelector('#tbItalic')?.addEventListener('click', () => formatDoc('italic'));
     overlay.querySelector('#tbUnderline')?.addEventListener('click', () => formatDoc('underline'));
     overlay.querySelector('#tbStrike')?.addEventListener('click', () => formatDoc('strikeThrough'));
+    overlay.querySelector('#tbSub')?.addEventListener('click', () => formatDoc('subscript'));
+    overlay.querySelector('#tbSup')?.addEventListener('click', () => formatDoc('superscript'));
+
+    overlay.querySelector('#tbCallout')?.addEventListener('change', (e) => {
+      const type = e.target.value;
+      if (!type) return;
+      e.target.value = '';
+      const calloutStyles = {
+        info: { bg: '#eff6ff', border: '#3b82f6', icon: 'ℹ️', title: 'Bilgi Notu', text: '#1e40af' },
+        warning: { bg: '#fffbeb', border: '#f59e0b', icon: '⚠️', title: 'Dikkat / Uyarı', text: '#92400e' },
+        success: { bg: '#ecfdf5', border: '#10b981', icon: '✅', title: 'Başarılı / Onay', text: '#065f46' },
+        danger: { bg: '#fef2f2', border: '#ef4444', icon: '❌', title: 'Kritik Durum', text: '#991b1b' }
+      };
+      const style = calloutStyles[type] || calloutStyles.info;
+      const html = `
+        <div style="background: ${style.bg}; border-left: 4px solid ${style.border}; border-radius: 8px; padding: 0.85rem 1.1rem; margin: 1rem 0; color: ${style.text}; font-size: 0.92rem;">
+          <div style="font-weight: 800; display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.35rem;">
+            <span>${style.icon}</span> <span>${style.title}</span>
+          </div>
+          <div>Buraya açıklamayı ve önemli detayları girin...</div>
+        </div>
+        <p><br></p>
+      `;
+      formatDoc('insertHTML', html);
+    });
 
     overlay.querySelector('#tbTextColor')?.addEventListener('change', (e) => formatDoc('foreColor', e.target.value));
     overlay.querySelector('#tbBgColor')?.addEventListener('change', (e) => formatDoc('hiliteColor', e.target.value));
