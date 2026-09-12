@@ -148,34 +148,19 @@
         <div style="position:absolute;top:-60px;left:-60px;width:220px;height:220px;background:rgba(37,99,235,0.25);border-radius:50%;filter:blur(60px);pointer-events:none;"></div>
         <div style="position:absolute;bottom:-80px;right:-60px;width:260px;height:260px;background:rgba(99,102,241,0.22);border-radius:50%;filter:blur(70px);pointer-events:none;"></div>
 
-        <div style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;text-align:center;padding:1.6rem 0.6rem;">
-          <div style="margin-bottom:1.5rem;filter:drop-shadow(0 12px 28px rgba(37,99,235,0.45));">
-            ${getFrpLogoSvg(80)}
+        <div style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;text-align:center;justify-content:center;flex:1;padding:2rem 1rem;">
+          <div style="margin-bottom:1.5rem;filter:drop-shadow(0 16px 36px rgba(37,99,235,0.5));">
+            ${getFrpLogoSvg(88)}
           </div>
-          <h1 style="font-size:1.65rem;font-weight:900;letter-spacing:-.03em;margin:0 0 .4rem;color:#ffffff;text-shadow:0 2px 12px rgba(0,0,0,0.35);">FrpOku Enterprise</h1>
-          <p style="font-size:.82rem;color:#94a3b8;margin:0 0 2.2rem;max-width:270px;line-height:1.5;font-weight:500;">
-            FastReport Raporlama, SQL Denetimi ve Kurumsal İş Birliği Platformu
-          </p>
-
-          <div style="width:100%;display:flex;flex-direction:column;gap:.75rem;max-width:280px;text-align:left;">
-            <div style="display:flex;align-items:center;gap:.75rem;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:.6rem .85rem;border-radius:10px;">
-              <span style="font-size:1rem;color:#38bdf8;">⚡</span>
-              <span style="font-size:.78rem;color:#cbd5e1;font-weight:600;">Hızlı Rapor & SQL Analizi</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:.75rem;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:.6rem .85rem;border-radius:10px;">
-              <span style="font-size:1rem;color:#10b981;">🛡️</span>
-              <span style="font-size:.78rem;color:#cbd5e1;font-weight:600;">Çift Katmanlı Veri Güvenliği</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:.75rem;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:.6rem .85rem;border-radius:10px;">
-              <span style="font-size:1rem;color:#a855f7;">💬</span>
-              <span style="font-size:.78rem;color:#cbd5e1;font-weight:600;">Canlı Ekip İletişimi & Notlar</span>
-            </div>
+          <h1 style="font-size:1.75rem;font-weight:900;letter-spacing:-.03em;margin:0 0 .5rem;color:#ffffff;text-shadow:0 2px 14px rgba(0,0,0,0.4);">FrpOku Enterprise</h1>
+          <div style="display:inline-flex;align-items:center;gap:.4rem;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);padding:.35rem .85rem;border-radius:20px;font-size:.76rem;color:#93c5fd;font-weight:600;letter-spacing:0.3px;">
+            Kurumsal Rapor Yönetimi
           </div>
         </div>
 
         <div style="position:relative;z-index:2;display:flex;align-items:center;justify-content:center;gap:.55rem;padding-top:1.2rem;border-top:1px solid rgba(255,255,255,0.08);">
           <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 8px #10b981;"></span>
-          <span style="font-size:.74rem;color:#94a3b8;font-weight:600;">Uçtan Uca Şifreli Kurumsal Oturum</span>
+          <span style="font-size:.74rem;color:#94a3b8;font-weight:600;">Güvenli Kurumsal Oturum</span>
         </div>
       </div>
 

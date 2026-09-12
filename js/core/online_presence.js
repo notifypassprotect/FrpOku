@@ -1004,12 +1004,13 @@
         <div class="frp-chat-header-user">
           <div class="frp-chat-avatar-wrap">
             <div class="frp-chat-avatar" style="background: ${avatarBg}; font-size: ${isRoom || isGroup || targetUser?.isSelfNote ? '1rem' : '0.82rem'}; font-weight: 800; color: #ffffff;">${escHtml(userInitials)}</div>
-            ${(!isRoom && !isGroup) ? `<span class="frp-chat-status-dot" style="background-color: ${statusDotColor};"></span>` : ''}
+            ${(!isRoom && !isGroup) ? `<span class="frp-chat-status-dot ${userStatus === 'online' ? 'frp-online-pulse' : ''}" style="background-color: ${statusDotColor};"></span>` : ''}
           </div>
           <div class="frp-chat-header-text">
             <div class="frp-chat-header-name" title="${escHtml(chatTitle)}">${escHtml(chatTitle)}</div>
             <div class="frp-chat-header-status">
               <span>${escHtml(statusText)}</span>
+              ${(!isRoom && !isGroup && userStatus === 'online') ? `<span class="frp-chat-live-badge">CANLI</span>` : ''}
               ${(!isRoom && !isGroup && !targetUser.isSelfNote && targetUser.department) ? `<span class="frp-presence-dept-badge" style="margin-left: 3px; font-size: 0.62rem;">${escHtml(targetUser.department)}</span>` : ''}
             </div>
           </div>
@@ -1049,6 +1050,15 @@
           <strong>${escHtml(chatTitle)}</strong> ile güvenli kurumsal iletişim oturumu.
         </div>
         <div class="frp-chat-messages-stream"></div>
+        <!-- CANLI YAZIYOR GÖSTERGESİ -->
+        <div class="frp-typing-indicator" style="display: none;">
+          <div class="typing-bubble">
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+          </div>
+          <span class="typing-text"></span>
+        </div>
       </div>
 
       <!-- EMOJI SEÇİCİ POPUP -->
@@ -1135,6 +1145,7 @@
     const audioFallbackInput = chatEl.querySelector('.frp-chat-audio-fallback');
     const btnMic = chatEl.querySelector('.btn-mic');
     const msgStream = chatEl.querySelector('.frp-chat-messages-stream');
+    const typingIndicator = chatEl.querySelector('.frp-typing-indicator');
     const chatHeader = chatEl.querySelector('.frp-chat-header');
     const btnNudgeHeader = chatEl.querySelector('.btn-nudge');
     const btnNudgeAction = chatEl.querySelector('.btn-nudge-action');
@@ -1237,6 +1248,17 @@
               }
             }
             renderMessageStream(currentMessages);
+          }
+
+          if (typingIndicator) {
+            if (data && Array.isArray(data.typingUsers) && data.typingUsers.length > 0) {
+              const typerNames = data.typingUsers.join(', ');
+              typingIndicator.style.display = 'flex';
+              const tText = typingIndicator.querySelector('.typing-text');
+              if (tText) tText.textContent = `${typerNames} yazıyor...`;
+            } else {
+              typingIndicator.style.display = 'none';
+            }
           }
         }
       } catch {}
@@ -1646,17 +1668,58 @@
       }
     }
 
+    function playMessageSentSound() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(580, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.12);
+      } catch {}
+    }
+
     function handleSend() {
       if (!input) return;
       const text = (input.value || '').trim();
       if (!text) return;
       input.value = '';
       if (emojiPicker) emojiPicker.style.display = 'none';
+      if (btnSend) {
+        btnSend.classList.add('sent-ripple');
+        setTimeout(() => btnSend.classList.remove('sent-ripple'), 300);
+      }
+      playMessageSentSound();
       sendMessage({ text });
     }
 
     if (btnSend) btnSend.addEventListener('click', handleSend);
+    let lastTypingSent = 0;
     if (input) {
+      input.addEventListener('input', () => {
+        const now = Date.now();
+        if (now - lastTypingSent > 2000 && (input.value || '').trim()) {
+          lastTypingSent = now;
+          fetch('/api/chat/typing', {
+            method: 'POST',
+            headers: (window.FrpAuth && window.FrpAuth.getAuthHeaders) ? window.FrpAuth.getAuthHeaders() : { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              peerId: (!isRoom && !isGroup) ? chatId : null,
+              roomId: isRoom ? chatId : null,
+              groupId: isGroup ? chatId : null
+            })
+          }).catch(() => {});
+        }
+      });
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();

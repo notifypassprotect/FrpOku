@@ -606,7 +606,7 @@ function esc(str) {
  if (comp.type === 'TfrxBarCodeView') {
  return `
  <div class="fr-view-item fr-barcode-view ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
- data-band-idx="${bIdx}" data-comp-idx="${cIdx}"
+ data-band-idx="${bIdx}" data-comp-idx="${cIdx}" data-comp-name="${esc(comp.name || '')}"
  style="
  left:${comp.left}px;
  top:${comp.top}px;
@@ -662,7 +662,7 @@ function esc(str) {
  if (comp.type === 'TfrxDMPMemoView') {
  return `
  <div class="fr-view-item ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
- data-band-idx="${bIdx}" data-comp-idx="${cIdx}"
+ data-band-idx="${bIdx}" data-comp-idx="${cIdx}" data-comp-name="${esc(comp.name || '')}"
  style="
  left:${comp.left}px;
  top:${comp.top}px;
@@ -692,7 +692,7 @@ function esc(str) {
  if (comp.type === 'TfrxPictureView') {
  return `
  <div class="fr-view-item fr-picture-view ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
- data-band-idx="${bIdx}" data-comp-idx="${cIdx}"
+ data-band-idx="${bIdx}" data-comp-idx="${cIdx}" data-comp-name="${esc(comp.name || '')}"
  style="left:${comp.left}px; top:${comp.top}px; width:${comp.width}px; height:${comp.height}px;"
  title="${esc(comp.name)} [${esc(comp.dataField || 'Logo')}]${eventTitle}">
  ️ ${esc(comp.dataField || comp.name)}
@@ -705,7 +705,7 @@ function esc(str) {
  if (comp.type === 'TfrxLineView') {
  return `
  <div class="fr-view-item fr-line-view ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
- data-band-idx="${bIdx}" data-comp-idx="${cIdx}"
+ data-band-idx="${bIdx}" data-comp-idx="${cIdx}" data-comp-name="${esc(comp.name || '')}"
  style="left:${comp.left}px; top:${comp.top}px; width:${comp.width}px; height:${Math.max(1, comp.height)}px; border-top:1px solid ${textColor};">
  ${renderResizeHandles(isSelected)}
  </div>
@@ -794,7 +794,7 @@ function esc(str) {
 
  return `
  <div class="fr-view-item fr-chart-view ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
- data-band-idx="${bIdx}" data-comp-idx="${cIdx}"
+ data-band-idx="${bIdx}" data-comp-idx="${cIdx}" data-comp-name="${esc(comp.name || '')}"
  style="
  left:${comp.left}px;
  top:${comp.top}px;
@@ -838,7 +838,7 @@ function esc(str) {
  const borderRadius = isCircle? '50%': (isRound? '8px': '0px');
  return `
  <div class="fr-view-item ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
- data-band-idx="${bIdx}" data-comp-idx="${cIdx}"
+ data-band-idx="${bIdx}" data-comp-idx="${cIdx}" data-comp-name="${esc(comp.name || '')}"
  style="
  left:${comp.left}px;
  top:${comp.top}px;
@@ -858,7 +858,7 @@ function esc(str) {
  // 7. Standart TfrxMemoView
  return `
  <div class="fr-view-item ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
- data-band-idx="${bIdx}" data-comp-idx="${cIdx}"
+ data-band-idx="${bIdx}" data-comp-idx="${cIdx}" data-comp-name="${esc(comp.name || '')}"
  style="
  left:${comp.left}px;
  top:${comp.top}px;
@@ -1358,21 +1358,22 @@ function esc(str) {
       { name: 'Duplex', val: 'dmNone', readOnly: true },
       { name: 'Visible', val: obj.visible !== false ? 'true' : 'false', propKey: 'visible', isSelect: isDesignEditing, options: ['true', 'false'] }
     ];
-  } else if (isBand) {
- // BANT NESNESİ ÖZELLİKLERİ
-     const isBoldVal = (obj.fontStyle && (obj.fontStyle.includes('fsBold') || obj.fontStyle.includes('bold'))) || obj.isBold;
+  } else {
+    // BANT, MEMO (TfrxMemoView), VE DİĞER BİLEŞENLERİN TÜM DELPHI ÖZELLİKLERİ
+    const isBoldVal = (obj.fontStyle && (obj.fontStyle.includes('fsBold') || obj.fontStyle.includes('bold'))) || obj.isBold;
     const isItalicVal = (obj.fontStyle && (obj.fontStyle.includes('fsItalic') || obj.fontStyle.includes('italic'))) || obj.isItalic;
     const isUnderlineVal = (obj.fontStyle && (obj.fontStyle.includes('fsUnderline') || obj.fontStyle.includes('underline'))) || obj.isUnderline;
+    const rawTextVal = obj.caption !== undefined ? obj.caption : (obj.text !== undefined ? obj.text : (Array.isArray(obj.memo) ? obj.memo.join('\n') : (obj.memo || '')));
 
     propList = [
       { name: 'Name', val: obj.name || '', propKey: 'name', editable: isDesignEditing },
-      { name: 'Class', val: obj.type || 'TfrxComponent', readOnly: true },
+      { name: 'Class', val: obj.type || (obj.bands ? 'TfrxReportPage' : 'TfrxMemoView'), readOnly: true },
       { name: 'Left', val: obj.left ?? 0, propKey: 'left', isNumber: true, editable: isDesignEditing },
       { name: 'Top', val: obj.top ?? 0, propKey: 'top', isNumber: true, editable: isDesignEditing },
       { name: 'Width', val: obj.width ?? 0, propKey: 'width', isNumber: true, editable: isDesignEditing },
       { name: 'Height', val: obj.height ?? 0, propKey: 'height', isNumber: true, editable: isDesignEditing },
       { name: 'Align', val: obj.align || 'alNone', propKey: 'align', isSelect: isDesignEditing, options: ['alNone', 'alLeft', 'alRight', 'alTop', 'alBottom', 'alClient', 'alCustom'] },
-      { name: 'Caption / Text', val: obj.caption || obj.text || '', propKey: 'text', editable: isDesignEditing },
+      { name: 'Caption / Text', val: rawTextVal, propKey: 'text', editable: isDesignEditing },
       { name: 'DataSet', val: obj.dataSet || obj.listSource || '', propKey: 'dataSet', editable: isDesignEditing },
       { name: 'DataField', val: obj.dataField || obj.listField || '', propKey: 'dataField', editable: isDesignEditing },
       { name: 'HAlign', val: obj.hAlign || obj.alignment || 'haLeft', propKey: 'hAlign', isSelect: isDesignEditing, options: ['haLeft', 'haCenter', 'haRight', 'haBlock'] },
@@ -1400,7 +1401,24 @@ function esc(str) {
       { name: 'Enabled', val: obj.enabled !== false ? 'true' : 'false', propKey: 'enabled', isSelect: isDesignEditing, options: ['true', 'false'] },
       { name: 'Printable', val: obj.printable !== false ? 'true' : 'false', propKey: 'printable', isSelect: isDesignEditing, options: ['true', 'false'] }
     ];
- }
+
+    if (obj.type === 'TfrxPictureView') {
+      propList.push(
+        { name: 'Picture.File', val: obj.picture || obj.file || '', propKey: 'picture', editable: isDesignEditing },
+        { name: 'KeepAspectRatio', val: obj.keepAspectRatio !== false ? 'true' : 'false', propKey: 'keepAspectRatio', isSelect: isDesignEditing, options: ['true', 'false'] }
+      );
+    } else if (obj.type === 'TfrxBarCodeView') {
+      propList.push(
+        { name: 'BarType', val: obj.barType || 'bcCode128', propKey: 'barType', isSelect: isDesignEditing, options: ['bcCode128', 'bcCode39', 'bcEAN13', 'bcUPCA', 'bcQR', 'bcPDF417'] },
+        { name: 'Expression', val: obj.expression || obj.text || '', propKey: 'expression', editable: isDesignEditing },
+        { name: 'Zoom', val: obj.zoom || 1, propKey: 'zoom', isNumber: true, editable: isDesignEditing }
+      );
+    } else if (obj.type === 'TfrxShapeView') {
+      propList.push(
+        { name: 'Shape', val: obj.shape || 'skRectangle', propKey: 'shape', isSelect: isDesignEditing, options: ['skRectangle', 'skRoundRectangle', 'skEllipse', 'skTriangle', 'skDiamond'] }
+      );
+    }
+  }
 
  const filtered = inspectorSearchQuery
 ? propList.filter(p => p.name.toLowerCase().includes(inspectorSearchQuery.toLowerCase()) || String(p.val).toLowerCase().includes(inspectorSearchQuery.toLowerCase()))
@@ -1485,6 +1503,11 @@ function esc(str) {
 
  pushUndoState();
  selectedItem[prop] = val;
+				if (prop === 'text' || prop === 'caption') {
+					selectedItem.text = val;
+					selectedItem.caption = val;
+					selectedItem.memo = val;
+				}
  if (prop === 'fillBackColor') selectedItem.color = val;
  if (prop === 'color') selectedItem.fillBackColor = val;
  renderCanvasOnly();
@@ -2312,7 +2335,9 @@ function esc(str) {
  }
  }
  } else if (currentMode === 'designer') {
- const targetEl = containerEl.querySelector(`[title*="${selectedItem.name}"]`) || containerEl.querySelector(`[data-ctrl-idx]`);
+ const targetEl = (selectedItem.name ? containerEl.querySelector(`[data-comp-name="${selectedItem.name}"]`) : null) ||
+ containerEl.querySelector(`[title*="${selectedItem.name}"]`) ||
+ containerEl.querySelector(`[data-ctrl-idx]`);
  if (targetEl) targetEl.classList.add('selected');
  }
  }

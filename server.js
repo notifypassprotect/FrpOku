@@ -2718,9 +2718,46 @@ app.get('/api/chat/messages', requireAuth, async (req, res) => {
       }
     }
 
-    res.json({ success: true, messages: matched.slice(-100) });
+    // Aktif yazıyor (typing) kullanıcıları topla
+    const now = Date.now();
+    const typingUsers = [];
+    for (const [key, item] of activeChatTyping.entries()) {
+      if (now > item.expiresAt) {
+        activeChatTyping.delete(key);
+      } else if (item.senderId !== myId) {
+        if (peerId && item.senderId === peerId && item.targetId === myId) {
+          typingUsers.push(item.senderName);
+        } else if ((roomId && item.targetId === roomId) || (groupId && item.targetId === groupId)) {
+          typingUsers.push(item.senderName);
+        }
+      }
+    }
+
+    res.json({ success: true, messages: matched.slice(-100), typingUsers });
   } catch (err) {
     res.status(500).json({ success: false, reason: 'Mesajlar alınamadı.' });
+  }
+});
+
+// Chat: Canlı Yazıyor (Typing) Bildirimi
+const activeChatTyping = new Map();
+app.post('/api/chat/typing', requireAuth, async (req, res) => {
+  try {
+    const senderId = String(req.authUser.id);
+    const senderName = req.authUser.full_name || req.authUser.username;
+    const targetId = req.body?.peerId || req.body?.roomId || req.body?.groupId;
+    if (targetId) {
+      const key = `${senderId}_${targetId}`;
+      activeChatTyping.set(key, {
+        senderId,
+        senderName,
+        targetId: String(targetId),
+        expiresAt: Date.now() + 3500
+      });
+    }
+    res.json({ success: true });
+  } catch {
+    res.json({ success: false });
   }
 });
 
