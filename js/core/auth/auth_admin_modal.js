@@ -153,63 +153,161 @@
  // ── Sekme 3: E-posta altyapısı ──
  async function renderMailTab() {
  const body = overlay.querySelector('#adminModalBody');
- body.innerHTML = `<div style="text-align:center;padding:2.5rem;color:var(--text-muted,#64748b);"><div class="splash-spinner" style="margin-bottom:1rem;"></div><div>SMTP durumu kontrol ediliyor...</div></div>`;
+ body.innerHTML = `<div style="text-align:center;padding:2.5rem;color:var(--text-muted,#64748b);"><div class="splash-spinner" style="margin-bottom:1rem;"></div><div>Sistem durumu ve SMTP kontrol ediliyor...</div></div>`;
 
  try {
- const headers = (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function')? window.FrpAuth.getAuthHeaders(): {};
- const response = await fetch('/api/admin/mail/status', { headers });
- const data = await response.json();
- if (!response.ok || !data.success) throw new Error(data.reason || 'Mail durumu alınamadı.');
+ const headers = (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') ? window.FrpAuth.getAuthHeaders() : {};
+ const [mailRes, healthRes] = await Promise.all([
+ fetch('/api/admin/mail/status', { headers }).then(r => r.json()).catch(() => ({})),
+ fetch('/api/admin/system-health', { headers }).then(r => r.json()).catch(() => ({}))
+ ]);
 
- const mail = data.mail || {};
+ const mail = mailRes.mail || {};
  const ready = mail.enabled && mail.configured;
+ const health = healthRes.health || {};
+ const supa = health.supabase || {};
+ const sys = health.system || {};
+ const stats = health.users || {};
+
+ const uptimeHours = sys.uptimeSec ? (sys.uptimeSec / 3600).toFixed(1) : '0';
+
  body.innerHTML = `
- <div style="max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:1rem;">
+ <div style="max-width:740px;margin:0 auto;display:flex;flex-direction:column;gap:1rem;">
+ 
+ <!-- 1. Canlı Sistem & Supabase Sağlık Kartı -->
+ <div style="padding:1.1rem;border:1px solid var(--border,#cbd5e1);border-radius:14px;background:var(--bg-surface,#fff);">
+ <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:.85rem;">
+ <div>
+ <div style="font-size:1rem;font-weight:900;display:flex;align-items:center;gap:.45rem;">
+ <span>⚡ Sistem & Supabase Sağlığı</span>
+ <span class="badge ${supa.connected ? 'badge-green' : 'badge-amber'}" style="font-size:.7rem;">
+ ${supa.connected ? 'Bulut Bağlantısı Aktif' : 'Yerel Mod / Çevrimdışı'}
+ </span>
+ </div>
+ <div style="font-size:.78rem;color:var(--text-muted,#64748b);margin-top:.2rem;">
+ Gerçek zamanlı sunucu performansı, bellek ve veritabanı yanıt süresi
+ </div>
+ </div>
+ <button type="button" id="btnRefreshHealth" class="btn btn-sm btn-ghost" style="font-size:.76rem;">🔄 Yenile</button>
+ </div>
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.65rem;font-size:.8rem;">
+ <div style="background:var(--bg-card,#f8fafc);padding:.6rem .8rem;border-radius:10px;border:1px solid var(--border-light,#e2e8f0);">
+ <div style="font-size:.7rem;color:var(--text-muted,#64748b);font-weight:700;">Supabase Gecikme</div>
+ <div style="font-size:.95rem;font-weight:900;color:var(--accent,#2563eb);margin-top:.15rem;">
+ ${supa.latencyMs ? supa.latencyMs + ' ms' : 'N/A'}
+ </div>
+ </div>
+ <div style="background:var(--bg-card,#f8fafc);padding:.6rem .8rem;border-radius:10px;border:1px solid var(--border-light,#e2e8f0);">
+ <div style="font-size:.7rem;color:var(--text-muted,#64748b);font-weight:700;">Bellek (RAM RSS)</div>
+ <div style="font-size:.95rem;font-weight:900;color:var(--text-primary,#0f172a);margin-top:.15rem;">
+ ${sys.memoryRssMb ? sys.memoryRssMb + ' MB' : 'N/A'}
+ </div>
+ </div>
+ <div style="background:var(--bg-card,#f8fafc);padding:.6rem .8rem;border-radius:10px;border:1px solid var(--border-light,#e2e8f0);">
+ <div style="font-size:.7rem;color:var(--text-muted,#64748b);font-weight:700;">Çalışma Süresi</div>
+ <div style="font-size:.95rem;font-weight:900;color:var(--text-primary,#0f172a);margin-top:.15rem;">
+ ${uptimeHours} saat
+ </div>
+ </div>
+ <div style="background:var(--bg-card,#f8fafc);padding:.6rem .8rem;border-radius:10px;border:1px solid var(--border-light,#e2e8f0);">
+ <div style="font-size:.7rem;color:var(--text-muted,#64748b);font-weight:700;">Kullanıcılar</div>
+ <div style="font-size:.95rem;font-weight:900;color:var(--text-primary,#0f172a);margin-top:.15rem;">
+ ${stats.total || 0} (Bekleyen: ${stats.pending || 0})
+ </div>
+ </div>
+ </div>
+ </div>
+
+ <!-- 2. SMTP Gönderim Durumu -->
  <div style="padding:1.1rem;border:1px solid var(--border,#cbd5e1);border-radius:14px;background:var(--bg-surface,#fff);">
  <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
- <div><div style="font-size:1rem;font-weight:900;">SMTP Gönderim Durumu</div><div style="font-size:.78rem;color:var(--text-muted,#64748b);margin-top:.25rem;">Google App Password daha sonra Render secret alanlarına eklenecek.</div></div>
- <span class="badge ${ready? 'badge-green': 'badge-amber'}">${ready? 'Hazır': mail.enabled? 'Eksik Yapılandırma': 'Kapalı'}</span>
+ <div>
+ <div style="font-size:1rem;font-weight:900;">SMTP Gönderim Durumu</div>
+ <div style="font-size:.78rem;color:var(--text-muted,#64748b);margin-top:.25rem;">E-posta bildirimleri (kayıt onayı, güvenlik uyarıları, doğrulama kodları)</div>
+ </div>
+ <span class="badge ${ready ? 'badge-green' : 'badge-amber'}">${ready ? 'Hazır' : mail.enabled ? 'Eksik Yapılandırma' : 'Kapalı'}</span>
  </div>
  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.75rem;margin-top:1rem;font-size:.8rem;">
- <div><strong>Sunucu</strong><br>${escHtml(mail.provider || 'Tanımlanmadı')}</div>
- <div><strong>Gönderen</strong><br>${escHtml(mail.from || 'Tanımlanmadı')}</div>
- <div><strong>Mail Enabled</strong><br>${mail.enabled? 'Evet': 'Hayır'}</div>
+ <div><strong>Sunucu:</strong> ${escHtml(mail.provider || 'Tanımlanmadı')}</div>
+ <div><strong>Gönderen:</strong> ${escHtml(mail.from || 'Tanımlanmadı')}</div>
+ <div><strong>Mail Durumu:</strong> ${mail.enabled ? 'Aktif' : 'Pasif'}</div>
  </div>
  </div>
+
+ <!-- 3. Test E-postası ve Sistem Özeti Gönderimi -->
  <div style="padding:1.1rem;border:1px solid var(--border,#cbd5e1);border-radius:14px;background:var(--bg-surface,#fff);">
- <div style="font-size:.95rem;font-weight:900;margin-bottom:.3rem;">Test E-postası</div>
- <div style="font-size:.78rem;color:var(--text-muted,#64748b);margin-bottom:.9rem;">SMTP etkinleştirildikten sonra bu alandan gerçek gönderim testi yapılabilir.</div>
- <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+ <div style="font-size:.95rem;font-weight:900;margin-bottom:.3rem;">Manuel Test & Sistem Özeti E-postası</div>
+ <div style="font-size:.78rem;color:var(--text-muted,#64748b);margin-bottom:.9rem;">
+ SMTP altyapısını test edebilir veya tüm sistem metriklerini içeren özet raporu admin adresinize tetikleyebilirsiniz.
+ </div>
+ <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:.65rem;">
  <input type="email" id="adminMailTestAddress" class="master-search-input" placeholder="ornek@gmail.com" style="flex:1;min-width:220px;" />
- <button type="button" id="btnAdminMailTest" class="btn btn-primary" ${ready? '': 'disabled'}>Test Maili Gönder</button>
+ <button type="button" id="btnAdminMailTest" class="btn btn-primary" ${ready ? '' : 'disabled'}>
+ ✉️ Test Maili Gönder
+ </button>
+ <button type="button" id="btnAdminSendDigest" class="btn btn-secondary" ${ready ? '' : 'disabled'} style="font-weight:800;">
+ 📊 Sistem Özetini Gönder
+ </button>
  </div>
- <div id="adminMailTestResult" style="font-size:.78rem;margin-top:.7rem;color:var(--text-muted,#64748b);"></div>
+ <div id="adminMailTestResult" style="font-size:.8rem;margin-top:.5rem;font-weight:600;color:var(--text-muted,#64748b);"></div>
  </div>
+
  </div>`;
+
+ body.querySelector('#btnRefreshHealth')?.addEventListener('click', renderMailTab);
 
  body.querySelector('#btnAdminMailTest')?.addEventListener('click', async event => {
  const email = (body.querySelector('#adminMailTestAddress')?.value || '').trim();
  const resultEl = body.querySelector('#adminMailTestResult');
  if (!email || !email.includes('@')) {
  resultEl.textContent = 'Geçerli bir e-posta adresi girin.';
+ resultEl.style.color = '#ef4444';
  return;
  }
  event.currentTarget.disabled = true;
+ resultEl.style.color = 'var(--accent,#2563eb)';
  resultEl.textContent = 'Test e-postası gönderiliyor...';
  try {
  const testResponse = await fetch('/api/admin/mail/test', {
  method: 'POST',
- headers: (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function')? window.FrpAuth.getAuthHeaders(): { 'Content-Type': 'application/json' },
+ headers: (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') ? window.FrpAuth.getAuthHeaders() : { 'Content-Type': 'application/json' },
  body: JSON.stringify({ email })
  });
  const testData = await testResponse.json();
- resultEl.textContent = testData.success? 'Test e-postası başarıyla gönderildi.': (testData.reason || 'E-posta gönderilemedi.');
+ resultEl.style.color = testData.success ? '#10b981' : '#ef4444';
+ resultEl.textContent = testData.success ? '✅ Test e-postası başarıyla gönderildi.' : (testData.reason || 'E-posta gönderilemedi.');
  } catch (error) {
+ resultEl.style.color = '#ef4444';
  resultEl.textContent = 'Mail servisine ulaşılamadı.';
  } finally {
  event.currentTarget.disabled = false;
  }
  });
+
+ body.querySelector('#btnAdminSendDigest')?.addEventListener('click', async event => {
+ const resultEl = body.querySelector('#adminMailTestResult');
+ event.currentTarget.disabled = true;
+ resultEl.style.color = 'var(--accent,#2563eb)';
+ resultEl.textContent = 'Sistem özeti e-postası hazırlanıp gönderiliyor...';
+ try {
+ const res = await fetch('/api/admin/mail/send-digest', {
+ method: 'POST',
+ headers: (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') ? window.FrpAuth.getAuthHeaders() : {}
+ });
+ const data = await res.json();
+ resultEl.style.color = data.success ? '#10b981' : '#ef4444';
+ resultEl.textContent = data.success ? '✅ Sistem özeti başarıyla admin e-postasına gönderildi.' : (data.reason || 'Özet e-posta gönderilemedi.');
+ if (data.success && typeof window.toast === 'function') {
+ window.toast('Sistem özeti e-postası gönderildi!', 'success');
+ }
+ } catch (e) {
+ resultEl.style.color = '#ef4444';
+ resultEl.textContent = 'Özet servisine ulaşılamadı: ' + e.message;
+ } finally {
+ event.currentTarget.disabled = false;
+ }
+ });
+
  } catch (error) {
  body.innerHTML = `<div style="padding:2rem;text-align:center;color:#ef4444;font-weight:700;">${escHtml(error.message)}</div>`;
  }
@@ -416,44 +514,55 @@
  <div class="admin-card-grid" id="allUsersGridList">
  `;
 
- allUsers.forEach(u => {
- const isUsrAdmin = (u.role === 'admin' || u.username === 'admin');
- const isPending = (u.is_active === false);
+  allUsers.forEach(u => {
+    const isUsrAdmin = (u.role === 'admin' || u.username === 'admin');
+    const isFrozen = (u.is_frozen === true || u.status === 'frozen');
+    const isPending = (u.is_active === false);
+    const currentAdminId = window.FrpAuth && typeof window.FrpAuth.getUser === 'function' ? window.FrpAuth.getUser()?.id : null;
+    const isSelf = (currentAdminId && String(u.id) === String(currentAdminId));
 
- html += `
- <div class="admin-user-card" id="userCard_${u.id}">
- <div class="admin-user-info">
- <div class="admin-user-avatar">${u.avatar || (isUsrAdmin? '': '')}</div>
- <div style="min-width:0;flex:1;">
- <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.2rem;">
- <span style="font-weight:800;font-size:.95rem;color:var(--text-primary,#0f172a);">${escHtml(u.full_name || u.username)}</span>
- <span style="font-size:.78rem;font-weight:700;font-family:monospace;color:#2563eb;background:rgba(37,99,235,0.08);padding:.15rem.45rem;border-radius:6px;display:inline-flex;align-items:center;gap:.35rem;">
- @${escHtml(u.username)}
- <button type="button" class="btn btn-sm btn-edit-username" data-id="${u.id}" data-name="${escHtml(u.username)}" title="Kullanıcı Adını Değiştir" style="padding:2px 8px;font-size:.72rem;">
- <span>✏️</span><span>Düzenle</span>
- </button>
- </span>
- ${isUsrAdmin? `<span class="badge badge-purple" style="font-size:.68rem;">👑 Admin</span>`: `<span class="badge badge-blue" style="font-size:.68rem;">Kullanıcı</span>`}
- ${isPending? `<span class="badge badge-amber" style="font-size:.68rem;">⏳ Onay Bekliyor</span>`: `<span class="badge badge-green" style="font-size:.68rem;">✓ Aktif</span>`}
- </div>
- <div style="display:flex;align-items:center;gap:.8rem;flex-wrap:wrap;font-size:.75rem;color:var(--text-secondary,#64748b);">
- <span>✉️ ${escHtml(u.email || '-')}</span>
- ${u.phone? `<span>📞 ${escHtml(u.phone)}</span>`: ''}
- <span>🏢 ${escHtml(u.department || 'Bilgi İşlem')}</span>
- </div>
- </div>
- </div>
- <div class="admin-actions">
- <button type="button" class="btn btn-sm btn-admin-reset-pass" data-id="${u.id}" data-name="${escHtml(u.full_name || u.username)}" title="Şifre Sıfırla" style="font-size:.78rem;padding:.38rem .75rem;">
- 🔑 Şifre Sıfırla
- </button>
- </div>
- </div>
- `;
- });
+    html += `
+    <div class="admin-user-card" id="userCard_${u.id}">
+      <div class="admin-user-info">
+        <div class="admin-user-avatar">${u.avatar || (isUsrAdmin ? '👑' : '👤')}</div>
+        <div style="min-width:0;flex:1;">
+          <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.2rem;">
+            <span style="font-weight:800;font-size:.95rem;color:var(--text-primary,#0f172a);">${escHtml(u.full_name || u.username)}</span>
+            <span style="font-size:.78rem;font-weight:700;font-family:monospace;color:#2563eb;background:rgba(37,99,235,0.08);padding:.15rem.45rem;border-radius:6px;display:inline-flex;align-items:center;gap:.35rem;">
+              @${escHtml(u.username)}
+              <button type="button" class="btn btn-sm btn-edit-username" data-id="${u.id}" data-name="${escHtml(u.username)}" title="Kullanıcı Adını Değiştir" style="padding:2px 8px;font-size:.72rem;">
+                <span>✏️</span><span>Düzenle</span>
+              </button>
+            </span>
+            ${isUsrAdmin ? `<span class="badge badge-purple" style="font-size:.68rem;">👑 Admin</span>` : `<span class="badge badge-blue" style="font-size:.68rem;">Kullanıcı</span>`}
+            ${isFrozen ? `<span class="badge badge-red" style="font-size:.68rem;">❄️ Donduruldu</span>` : (isPending ? `<span class="badge badge-amber" style="font-size:.68rem;">⏳ Onay Bekliyor</span>` : `<span class="badge badge-green" style="font-size:.68rem;">✓ Aktif</span>`)}
+          </div>
+          <div style="display:flex;align-items:center;gap:.8rem;flex-wrap:wrap;font-size:.75rem;color:var(--text-secondary,#64748b);">
+            <span>✉️ ${escHtml(u.email || '-')}</span>
+            ${u.phone ? `<span>📞 ${escHtml(u.phone)}</span>` : ''}
+            <span>🏢 ${escHtml(u.department || 'Bilgi İşlem')}</span>
+          </div>
+        </div>
+      </div>
+      <div class="admin-actions">
+        <button type="button" class="btn btn-sm btn-admin-reset-pass" data-id="${u.id}" data-name="${escHtml(u.full_name || u.username)}" title="Şifre Sıfırla" style="font-size:.78rem;padding:.38rem .75rem;">
+          🔑 Şifre Sıfırla
+        </button>
+        ${!isSelf ? `
+          <button type="button" class="btn btn-sm btn-freeze-user" data-id="${u.id}" data-name="${escHtml(u.full_name || u.username)}" data-frozen="${isFrozen ? '1' : '0'}" title="${isFrozen ? 'Hesabı Aç' : 'Hesabı Dondur'}" style="font-size:.78rem;padding:.38rem .75rem;${isFrozen ? 'background:rgba(16,185,129,0.1);color:#10b981;border:1px solid rgba(16,185,129,0.3);' : 'background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.3);'}">
+            ${isFrozen ? '☀️ Hesabı Aç' : '❄️ Dondur'}
+          </button>
+          <button type="button" class="btn btn-sm btn-delete-user" data-id="${u.id}" data-name="${escHtml(u.full_name || u.username)}" title="Kullanıcıyı Sil" style="font-size:.78rem;padding:.38rem .75rem;background:rgba(239,68,68,0.15);color:#dc2626;border:1px solid rgba(239,68,68,0.35);">
+            🗑️ Sil
+          </button>
+        ` : ''}
+      </div>
+    </div>
+    `;
+  });
 
- html += `</div>`;
- body.innerHTML = html;
+  html += `</div>`;
+  body.innerHTML = html;
 
   // Arama filtresi (Türkçe karakter duyarlı)
   const searchInp = body.querySelector('#adminUserSearchInput');
@@ -468,61 +577,125 @@
     });
   }
 
- body.querySelector('#btnRefreshAllUsers')?.addEventListener('click', renderAllUsersTab);
+  body.querySelector('#btnRefreshAllUsers')?.addEventListener('click', renderAllUsersTab);
 
- // Kullanıcı Adı Değiştirme
- body.querySelectorAll('.btn-edit-username').forEach(btn => {
- btn.onclick = () => {
- const uId = btn.getAttribute('data-id');
- const oldName = btn.getAttribute('data-name');
- showAdminCustomPrompt({
- title: 'Kullanıcı Adını Değiştir',
- message: `<strong>@${oldName}</strong> için yeni kullanıcı adını girin:`,
- defaultValue: oldName,
- confirmText: 'Kaydet',
- onConfirm: async (newName) => {
- if (!newName || newName === oldName) return;
- try {
- const res = await fetch('/api/admin/update-username', {
- method: 'POST',
- headers: (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function')? window.FrpAuth.getAuthHeaders(): {},
- body: JSON.stringify({ userId: uId, newUsername: newName })
- });
- const data = await res.json();
- if (data.success) {
- if (typeof window.toast === 'function') window.toast(`Kullanıcı adı @${newName} olarak güncellendi!`, 'success');
- renderAllUsersTab();
- } else {
- alert(data.reason || 'Kullanıcı adı güncellenemedi.');
- }
- } catch (e) {
- alert('Hata oluştu: ' + e.message);
- }
- }
- });
- };
- });
+  // Kullanıcı Adı Değiştirme
+  body.querySelectorAll('.btn-edit-username').forEach(btn => {
+    btn.onclick = () => {
+      const uId = btn.getAttribute('data-id');
+      const oldName = btn.getAttribute('data-name');
+      showAdminCustomPrompt({
+        title: 'Kullanıcı Adını Değiştir',
+        message: `<strong>@${oldName}</strong> için yeni kullanıcı adını girin:`,
+        defaultValue: oldName,
+        confirmText: 'Kaydet',
+        onConfirm: async (newName) => {
+          if (!newName || newName === oldName) return;
+          try {
+            const res = await fetch('/api/admin/update-username', {
+              method: 'POST',
+              headers: (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') ? window.FrpAuth.getAuthHeaders() : {},
+              body: JSON.stringify({ userId: uId, newUsername: newName })
+            });
+            const data = await res.json();
+            if (data.success) {
+              if (typeof window.toast === 'function') window.toast(`Kullanıcı adı @${newName} olarak güncellendi!`, 'success');
+              renderAllUsersTab();
+            } else {
+              alert(data.reason || 'Kullanıcı adı güncellenemedi.');
+            }
+          } catch (e) {
+            alert('Hata oluştu: ' + e.message);
+          }
+        }
+      });
+    };
+  });
 
- // Şifre Sıfırla
- body.querySelectorAll('.btn-admin-reset-pass').forEach(btn => {
- btn.onclick = () => {
- const uId = btn.getAttribute('data-id');
- const uName = btn.getAttribute('data-name');
- const newPass = prompt(`"${uName}" kullanıcısı için YENİ şifreyi giriniz:`);
- if (!newPass) return;
- fetch('/api/admin/reset-user-password', {
- method: 'POST',
- headers: (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function')? window.FrpAuth.getAuthHeaders(): {},
- body: JSON.stringify({ userId: uId, newPassword: newPass })
- }).then(r => r.json()).then(data => {
- if (data.success) {
- if (typeof window.toast === 'function') window.toast(`"${uName}" şifresi başarıyla güncellendi! `, 'success');
- } else {
- alert(data.reason || 'Şifre güncellenemedi.');
- }
- });
- };
- });
+  // Şifre Sıfırla
+  body.querySelectorAll('.btn-admin-reset-pass').forEach(btn => {
+    btn.onclick = () => {
+      const uId = btn.getAttribute('data-id');
+      const uName = btn.getAttribute('data-name');
+      const newPass = prompt(`"${uName}" kullanıcısı için YENİ şifreyi giriniz:`);
+      if (!newPass) return;
+      fetch('/api/admin/reset-user-password', {
+        method: 'POST',
+        headers: (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') ? window.FrpAuth.getAuthHeaders() : {},
+        body: JSON.stringify({ userId: uId, newPassword: newPass })
+      }).then(r => r.json()).then(data => {
+        if (data.success) {
+          if (typeof window.toast === 'function') window.toast(`"${uName}" şifresi başarıyla güncellendi! `, 'success');
+        } else {
+          alert(data.reason || 'Şifre güncellenemedi.');
+        }
+      });
+    };
+  });
+
+  // Dondur / Aç
+  body.querySelectorAll('.btn-freeze-user').forEach(btn => {
+    btn.onclick = async () => {
+      const uId = btn.getAttribute('data-id');
+      const uName = btn.getAttribute('data-name');
+      const isFrozen = btn.getAttribute('data-frozen') === '1';
+      const actionText = isFrozen ? 'açmak' : 'dondurmak';
+      if (!confirm(`"${uName}" kullanıcısının hesabını ${actionText} istediğinizden emin misiniz?${!isFrozen ? '\n\nNot: Dondurulan kullanıcı sisteme giriş yapamaz.' : ''}`)) return;
+
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/admin/freeze-user', {
+          method: 'POST',
+          headers: (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') ? window.FrpAuth.getAuthHeaders() : {},
+          body: JSON.stringify({ userId: uId, freeze: !isFrozen })
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (typeof window.toast === 'function') {
+            window.toast(data.message || `Kullanıcı hesabı güncellendi.`, 'success');
+          }
+          renderAllUsersTab();
+        } else {
+          alert(data.reason || 'İşlem başarısız.');
+          btn.disabled = false;
+        }
+      } catch (e) {
+        alert('Hata: ' + e.message);
+        btn.disabled = false;
+      }
+    };
+  });
+
+  // Sil
+  body.querySelectorAll('.btn-delete-user').forEach(btn => {
+    btn.onclick = async () => {
+      const uId = btn.getAttribute('data-id');
+      const uName = btn.getAttribute('data-name');
+      if (!confirm(`⚠️ DİKKAT: "${uName}" kullanıcısını ve tüm verilerini kalıcı olarak silmek istediğinizden emin misiniz?\n\nBu işlem geri alınamaz!`)) return;
+
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/admin/delete-user', {
+          method: 'POST',
+          headers: (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') ? window.FrpAuth.getAuthHeaders() : {},
+          body: JSON.stringify({ userId: uId })
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (typeof window.toast === 'function') {
+            window.toast(`"${uName}" kullanıcısı başarıyla silindi.`, 'success');
+          }
+          renderAllUsersTab();
+        } else {
+          alert(data.reason || 'Kullanıcı silinemedi.');
+          btn.disabled = false;
+        }
+      } catch (e) {
+        alert('Hata: ' + e.message);
+        btn.disabled = false;
+      }
+    };
+  });
  }
 
  // Modal açıldığında her iki sekmenin sayaçlarını arka planda çek

@@ -45,39 +45,66 @@
  }
  }
 
- async function login({ identifier, password, rememberMe = true }) {
- const ident = (identifier || '').trim();
- if (!ident ||!password) return { success: false, reason: 'Lütfen tüm alanları doldurun.' };
+  async function login({ identifier, password, rememberMe = true, captchaAnswer, captchaToken }) {
+    const ident = (identifier || '').trim();
+    if (!ident || !password) return { success: false, reason: 'Lütfen tüm alanları doldurun.' };
 
- try {
- const res = await fetch('/api/auth/login', {
- method: 'POST',
- headers: { 'Content-Type': 'application/json' },
- body: JSON.stringify({ identifier: ident, password })
- });
- const data = await res.json();
- if (data && data.success && data.user) {
- if (data.token) {
- data.user.token = data.token;
- try { localStorage.setItem('frpoku_auth_token', data.token); } catch (e) {}
- }
- if (rememberMe) localStorage.setItem(SAVED_IDENTIFIER_KEY, ident);
- else localStorage.removeItem(SAVED_IDENTIFIER_KEY);
- setSession(data.user, rememberMe);
- return { success: true, user: data.user };
- } else if (data && data.pendingApproval) {
- return {
- success: false,
- pendingApproval: true,
- reason: data.reason || '⏳ Hesabınız henüz sistem yöneticisi (Admin) tarafından onaylanmamıştır.'
- };
- } else if (data && data.reason) {
- return { success: false, reason: data.reason };
- }
- } catch (err) {
- return { success: false, reason: 'Giriş servisine ulaşılamadı. Lütfen daha sonra tekrar deneyin.' };
- }
- }
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: ident, password, captchaAnswer, captchaToken })
+      });
+      const data = await res.json();
+      if (data && data.success && data.user) {
+        if (data.token) {
+          data.user.token = data.token;
+          try { localStorage.setItem('frpoku_auth_token', data.token); } catch (e) {}
+        }
+        if (rememberMe) localStorage.setItem(SAVED_IDENTIFIER_KEY, ident);
+        else localStorage.removeItem(SAVED_IDENTIFIER_KEY);
+        setSession(data.user, rememberMe);
+        return { success: true, user: data.user };
+      }
+      return data;
+    } catch (err) {
+      return { success: false, reason: 'Giriş servisine ulaşılamadı. Lütfen daha sonra tekrar deneyin.' };
+    }
+  }
+
+  async function requestEmailChange(newEmail, currentPassword) {
+    try {
+      const res = await fetch('/api/auth/request-email-change', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ newEmail, currentPassword })
+      });
+      return await res.json();
+    } catch (e) {
+      return { success: false, reason: 'E-posta kod servisine ulaşılamadı: ' + e.message };
+    }
+  }
+
+  async function confirmEmailChange(code) {
+    try {
+      const res = await fetch('/api/auth/confirm-email-change', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ code })
+      });
+      const data = await res.json();
+      if (data && data.success && data.email) {
+        const u = getSession();
+        if (u) {
+          u.email = data.email;
+          updateSession({ email: data.email });
+        }
+      }
+      return data;
+    } catch (e) {
+      return { success: false, reason: 'E-posta onay servisine ulaşılamadı: ' + e.message };
+    }
+  }
 
  function setSession(user, remember = true) {
  currentUser = user;
@@ -369,6 +396,8 @@
  refreshAdminPendingBadge,
  updatePassword,
  updateEmail,
+ requestEmailChange,
+ confirmEmailChange,
  updateProfile,
  updateSession(updatedUser) {
  if (currentUser && updatedUser) {

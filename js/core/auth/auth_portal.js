@@ -156,12 +156,31 @@
  </label>
  </div>
 
- <button type="submit" id="btnLoginSubmit" style="
- width: 100%; padding:.75rem; border: none; border-radius: 10px;
- background: #2563eb; color: #ffffff; font-weight: 700; font-size:.9rem; cursor: pointer;
- box-shadow: 0 4px 12px rgba(37,99,235,0.25); transition: background.15s;
- ">Giriş Yap</button>
- </form>
+  <div id="loginCaptchaContainer" style="display:none;margin-bottom:.9rem;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:10px;padding:.75rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem;">
+      <label style="font-size:.76rem;font-weight:700;color:#334155;">
+        🤖 Güvenlik Doğrulaması (Captcha)
+      </label>
+      <button type="button" id="btnRefreshCaptcha" title="Soruyu Yenile" style="background:none;border:none;cursor:pointer;font-size:.9rem;color:#475569;">🔄 Yenile</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:.65rem;margin-bottom:.35rem;">
+      <span id="loginCaptchaQuestion" style="font-size:.95rem;font-weight:700;color:#1e293b;background:#e2e8f0;padding:.3rem.65rem;border-radius:6px;letter-spacing:1px;">?</span>
+      <input type="text" id="loginCaptchaAnswer" placeholder="Sonuç nedir?" style="
+        flex: 1; padding:.5rem.75rem; border-radius: 8px;
+        background: #ffffff; border: 1.5px solid #cbd5e1;
+        color: #0f172a; font-size:.84rem; outline: none; box-sizing: border-box;
+      " />
+      <input type="hidden" id="loginCaptchaToken" value="" />
+    </div>
+    <div style="font-size:.7rem;color:#64748b;">3 ve üzeri hatalı denemede doğrulama zorunludur.</div>
+  </div>
+
+  <button type="submit" id="btnLoginSubmit" style="
+  width: 100%; padding:.75rem; border: none; border-radius: 10px;
+  background: #2563eb; color: #ffffff; font-weight: 700; font-size:.9rem; cursor: pointer;
+  box-shadow: 0 4px 12px rgba(37,99,235,0.25); transition: background.15s;
+  ">Giriş Yap</button>
+  </form>
 
  <!-- 2. KAYIT FORMU -->
  <form id="authRegisterForm" style="display: ${initialTab === 'register'? 'block': 'none'};">
@@ -384,6 +403,35 @@
  }
  };
 
+ const captchaContainer = portal.querySelector('#loginCaptchaContainer');
+ const captchaQuestion = portal.querySelector('#loginCaptchaQuestion');
+ const captchaAnswerInput = portal.querySelector('#loginCaptchaAnswer');
+ const captchaTokenInput = portal.querySelector('#loginCaptchaToken');
+ const btnRefreshCaptcha = portal.querySelector('#btnRefreshCaptcha');
+
+ async function loadCaptcha() {
+ try {
+ const res = await fetch('/api/auth/captcha');
+ const data = await res.json();
+ if (data && data.token) {
+ captchaTokenInput.value = data.token;
+ captchaQuestion.textContent = data.question;
+ captchaAnswerInput.value = '';
+ captchaContainer.style.display = 'block';
+ captchaAnswerInput.focus();
+ }
+ } catch (e) {
+ console.warn('Captcha yuklenemedi:', e);
+ }
+ }
+
+ if (btnRefreshCaptcha) {
+ btnRefreshCaptcha.onclick = (e) => {
+ e.preventDefault();
+ loadCaptcha();
+ };
+ }
+
  // Giriş submit
  portal.querySelector('#authLoginForm').onsubmit = async (e) => {
  e.preventDefault();
@@ -392,17 +440,26 @@
  const ident = (portal.querySelector('#loginIdentifier').value || '').trim();
  const pass = portal.querySelector('#loginPassword').value;
 
- if (!ident ||!pass) {
+ if (!ident || !pass) {
  showAlert('⚠️ Lütfen tüm alanları doldurunuz.', 'warning');
  return;
  }
+
+ const captchaAnswer = captchaAnswerInput?.value ? captchaAnswerInput.value.trim() : '';
+ const captchaToken = captchaTokenInput?.value || '';
 
  const submitBtn = portal.querySelector('#btnLoginSubmit');
  submitBtn.disabled = true;
  submitBtn.textContent = 'Giriş Yapılıyor...';
 
  const remember = portal.querySelector('#loginRememberMe').checked;
- const res = await window.FrpAuth.login({ identifier: ident, password: pass, rememberMe: remember });
+ const res = await window.FrpAuth.login({
+ identifier: ident,
+ password: pass,
+ rememberMe: remember,
+ captchaAnswer,
+ captchaToken
+ });
  submitBtn.disabled = false;
  submitBtn.textContent = 'Giriş Yap';
 
@@ -422,7 +479,14 @@
  if (typeof window.toast === 'function') window.toast(`Hoş geldiniz, ${res.user.full_name || res.user.username}!`, 'success');
  });
  } else {
- showAlert(res.reason || 'Giriş başarısız oldu.', res.pendingApproval? 'warning': 'error');
+ if (res.requireCaptcha) {
+ await loadCaptcha();
+ }
+ if (res.isFrozen) {
+ showAlert('❄️ Bu hesap dondurulmuştur. Lütfen sistem yöneticisi ile iletişime geçin.', 'error');
+ } else {
+ showAlert(res.reason || 'Giriş başarısız oldu.', res.pendingApproval ? 'warning' : 'error');
+ }
  }
  };
 

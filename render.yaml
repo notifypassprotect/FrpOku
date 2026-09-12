@@ -37,7 +37,7 @@ services:
       - key: ENABLE_BROWSER_SUPABASE
         value: "false"
       - key: MAIL_ENABLED
-        value: "false"
+        value: "true"
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT

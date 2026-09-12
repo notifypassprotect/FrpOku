@@ -53,3 +53,97 @@ test('mail şablonu kullanıcı HTML girdisini escape eder', () => {
   assert.match(message.html, /&lt;img/);
   assert.match(message.html, /a&#39;b/);
 });
+
+test('sendEmailChangeCode 6 haneli doğrulama kodunu şablonda barındırır', async () => {
+  let sentMessage = null;
+  const mailer = createMailer({
+    env: {
+      MAIL_ENABLED: 'true',
+      SMTP_HOST: 'smtp.example.com',
+      SMTP_USER: 'sender@example.com',
+      SMTP_PASS: 'secret',
+      SMTP_FROM: 'FrpOku <sender@example.com>'
+    },
+    transporter: {
+      sendMail: async message => {
+        sentMessage = message;
+        return { messageId: 'code-1' };
+      }
+    }
+  });
+
+  const res = await mailer.sendEmailChangeCode({
+    to: 'new@example.com',
+    code: '987654',
+    username: 'ilker'
+  });
+
+  assert.equal(res.sent, true);
+  assert.equal(sentMessage.to, 'new@example.com');
+  assert.match(sentMessage.subject, /987654/);
+  assert.match(sentMessage.html, /987654/);
+});
+
+test('sendAccountStatusChanged dondurma ve açma durumlarını doğru iletir', async () => {
+  let sentMessages = [];
+  const mailer = createMailer({
+    env: {
+      MAIL_ENABLED: 'true',
+      SMTP_HOST: 'smtp.example.com',
+      SMTP_USER: 'sender@example.com',
+      SMTP_PASS: 'secret',
+      SMTP_FROM: 'FrpOku <sender@example.com>'
+    },
+    transporter: {
+      sendMail: async message => {
+        sentMessages.push(message);
+        return { messageId: 'status-' + sentMessages.length };
+      }
+    }
+  });
+
+  await mailer.sendAccountStatusChanged({
+    to: 'user@example.com',
+    username: 'user1',
+    isFrozen: true
+  });
+  assert.match(sentMessages[0].subject, /donduruldu/i);
+
+  await mailer.sendAccountStatusChanged({
+    to: 'user@example.com',
+    username: 'user1',
+    isFrozen: false
+  });
+  assert.match(sentMessages[1].subject, /aktif/i);
+});
+
+test('sendSecurityAlert şüpheli giriş uyarısı oluşturur', async () => {
+  let sentMessage = null;
+  const mailer = createMailer({
+    env: {
+      MAIL_ENABLED: 'true',
+      SMTP_HOST: 'smtp.example.com',
+      SMTP_USER: 'sender@example.com',
+      SMTP_PASS: 'secret',
+      SMTP_FROM: 'FrpOku <sender@example.com>'
+    },
+    transporter: {
+      sendMail: async message => {
+        sentMessage = message;
+        return { messageId: 'sec-1' };
+      }
+    }
+  });
+
+  await mailer.sendSecurityAlert({
+    to: 'admin@example.com',
+    identifier: 'hacker',
+    clientIp: '192.168.1.50',
+    attempts: 5
+  });
+
+  assert.match(sentMessage.subject, /GÜVENLİK ALARMI/i);
+  assert.match(sentMessage.html, /192\.168\.1\.50/);
+  assert.match(sentMessage.html, /hacker/);
+});
+

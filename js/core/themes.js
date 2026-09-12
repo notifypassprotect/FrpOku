@@ -21,7 +21,10 @@
     { id: 'synthwave',        label: 'Synthwave Sunset' },
     { id: 'deep-ocean',       label: 'Deep Ocean Blue' },
     { id: 'solarized-light',  label: 'Solarized Light' },
-    { id: 'solarized-dark',   label: 'Solarized Dark' }
+    { id: 'solarized-dark',   label: 'Solarized Dark' },
+    { id: 'midnight-amethyst',label: 'Midnight Amethyst 🔮' },
+    { id: 'nordic-frost',     label: 'Nordic Frost ❄️' },
+    { id: 'aurora-emerald',   label: 'Aurora Emerald 🌌' }
   ];
 
   function getCodeTheme() {
@@ -67,7 +70,8 @@
     const isDark = target === 'frpoku-dark' || target === 'dracula' || target === 'github-dark' || 
                    target === 'monokai' || target === 'nord' || target === 'tokyo-night' || target === 'cyberpunk' || 
                    target === 'matrix' || target === 'synthwave' || target === 'deep-ocean' || 
-                   target === 'solarized-dark';
+                   target === 'solarized-dark' || target === 'midnight-amethyst' || target === 'nordic-frost' ||
+                   target === 'aurora-emerald';
     const uiTheme = isDark ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', uiTheme);
     if (document.body) document.body.setAttribute('data-theme', uiTheme);
@@ -95,6 +99,11 @@
 
     // Custom event fırlat
     window.dispatchEvent(new CustomEvent('frpoku:themeChanged', { detail: { themeId: target, uiTheme } }));
+
+    if (!skipStorage && typeof window.toast === 'function') {
+      const th = CODE_THEMES.find(t => t.id === target);
+      if (th) window.toast(`🎨 Tema uygulandı: ${th.label}`, 'info', 2000);
+    }
   }
 
   function setTheme(theme) {

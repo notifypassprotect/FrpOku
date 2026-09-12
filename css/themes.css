@@ -435,3 +435,112 @@
 .code-theme-solarized-dark .sql-operator,
 .code-theme-solarized-dark .pas-special { color: #93a1a1 !important; }
 .code-theme-solarized-dark .pas-proc { color: #268bd2 !important; font-weight: 700; }
+
+/* ══════════════════════════════════════════════════════════
+   TEMA 14 — Midnight Amethyst 🔮
+   ══════════════════════════════════════════════════════════ */
+.ui-theme-midnight-amethyst {
+  --accent: #9333ea;
+  --accent-bright: #c084fc;
+  --accent-glow: rgba(192, 132, 252, 0.35);
+}
+.code-theme-midnight-amethyst .code-scroll,
+.code-theme-midnight-amethyst .code-editor-backdrop,
+.code-theme-midnight-amethyst .code-editor-wrap,
+.code-theme-midnight-amethyst .editor-main {
+  background: #120924 !important;
+  color: #e9d5ff !important;
+}
+.code-theme-midnight-amethyst .line-src { color: #e9d5ff !important; }
+.code-theme-midnight-amethyst .code-line { color: #e9d5ff; }
+.code-theme-midnight-amethyst .line-num { background: #0c051a !important; color: #8b5cf6 !important; border-right: 1px solid #2e1065; }
+.code-theme-midnight-amethyst .editor-gutter { background: #0c051a !important; border-right: 1px solid #2e1065 !important; }
+.code-theme-midnight-amethyst .editor-gutter-line { color: #8b5cf6 !important; }
+
+.code-theme-midnight-amethyst .sql-keyword,
+.code-theme-midnight-amethyst .pas-keyword { color: #c084fc !important; font-weight: 700; }
+.code-theme-midnight-amethyst .sql-fn,
+.code-theme-midnight-amethyst .pas-type { color: #f472b6 !important; font-weight: 600; }
+.code-theme-midnight-amethyst .sql-string,
+.code-theme-midnight-amethyst .pas-string { color: #fde047 !important; }
+.code-theme-midnight-amethyst .sql-comment,
+.code-theme-midnight-amethyst .pas-comment { color: #7e699b !important; font-style: italic; }
+.code-theme-midnight-amethyst .sql-number,
+.code-theme-midnight-amethyst .pas-number { color: #38bdf8 !important; }
+.code-theme-midnight-amethyst .sql-param { color: #fb923c !important; font-weight: 700; }
+.code-theme-midnight-amethyst .sql-operator,
+.code-theme-midnight-amethyst .pas-special { color: #a855f7 !important; }
+.code-theme-midnight-amethyst .pas-proc { color: #e879f9 !important; font-weight: 700; }
+
+/* ══════════════════════════════════════════════════════════
+   TEMA 15 — Nordic Frost ❄️
+   ══════════════════════════════════════════════════════════ */
+.ui-theme-nordic-frost {
+  --accent: #0284c7;
+  --accent-bright: #38bdf8;
+  --accent-glow: rgba(56, 189, 248, 0.35);
+}
+.code-theme-nordic-frost .code-scroll,
+.code-theme-nordic-frost .code-editor-backdrop,
+.code-theme-nordic-frost .code-editor-wrap,
+.code-theme-nordic-frost .editor-main {
+  background: #091524 !important;
+  color: #e2e8f0 !important;
+}
+.code-theme-nordic-frost .line-src { color: #e2e8f0 !important; }
+.code-theme-nordic-frost .code-line { color: #e2e8f0; }
+.code-theme-nordic-frost .line-num { background: #050d18 !important; color: #38bdf8 !important; border-right: 1px solid #1e3a5f; }
+.code-theme-nordic-frost .editor-gutter { background: #050d18 !important; border-right: 1px solid #1e3a5f !important; }
+.code-theme-nordic-frost .editor-gutter-line { color: #38bdf8 !important; }
+
+.code-theme-nordic-frost .sql-keyword,
+.code-theme-nordic-frost .pas-keyword { color: #38bdf8 !important; font-weight: 700; }
+.code-theme-nordic-frost .sql-fn,
+.code-theme-nordic-frost .pas-type { color: #67e8f9 !important; font-weight: 600; }
+.code-theme-nordic-frost .sql-string,
+.code-theme-nordic-frost .pas-string { color: #a5f3fc !important; }
+.code-theme-nordic-frost .sql-comment,
+.code-theme-nordic-frost .pas-comment { color: #64748b !important; font-style: italic; }
+.code-theme-nordic-frost .sql-number,
+.code-theme-nordic-frost .pas-number { color: #818cf8 !important; }
+.code-theme-nordic-frost .sql-param { color: #fdba74 !important; font-weight: 700; }
+.code-theme-nordic-frost .sql-operator,
+.code-theme-nordic-frost .pas-special { color: #0ea5e9 !important; }
+.code-theme-nordic-frost .pas-proc { color: #7dd3fc !important; font-weight: 700; }
+
+/* ══════════════════════════════════════════════════════════
+   TEMA 16 — Aurora Emerald 🌌
+   ══════════════════════════════════════════════════════════ */
+.ui-theme-aurora-emerald {
+  --accent: #059669;
+  --accent-bright: #10b981;
+  --accent-glow: rgba(16, 185, 129, 0.35);
+}
+.code-theme-aurora-emerald .code-scroll,
+.code-theme-aurora-emerald .code-editor-backdrop,
+.code-theme-aurora-emerald .code-editor-wrap,
+.code-theme-aurora-emerald .editor-main {
+  background: #051a14 !important;
+  color: #d1fae5 !important;
+}
+.code-theme-aurora-emerald .line-src { color: #d1fae5 !important; }
+.code-theme-aurora-emerald .code-line { color: #d1fae5; }
+.code-theme-aurora-emerald .line-num { background: #02100c !important; color: #10b981 !important; border-right: 1px solid #064e3b; }
+.code-theme-aurora-emerald .editor-gutter { background: #02100c !important; border-right: 1px solid #064e3b !important; }
+.code-theme-aurora-emerald .editor-gutter-line { color: #10b981 !important; }
+
+.code-theme-aurora-emerald .sql-keyword,
+.code-theme-aurora-emerald .pas-keyword { color: #10b981 !important; font-weight: 700; }
+.code-theme-aurora-emerald .sql-fn,
+.code-theme-aurora-emerald .pas-type { color: #34d399 !important; font-weight: 600; }
+.code-theme-aurora-emerald .sql-string,
+.code-theme-aurora-emerald .pas-string { color: #a7f3d0 !important; }
+.code-theme-aurora-emerald .sql-comment,
+.code-theme-aurora-emerald .pas-comment { color: #047857 !important; font-style: italic; }
+.code-theme-aurora-emerald .sql-number,
+.code-theme-aurora-emerald .pas-number { color: #6ee7b7 !important; }
+.code-theme-aurora-emerald .sql-param { color: #fbbf24 !important; font-weight: 700; }
+.code-theme-aurora-emerald .sql-operator,
+.code-theme-aurora-emerald .pas-special { color: #059669 !important; }
+.code-theme-aurora-emerald .pas-proc { color: #6ee7b7 !important; font-weight: 700; }
+

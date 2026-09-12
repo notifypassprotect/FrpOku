@@ -148,9 +148,9 @@ window.FrpSettingsTabs.profile = {
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-light); padding-bottom:.5rem;">
               <div>
                 <div style="font-weight:800; font-size:.92rem; color:var(--text-primary);">E-Posta Adresi Güncelleme</div>
-                <div style="font-size:.74rem; color:var(--text-muted);">Hesabınıza bağlı iletişim e-posta adresini doğrulayarak güncelleyin</div>
+                <div style="font-size:.74rem; color:var(--text-muted);">Hesabınıza bağlı iletişim e-posta adresini 6 haneli doğrulama kodu ile güncelleyin</div>
               </div>
-              <span class="badge badge-purple" style="font-weight:700; font-size:.7rem;">İletişim & Bildirim</span>
+              <span class="badge badge-purple" style="font-weight:700; font-size:.7rem;">İletişim & Güvenlik</span>
             </div>
 
             <!-- Canlı Uyarı / Bilgi Kutusu -->
@@ -168,9 +168,25 @@ window.FrpSettingsTabs.profile = {
             </div>
 
             <div style="display:flex; justify-content:flex-end; margin-top:.2rem;">
-              <button type="button" id="btnUpdateEmailSecurely" class="btn btn-primary" style="padding:.55rem 1.35rem; font-weight:800; font-size:.84rem; border-radius:10px;">
-                E-Posta Adresimi Güncelle
+              <button type="button" id="btnRequestEmailCode" class="btn btn-primary" style="padding:.55rem 1.35rem; font-weight:800; font-size:.84rem; border-radius:10px;">
+                📨 Doğrulama Kodu Gönder
               </button>
+            </div>
+
+            <!-- 6 Haneli Kod Onay Alanı -->
+            <div id="emailVerificationSection" style="display:none; margin-top:.35rem; padding:.85rem 1rem; background:rgba(37,99,235,0.05); border:1.5px dashed var(--accent); border-radius:10px;">
+              <div style="font-size:.82rem; font-weight:800; color:var(--text-primary); margin-bottom:.2rem;">
+                ✉️ Doğrulama Kodu Yeni Adresinize Gönderildi
+              </div>
+              <div style="font-size:.74rem; color:var(--text-muted); margin-bottom:.6rem;">
+                Yeni e-posta gelen kutunuzu (ve spam klasörünü) kontrol edip 6 haneli kodu giriniz.
+              </div>
+              <div style="display:flex; gap:.65rem; align-items:center; flex-wrap:wrap;">
+                <input type="text" id="profEmailVerificationCode" maxlength="6" class="master-search-input" style="width:140px; text-align:center; font-weight:800; font-size:1.15rem; letter-spacing:4px;" placeholder="123456" />
+                <button type="button" id="btnConfirmEmailCode" class="btn btn-primary" style="padding:.55rem 1.25rem; font-weight:800; font-size:.82rem; border-radius:8px;">
+                  ✅ Kodu Onayla & Güncelle
+                </button>
+              </div>
             </div>
           </div>
 
@@ -226,69 +242,109 @@ window.FrpSettingsTabs.profile = {
     bindInput('#profLastName', 'lastName');
     bindInput('#profUsername', 'username');
 
-    // E-Posta Güvenli Güncelle Butonu
-    overlay.querySelector('#btnUpdateEmailSecurely')?.addEventListener('click', async () => {
-      const emailInput = overlay.querySelector('#profNewEmail');
-      const passInput = overlay.querySelector('#profEmailCurrentPass');
-      const alertEl = overlay.querySelector('#profileEmailAlert');
-      const displayEl = overlay.querySelector('#profEmailDisplay');
+    // E-Posta Güvenli Güncelle (6 Haneli Doğrulama Kodu ile)
+    const emailInput = overlay.querySelector('#profNewEmail');
+    const passInput = overlay.querySelector('#profEmailCurrentPass');
+    const alertEl = overlay.querySelector('#profileEmailAlert');
+    const displayEl = overlay.querySelector('#profEmailDisplay');
+    const verifySection = overlay.querySelector('#emailVerificationSection');
+    const codeInput = overlay.querySelector('#profEmailVerificationCode');
 
+    const showEmailAlert = (msg, type) => {
+      if (!alertEl) return;
+      alertEl.style.display = 'block';
+      alertEl.textContent = msg;
+      if (type === 'error') {
+        alertEl.style.background = 'rgba(239, 68, 68, 0.12)';
+        alertEl.style.color = '#ef4444';
+        alertEl.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+      } else if (type === 'success') {
+        alertEl.style.background = 'rgba(16, 185, 129, 0.12)';
+        alertEl.style.color = '#10b981';
+        alertEl.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+      } else {
+        alertEl.style.background = 'rgba(37, 99, 235, 0.12)';
+        alertEl.style.color = '#2563eb';
+        alertEl.style.border = '1px solid rgba(37, 99, 235, 0.3)';
+      }
+    };
+
+    overlay.querySelector('#btnRequestEmailCode')?.addEventListener('click', async () => {
       const newEmail = (emailInput?.value || '').trim();
       const currentPass = (passInput?.value || '').trim();
 
-      const showEmailAlert = (msg, type) => {
-        if (!alertEl) return;
-        alertEl.style.display = 'block';
-        alertEl.textContent = msg;
-        if (type === 'error') {
-          alertEl.style.background = 'rgba(239, 68, 68, 0.12)';
-          alertEl.style.color = '#ef4444';
-          alertEl.style.border = '1px solid rgba(239, 68, 68, 0.3)';
-        } else if (type === 'success') {
-          alertEl.style.background = 'rgba(16, 185, 129, 0.12)';
-          alertEl.style.color = '#10b981';
-          alertEl.style.border = '1px solid rgba(16, 185, 129, 0.3)';
-        } else {
-          alertEl.style.background = 'rgba(245, 158, 11, 0.12)';
-          alertEl.style.color = '#f59e0b';
-          alertEl.style.border = '1px solid rgba(245, 158, 11, 0.3)';
-        }
-      };
-
       if (!newEmail || !newEmail.includes('@')) {
-        showEmailAlert('Lütfen geçerli bir e-posta adresi giriniz.', 'warning');
+        showEmailAlert('Lütfen geçerli bir yeni e-posta adresi giriniz.', 'error');
         return;
       }
 
       if (!currentPass) {
-        showEmailAlert('Güvenliğiniz için lütfen mevcut şifrenizi giriniz.', 'warning');
+        showEmailAlert('Güvenliğiniz için lütfen mevcut şifrenizi giriniz.', 'error');
         return;
       }
 
-      const btn = overlay.querySelector('#btnUpdateEmailSecurely');
-      if (btn) { btn.disabled = true; btn.textContent = 'Güncelleniyor...'; }
+      const btnReq = overlay.querySelector('#btnRequestEmailCode');
+      if (btnReq) { btnReq.disabled = true; btnReq.textContent = 'Kod Gönderiliyor...'; }
 
-      if (window.FrpAuth?.updateEmail) {
-        const res = await window.FrpAuth.updateEmail(newEmail);
-        if (btn) { btn.disabled = false; btn.textContent = 'E-Posta Adresimi Güncelle'; }
+      try {
+        if (window.FrpAuth?.requestEmailChange) {
+          const res = await window.FrpAuth.requestEmailChange(newEmail, currentPass);
+          if (btnReq) { btnReq.disabled = false; btnReq.textContent = '📨 Doğrulama Kodu Gönder'; }
 
-        if (res.success) {
-          stagedProfile.email = newEmail;
-          if (displayEl) displayEl.value = newEmail;
-          if (emailInput) emailInput.value = '';
-          if (passInput) passInput.value = '';
-          showEmailAlert('E-posta adresi başarıyla güncellendi.', 'success');
-          safeToast('E-posta adresi başarıyla güncellendi.', 'success');
+          if (res.success) {
+            if (verifySection) verifySection.style.display = 'block';
+            showEmailAlert(res.message || '6 haneli doğrulama kodu yeni adresinize gönderildi. Lütfen kodu girin.', 'info');
+            safeToast('Doğrulama kodu e-postanıza gönderildi.', 'info');
+            if (codeInput) codeInput.focus();
+          } else {
+            showEmailAlert(res.reason || 'Doğrulama kodu gönderilemedi.', 'error');
+          }
         } else {
-          showEmailAlert(res.reason || 'E-posta güncellenemedi.', 'error');
+          if (btnReq) { btnReq.disabled = false; btnReq.textContent = '📨 Doğrulama Kodu Gönder'; }
+          showEmailAlert('E-posta doğrulama servisi henüz hazır değil.', 'error');
         }
-      } else {
-        stagedProfile.email = newEmail;
-        if (displayEl) displayEl.value = newEmail;
-        if (btn) { btn.disabled = false; btn.textContent = 'E-Posta Adresimi Güncelle'; }
-        markDirty();
-        showEmailAlert('E-posta kaydedilmek üzere hazırlandı.', 'success');
-        safeToast('E-posta kaydedilmek üzere hazırlandı.', 'info');
+      } catch (err) {
+        if (btnReq) { btnReq.disabled = false; btnReq.textContent = '📨 Doğrulama Kodu Gönder'; }
+        showEmailAlert('Hata: ' + err.message, 'error');
+      }
+    });
+
+    overlay.querySelector('#btnConfirmEmailCode')?.addEventListener('click', async () => {
+      const code = (codeInput?.value || '').trim();
+      if (!code || code.length !== 6) {
+        showEmailAlert('Lütfen 6 haneli doğrulama kodunu eksiksiz giriniz.', 'error');
+        return;
+      }
+
+      const btnConf = overlay.querySelector('#btnConfirmEmailCode');
+      if (btnConf) { btnConf.disabled = true; btnConf.textContent = 'Onaylanıyor...'; }
+
+      try {
+        if (window.FrpAuth?.confirmEmailChange) {
+          const res = await window.FrpAuth.confirmEmailChange(code);
+          if (btnConf) { btnConf.disabled = false; btnConf.textContent = '✅ Kodu Onayla & Güncelle'; }
+
+          if (res.success) {
+            const updatedEmail = res.email || (emailInput?.value || '').trim();
+            stagedProfile.email = updatedEmail;
+            if (displayEl) displayEl.value = updatedEmail;
+            if (emailInput) emailInput.value = '';
+            if (passInput) passInput.value = '';
+            if (codeInput) codeInput.value = '';
+            if (verifySection) verifySection.style.display = 'none';
+
+            showEmailAlert('E-posta adresiniz başarıyla güncellendi!', 'success');
+            safeToast('E-posta adresiniz başarıyla güncellendi!', 'success');
+          } else {
+            showEmailAlert(res.reason || 'Geçersiz veya süresi dolmuş kod.', 'error');
+          }
+        } else {
+          if (btnConf) { btnConf.disabled = false; btnConf.textContent = '✅ Kodu Onayla & Güncelle'; }
+          showEmailAlert('E-posta onay servisi hazır değil.', 'error');
+        }
+      } catch (err) {
+        if (btnConf) { btnConf.disabled = false; btnConf.textContent = '✅ Kodu Onayla & Güncelle'; }
+        showEmailAlert('Hata: ' + err.message, 'error');
       }
     });
 

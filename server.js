@@ -254,6 +254,34 @@ const { signToken, requireAuth, requireAdmin } = createSessionAuth({
   userLoader: loadUserById
 });
 
+// ── E-POSTA DOĞRULAMA & BRUTE-FORCE / CAPTCHA KORUMASI ─────
+const pendingEmailVerifications = new Map();
+const loginFailures = new Map();
+
+function generateCaptcha() {
+  const a = Math.floor(Math.random() * 8) + 1;
+  const b = Math.floor(Math.random() * 8) + 1;
+  const ans = String(a + b);
+  const exp = Date.now() + 5 * 60 * 1000;
+  const sig = crypto.createHmac('sha256', SESSION_SECRET).update(`${ans}:${exp}`).digest('hex');
+  return {
+    question: `${a} + ${b} = ?`,
+    token: `${ans}:${exp}:${sig}`
+  };
+}
+
+function verifyCaptcha(token, answer) {
+  if (!token || !answer) return false;
+  const parts = String(token).split(':');
+  if (parts.length !== 3) return false;
+  const [expectedAns, expStr, sig] = parts;
+  const exp = Number(expStr);
+  if (!Number.isFinite(exp) || Date.now() > exp) return false;
+  const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(`${expectedAns}:${expStr}`).digest('hex');
+  if (sig !== expectedSig) return false;
+  return String(answer).trim() === expectedAns;
+}
+
 function safeLogStr(str) {
   if (typeof str !== 'string') return String(str || '');
   return str.replace(/[\r\n\x00-\x1f\x7f]/g, '').slice(0, 150);
@@ -499,6 +527,13 @@ app.post('/api/auth/register', authRateLimiter, async (req, res) => {
     console.error('Kayıt hatası:', safeLogStr(err.message));
     res.status(503).json({ success: false, reason: 'Kayıt servisi geçici olarak kullanılamıyor.' });
   }
+});
+
+
+// ── CAPTCHA GÜVENLİK DOĞRULAMA ROTASI ─────────────────────────
+app.get('/api/auth/captcha', authRateLimiter, (req, res) => {
+  const c = generateCaptcha();
+  res.json({ success: true, question: c.question, captchaToken: c.token });
 });
 
 // ── 2. KULLANICI GİRİŞİ (Login) ──────────────────────────────
@@ -965,6 +1000,15 @@ app.post('/api/auth/change-password', authRateLimiter, requireAuth, async (req, 
       iat: Date.now()
     });
 
+        if (user.email) {
+      mailer.sendPasswordChanged({
+        to: user.email,
+        fullName: user.full_name || user.username,
+        username: user.username,
+        ip: req.ip,
+        timestamp: nowIso
+      }).catch(() => {});
+    }
     res.json({ success: true, message: 'Şifreniz başarıyla değiştirildi.', token: newToken });
   } catch (err) {
     console.warn('Şifre güncelleme hatası:', safeLogStr(err.message));
@@ -1766,4 +1810,305 @@ async function startServer() {
 startServer().catch(error => {
   console.error('Sunucu başlatılamadı:', safeLogStr(error.message));
   process.exit(1);
+});
+
+
+// ── 10.6. E-POSTA DEĞİŞİKLİĞİ İÇİN 6 HANELİ DOĞRULAMA KODU GÖNDERME ─────────
+app.post('/api/auth/request-email-change', authRateLimiter, requireAuth, async (req, res) => {
+  const { newEmail, currentPassword } = req.body;
+  const cleanEmail = normalizeEmail(newEmail);
+  if (!cleanEmail || !isValidEmail(cleanEmail)) {
+    return res.status(400).json({ success: false, reason: 'Geçerli bir yeni e-posta adresi giriniz.' });
+  }
+
+  try {
+    const user = await loadUserById(req.authUser.id);
+    if (!user) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
+
+    if (!currentPassword) {
+      return res.status(400).json({ success: false, reason: 'Güvenliğiniz için lütfen mevcut şifrenizi giriniz.' });
+    }
+
+    const passCheck = await verifyPasswordHash(currentPassword, user.password_hash);
+    if (!passCheck.valid) {
+      return res.status(401).json({ success: false, reason: 'Mevcut şifreniz hatalıdır.' });
+    }
+
+    if (user.email && normalizeEmail(user.email) === cleanEmail) {
+      return res.status(400).json({ success: false, reason: 'Girdiğiniz adres zaten mevcut e-posta adresinizdir.' });
+    }
+
+    // Başka kullanıcıda kayıtlı mı kontrolü
+    if (supabase) {
+      const { data: existing, error } = await supabase.from('app_users').select('id').eq('email', cleanEmail).neq('id', user.id).limit(1);
+      if (!error && existing?.length) {
+        return res.status(409).json({ success: false, reason: 'Bu e-posta adresi başka bir kullanıcı tarafından kullanılmaktadır.' });
+      }
+    } else {
+      const local = getLocalUsers();
+      if (local.some(u => u.id !== user.id && normalizeEmail(u.email) === cleanEmail)) {
+        return res.status(409).json({ success: false, reason: 'Bu e-posta adresi başka bir kullanıcı tarafından kullanılmaktadır.' });
+      }
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 15 * 60 * 1000;
+
+    pendingEmailVerifications.set(user.id, {
+      userId: user.id,
+      code,
+      newEmail: cleanEmail,
+      oldEmail: user.email,
+      expiresAt
+    });
+
+    const mailResult = await mailer.sendEmailChangeCode({
+      to: cleanEmail,
+      fullName: user.full_name || user.username,
+      code,
+      expiresIn: '15'
+    });
+
+    await recordAuditLog({
+      userId: user.id,
+      username: user.username,
+      role: user.role,
+      action: 'EMAIL_CHANGE_CODE_REQUESTED',
+      target: cleanEmail,
+      details: `6 haneli doğrulama kodu gönderildi (Durum: ${mailResult.status})`,
+      ip: req.ip
+    });
+
+    res.json({
+      success: true,
+      message: `'${cleanEmail}' adresine 6 haneli güvenlik doğrulama kodu gönderildi.`,
+      notification: { email: { sent: mailResult.sent, status: mailResult.status } }
+    });
+  } catch (err) {
+    console.warn('E-posta kod talebi hatası:', safeLogStr(err.message));
+    res.status(503).json({ success: false, reason: 'E-posta doğrulama kodu gönderilemedi.' });
+  }
+});
+
+// ── 10.7. 6 HANELİ KOD İLE E-POSTA DEĞİŞİKLİĞİNİ ONAYLAMA ──────────────────
+app.post('/api/auth/confirm-email-change', authRateLimiter, requireAuth, async (req, res) => {
+  const { code } = req.body;
+  const userId = req.authUser.id;
+  const pending = pendingEmailVerifications.get(userId);
+
+  if (!pending || Date.now() > pending.expiresAt) {
+    pendingEmailVerifications.delete(userId);
+    return res.status(400).json({ success: false, reason: 'Doğrulama kodunun süresi dolmuş veya kod talep edilmemiş. Lütfen yeni kod isteyiniz.' });
+  }
+
+  if (String(code || '').trim() !== String(pending.code)) {
+    return res.status(400).json({ success: false, reason: 'Girdiğiniz doğrulama kodu hatalıdır.' });
+  }
+
+  const { newEmail, oldEmail } = pending;
+  pendingEmailVerifications.delete(userId);
+
+  try {
+    if (supabase) {
+      const { error } = await supabase.from('app_users').update({ email: newEmail }).eq('id', userId);
+      if (error) throw error;
+    } else {
+      const local = getLocalUsers();
+      const idx = local.findIndex(u => u.id === userId);
+      if (idx !== -1) {
+        local[idx].email = newEmail;
+        saveLocalUsers(local);
+      }
+    }
+
+    // Eski e-posta adresine güvenlik uyarısı gönder
+    if (oldEmail && oldEmail !== newEmail) {
+      mailer.sendEmailChangedNotice({
+        to: oldEmail,
+        fullName: req.authUser.full_name || req.authUser.username,
+        newEmail,
+        ip: req.ip
+      }).catch(() => {});
+    }
+
+    await recordAuditLog({
+      userId,
+      username: req.authUser.username,
+      role: req.authUser.role,
+      action: 'EMAIL_CHANGED',
+      target: newEmail,
+      details: `E-posta adresi '${oldEmail}' -> '${newEmail}' olarak doğrulandı ve güncellendi.`,
+      ip: req.ip
+    });
+
+    res.json({ success: true, email: newEmail, message: 'E-posta adresiniz başarıyla güncellendi.' });
+  } catch (err) {
+    console.warn('E-posta onaylama hatası:', safeLogStr(err.message));
+    res.status(503).json({ success: false, reason: 'E-posta adresi güncellenirken sunucu hatası oluştu.' });
+  }
+});
+
+// ── ADMİN: KULLANICIYI KALICI SİL ──────────────────────────────────────────
+app.post('/api/admin/delete-user', adminRateLimiter, requireAdmin, async (req, res) => {
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ success: false, reason: 'Kullanıcı kimliği belirtilmedi.' });
+  if (String(userId) === String(req.adminUser.id)) {
+    return res.status(400).json({ success: false, reason: 'Kendi yönetici hesabınızı silemezsiniz.' });
+  }
+
+  try {
+    const userObj = await loadUserById(userId);
+    if (!userObj) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
+    const targetUsername = userObj.username || String(userId);
+
+    if (supabase) {
+      const reportDelete = await supabase.from('reports').delete().eq('user_id', String(userId));
+      if (reportDelete.error) console.warn('Kullanıcı raporları silme uyarısı:', reportDelete.error.message);
+      const userDelete = await supabase.from('app_users').delete().eq('id', String(userId));
+      if (userDelete.error) throw userDelete.error;
+    } else {
+      saveLocalUsers(getLocalUsers().filter(user => String(user.id) !== String(userId)));
+      writeLocalReports(readLocalReports().filter(report => String(report.user_id) !== String(userId)));
+    }
+
+    await recordAuditLog({
+      userId: req.adminUser.id,
+      username: req.adminUser.username,
+      role: 'admin',
+      action: 'USER_DELETE',
+      target: targetUsername,
+      details: `@${targetUsername} kullanıcısı ve kişisel kayıtları sistemden silindi.`,
+      ip: req.ip
+    });
+
+    res.json({ success: true, message: `@${targetUsername} kullanıcısı başarıyla silindi.` });
+  } catch (err) {
+    console.warn('Kullanıcı silme hatası:', safeLogStr(err.message));
+    res.status(503).json({ success: false, reason: 'Kullanıcı silme işlemi tamamlanamadı.' });
+  }
+});
+
+// ── ADMİN: HESAP DONDUR / AÇ (Freeze / Unfreeze) ───────────────────────────
+app.post('/api/admin/freeze-user', adminRateLimiter, requireAdmin, async (req, res) => {
+  const { userId, freeze = true } = req.body;
+  if (!userId) return res.status(400).json({ success: false, reason: 'Kullanıcı kimliği gerekli.' });
+  if (String(userId) === String(req.adminUser.id) && freeze) {
+    return res.status(400).json({ success: false, reason: 'Kendi yönetici hesabınızı donduramazsınız.' });
+  }
+
+  try {
+    const isFrozen = Boolean(freeze);
+    const updatedUser = await updateUserById(userId, {
+      is_frozen: isFrozen,
+      is_active: !isFrozen
+    });
+    if (!updatedUser) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
+
+    if (updatedUser.email) {
+      mailer.sendAccountStatusChanged({
+        to: updatedUser.email,
+        fullName: updatedUser.full_name || updatedUser.username,
+        username: updatedUser.username,
+        action: isFrozen ? 'frozen' : 'activated'
+      }).catch(() => {});
+    }
+
+    await recordAuditLog({
+      userId: req.adminUser.id,
+      username: req.adminUser.username,
+      role: 'admin',
+      action: isFrozen ? 'USER_FROZEN' : 'USER_UNFROZEN',
+      target: updatedUser.username,
+      details: `Hesap durumu: ${isFrozen ? '❄️ donduruldu' : '☀️ aktifleştirildi'}`,
+      ip: req.ip
+    });
+
+    res.json({ success: true, is_frozen: isFrozen, is_active: !isFrozen });
+  } catch (err) {
+    console.warn('Hesap dondurma hatası:', safeLogStr(err.message));
+    res.status(503).json({ success: false, reason: 'Hesap dondurma işlemi tamamlanamadı.' });
+  }
+});
+
+// ── ADMİN: CANLI SİSTEM SAĞLIĞI & GECİKME MONİTÖRÜ ─────────────────────────
+app.get('/api/admin/system-health', adminRateLimiter, requireAdmin, async (req, res) => {
+  const start = Date.now();
+  let dbStatus = 'local';
+  let dbLatencyMs = 0;
+
+  if (supabase) {
+    try {
+      const dbCheck = await supabase.from('app_users').select('id').limit(1);
+      dbLatencyMs = Date.now() - start;
+      dbStatus = dbCheck.error ? 'error' : 'connected';
+    } catch {
+      dbStatus = 'error';
+      dbLatencyMs = Date.now() - start;
+    }
+  }
+
+  const memoryUsage = process.memoryUsage();
+  res.json({
+    success: true,
+    health: {
+      uptimeSeconds: Math.floor(process.uptime()),
+      db: { provider: supabase ? 'Supabase Cloud (PostgreSQL)' : 'Local JSON Storage', status: dbStatus, latencyMs: dbLatencyMs },
+      mail: mailer.getStatus(),
+      memory: {
+        rssMb: (memoryUsage.rss / (1024 * 1024)).toFixed(1),
+        heapUsedMb: (memoryUsage.heapUsed / (1024 * 1024)).toFixed(1)
+      }
+    }
+  });
+});
+
+// ── ADMİN: SİSTEM & HAVUZ DURUM ÖZETİ E-POSTASI GÖNDERME ──────────────────
+app.post('/api/admin/mail/send-digest', adminRateLimiter, requireAdmin, async (req, res) => {
+  const adminEmail = req.adminUser.email || process.env.BOOTSTRAP_ADMIN_EMAIL || process.env.SMTP_USER;
+  if (!adminEmail) return res.status(400).json({ success: false, reason: 'Yönetici e-posta adresi bulunamadı.' });
+
+  try {
+    let users = [];
+    let reports = [];
+    if (supabase) {
+      const uRes = await supabase.from('app_users').select('id, is_active, is_frozen, role');
+      users = uRes.data || [];
+      const rRes = await supabase.from('reports').select('id, is_public, in_pool');
+      reports = rRes.data || [];
+    } else {
+      users = getLocalUsers();
+      reports = readLocalReports();
+    }
+
+    const stats = {
+      totalUsers: users.length,
+      pendingUsers: users.filter(u => u.is_active === false && !u.is_frozen).length,
+      frozenUsers: users.filter(u => u.is_frozen === true).length,
+      totalReports: reports.length,
+      poolReports: reports.filter(r => r.is_public || r.in_pool || r.data?.isPublic).length
+    };
+
+    const mailResult = await mailer.sendSystemDigest({
+      to: adminEmail,
+      stats
+    });
+
+    await recordAuditLog({
+      userId: req.adminUser.id,
+      username: req.adminUser.username,
+      role: 'admin',
+      action: 'MAIL_DIGEST_SENT',
+      target: adminEmail,
+      details: `Sistem durum özeti gönderildi: ${mailResult.status}`,
+      ip: req.ip
+    });
+
+    res.json({
+      success: mailResult.sent,
+      status: mailResult.status,
+      message: mailResult.sent ? 'Sistem özeti e-posta adresinize gönderildi.' : 'E-posta gönderilemedi (SMTP kapalı veya hatalı).'
+    });
+  } catch (err) {
+    res.status(503).json({ success: false, reason: err.message });
+  }
 });
