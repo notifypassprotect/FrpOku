@@ -16,9 +16,12 @@ test('store değişiklikleri toplu snapshot yerine tekil rapor kuyruğuna gönde
 
 test('tekil rapor endpointi version koşullu güncelleme yapar', () => {
   const source = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+  const reportAccessSource = fs.readFileSync(path.join(root, 'lib/report_access.js'), 'utf8');
   assert.match(source, /app\.put\('\/api\/reports\/:id'/);
   assert.match(source, /\.eq\('version', currentVersion\)/);
   assert.match(source, /REPORT_CONFLICT/);
+  assert.match(source, /user_id, version, meta:data->meta/);
+  assert.match(reportAccessSource, /'version', 'created_at', 'updated_at'/);
 });
 
 test('Supabase doğrudan yazmaları hata kontrolü olmadan await edilmez', () => {

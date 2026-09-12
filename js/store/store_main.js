@@ -148,10 +148,14 @@
     if (raw) JSON.parse(raw).forEach(id => _pendingSyncIds.add(String(id)));
   } catch (e) {}
 
-  const USER_NOTES_KEY = 'frpoku_user_notes';
+  const USER_NOTES_KEY = 'frpoku_user_notes_v2';
+  function _scopedStorageKey(baseKey) {
+    const user = window.FrpAuth && typeof window.FrpAuth.getUser === 'function' ? window.FrpAuth.getUser() : null;
+    return `${baseKey}:${encodeURIComponent(String(user?.id || 'anonymous'))}`;
+  }
   function _getUserNotesMap() {
     try {
-      const raw = localStorage.getItem(USER_NOTES_KEY);
+      const raw = localStorage.getItem(_scopedStorageKey(USER_NOTES_KEY));
       return raw ? JSON.parse(raw) : {};
     } catch { return {}; }
   }
@@ -164,14 +168,14 @@
       } else {
         delete map[strId];
       }
-      localStorage.setItem(USER_NOTES_KEY, JSON.stringify(map));
+      localStorage.setItem(_scopedStorageKey(USER_NOTES_KEY), JSON.stringify(map));
     } catch {}
   }
 
-  const USER_PIN_OVERRIDES_KEY = 'frpoku_user_pin_overrides';
+  const USER_PIN_OVERRIDES_KEY = 'frpoku_user_pin_overrides_v2';
   function _getUserPinOverrides() {
     try {
-      const raw = localStorage.getItem(USER_PIN_OVERRIDES_KEY);
+      const raw = localStorage.getItem(_scopedStorageKey(USER_PIN_OVERRIDES_KEY));
       return raw ? JSON.parse(raw) : {};
     } catch { return {}; }
   }
@@ -179,7 +183,7 @@
     try {
       const map = _getUserPinOverrides();
       map[String(id)] = Boolean(isPinned);
-      localStorage.setItem(USER_PIN_OVERRIDES_KEY, JSON.stringify(map));
+      localStorage.setItem(_scopedStorageKey(USER_PIN_OVERRIDES_KEY), JSON.stringify(map));
     } catch {}
   }
 
@@ -1049,7 +1053,6 @@
     if (idx >= 0) {
       files[idx].userNote = cleanNote;
       files[idx].user_note = cleanNote;
-      files[idx].version = (Number(files[idx].version) || 1) + 1;
       files[idx].updated_at = new Date().toISOString();
       _write(files);
       _audit('NOTE_UPDATE', files[idx].name || id, 'Rapor kullanıcı notu güncellendi.');
@@ -1198,7 +1201,6 @@
       const nextPin = !Boolean(files[idx].isPinned || files[idx].is_pinned);
       files[idx].isPinned = nextPin;
       files[idx].is_pinned = nextPin;
-      files[idx].version = (Number(files[idx].version) || 1) + 1;
       files[idx].updated_at = new Date().toISOString();
       _saveUserPinOverride(strId, nextPin);
       _write(files);

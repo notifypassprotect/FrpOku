@@ -54,10 +54,32 @@ test('list_modals.js ve list.js sağ tık menüsünde not ekleme/düzenleme işl
   assert.match(indexHtml, /data-action="note"/);
 });
 
-test('store_main.js notları ve pin durumunu kalıcı saklar ve versiyon artırır', () => {
+test('store_main.js notları ve pin durumunu kullanıcıya özel saklar, sunucu sürümünü istemcide erken artırmaz', () => {
   const storeContent = fs.readFileSync(path.join(__dirname, '../js/store/store_main.js'), 'utf8');
   assert.match(storeContent, /_saveUserNote/);
   assert.match(storeContent, /_getUserNotesMap/);
   assert.match(storeContent, /_saveUserPinOverride/);
+  assert.match(storeContent, /_scopedStorageKey/);
+
+  const noteBody = storeContent.slice(storeContent.indexOf('function updateNote('), storeContent.indexOf('function updateMeta('));
+  const pinBody = storeContent.slice(storeContent.indexOf('function togglePin('), storeContent.indexOf('function addTag('));
+  assert.doesNotMatch(noteBody, /files\[idx\]\.version\s*=/);
+  assert.doesNotMatch(pinBody, /files\[idx\]\.version\s*=/);
 });
 
+test('çıkış ekranı tamamlanınca kaldırılır ve giriş portalı daha sonra açılır', () => {
+  const fxContent = fs.readFileSync(path.join(__dirname, '../js/core/circuit_fx.js'), 'utf8');
+  const logoutBody = fxContent.slice(fxContent.indexOf('function showLogoutSplash('), fxContent.indexOf('window.FrpCircuit'));
+  assert.match(logoutBody, /logoutOverlay\.classList\.add\('loaded'\)/);
+  assert.match(logoutBody, /logoutOverlay\.remove\(\)/);
+  assert.ok(logoutBody.indexOf('logoutOverlay.remove()') < logoutBody.indexOf("typeof onComplete === 'function'"));
+});
+
+test('şifre değişiminde yeni token istemci oturumuna yazılır ve şema geçişi bulunur', () => {
+  const authContent = fs.readFileSync(path.join(__dirname, '../js/core/auth.js'), 'utf8');
+  const serverContent = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
+  const migration = fs.readFileSync(path.join(__dirname, '../supabase/migrations/004_add_password_changed_at.sql'), 'utf8');
+  assert.match(authContent, /data\.success && data\.token/);
+  assert.match(serverContent, /\['is_frozen', 'password_changed_at'\]/);
+  assert.match(migration, /add column if not exists password_changed_at timestamptz/i);
+});

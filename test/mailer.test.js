@@ -147,3 +147,13 @@ test('sendSecurityAlert şüpheli giriş uyarısı oluşturur', async () => {
   assert.match(sentMessage.html, /hacker/);
 });
 
+test('mailer kaynak kodu SMTP bağlantısını sınırlı sürede sonlandırır ve Gmail uygulama şifresi boşluklarını temizler', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const source = fs.readFileSync(path.join(__dirname, '../lib/mailer.js'), 'utf8');
+  assert.match(source, /connectionTimeout:\s*15000/);
+  assert.match(source, /greetingTimeout:\s*10000/);
+  assert.match(source, /socketTimeout:\s*20000/);
+  assert.match(source, /gmail\\\.com\$\/i\.test\(smtpHost\)/);
+  assert.match(source, /rawPassword\.replace\(\/\\s\+\/g, ''\)/);
+});

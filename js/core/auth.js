@@ -340,6 +340,12 @@
  body: JSON.stringify({ userId: user.id, oldPassword, newPassword })
  });
  const data = await res.json();
+ if (data && data.success && data.token) {
+ currentUser.token = data.token;
+ localStorage.setItem('frpoku_auth_token', data.token);
+ const isRemembered = localStorage.getItem(REMEMBER_KEY) === '1';
+ setSession(currentUser, isRemembered);
+ }
  return data;
  } catch (e) {
  return { success: false, reason: 'Sunucu bağlantı hatası: ' + e.message };

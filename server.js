@@ -97,44 +97,26 @@ async function loadUserById(userId) {
 
 async function updateUserById(userId, updates) {
   if (supabase) {
-    try {
+    const pendingUpdates = { ...updates };
+    for (let attempt = 0; attempt < 3; attempt++) {
       const { data, error } = await supabase
         .from('app_users')
-        .update(updates)
+        .update(pendingUpdates)
         .eq('id', String(userId))
         .select('id, username, email, full_name, phone, department, role, is_active, avatar, created_at, last_login')
         .limit(1);
-      if (error) {
-        if (error.message && error.message.includes('is_frozen')) {
-          const fallbackUpdates = { ...updates };
-          delete fallbackUpdates.is_frozen;
-          const { data: fbData, error: fbError } = await supabase
-            .from('app_users')
-            .update(fallbackUpdates)
-            .eq('id', String(userId))
-            .select('id, username, email, full_name, phone, department, role, is_active, avatar, created_at, last_login')
-            .limit(1);
-          if (fbError) throw fbError;
-          return fbData && fbData[0] ? fbData[0] : null;
-        }
-        throw error;
+      if (!error) return data && data[0] ? data[0] : null;
+
+      const optionalColumn = ['is_frozen', 'password_changed_at'].find(column =>
+        Object.prototype.hasOwnProperty.call(pendingUpdates, column) && String(error.message || '').includes(column)
+      );
+      if (optionalColumn) {
+        delete pendingUpdates[optionalColumn];
+        continue;
       }
-      return data && data[0] ? data[0] : null;
-    } catch (err) {
-      if (err.message && err.message.includes('is_frozen')) {
-        const fallbackUpdates = { ...updates };
-        delete fallbackUpdates.is_frozen;
-        const { data: fbData, error: fbError } = await supabase
-          .from('app_users')
-          .update(fallbackUpdates)
-          .eq('id', String(userId))
-          .select('id, username, email, full_name, phone, department, role, is_active, avatar, created_at, last_login')
-          .limit(1);
-        if (fbError) throw fbError;
-        return fbData && fbData[0] ? fbData[0] : null;
-      }
-      throw err;
+      throw error;
     }
+    throw new Error('Kullanıcı güncellemesi desteklenmeyen veritabanı şeması nedeniyle tamamlanamadı.');
   }
 
   const users = getLocalUsers();
@@ -795,7 +777,7 @@ app.post('/api/admin/approve-user', adminRateLimiter, requireAdmin, async (req, 
   }
 });
 
-app.get('/api/admin/mail/status', adminRateLimiter, requireAdmin, (req, res) => {
+app.get('/api/admin/mail/status', adminRateLimiter, requireAdmin, async (req, res) => {
   try {
     const envPath = path.join(__dirname, '.env');
     if (fs.existsSync(envPath)) {
@@ -805,7 +787,17 @@ app.get('/api/admin/mail/status', adminRateLimiter, requireAdmin, (req, res) => 
       }
     }
   } catch (e) {}
-  res.json({ success: true, mail: mailer.getStatus() });
+  const status = mailer.getStatus();
+  const verification = status.ready ? await mailer.verify() : { ok: false, status: status.enabled ? 'not_configured' : 'disabled' };
+  res.json({
+    success: true,
+    mail: {
+      ...status,
+      verified: verification.ok,
+      verifyStatus: verification.status,
+      error: verification.error || null
+    }
+  });
 });
 
 app.post('/api/admin/mail/test', adminRateLimiter, requireAdmin, async (req, res) => {
@@ -828,7 +820,7 @@ app.post('/api/admin/mail/test', adminRateLimiter, requireAdmin, async (req, res
   res.status(result.sent ? 200 : 503).json({
     success: result.sent,
     mail: { sent: result.sent, status: result.status },
-    reason: result.sent ? undefined : 'Test e-postası gönderilemedi. Mail yapılandırmasını kontrol edin.'
+    reason: result.sent ? undefined : (result.error || result.reason || 'Test e-postası gönderilemedi. Mail yapılandırmasını kontrol edin.')
   });
 });
 
@@ -1293,7 +1285,7 @@ async function getReportRecord(id) {
   }) || null;
 }
 
-const SUMMARY_SELECT_COLUMNS = 'id, name, file_size, category, tags, is_favorite, is_pinned, sql_count, memo_count, dataset_count, page_count, has_script, created_at, updated_at, user_note, is_deleted, deleted_at, user_id, meta:data->meta, data->isPublic, data->is_public, data->inPool, data->in_pool, data->ownerName, data->ownerUsername, data->ownerDepartment, data->sharedAt, data->version, tableNames:data->tableNames, queryNames:data->queryNames, paramNames:data->paramNames, datasets:data->datasets';
+const SUMMARY_SELECT_COLUMNS = 'id, name, file_size, category, tags, is_favorite, is_pinned, sql_count, memo_count, dataset_count, page_count, has_script, created_at, updated_at, user_note, is_deleted, deleted_at, user_id, version, meta:data->meta, data->isPublic, data->is_public, data->inPool, data->in_pool, data->ownerName, data->ownerUsername, data->ownerDepartment, data->sharedAt, tableNames:data->tableNames, queryNames:data->queryNames, paramNames:data->paramNames, datasets:data->datasets';
 
 async function loadVisibleReports(user, isDeleted, { summaryOnly = true } = {}) {
   if (supabase) {

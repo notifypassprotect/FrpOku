@@ -210,7 +210,7 @@ window.FrpSettingsTabs.profile = {
               </div>
               <div>
                 <label style="font-size:.75rem; font-weight:700; color:var(--text-secondary); margin-bottom:.3rem; display:block;">Yeni Şifre</label>
-                <input type="password" id="profNewPass" class="master-search-input" style="width:100%;" placeholder="En az 4 karakter" />
+                <input type="password" id="profNewPass" class="master-search-input" style="width:100%;" placeholder="En az 10 karakter" />
               </div>
               <div>
                 <label style="font-size:.75rem; font-weight:700; color:var(--text-secondary); margin-bottom:.3rem; display:block;">Yeni Şifre Tekrar</label>
@@ -383,8 +383,8 @@ window.FrpSettingsTabs.profile = {
         return;
       }
 
-      if (newPass.length < 4) {
-        showAlert('Yeni şifreniz en az 4 karakter uzunluğunda olmalıdır.', 'warning');
+      if (newPass.length < 10) {
+        showAlert('Yeni şifreniz en az 10 karakter uzunluğunda olmalıdır.', 'warning');
         return;
       }
 

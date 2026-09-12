@@ -70,7 +70,11 @@
     });
 
     setTimeout(() => {
-      if (typeof onComplete === 'function') onComplete();
+      logoutOverlay.classList.add('loaded');
+      setTimeout(() => {
+        try { logoutOverlay.remove(); } catch (e) {}
+        if (typeof onComplete === 'function') onComplete();
+      }, 450);
     }, 850);
   }
 

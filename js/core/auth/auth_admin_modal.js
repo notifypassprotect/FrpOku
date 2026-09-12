@@ -163,7 +163,7 @@
  ]);
 
  const mail = mailRes.mail || {};
- const ready = mail.enabled && mail.configured;
+ const ready = mail.enabled && mail.configured && mail.verified === true;
  const health = healthRes.health || {};
  const supa = health.supabase || {
  connected: health.db?.status === 'connected',
@@ -234,13 +234,14 @@
  <div style="font-size:1rem;font-weight:800;">SMTP Gönderim Durumu</div>
  <div style="font-size:.78rem;color:var(--text-muted,#64748b);margin-top:.25rem;">E-posta bildirimleri (kayıt onayı, güvenlik uyarıları, doğrulama kodları)</div>
  </div>
- <span class="badge ${ready ? 'badge-green' : 'badge-amber'}">${ready ? 'Hazır' : mail.enabled ? 'Eksik Yapılandırma' : 'Kapalı'}</span>
+ <span class="badge ${ready ? 'badge-green' : 'badge-amber'}">${ready ? 'Hazır' : !mail.enabled ? 'Kapalı' : mail.configured ? 'Bağlantı Hatası' : 'Eksik Yapılandırma'}</span>
  </div>
  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.75rem;margin-top:1rem;font-size:.8rem;">
  <div><strong>Sunucu:</strong> ${escHtml(mail.provider || 'Tanımlanmadı')}</div>
  <div><strong>Gönderen:</strong> ${escHtml(mail.from || 'Tanımlanmadı')}</div>
  <div><strong>Mail Durumu:</strong> ${mail.enabled ? 'Aktif' : 'Pasif'}</div>
  </div>
+ ${mail.enabled && mail.configured && !mail.verified ? `<div style="color:#ef4444;margin-top:.75rem;font-size:.76rem;font-weight:700;word-break:break-word;">SMTP bağlantısı doğrulanamadı: ${escHtml(mail.error || 'Sunucu SMTP bağlantısını kabul etmedi.')}</div>` : ''}
  ${!ready ? `
  <div style="background:rgba(37,99,235,0.06);border:1px solid rgba(37,99,235,0.25);border-radius:10px;padding:12px 16px;margin-top:1rem;font-size:.78rem;line-height:1.6;color:var(--text-secondary,#334155);">
  <strong style="color:var(--accent,#2563eb);">Render.com Ortam Değişkeni (Environment) Rehberi:</strong>
