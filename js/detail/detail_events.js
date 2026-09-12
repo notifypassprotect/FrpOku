@@ -20,7 +20,6 @@
     else if (action === 'format-sql') call('formatSqlInTab', tab, target.dataset.mode);
     else if (action === 'minify-sql') call('minifySqlInTab', tab);
     else if (action === 'change-case') call('changeSqlCaseInTab', tab);
-    else if (action === 'complexity') call('openComplexityModal', index);
     else if (action === 'snippet') call('addToSnippetLibrary', index);
     else if (action === 'param') call('openParamInjector', index);
     else if (action === 'check-pascal') call('checkPascalSyntaxInTab');

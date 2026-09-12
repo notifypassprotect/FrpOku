@@ -20,7 +20,13 @@ function showModal({
   closeOnBackdrop = true,
   buttons = null
 }) {
-  return new Promise(resolve => {
+    // Prevent duplicate modals with the same title
+    const existingSame = Array.from(document.querySelectorAll('.modal-overlay .modal-title')).find(el => el.textContent.trim() === String(title || '').trim());
+    if (existingSame) {
+      resolve(false);
+      return;
+    }
+
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     
@@ -46,14 +52,31 @@ function showModal({
     }
 
     overlay.innerHTML = `
-      <div class="modal" style="max-width:${maxWidth};">
-        <div class="modal-title">${title}</div>
+      <div class="modal" style="max-width:${maxWidth};position:relative;">
+        <button type="button" class="modal-close-x" id="modalCloseX" title="Pencereyi Kapat" style="position:absolute;top:1rem;right:1rem;background:none;border:none;font-size:1.15rem;cursor:pointer;color:var(--text-muted);display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;transition:all .15s;line-height:1;">✕</button>
+        <div class="modal-title" style="padding-right:2rem;">${title}</div>
         <div class="modal-body">${body}</div>
         <div class="modal-actions">
           ${actionsHtml}
         </div>
       </div>`;
     document.body.appendChild(overlay);
+
+    const closeXBtn = overlay.querySelector('#modalCloseX');
+    if (closeXBtn) {
+      closeXBtn.addEventListener('click', () => {
+        overlay.remove();
+        resolve(false);
+      });
+      closeXBtn.addEventListener('mouseenter', () => {
+        closeXBtn.style.color = 'var(--red)';
+        closeXBtn.style.background = 'var(--bg-raised)';
+      });
+      closeXBtn.addEventListener('mouseleave', () => {
+        closeXBtn.style.color = 'var(--text-muted)';
+        closeXBtn.style.background = 'none';
+      });
+    }
 
     if (typeof onOpen === 'function') {
       requestAnimationFrame(() => onOpen(overlay));

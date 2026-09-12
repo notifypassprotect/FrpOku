@@ -164,7 +164,7 @@
 
   function _reportHash(report) {
     if (!report) return '';
-    return `${report.id}:${report.version || 0}:${report.updated_at || report.loadedAt || ''}:${Boolean(report.isPublic || report.is_public || report.inPool || report.in_pool)}:${Boolean(report.isFavorite)}:${Boolean(report.isPinned)}:${Boolean(report.isDeleted || report.is_deleted)}`;
+    return `${report.id}:${report.version || 0}:${report.updated_at || report.loadedAt || ''}:${Boolean(report.isPublic || report.is_public || report.inPool || report.in_pool)}:${Boolean(report.isFavorite || report.is_favorite)}:${Boolean(report.isPinned || report.is_pinned)}:${Boolean(report.isDeleted || report.is_deleted)}:${report.userNote || report.user_note || ''}:${Array.isArray(report.tags) ? report.tags.join(',') : ''}:${report.category || ''}:${report.name || ''}`;
   }
 
   function _rememberPersisted(files) {
@@ -478,10 +478,17 @@
     const existingTags = existingIdx >= 0 ? (files[existingIdx].tags || []) : [];
     const mergedTags = [...new Set([...existingTags, ...autoTags])];
 
+    const tableNames = window.getReportTables ? window.getReportTables(parsedData) : (Array.isArray(parsedData.tableNames) ? parsedData.tableNames : []);
+    const queryNames = Array.isArray(parsedData.queries) ? parsedData.queries.map(q => q.name).filter(Boolean) : [];
+    const isFav = existingIdx >= 0 ? Boolean(files[existingIdx].isFavorite || files[existingIdx].is_favorite) : false;
+    const isPin = existingIdx >= 0 ? Boolean(files[existingIdx].isPinned || files[existingIdx].is_pinned) : false;
+    const uNote = existingIdx >= 0 ? (files[existingIdx].userNote || files[existingIdx].user_note || '') : '';
+
     const fileRecord = {
       id:              existingIdx >= 0 ? files[existingIdx].id : _uuid(),
       name:            fileName,
       userId:          existingIdx >= 0 ? (files[existingIdx].userId || userId) : userId,
+      user_id:         existingIdx >= 0 ? (files[existingIdx].userId || userId) : userId,
       sizeBytes:       fileSize,
       loadedAt:        new Date().toISOString(),
       meta:            parsedData.meta || {},
@@ -492,16 +499,21 @@
       pages:           parsedData.pages || [],
       dialogPages:     parsedData.dialogPages || [],
       rawXml:          parsedData.rawXml || null,
-      userNote:        existingIdx >= 0 ? (files[existingIdx].userNote || '') : '',
-      isFavorite:      existingIdx >= 0 ? (files[existingIdx].isFavorite || false) : false,
-      isPinned:        existingIdx >= 0 ? (files[existingIdx].isPinned || false) : false,
+      userNote:        uNote,
+      user_note:       uNote,
+      isFavorite:      isFav,
+      is_favorite:     isFav,
+      isPinned:        isPin,
+      is_pinned:       isPin,
       isPublic:        existingIdx >= 0 ? (files[existingIdx].isPublic || false) : false,
       ownerName:       existingIdx >= 0 ? (files[existingIdx].ownerName || ownerName) : ownerName,
       ownerUsername:   existingIdx >= 0 ? (files[existingIdx].ownerUsername || ownerUsername) : ownerUsername,
       ownerDepartment: existingIdx >= 0 ? (files[existingIdx].ownerDepartment || ownerDepartment) : ownerDepartment,
       sharedAt:        existingIdx >= 0 ? (files[existingIdx].sharedAt || null) : null,
       version:         existingIdx >= 0 ? (Number(files[existingIdx].version) || 1) : 0,
-      tags:            mergedTags
+      tags:            mergedTags,
+      tableNames,
+      queryNames
     };
 
     if (existingIdx >= 0) {
@@ -533,10 +545,17 @@
       const existingTags = existingIdx >= 0 ? (files[existingIdx].tags || []) : [];
       const mergedTags = [...new Set([...existingTags, ...autoTags])];
 
+      const tableNames = window.getReportTables ? window.getReportTables(parsedData) : (Array.isArray(parsedData.tableNames) ? parsedData.tableNames : []);
+      const queryNames = Array.isArray(parsedData.queries) ? parsedData.queries.map(q => q.name).filter(Boolean) : [];
+      const isFav = existingIdx >= 0 ? Boolean(files[existingIdx].isFavorite || files[existingIdx].is_favorite) : false;
+      const isPin = existingIdx >= 0 ? Boolean(files[existingIdx].isPinned || files[existingIdx].is_pinned) : false;
+      const uNote = existingIdx >= 0 ? (files[existingIdx].userNote || files[existingIdx].user_note || '') : '';
+
       const fileRecord = {
         id:              existingIdx >= 0 ? files[existingIdx].id : _uuid(),
         name:            fileName,
         userId:          existingIdx >= 0 ? (files[existingIdx].userId || userId) : userId,
+        user_id:         existingIdx >= 0 ? (files[existingIdx].userId || userId) : userId,
         sizeBytes:       fileSize,
         loadedAt:        new Date().toISOString(),
         meta:            parsedData.meta || {},
@@ -547,16 +566,21 @@
         pages:           parsedData.pages || [],
         dialogPages:     parsedData.dialogPages || [],
         rawXml:          parsedData.rawXml || null,
-        userNote:        existingIdx >= 0 ? (files[existingIdx].userNote || '') : '',
-        isFavorite:      existingIdx >= 0 ? (files[existingIdx].isFavorite || false) : false,
-        isPinned:        existingIdx >= 0 ? (files[existingIdx].isPinned || false) : false,
+        userNote:        uNote,
+        user_note:       uNote,
+        isFavorite:      isFav,
+        is_favorite:     isFav,
+        isPinned:        isPin,
+        is_pinned:       isPin,
         isPublic:        existingIdx >= 0 ? (files[existingIdx].isPublic || false) : false,
         ownerName:       existingIdx >= 0 ? (files[existingIdx].ownerName || ownerName) : ownerName,
         ownerUsername:   existingIdx >= 0 ? (files[existingIdx].ownerUsername || ownerUsername) : ownerUsername,
         ownerDepartment: existingIdx >= 0 ? (files[existingIdx].ownerDepartment || ownerDepartment) : ownerDepartment,
         sharedAt:        existingIdx >= 0 ? (files[existingIdx].sharedAt || null) : null,
         version:         existingIdx >= 0 ? (Number(files[existingIdx].version) || 1) : 0,
-        tags:            mergedTags
+        tags:            mergedTags,
+        tableNames,
+        queryNames
       };
 
       if (existingIdx >= 0) {
@@ -964,6 +988,7 @@
     const idx = files.findIndex(f => f.id === id);
     if (idx >= 0) {
       files[idx].userNote = note;
+      files[idx].user_note = note;
       _write(files);
       _audit('NOTE_UPDATE', files[idx].name || id, 'Rapor kullanıcı notu güncellendi.');
       return true;
@@ -1057,6 +1082,7 @@
     const idx = files.findIndex(f => f.id === id);
     if (idx >= 0) {
       files[idx].isFavorite = !files[idx].isFavorite;
+      files[idx].is_favorite = files[idx].isFavorite;
       _write(files);
       _audit('REPORT_FAVORITE', files[idx].name || id, files[idx].isFavorite ? 'Favorilere eklendi.' : 'Favorilerden çıkarıldı.');
       return files[idx].isFavorite;
@@ -1072,6 +1098,7 @@
     files.forEach(f => {
       if (idSet.has(f.id)) {
         f.isFavorite = !!isFav;
+        f.is_favorite = !!isFav;
         count++;
       }
     });
@@ -1090,6 +1117,7 @@
     files.forEach(f => {
       if (idSet.has(f.id)) {
         f.isFavorite = !f.isFavorite;
+        f.is_favorite = f.isFavorite;
         count++;
       }
     });
@@ -1105,6 +1133,7 @@
     const idx = files.findIndex(f => f.id === id);
     if (idx >= 0) {
       files[idx].isPinned = !files[idx].isPinned;
+      files[idx].is_pinned = files[idx].isPinned;
       _write(files);
       _audit('REPORT_PIN', files[idx].name || id, files[idx].isPinned ? 'Rapor üste sabitlendi.' : 'Rapor sabitlemesi kaldırıldı.');
       return files[idx].isPinned;

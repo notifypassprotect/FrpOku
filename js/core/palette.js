@@ -36,7 +36,6 @@
  { id: 'view_theme', label: 'Tema Değiştir', desc: 'Koyu/Aydınlık tema', action: () => { document.getElementById('btnThemeToggle')?.click(); } },
 
  // Araçlar
- { id: 'tool_complexity', label: 'SQL Karmaşıklık & DBA Analizi', desc: 'Tüm sorguların zeki statik analizi', action: () => { document.getElementById('btnComplexityCenter')?.click() || window.openComplexityCenter?.(); } },
  { id: 'tool_params', label: 'SQL Parametre Paneli', desc: 'Tüm parametreleri görüntüle', action: () => { document.getElementById('btnParams')?.click() || window.openParamsModal?.(); } },
  { id: 'tool_deps', label: 'Bağımlılık Haritası', desc: 'Tablo bağımlılıkları', action: () => { document.getElementById('btnDependencies')?.click() || window.openDependenciesModal?.(); } },
  { id: 'tool_snippets', label: 'Sorgu Kütüphanesi', desc: 'Kayıtlı SQL şablonları', action: () => { if (window.renderSnippetsModal) { window.renderSnippetsModal(); } else { document.getElementById('btnSnippets')?.click(); } } },

@@ -14,7 +14,6 @@ window.FrpSettingsTabs.shortcuts = {
     { key: 'Ctrl + M', desc: 'Komut Paletini aç (Hızlı Menü)' },
     { key: 'ESC',      desc: 'Açık modal pencereleri veya aramayı kapat' },
     { key: 'F6',       desc: 'Görünüm modunu değiştir (Tablo / Kartlar / Zaman Tüneli)' },
-    { key: 'F7',       desc: 'SQL Karmaşıklık & Anti-Pattern Analizini aç' },
     { key: 'F8',       desc: 'Seçili raporlar için Karşılaştırma modunu aç' }
   ],
 

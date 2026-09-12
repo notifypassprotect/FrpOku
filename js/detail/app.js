@@ -372,6 +372,9 @@ function renderSidebar(file) {
  const noteInp = document.getElementById('noteTextarea');
  const note = noteInp? noteInp.value: '';
  FrpStore.updateNote(file.id, note);
+      file.userNote = note;
+      file.user_note = note;
+      currentFile = FrpStore.getById(file.id) || file;
  this.textContent = '✅ Kaydedildi';
  this.classList.add('saved');
  setTimeout(() => { this.textContent = ' Kaydet'; this.classList.remove('saved'); }, 2000);
@@ -553,7 +556,6 @@ function addTab(cfg) {
  </div>
  </div>
  <button class="btn-copy" id="${esc(cfg.id)}_casetogglebtn" data-detail-action="change-case" data-tab="${encodeInlineArg(cfg.id)}" title="SQL Anahtar Kelimelerini BÜYÜK / KÜÇÜK Harfe Dönüştür">BÜYÜK Harf</button>
- <button class="btn-copy" data-detail-action="complexity" data-index="${cfg.queryIndex}" title="SQL Karmaşıklık Puanı & Analiz">Karmaşıklık</button>
  <button class="btn-copy" data-detail-action="snippet" data-index="${cfg.queryIndex}">Kütüphaneye Ekle</button>
  <button class="btn-copy" data-detail-action="param" data-index="${cfg.queryIndex}">SQL Testi</button>
  `: ''}
@@ -1919,217 +1921,6 @@ function setupCodeSearch() {
  });
 }
 
-// ── SQL KARMAŞIKLIK & STATİK ANALİZ DETAY MODALI (Zeki DBA Motoru) ────────
-function openComplexityModal(qIdx) {
- let targetIdx = qIdx;
- let sql = '';
- let queryName = 'SQL Sorgusu';
-
- // 1. qIdx sayısal değilse veya aktif sekmeden çıkarılacaksa
- if (typeof targetIdx!== 'number' || isNaN(targetIdx)) {
- const activeSqlTab = activeTabs.find(t => t.type === 'sql' && document.getElementById(t.id + '_panel')?.classList.contains('active'));
- if (activeSqlTab) {
- targetIdx = typeof activeSqlTab.queryIndex === 'number'? activeSqlTab.queryIndex: 0;
- } else {
- targetIdx = 0;
- }
- }
-
- // 2. Canlı düzenleyici açıksa oradaki güncel kodu al, yoksa currentFile'dan oku
- const tabId = 'tab_sql_' + targetIdx;
- const editArea = document.getElementById(tabId + '_editarea');
- if (editArea && editArea.style.display!== 'none' && editArea.value) {
- sql = editArea.value;
- } else if (currentFile && currentFile.queries && currentFile.queries[targetIdx]) {
- sql = currentFile.queries[targetIdx].sql || '';
- queryName = currentFile.queries[targetIdx].name || `Sorgu ${targetIdx + 1}`;
- } else {
- const tabObj = activeTabs.find(t => t.id === tabId);
- if (tabObj) {
- sql = tabObj.rawCode || '';
- queryName = tabObj.queryName || tabObj.label || 'SQL Sorgusu';
- }
- }
-
- if (!sql ||!sql.trim()) {
- showToast('Analiz edilecek SQL sorgusu bulunamadı.', 'warning');
- return;
- }
-
- const comp = FrpStore.getSqlComplexity(sql);
- const d = comp.details || {};
-
- let issuesHtml = '';
- if (comp.warnings && comp.warnings.length > 0) {
- issuesHtml = comp.warnings.map((w, wIdx) => {
- const recIdx = comp.recommendations.findIndex(r => r.category === w.category);
- const rec = recIdx!== -1? comp.recommendations[recIdx]: (comp.recommendations[wIdx] || {});
- const actualRecIdx = recIdx!== -1? recIdx: wIdx;
-
- return `
- <div style="background:var(--bg-surface);border:1px solid ${w.type === 'danger'? 'rgba(239,68,68,.3)': 'rgba(245,158,11,.3)'};border-radius:12px;padding:.9rem 1.1rem;display:flex;flex-direction:column;gap:.65rem;">
- <div style="display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-wrap:wrap;">
- <div style="font-weight:800;font-size:.88rem;color:${w.type === 'danger'? '#ef4444': '#f59e0b'};display:flex;align-items:center;gap:.4rem;">
- ${w.type === 'danger'? '': '⚠️'} ${esc(w.title)}
- </div>
- <div style="display:flex;align-items:center;gap:.4rem;">
- ${w.categoryLabel? `<span class="badge" style="font-size:.7rem;">${esc(w.categoryLabel)}</span>`: ''}
- </div>
- </div>
-
- <div style="font-size:.8rem;color:var(--text-secondary);line-height:1.45;background:rgba(0,0,0,.08);padding:.55rem.8rem;border-radius:6px;">
- <strong style="color:var(--text-primary);">❌ Neden Kötü?:</strong> ${esc(w.text)}
- </div>
-
- ${rec.desc? `
- <div style="font-size:.8rem;color:var(--text-primary);line-height:1.45;">
- <strong style="color:var(--green);"> Çözüm & Tavsiye:</strong> ${esc(rec.desc)}
- </div>
- `: ''}
-
- ${(rec.before || rec.after)? `
- <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-top:.3rem;">
- <div style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.25);border-radius:8px;padding:.6rem.75rem;">
- <div style="font-size:.7rem;font-weight:700;color:var(--red);margin-bottom:.3rem;display:flex;align-items:center;justify-content:space-between;">
- <span>❌ Mevcut / Riskli Kod:</span>
- <button type="button" class="btn btn-sm" style="font-size:.65rem;padding:.1rem.35rem;" data-detail-action="copy-text" data-value="${encodeInlineArg(rec.before || '')}"></button>
- </div>
- <pre style="margin:0;font-family:var(--mono);font-size:.73rem;color:var(--text-primary);white-space:pre-wrap;line-height:1.4;max-height:140px;overflow-y:auto;">${esc(rec.before || '')}</pre>
- </div>
- <div style="background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.25);border-radius:8px;padding:.6rem.75rem;">
- <div style="font-size:.7rem;font-weight:700;color:var(--green);margin-bottom:.3rem;display:flex;align-items:center;justify-content:space-between;">
- <span>✅ Önerilen Optimize Kod:</span>
- <button type="button" class="btn btn-sm" style="font-size:.65rem;padding:.1rem.35rem;" data-detail-action="copy-text" data-value="${encodeInlineArg(rec.after || '')}"></button>
- </div>
- <pre style="margin:0;font-family:var(--mono);font-size:.73rem;color:var(--text-primary);white-space:pre-wrap;line-height:1.4;max-height:140px;overflow-y:auto;">${esc(rec.after || '')}</pre>
- </div>
- </div>
- `: ''}
- </div>
- `;
- }).join('');
- } else {
- issuesHtml = `
- <div style="background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.25);border-radius:12px;padding:1.2rem 1.4rem;color:var(--green);font-size:.85rem;font-weight:600;display:flex;align-items:center;gap:.5rem;">
- ✨ Harika! Bu SQL sorgusunda bilinen kritik bir anti-pattern tespit edilmedi. Kod temiz ve optimize görünüyor.
- </div>
- `;
- }
-
- const body = `
- <div style="display:flex;flex-direction:column;gap:1.1rem;max-height:75vh;overflow-y:auto;padding-right:.3rem;">
- 
- <!-- Skor Özeti & Termometre Barı -->
- <div style="background:var(--bg-raised);border-radius:12px;border:1px solid var(--border-light);padding:1.1rem 1.25rem;">
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
- <div>
- <div style="font-size:.76rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;">SQL Karmaşıklık & Sağlık Skoru</div>
- <div style="font-size:1.35rem;font-weight:800;color:${comp.color};margin-top:.2rem;display:flex;align-items:center;gap:.6rem;">
- <span>${comp.score}/100</span>
- <span style="font-size:.85rem;padding:.2rem.65rem;border-radius:20px;background:${comp.color}20;border:1px solid ${comp.color}40;color:${comp.color};">${comp.level}</span>
- </div>
- </div>
- <div style="text-align:right;display:flex;align-items:center;gap:.8rem;">
- <div>
- <div style="font-size:.72rem;color:var(--text-muted);font-weight:600;">Sağlık Notu</div>
- <div style="font-size:.88rem;font-weight:800;color:${comp.healthScore >= 75? 'var(--green)': (comp.healthScore >= 50? 'var(--orange)': 'var(--red)')};">${comp.healthScore || 100} / 100</div>
- </div>
- <div style="display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:50%;background:${comp.color};color:#fff;font-size:1.4rem;font-weight:900;box-shadow:0 6px 16px ${comp.color}40;">
- ${comp.grade || 'A'}
- </div>
- </div>
- </div>
-
- <!-- Görsel Gösterge Çubuğu -->
- <div style="background:var(--bg-surface);border-radius:10px;height:10px;overflow:hidden;border:1px solid var(--border);position:relative;">
- <div style="background:linear-gradient(90deg, #10b981 0%, #3b82f6 35%, #f59e0b 65%, #ef4444 100%);height:100%;width:100%;opacity:.2;position:absolute;"></div>
- <div style="background:${comp.color};height:100%;width:${comp.score}%;transition:width.4s ease;position:relative;border-radius:10px;"></div>
- </div>
-
- <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--text-muted);margin-top:.35rem;">
- <span>0 Basit (A+)</span>
- <span>40 Orta (A)</span>
- <span>65 Karmaşık (B)</span>
- <span>85 Çok Karmaşık (C)</span>
- <span>100 Kritik (F)</span>
- </div>
-
- <!-- SKORLAR ARASINDAKİ FARK VE PUANLAMA MANTIĞI KARTI -->
- <div style="margin-top:.85rem;padding:.75rem.9rem;background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.25);border-radius:10px;font-size:.78rem;line-height:1.45;color:var(--text-primary);display:flex;flex-direction:column;gap:.4rem;">
- <div style="font-weight:800;color:var(--accent-bright);display:flex;align-items:center;gap:.35rem;">
- <span>ℹ️</span> <span>Skorlar Arasındaki Fark & Puanlama Mantığı:</span>
- </div>
- <div>
- <strong>1. Karmaşıklık Skoru (${comp.score}/100):</strong> Sorgunun <em>yapısal büyüklüğünü ve hacmini</em> ölçer (${d.totalJoins || 0} JOIN, ${d.subqCount || 0} Alt Sorgu, ${d.unionCount || 0} UNION, ${d.lines || 0} satır). Büyük sorgularda bu skorun yüksek olması doğaldır ve tek başına hata anlamına gelmez.
- </div>
- <div>
- <strong>2. Sağlık Notu (${comp.healthScore || 100}/100):</strong> Sorgunun <em>performans kalitesini ve DBA iyi pratiklerine uyumunu</em> ölçer (100 puandan başlar; indeks iptali, kartezyen riski gibi anti-pattern'lerden puan kırılır).
- </div>
- </div>
- </div>
-
- <!-- Sorunlar ve DBA Çözümleri -->
- <div style="display:flex;flex-direction:column;gap:.75rem;">
- <div style="font-size:.85rem;font-weight:800;color:var(--text-primary);display:flex;align-items:center;justify-content:space-between;">
- <span> Tespit Edilen Riskler & DBA Çözüm Önerileri</span>
- <span style="font-size:.74rem;color:var(--text-muted);font-weight:normal;">(${comp.warnings.length} tespit)</span>
- </div>
- ${issuesHtml}
- </div>
-
- <!-- Katlanabilir Yapısal Bileşen Sayımları -->
- <details style="background:var(--bg-raised);border:1px solid var(--border-light);border-radius:12px;padding:.85rem 1.1rem;">
- <summary style="cursor:pointer;font-weight:700;font-size:.82rem;color:var(--accent);user-select:none;">
- Sorgunun Yapısal Bileşen Sayımları (Aç / Kapat)
- </summary>
- <table class="dash-tbl" style="font-size:.78rem;width:100%;margin-top:.6rem;">
- <tbody>
- <tr><td>Toplam Tablo & JOIN</td><td><strong>${d.totalJoins || 0}</strong> <small style="opacity:.7">(${d.innerJoinCount || 0} Inner, ${d.leftJoinCount || 0} Left, ${d.crossJoinCount || 0} Cross)</small></td></tr>
- <tr><td>Alt Sorgular (Subquery)</td><td><strong>${d.subqCount || 0}</strong> <small style="opacity:.7">(${d.inSubqCount || 0} IN, ${d.notInSubqCount || 0} NOT IN)</small></td></tr>
- <tr><td>CTE (WITH İfadeleri)</td><td><strong>${d.cteCount || 0}</strong> ${(d.cteNames && d.cteNames.length > 0)? `<span style="font-size:.72rem;background:rgba(59,130,246,.15);color:var(--accent-bright);padding:.1rem.4rem;border-radius:4px;font-family:var(--mono);margin-left:.4rem;">${d.cteNames.join(', ')}</span>`: ''}</td></tr>
- <tr><td>Koşul Mantığı (AND / OR)</td><td><strong>${d.andOrCount || 0}</strong> <small style="opacity:.7">(${d.orCount || 0} OR)</small></td></tr>
- <tr><td>CASE / WHEN Blokları</td><td><strong>${d.caseCount || 0}</strong></td></tr>
- <tr><td>UNION Kümeleri</td><td><strong>${d.unionCount || 0}</strong> <small style="opacity:.7">(${d.unionAllCount || 0} UNION ALL, ${d.unionPureCount || 0} Saf UNION)</small></td></tr>
- <tr><td>Sorgu Satır & Parametre</td><td><strong>${d.lines || 0} satır</strong> · <strong>${d.paramCount || 0} parametre</strong></td></tr>
- </tbody>
- </table>
- </details>
-
- </div>
- `;
-
- // DBA önerisini canlı editöre uygulama yardımcısı
- window._lastDbaComplexity = comp;
- window.applyDbaSuggestion = function(qIndex, recIndex) {
- const rec = window._lastDbaComplexity?.recommendations?.[recIndex];
- if (!rec ||!rec.before ||!rec.after) return;
-
- const tId = 'tab_sql_' + qIndex;
- const editAreaEl = document.getElementById(tId + '_editarea');
- if (editAreaEl) {
- if (editAreaEl.style.display === 'none') {
- toggleEditMode(tId);
- }
- if (editAreaEl.value.includes(rec.before)) {
- editAreaEl.value = editAreaEl.value.replace(rec.before, rec.after);
- syncEditorBackdrop(tId);
- showToast('Öneri başarıyla editöre uygulandı! ⚡', 'success');
- } else {
- navigator.clipboard.writeText(rec.after);
- showToast('Önerilen kod panoya kopyalandı! ', 'info');
- }
- }
- };
-
- showModal({
- title: ` Zeki SQL Karmaşıklık & DBA Analizi — ${esc(queryName)}`,
- body,
- confirmText: 'Kapat',
- cancelText: '',
- maxWidth: '1100px'
- });
-}
-
 function scrollToPascalLine(lineNum) {
  activateTab('tab_pascal');
  setTimeout(() => {
@@ -3208,7 +2999,6 @@ window.copyGuidText = copyGuidText;
 window.formatSqlInTab = formatSqlInTab;
 window.minifySqlInTab = minifySqlInTab;
 window.changeSqlCaseInTab = changeSqlCaseInTab;
-window.openComplexityModal = openComplexityModal;
 window.checkPascalSyntaxInTab = checkPascalSyntaxInTab;
 window.toggleZenMode = toggleZenMode;
 window.openParamInjector = openParamInjector;

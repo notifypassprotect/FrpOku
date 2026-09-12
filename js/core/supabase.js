@@ -99,8 +99,10 @@
     const category = String(report.category || '');
     const tags = Array.isArray(report.tags) ? report.tags : [];
     const userNote = String(report.userNote || report.user_note || '');
-    const isFavorite = !!(report.isFavorite || report.favorite || report.is_favorite);
-    const isPinned = !!(report.isPinned || report.pinned || report.is_pinned);
+    const isFavorite = report.isFavorite !== undefined ? !!report.isFavorite :
+      (report.favorite !== undefined ? !!report.favorite : !!report.is_favorite);
+    const isPinned = report.isPinned !== undefined ? !!report.isPinned :
+      (report.pinned !== undefined ? !!report.pinned : !!report.is_pinned);
     const isPublic = !!(report.isPublic || report.is_public || report.inPool || report.in_pool);
     const ownerName = String(report.ownerName || report.owner_name || report.uploadedBy || '');
     const ownerUsername = String(report.ownerUsername || report.owner_username || '');
@@ -114,11 +116,27 @@
     const hasScript = !!(report.pascalScript && report.pascalScript.trim().length > 0);
     const userId = String(report.userId || report.user_id || (window.FrpAuth && window.FrpAuth.getUser() ? window.FrpAuth.getUser().id : 'public'));
 
+    const tableNames = Array.isArray(report.tableNames) ? report.tableNames :
+      (Array.isArray(report.data?.tableNames) ? report.data.tableNames : (window.getReportTables ? window.getReportTables(report) : []));
+    const paramNames = Array.isArray(report.paramNames) ? report.paramNames :
+      (Array.isArray(report.data?.paramNames) ? report.data.paramNames : []);
+    const queryNames = Array.isArray(report.queryNames) ? report.queryNames :
+      (Array.isArray(report.data?.queryNames) ? report.data.queryNames : (Array.isArray(report.queries) ? report.queries.map(q => q.name).filter(Boolean) : []));
+    const datasets = Array.isArray(report.datasets) ? report.datasets : (Array.isArray(report.data?.datasets) ? report.data.datasets : []);
+
     const safeData = {
       ...report,
       userId,
+      isFavorite,
+      is_favorite: isFavorite,
+      isPinned,
+      is_pinned: isPinned,
       isPublic,
       is_public: isPublic,
+      tableNames,
+      paramNames,
+      queryNames,
+      datasets,
       ownerName,
       owner_name: ownerName,
       ownerUsername,
@@ -167,8 +185,17 @@
     r.sizeBytes = Number(row.file_size || r.sizeBytes || 0);
     r.category = row.category || r.category || '';
     r.tags = Array.isArray(row.tags) ? row.tags : (Array.isArray(r.tags) ? r.tags : []);
-    r.userNote = row.user_note || r.userNote || '';
-    r.isFavorite = !!(row.is_favorite || r.isFavorite);
+    r.userNote = row.user_note || r.userNote || r.user_note || '';
+
+    const isFavorite = row.is_favorite !== undefined ? !!row.is_favorite :
+      (row.isFavorite !== undefined ? !!row.isFavorite : !!(r.isFavorite || r.is_favorite));
+    const isPinned = row.is_pinned !== undefined ? !!row.is_pinned :
+      (row.isPinned !== undefined ? !!row.isPinned : !!(r.isPinned || r.is_pinned));
+    r.isFavorite = isFavorite;
+    r.is_favorite = isFavorite;
+    r.isPinned = isPinned;
+    r.is_pinned = isPinned;
+
     const isPub = !!(row.is_public || r.isPublic || r.is_public || r.inPool || r.in_pool || row.isPublic);
     r.isPublic = isPub;
     r.is_public = isPub;
@@ -182,7 +209,18 @@
     r.version = Math.max(0, Number(row.version || r.version) || 1);
     r.meta = r.meta || { reportName: r.name };
     r.queries = Array.isArray(r.queries) ? r.queries : [];
-    r.datasets = Array.isArray(r.datasets) ? r.datasets : [];
+    r.datasets = Array.isArray(row.datasets) ? row.datasets :
+      (Array.isArray(row['data->datasets']) ? row['data->datasets'] :
+      (Array.isArray(r.datasets) ? r.datasets : []));
+    r.tableNames = Array.isArray(row.tableNames) ? row.tableNames :
+      (Array.isArray(row['data->tableNames']) ? row['data->tableNames'] :
+      (Array.isArray(r.tableNames) ? r.tableNames : (Array.isArray(row.tables) ? row.tables : [])));
+    r.paramNames = Array.isArray(row.paramNames) ? row.paramNames :
+      (Array.isArray(row['data->paramNames']) ? row['data->paramNames'] :
+      (Array.isArray(r.paramNames) ? r.paramNames : []));
+    r.queryNames = Array.isArray(row.queryNames) ? row.queryNames :
+      (Array.isArray(row['data->queryNames']) ? row['data->queryNames'] :
+      (Array.isArray(r.queryNames) ? r.queryNames : []));
     r.tree = Array.isArray(r.tree) ? r.tree : [];
     r.loadedAt = r.loadedAt || row.updated_at || new Date().toISOString();
     return r;

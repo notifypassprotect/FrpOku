@@ -1210,7 +1210,7 @@ async function getReportRecord(id) {
   }) || null;
 }
 
-const SUMMARY_SELECT_COLUMNS = 'id, name, file_size, category, tags, is_favorite, is_pinned, sql_count, memo_count, dataset_count, page_count, has_script, created_at, updated_at, user_note, is_deleted, deleted_at, user_id, data->meta, data->isPublic, data->is_public, data->inPool, data->in_pool, data->ownerName, data->ownerUsername, data->ownerDepartment, data->sharedAt, data->version, data->tableNames, data->queryNames, data->paramNames, data->datasets';
+const SUMMARY_SELECT_COLUMNS = 'id, name, file_size, category, tags, is_favorite, is_pinned, sql_count, memo_count, dataset_count, page_count, has_script, created_at, updated_at, user_note, is_deleted, deleted_at, user_id, meta:data->meta, data->isPublic, data->is_public, data->inPool, data->in_pool, data->ownerName, data->ownerUsername, data->ownerDepartment, data->sharedAt, data->version, tableNames:data->tableNames, queryNames:data->queryNames, paramNames:data->paramNames, datasets:data->datasets';
 
 async function loadVisibleReports(user, isDeleted, { summaryOnly = true } = {}) {
   if (supabase) {

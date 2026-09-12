@@ -60,9 +60,6 @@
           Analizler
         </button>
         <div class="topbar-dropdown-menu">
-          <button class="topbar-dropdown-item" id="btnComplexityCenter" data-list-action="complexity" title="Tüm Raporların SQL Karmaşıklık ve Statik Anti-Pattern Analizi">
-            <span>Karmaşıklık Analizi</span>
-          </button>
           <button class="topbar-dropdown-item" id="btnDependencies" data-list-action="dependencies" title="Tablo Bağımlılık Haritası">
             <span>Bağımlılık Haritası</span>
           </button>
@@ -141,9 +138,6 @@
 
     <div class="mobile-drawer-section">
       <div class="mobile-drawer-section-title">Analiz & Rapor Araçları</div>
-      <button class="mobile-drawer-item" id="btnMobComplexity">
-        <span>⚡</span> <span>SQL Karmaşıklık Analizi</span>
-      </button>
       <button class="mobile-drawer-item" id="btnMobDependencies">
         <span>🗺️</span> <span>Tablo Bağımlılık Haritası</span>
       </button>
@@ -243,6 +237,11 @@
         <!-- Kategori filtresi -->
         <select class="select-field" id="catSelect" title="Kategoriye göre filtrele">
           <option value="">Tüm Kategoriler</option>
+        </select>
+
+        <!-- Ortak Havuz Kullanıcı Filtresi -->
+        <select class="select-field" id="userSelect" title="Kullanıcıya göre filtrele" style="display:none;">
+          <option value="">Tüm Kullanıcılar</option>
         </select>
 
         <!-- Hızlı Filtre Butonları -->
@@ -374,7 +373,6 @@
 <script src="js/core/zip.js?v=5.0"></script>
 
 <!-- 2. İleri Analiz Motorları -->
-<script src="js/analytics/complexity.js?v=5.0"></script>
 <script src="js/analytics/dependencies.js?v=5.0"></script>
 <script src="js/analytics/table_usage.js?v=5.0"></script>
 <script src="js/analytics/param_usage.js?v=5.0"></script>

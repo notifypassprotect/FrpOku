@@ -13,6 +13,7 @@ let searchQuery      = '';
 let searchField      = 'all';
 let selectedTag      = '';
 let selectedCategory = '';
+let selectedUser     = '';
 let onlyFavorites    = false;
 let onlyPinned       = false;
 let onlyNotes        = false;
@@ -29,6 +30,7 @@ const regexErrMsg        = document.getElementById('regexErrMsg');
 const fieldSelect        = document.getElementById('fieldSelect') || document.getElementById('searchFieldSelect');
 const tagSelect          = document.getElementById('tagSelect');
 const catSelect          = document.getElementById('catSelect');
+const userSelect         = document.getElementById('userSelect');
 const btnFavOnly         = document.getElementById('btnFavOnly');
 const bulkBar            = document.getElementById('bulkBar');
 const resultCount        = document.getElementById('resultCount');
@@ -263,25 +265,39 @@ const SEARCH_SQL_RESERVED = new Set([
 
 function getReportTables(file) {
   if (!file) return [];
-  if (Array.isArray(file.tableNames) && file.tableNames.length > 0) return file.tableNames;
-  if (Array.isArray(file.tables) && file.tables.length > 0) return file.tables;
   const set = new Set();
+
+  const addTableCandidate = (raw) => {
+    if (!raw || typeof raw !== 'string') return;
+    let t = raw.replace(/[()[\]`"']/g, '').trim().toUpperCase().split('.')[0];
+    if (t && !SEARCH_SQL_RESERVED.has(t) && t.length > 1 && !/^\d+$/.test(t)) {
+      set.add(t);
+    }
+  };
+
+  if (Array.isArray(file.tableNames)) file.tableNames.forEach(addTableCandidate);
+  if (Array.isArray(file.tables)) file.tables.forEach(addTableCandidate);
+  if (file.data && Array.isArray(file.data.tableNames)) file.data.tableNames.forEach(addTableCandidate);
+
   (file.queries || []).forEach(q => {
     const sql = String(q.sql || '').replace(/--[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/'(?:''|[^'\r\n])*'/g, "''");
     const rx = /\b(?:FROM|JOIN)\s+([a-zA-Z0-9_$.]+)/gi;
     let m;
     while ((m = rx.exec(sql)) !== null) {
-      let t = m[1].replace(/[()]/g, '').trim().toUpperCase().split('.')[0];
-      if (t && !SEARCH_SQL_RESERVED.has(t) && t.length > 2 && !/^\d+$/.test(t)) {
-        set.add(t);
-      }
+      addTableCandidate(m[1]);
     }
   });
+
   (file.datasets || []).forEach(d => {
-    if (d && typeof d === 'string' && d.length > 2) set.add(d.toUpperCase());
+    if (d && typeof d === 'string') addTableCandidate(d);
+    else if (d && typeof d === 'object' && d.name) addTableCandidate(d.name);
   });
-  file.tableNames = Array.from(set);
-  return file.tableNames;
+
+  const res = Array.from(set);
+  if (!Array.isArray(file.tableNames) || file.tableNames.length === 0) {
+    file.tableNames = res;
+  }
+  return res;
 }
 window.getReportTables = getReportTables;
 
@@ -290,7 +306,7 @@ function applySearch() {
   currentPage = 1;
   const btnReset = document.getElementById('btnResetFilters');
   if (btnReset) {
-    const hasFilter = !!searchQuery || !!selectedTag || !!selectedCategory || onlyFavorites || onlyPinned || onlyNotes;
+    const hasFilter = !!searchQuery || !!selectedTag || !!selectedCategory || !!selectedUser || onlyFavorites || onlyPinned || onlyNotes;
     btnReset.style.display = hasFilter ? 'inline-flex' : 'none';
   }
 
@@ -320,6 +336,12 @@ function applySearch() {
     if (onlyPinned && !file.isPinned) return false;
     if (onlyNotes && !(file.userNote && file.userNote.trim())) return false;
     if (selectedCategory && file.category !== selectedCategory) return false;
+    if (curWs === 'pool' && selectedUser) {
+      const oName = (file.ownerName || file.owner_name || file.ownerUsername || file.owner_username || (file.userId === 'usr_admin_root' ? 'Admin' : 'Bilinmeyen Kullanıcı')).trim();
+      if (oName !== selectedUser && file.userId !== selectedUser && file.user_id !== selectedUser) {
+        return false;
+      }
+    }
 
     if (!searchQuery) return true;
 
@@ -335,23 +357,33 @@ function applySearch() {
     const tagsStr = (file.tags || []).join(' ');
     const tablesList = getReportTables(file);
     const tablesStr = tablesList.join(' ');
-    const datasetsStr = (file.datasets || []).join(' ');
+    const datasetsStr = (file.datasets || []).map(d => typeof d === 'object' ? (d.name || '') : String(d || '')).join(' ');
     const metaDesc = file.meta?.description || '';
     const metaAuthor = file.meta?.author || '';
+
+    const matchTableRegex = (rgx) => tablesList.some(t => rgx.test(t) || rgx.test(t.replace(/_/g, '')) || rgx.test(t.replace(/\s+/g, '_')));
+    const matchTableText = (queryStr) => {
+      const qNorm = queryStr.toLowerCase();
+      const qNoUnder = qNorm.replace(/_/g, '');
+      return tablesList.some(t => {
+        const low = t.toLowerCase();
+        return low.includes(qNorm) || low.replace(/_/g, '').includes(qNoUnder);
+      });
+    };
 
     if (regex) {
       if (searchField === 'name') return regex.test(name) || regex.test(fileName);
       if (searchField === 'guid') return regex.test(guid);
       if (searchField === 'sql') return regex.test(sql) || regex.test(queryNames);
       if (searchField === 'pascal') return regex.test(pascal);
-      if (searchField === 'tables') return regex.test(tablesStr) || tablesList.some(t => regex.test(t));
+      if (searchField === 'tables') return regex.test(tablesStr) || matchTableRegex(regex);
       if (searchField === 'notes') return regex.test(notes);
       if (searchField === 'author' || searchField === 'owner') return regex.test(owner) || regex.test(metaAuthor);
       // searchField === 'all'
       return regex.test(name) || regex.test(fileName) || regex.test(guid) || regex.test(owner) ||
              regex.test(sql) || regex.test(queryNames) || regex.test(pascal) || regex.test(notes) ||
              regex.test(cat) || regex.test(tagsStr) || regex.test(tablesStr) || regex.test(datasetsStr) ||
-             regex.test(metaDesc) || regex.test(metaAuthor) || tablesList.some(t => regex.test(t));
+             regex.test(metaDesc) || regex.test(metaAuthor) || matchTableRegex(regex);
     }
 
     const q = searchQuery.toLowerCase();
@@ -373,12 +405,12 @@ function applySearch() {
     if (searchField === 'guid') return lGuid.includes(q);
     if (searchField === 'sql') return lSql.includes(q);
     if (searchField === 'pascal') return lPascal.includes(q);
-    if (searchField === 'tables') return lTables.includes(q) || tablesList.some(t => t.toLowerCase().includes(q));
+    if (searchField === 'tables') return lTables.includes(q) || matchTableText(q);
     if (searchField === 'notes') return lNotes.includes(q);
     if (searchField === 'author' || searchField === 'owner') return lOwner.includes(q) || lAuthor.includes(q);
     return lName.includes(q) || lFileName.includes(q) || lGuid.includes(q) || lOwner.includes(q) ||
            lSql.includes(q) || lPascal.includes(q) || lNotes.includes(q) || lCat.includes(q) ||
-           lTags.includes(q) || lTables.includes(q) || lDatasets.includes(q) || lDesc.includes(q) || lAuthor.includes(q);
+           lTags.includes(q) || lTables.includes(q) || lDatasets.includes(q) || lDesc.includes(q) || lAuthor.includes(q) || matchTableText(q);
   });
 
   window.allFiles = allFiles;
@@ -414,10 +446,48 @@ function updateCatList() {
 }
 window.updateCatList = updateCatList;
 
+function updateUserList() {
+  if (!userSelect) return;
+  const curWs = FrpStore.getActiveWorkspace ? FrpStore.getActiveWorkspace() : 'personal';
+  if (curWs !== 'pool') {
+    userSelect.style.display = 'none';
+    if (selectedUser) {
+      selectedUser = '';
+      userSelect.value = '';
+    }
+    return;
+  }
+
+  userSelect.style.display = 'inline-block';
+  const poolReports = FrpStore.getPoolReports ? FrpStore.getPoolReports() : [];
+  const userCounts = new Map();
+  poolReports.forEach(file => {
+    const raw = file.ownerName || file.owner_name || file.ownerUsername || file.owner_username || (file.userId === 'usr_admin_root' ? 'Admin' : 'Bilinmeyen Kullanıcı');
+    const name = String(raw || '').trim();
+    if (name) {
+      userCounts.set(name, (userCounts.get(name) || 0) + 1);
+    }
+  });
+
+  const curVal = selectedUser;
+  userSelect.innerHTML = '<option value="">Tüm Kullanıcılar</option>' +
+    Array.from(userCounts.entries())
+      .sort((a, b) => a[0].localeCompare(b[0], 'tr'))
+      .map(([name, count]) => `<option value="${escHtml(name)}" ${name === curVal ? 'selected' : ''}>👤 ${escHtml(name)} (${count})</option>`)
+      .join('');
+
+  if (curVal && !userCounts.has(curVal)) {
+    selectedUser = '';
+    userSelect.value = '';
+  }
+}
+window.updateUserList = updateUserList;
+
 function updateStats() {
   updateWorkspaceCounts();
   updateTagList();
   updateCatList();
+  updateUserList();
 }
 window.updateStats = updateStats;
 
@@ -492,6 +562,21 @@ function renderTable() {
     lastModified: true,
     ...(prefs.visibleColumns || {})
   };
+
+  // Etiket sütunu kapalıysa araç çubuğundaki etiket filtresini de gizle
+  const tagSelectEl = document.getElementById('tagSelect');
+  if (tagSelectEl) {
+    if (visibleCols.tags === false) {
+      tagSelectEl.style.display = 'none';
+      if (selectedTag) {
+        selectedTag = '';
+        tagSelectEl.value = '';
+        setTimeout(() => applySearch(), 0);
+      }
+    } else {
+      tagSelectEl.style.display = '';
+    }
+  }
 
   if (window.FrpListRenderers && typeof window.FrpListRenderers.renderTableHeader === 'function') {
     window.FrpListRenderers.renderTableHeader(prefs, visibleCols, sortField, sortDir);
@@ -1114,6 +1199,7 @@ function initListPage() {
     const pn = document.getElementById('poolNotice');
     if (pn) pn.style.display = 'none';
     updateAnalyticsVisibility();
+    updateUserList();
     applySearch();
   });
 
@@ -1124,12 +1210,15 @@ function initListPage() {
     const pn = document.getElementById('poolNotice');
     if (pn) pn.style.display = 'block';
     updateAnalyticsVisibility();
+    updateUserList();
     applySearch();
 
     // Ortak havuz sekmesine geçildiğinde havuz raporlarını arka planda buluttan anında tazele:
     if (FrpStore.refreshFromCloud) {
       try {
         await FrpStore.refreshFromCloud();
+        updateUserList();
+        applySearch();
       } catch (e) {}
     }
   });
@@ -1155,6 +1244,7 @@ function initListPage() {
     try {
       if (FrpStore.refreshFromCloud) {
         await FrpStore.refreshFromCloud();
+        updateUserList();
       } else {
         refreshAll();
       }
@@ -1406,6 +1496,11 @@ function initListPage() {
     applySearch();
   });
 
+  userSelect?.addEventListener('change', (e) => {
+    selectedUser = e.target.value;
+    applySearch();
+  });
+
   btnFavOnly?.addEventListener('click', () => {
     onlyFavorites = !onlyFavorites;
     btnFavOnly.classList.toggle('active', onlyFavorites);
@@ -1431,6 +1526,8 @@ function initListPage() {
     if (tagSelect) tagSelect.value = '';
     selectedCategory = '';
     if (catSelect) catSelect.value = '';
+    selectedUser = '';
+    if (userSelect) userSelect.value = '';
     onlyFavorites = false;
     btnFavOnly?.classList.remove('active');
     onlyPinned = false;
@@ -1448,14 +1545,6 @@ function initListPage() {
   document.getElementById('btnViewCards')?.addEventListener('click', () => { currentViewMode = 'cards'; renderCurrentView(); });
   document.getElementById('btnViewTimeline')?.addEventListener('click', () => { currentViewMode = 'timeline'; renderCurrentView(); });
 
-  // Topbar Analiz & Modallar
-  document.getElementById('btnOpenRecentModal')?.addEventListener('click', () => window.openRecentModal?.());
-  document.getElementById('btnRecentDownloadsModal')?.addEventListener('click', () => window.openDownloadHistoryModal?.());
-  document.getElementById('btnComplexityCenter')?.addEventListener('click', () => window.openComplexityCenter?.());
-  document.getElementById('btnDependencies')?.addEventListener('click', () => window.openDependenciesModal?.());
-  document.getElementById('btnParams')?.addEventListener('click', () => window.openParamsModal?.());
-  document.getElementById('btnSnippets')?.addEventListener('click', () => window.renderSnippetsModal?.());
-  document.getElementById('btnTableAnalysis')?.addEventListener('click', () => window.openTableUsageModal?.());
 
   // Ayarlar Modalı Tetikleyici (Ctrl+,)
   document.getElementById('btnOpenSettingsModal')?.addEventListener('click', () => window.openSettingsModal?.('appearance'));

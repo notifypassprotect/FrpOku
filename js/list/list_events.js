@@ -15,7 +15,6 @@
     else if (action === 'toggle-fav') window.toggleFav?.(event, id);
     else if (action === 'row') window.handleItemClick?.(event, id);
     else if (action === 'download') window.downloadSingleReport?.(id);
-    else if (action === 'complexity') { document.querySelectorAll('.topbar-dropdown.open').forEach(d => d.classList.remove('open')); window.openComplexityCenter?.(); }
     else if (action === 'dependencies') { document.querySelectorAll('.topbar-dropdown.open').forEach(d => d.classList.remove('open')); window.openDependenciesModal?.(); }
     else if (action === 'params') { document.querySelectorAll('.topbar-dropdown.open').forEach(d => d.classList.remove('open')); window.openParamsModal?.(); }
     else if (action === 'snippets') { document.querySelectorAll('.topbar-dropdown.open').forEach(d => d.classList.remove('open')); window.renderSnippetsModal?.(); }
