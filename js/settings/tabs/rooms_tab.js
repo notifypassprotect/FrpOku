@@ -278,7 +278,7 @@ window.FrpSettingsTabs.rooms = {
           safeToast('Hata: ' + err.message, 'error');
           saveBtn.disabled = false;
         }
-      };
+      });
     }
 
     if (btnCreate) {

@@ -35,9 +35,9 @@
  })
  });
  const data = await res.json();
- if (data && data.success) {
- return { success: true, pendingApproval: true, message: data.message };
- } else if (data && data.reason) {
+  if (data && data.success) {
+  return { success: true, pendingApproval: true, message: data.message, recoveryKeys: data.recoveryKeys };
+  } else if (data && data.reason) {
  return { success: false, reason: data.reason };
  }
  } catch (err) {
@@ -410,9 +410,32 @@
  }
  }
 
+  async function recoverWithKey({ identifier, recoveryKey, newPassword }) {
+    try {
+      const res = await fetch('/api/auth/recover-with-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier, recoveryKey, newPassword })
+      });
+      const data = await res.json();
+      if (data && data.success && data.user) {
+        if (data.token) {
+          data.user.token = data.token;
+          try { localStorage.setItem('frpoku_auth_token', data.token); } catch (e) {}
+        }
+        setSession(data.user, true);
+        return { success: true, user: data.user };
+      }
+      return data;
+    } catch (err) {
+      return { success: false, reason: 'Kurtarma servisine ulaşılamadı: ' + err.message };
+    }
+  }
+
  window.FrpAuth = {
  register,
  login,
+ recoverWithKey,
  logout,
  confirmLogout,
  isLoggedIn,

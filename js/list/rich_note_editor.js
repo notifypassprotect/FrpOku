@@ -143,15 +143,15 @@
           </div>
           
           <div style="display: flex; align-items: center; gap: 0.5rem;">
-            ${isImage || isWord ? `
-              <!-- Zoom & Görsel Kontrolleri -->
+            ${(isImage || isWord || isPdf) ? `
+              <!-- Zoom & Önizleme Kontrolleri -->
               <div style="display: flex; align-items: center; background: var(--bg-surface, #fff); border: 1px solid var(--border, #cbd5e1); border-radius: 8px; padding: 0.15rem 0.35rem; gap: 0.2rem;">
                 <button type="button" id="btnPrevZoomOut" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.45rem; font-size: 0.85rem;" title="Uzaklaştır">➖</button>
                 <span id="prevZoomBadge" style="font-size: 0.75rem; font-weight: 800; min-width: 44px; text-align: center; color: var(--text-primary, #0f172a);">%100</span>
                 <button type="button" id="btnPrevZoomIn" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.45rem; font-size: 0.85rem;" title="Yakınlaştır">➕</button>
                 <button type="button" id="btnPrevZoom100" class="btn btn-sm btn-ghost" style="font-size: 0.72rem; padding: 0.2rem 0.4rem; font-weight: 700;" title="Gerçek Boyut (%100)">1:1</button>
                 <button type="button" id="btnPrevZoomFit" class="btn btn-sm btn-ghost" style="font-size: 0.72rem; padding: 0.2rem 0.45rem; font-weight: 700;" title="Ekrana Sığdır">Sığdır</button>
-                ${isImage ? `<button type="button" id="btnPrevRotate" class="btn btn-sm btn-ghost" style="font-size: 0.74rem; padding: 0.2rem 0.4rem;" title="90° Döndür">↷</button>` : ''}
+                ${(isImage || isPdf) ? `<button type="button" id="btnPrevRotate" class="btn btn-sm btn-ghost" style="font-size: 0.74rem; padding: 0.2rem 0.4rem;" title="90° Döndür">↷</button>` : ''}
               </div>
             ` : ''}
 
@@ -451,30 +451,88 @@
       }
 
     } else if (isPdf) {
+      let pdfZoom = 1.0;
+      let pdfRotate = 0;
+      let isDarkContrast = false;
+
       previewBody.innerHTML = `
-        <div style="width: 100%; height: 100%; display: flex; flex-direction: column; background: #1e293b; border-radius: 8px; overflow: hidden;">
-          <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0.85rem; background: #0f172a; border-bottom: 1px solid #334155; color: #f8fafc; font-size: 0.8rem;">
+        <div id="pdfViewerOuter" style="width: 100%; height: 100%; display: flex; flex-direction: column; background: #0f172a; border-radius: 8px; overflow: hidden; position: relative;">
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0.85rem; background: #090e17; border-bottom: 1px solid #334155; color: #f8fafc; font-size: 0.8rem; z-index: 5;">
             <div style="font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
               <span style="color: #ef4444;">📄</span>
-              <span>${escHtml(att.name)}</span>
+              <span style="max-width: 45vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escHtml(att.name)}</span>
             </div>
-            <div style="display: flex; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <button type="button" id="btnPdfNightMode" class="btn btn-sm btn-ghost" style="font-size: 0.74rem; padding: 0.2rem 0.55rem; color: #facc15; border: 1px solid #334155;" title="Gece Okuma / Yüksek Kontrast">🌓 Kontrast</button>
+              <button type="button" id="btnPdfFullscreen" class="btn btn-sm btn-ghost" style="font-size: 0.74rem; padding: 0.2rem 0.55rem; color: #cbd5e1; border: 1px solid #334155;" title="Tam Ekran Modu">⛶ Tam Ekran</button>
               <a href="${mediaUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; text-decoration: none;">↗️ Yeni Sekmede Aç</a>
-              <button type="button" id="btnPreviewDirectDownload" class="btn btn-sm btn-primary" style="padding: 0.25rem 0.65rem; font-size: 0.74rem;">⬇️ İndir</button>
+              <button type="button" id="btnPreviewDirectDownload" class="btn btn-sm btn-primary" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; font-weight: 700;">⬇️ İndir</button>
             </div>
           </div>
-          <div style="flex: 1; position: relative;">
-            <object data="${mediaUrl}" type="application/pdf" style="width: 100%; height: 100%; border: none;">
-              <iframe src="${mediaUrl}" style="width: 100%; height: 100%; border: none; background: #ffffff;">
-                <div style="text-align: center; padding: 3rem; color: #cbd5e1;">
-                  <p>Tarayıcınız PDF önizlemeyi doğrudan görüntüleyemiyor.</p>
-                  <a href="${mediaUrl}" target="_blank" class="btn btn-primary" style="margin-top: 1rem;">PDF Dosyasını Aç / İndir</a>
-                </div>
-              </iframe>
-            </object>
+          <div id="pdfViewport" style="flex: 1; position: relative; overflow: auto; display: flex; align-items: center; justify-content: center; background: #1e293b; transition: filter 0.15s ease;">
+            <div id="pdfFrameWrapper" style="width: 100%; height: 100%; transform-origin: center center; transition: transform 0.1s ease-out;">
+              <object id="pdfObjectTag" data="${mediaUrl}#toolbar=1&navpanes=1" type="application/pdf" style="width: 100%; height: 100%; border: none;">
+                <iframe id="pdfIframeTag" src="${mediaUrl}#toolbar=1&navpanes=1" style="width: 100%; height: 100%; border: none; background: #ffffff;">
+                  <div style="text-align: center; padding: 3rem; color: #cbd5e1;">
+                    <p>Tarayıcınız PDF önizlemeyi doğrudan görüntüleyemiyor.</p>
+                    <a href="${mediaUrl}" target="_blank" class="btn btn-primary" style="margin-top: 1rem;">PDF Dosyasını Aç / İndir</a>
+                  </div>
+                </iframe>
+              </object>
+            </div>
           </div>
         </div>
       `;
+
+      const outerContainer = previewBody.querySelector('#pdfViewerOuter');
+      const pdfViewport = previewBody.querySelector('#pdfViewport');
+      const pdfFrameWrapper = previewBody.querySelector('#pdfFrameWrapper');
+      const zoomBadge = overlay.querySelector('#prevZoomBadge');
+
+      function updatePdfTransform() {
+        pdfFrameWrapper.style.transform = `scale(${pdfZoom}) rotate(${pdfRotate}deg)`;
+        if (zoomBadge) zoomBadge.textContent = `%${Math.round(pdfZoom * 100)}`;
+      }
+
+      overlay.querySelector('#btnPrevZoomIn')?.addEventListener('click', () => {
+        pdfZoom = Math.min(3.0, pdfZoom + 0.2);
+        updatePdfTransform();
+      });
+      overlay.querySelector('#btnPrevZoomOut')?.addEventListener('click', () => {
+        pdfZoom = Math.max(0.4, pdfZoom - 0.2);
+        updatePdfTransform();
+      });
+      overlay.querySelector('#btnPrevZoom100')?.addEventListener('click', () => {
+        pdfZoom = 1.0;
+        updatePdfTransform();
+      });
+      overlay.querySelector('#btnPrevZoomFit')?.addEventListener('click', () => {
+        pdfZoom = 1.0;
+        pdfRotate = 0;
+        updatePdfTransform();
+      });
+      overlay.querySelector('#btnPrevRotate')?.addEventListener('click', () => {
+        pdfRotate = (pdfRotate + 90) % 360;
+        updatePdfTransform();
+      });
+
+      const nightBtn = previewBody.querySelector('#btnPdfNightMode');
+      nightBtn?.addEventListener('click', () => {
+        isDarkContrast = !isDarkContrast;
+        pdfViewport.style.filter = isDarkContrast ? 'invert(0.9) hue-rotate(180deg) contrast(1.2)' : 'none';
+        nightBtn.style.background = isDarkContrast ? '#facc15' : 'transparent';
+        nightBtn.style.color = isDarkContrast ? '#0f172a' : '#facc15';
+      });
+
+      const fsBtn = previewBody.querySelector('#btnPdfFullscreen');
+      fsBtn?.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+          outerContainer.requestFullscreen?.().catch(() => {});
+        } else {
+          document.exitFullscreen?.().catch(() => {});
+        }
+      });
+
       previewBody.querySelector('#btnPreviewDirectDownload')?.addEventListener('click', () => downloadAttachment(att));
     } else {
       previewBody.innerHTML = `
@@ -828,9 +886,11 @@
         </div>
 
         <!-- 3. ALT EYLEM ÇUBUĞU (FOOTER ACTIONS) -->
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1.6rem; border-top: 1px solid var(--border-light, #e2e8f0); background: var(--bg-card, #f8fafc);">
-          <div style="display: flex; align-items: center; gap: 0.6rem; font-size: 0.8rem; color: var(--text-muted, #64748b);">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1.6rem; border-top: 1px solid var(--border-light, #e2e8f0); background: var(--bg-card, #f8fafc); flex-wrap: wrap; gap: 0.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.6rem; font-size: 0.8rem; color: var(--text-muted, #64748b); flex-wrap: wrap;">
             <span id="richNoteSaveStatus">Tüm değişiklikler otomatik taslağa alınır.</span>
+            <span style="display: inline-block; width: 1px; height: 14px; background: var(--border, #cbd5e1); margin: 0 0.2rem;"></span>
+            <span id="richNoteStatsBar" style="font-weight: 700; color: var(--text-secondary, #475569); font-size: 0.76rem; background: var(--bg-surface, #ffffff); padding: 0.2rem 0.65rem; border-radius: 6px; border: 1px solid var(--border-light, #e2e8f0);">0 Kelime · 0 Karakter · 0 Cümle · ~1 dk Okuma</span>
           </div>
 
           <div style="display: flex; align-items: center; gap: 0.75rem;">
@@ -853,6 +913,20 @@
     const attCountBadge = overlay.querySelector('#attCountBadge');
     const fileInput = overlay.querySelector('#inputAttachFile');
     const saveStatus = overlay.querySelector('#richNoteSaveStatus');
+    const statsBar = overlay.querySelector('#richNoteStatsBar');
+
+    function updateNoteStatistics() {
+      if (!editor || !statsBar) return;
+      const text = (editor.innerText || '').trim();
+      const chars = text.length;
+      const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
+      const sentences = text ? text.split(/[.!?]+/).filter(s => s.trim().length > 0).length : 0;
+      const readMin = Math.max(1, Math.ceil(words / 200));
+      statsBar.textContent = `${words} Kelime · ${chars} Karakter · ${sentences} Cümle · ~${readMin} dk Okuma`;
+    }
+
+    editor.addEventListener('input', updateNoteStatistics);
+    updateNoteStatistics();
 
     // ── GÜVENLİ PENCERE KAPATMA (MOUSE SÜRÜKLEME KORUMASI) ──
     // Metin seçimi sırasında farenin dışarı kayması pencereyi ASLA kapatmaz!

@@ -95,6 +95,8 @@
             <button type="button" id="toolText" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Modern Metin / Not Ekle">🔤 Metin</button>
             <button type="button" id="toolStamp" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 800; color: #dc2626;" title="Kurumsal Kaşe (ONAYLANDI, KVKK...)">📑 Kaşe</button>
             <button type="button" id="toolStep" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700; color: #2563eb;" title="Adım Rozeti Ekle (1, 2, 3...)">🔢 Adım <span id="annotatorStepNum">①</span></button>
+            <button type="button" id="toolSticker" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700; color: #eab308;" title="Hızlı Çıkartma & İkon Ekle">⭐ Çıkartma <span id="annotatorActiveSticker">✅</span></button>
+            <button type="button" id="toolWatermark" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700; color: #0284c7;" title="Filigran Ekle (GİZLİDİR, FRP KÜTÜPHANESİ...)">💧 Filigran</button>
             <button type="button" id="toolEraser" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.4rem; font-size: 0.75rem; font-weight: 700;" title="Silgi">🧽 Silgi</button>
           </div>
 
@@ -108,7 +110,7 @@
             <button type="button" id="toolCrop" class="btn btn-sm annotator-tool-btn" style="padding: 0.2rem 0.45rem; font-size: 0.75rem; font-weight: 700; color: #ea580c;" title="Alanı Seçip Kırp">✂️ Kırp</button>
           </div>
 
-          <!-- Döndürme & Filtreler -->
+          <!-- Döndürme & Filtreler & İnce Ayar -->
           <div style="display: flex; align-items: center; gap: 0.2rem;">
             <button type="button" id="btnRotateRight" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.35rem;" title="90° Sağa Döndür">↷ 90°</button>
             <button type="button" id="btnRotateLeft" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.35rem;" title="90° Sola Döndür">↶ 90°</button>
@@ -122,6 +124,7 @@
               <option value="grayscale">⬛ Siyah-Beyaz</option>
               <option value="invert">🔄 Negatif</option>
             </select>
+            <button type="button" id="btnOpenAdjustModal" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.45rem; font-size: 0.74rem; font-weight: 700; color: var(--accent, #2563eb); border: 1px solid var(--border);" title="Parlaklık, Kontrast ve Doygunluk">🎛️ İnce Ayar</button>
           </div>
 
           <!-- Renk Paleti (Aktif Halka Destekli) -->
@@ -145,6 +148,20 @@
             <button type="button" class="annotator-size-btn active" data-size="8" style="padding: 0.2rem 0.35rem; font-size: 0.72rem; border: 1px solid var(--accent, #2563eb); border-radius: 6px; background: var(--accent, #2563eb); color: #fff; font-weight: 700; cursor: pointer;">8px</button>
             <button type="button" class="annotator-size-btn" data-size="14" style="padding: 0.2rem 0.35rem; font-size: 0.72rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-surface); cursor: pointer;">14px</button>
             <button type="button" class="annotator-size-btn" data-size="24" style="padding: 0.2rem 0.35rem; font-size: 0.72rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-surface); cursor: pointer;">24px</button>
+          </div>
+
+          <!-- Çizgi Deseni & Şekil Dolgusu -->
+          <div style="display: flex; align-items: center; gap: 0.2rem; background: var(--bg-card, #f8fafc); padding: 0.15rem 0.35rem; border-radius: 8px; border: 1px solid var(--border, #cbd5e1);">
+            <select id="selLineDash" style="padding: 0.2rem 0.35rem; font-size: 0.72rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-surface); cursor: pointer;" title="Çizgi Deseni">
+              <option value="solid">― Düz</option>
+              <option value="dashed">- - Kesikli</option>
+              <option value="dotted">··· Noktalı</option>
+            </select>
+            <select id="selShapeFill" style="padding: 0.2rem 0.35rem; font-size: 0.72rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-surface); cursor: pointer;" title="Şekil Dolgu Stili">
+              <option value="none">İçi Boş</option>
+              <option value="semi">Yarı Saydam (%35)</option>
+              <option value="solid">Tam Dolu</option>
+            </select>
           </div>
 
           <!-- Geri Al, Yinele, Orijinale Sıfırla & Temizle -->
@@ -181,6 +198,9 @@
     let activeTool = 'pen';
     let currentColor = '#ef4444';
     let currentLineWidth = 8;
+    let currentLineDash = 'solid';
+    let currentShapeFill = 'none';
+    let activeSticker = '✅';
     let zoomLevel = 1.0;
     let stepCount = 1;
 
@@ -584,8 +604,19 @@
       drawArrow(context, tox, toy, fromx, fromy, width);
     }
 
+    // HEX TO RGBA DÖNÜŞTÜRÜCÜ
+    function hexToRgba(hex, alpha = 1) {
+      let c = String(hex || '#000000').replace('#', '');
+      if (c.length === 3) c = c.split('').map(x => x + x).join('');
+      const num = parseInt(c, 16);
+      const r = (num >> 16) & 255;
+      const g = (num >> 8) & 255;
+      const b = num & 255;
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
     // YILDIZ ÇİZİMİ
-    function drawStar(context, cx, cy, spikes, outerRadius, innerRadius) {
+    function drawStar(context, cx, cy, spikes, outerRadius, innerRadius, fillStyle = 'none', color = currentColor) {
       let rot = (Math.PI / 2) * 3;
       let x = cx;
       let y = cy;
@@ -604,6 +635,13 @@
       }
       context.lineTo(cx, cy - outerRadius);
       context.closePath();
+      if (fillStyle === 'semi') {
+        context.fillStyle = hexToRgba(color, 0.35);
+        context.fill();
+      } else if (fillStyle === 'solid') {
+        context.fillStyle = color;
+        context.fill();
+      }
       context.stroke();
     }
 
@@ -652,7 +690,7 @@
     }
 
     // YUVARLAK KÖŞELİ KUTU
-    function drawRoundRect(context, x, y, w, h, radius = 12) {
+    function drawRoundRect(context, x, y, w, h, radius = 12, fillStyle = 'none', color = currentColor) {
       const rx = Math.min(x, x + w);
       const ry = Math.min(y, y + h);
       const rw = Math.abs(w);
@@ -669,6 +707,13 @@
       context.lineTo(rx, ry + r);
       context.quadraticCurveTo(rx, ry, rx + r, ry);
       context.closePath();
+      if (fillStyle === 'semi') {
+        context.fillStyle = hexToRgba(color, 0.35);
+        context.fill();
+      } else if (fillStyle === 'solid') {
+        context.fillStyle = color;
+        context.fill();
+      }
       context.stroke();
     }
 
@@ -877,6 +922,309 @@
       });
     }
 
+    // HIZLI ÇIKARTMALAR / İKONLAR (STICKERS)
+    const STICKERS = [
+      { icon: '✅', name: 'Onaylandı' },
+      { icon: '❌', name: 'Hatalı / İptal' },
+      { icon: '⚠️', name: 'Dikkat / Uyarı' },
+      { icon: '📌', name: 'Sabitlendi' },
+      { icon: '🔒', name: 'Gizli / Kilitli' },
+      { icon: '⭐', name: 'Önemli' },
+      { icon: '💡', name: 'Öneri' },
+      { icon: '🏷️', name: 'Etiket' },
+      { icon: '🚨', name: 'Acil' },
+      { icon: '🎯', name: 'Hedef' },
+      { icon: '👍', name: 'Beğenildi' },
+      { icon: '🚩', name: 'Bayrak' }
+    ];
+
+    function showStickerSelectionModal() {
+      const existing = document.getElementById('frpAnnotatorStickerModal');
+      if (existing) existing.remove();
+
+      const mOverlay = document.createElement('div');
+      mOverlay.id = 'frpAnnotatorStickerModal';
+      mOverlay.className = 'modal-overlay';
+      mOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.75);backdrop-filter:blur(6px);z-index:200080;display:flex;align-items:center;justify-content:center;padding:1rem;';
+
+      const itemsHtml = STICKERS.map(s => `
+        <button type="button" class="btn-sticker-item" data-icon="${s.icon}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:.75rem .5rem;border-radius:12px;border:1.5px solid var(--border,#cbd5e1);background:var(--bg-surface,#fff);cursor:pointer;transition:transform .1s, border-color .1s;gap:.25rem;">
+          <span style="font-size:2rem;line-height:1;">${s.icon}</span>
+          <span style="font-size:.68rem;font-weight:700;color:var(--text-secondary,#475569);text-align:center;">${s.name}</span>
+        </button>
+      `).join('');
+
+      mOverlay.innerHTML = `
+        <div class="modal" style="max-width:420px;width:92vw;padding:1.4rem;border-radius:18px;background:var(--bg-surface,#ffffff);box-shadow:0 20px 50px rgba(0,0,0,0.4);">
+          <div style="font-size:1.05rem;font-weight:800;color:var(--text-primary,#0f172a);margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:.45rem;">
+              <span>⭐</span>
+              <span>Çıkartma & İkon Seçin</span>
+            </div>
+            <button type="button" id="btnStickerModalClose" class="btn btn-sm btn-ghost" style="padding:.2rem .4rem;">✕</button>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:.6rem;margin-bottom:1rem;">
+            ${itemsHtml}
+          </div>
+          <div style="font-size:.74rem;color:var(--text-muted,#64748b);text-align:center;">
+            Seçtikten sonra görsel üzerine tıklayarak istediğiniz konuma çıkartma basabilirsiniz.
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(mOverlay);
+      const close = () => mOverlay.remove();
+      mOverlay.querySelector('#btnStickerModalClose').addEventListener('click', close);
+      mOverlay.querySelectorAll('.btn-sticker-item').forEach(b => {
+        b.addEventListener('click', () => {
+          activeSticker = b.dataset.icon;
+          const badge = overlay.querySelector('#annotatorActiveSticker');
+          if (badge) badge.textContent = activeSticker;
+          close();
+          setActiveTool('sticker');
+        });
+      });
+    }
+
+    function stampSticker(cx, cy, sticker = activeSticker) {
+      ctx.save();
+      ctx.font = '38px "Segoe UI Emoji", "Apple Color Emoji", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(0,0,0,0.35)';
+      ctx.shadowBlur = 8;
+      ctx.shadowOffsetY = 3;
+      ctx.fillText(sticker, cx, cy);
+      ctx.restore();
+      saveState();
+    }
+
+    // FİLİGRAN (WATERMARK)
+    function showWatermarkModal() {
+      const existing = document.getElementById('frpAnnotatorWmModal');
+      if (existing) existing.remove();
+
+      const mOverlay = document.createElement('div');
+      mOverlay.id = 'frpAnnotatorWmModal';
+      mOverlay.className = 'modal-overlay';
+      mOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.75);backdrop-filter:blur(6px);z-index:200080;display:flex;align-items:center;justify-content:center;padding:1rem;';
+
+      mOverlay.innerHTML = `
+        <div class="modal" style="max-width:440px;width:92vw;padding:1.4rem;border-radius:18px;background:var(--bg-surface,#ffffff);box-shadow:0 20px 50px rgba(0,0,0,0.4);">
+          <div style="font-size:1.05rem;font-weight:800;color:var(--text-primary,#0f172a);margin-bottom:.85rem;display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:.45rem;">
+              <span>💧</span>
+              <span>Görsele Filigran (Watermark) Ekle</span>
+            </div>
+            <button type="button" id="btnWmModalClose" class="btn btn-sm btn-ghost" style="padding:.2rem .4rem;">✕</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:.75rem;margin-bottom:1.25rem;">
+            <div>
+              <label style="font-size:.76rem;font-weight:700;color:var(--text-secondary,#475569);display:block;margin-bottom:.3rem;">Hazır Kurumsal Metin</label>
+              <select id="selWmPreset" style="width:100%;padding:.5rem;border-radius:8px;border:1px solid var(--border,#cbd5e1);font-size:.84rem;background:var(--bg-card,#f8fafc);color:var(--text-primary,#0f172a);">
+                <option value="GİZLİDİR" selected>🔒 GİZLİDİR</option>
+                <option value="FRP KÜTÜPHANESİ">📚 FRP KÜTÜPHANESİ</option>
+                <option value="KOPYALANAMAZ">🚫 KOPYALANAMAZ</option>
+                <option value="TASLAK">📝 TASLAK</option>
+                <option value="ÖZEL VE GİZLİ">🛡️ ÖZEL VE GİZLİ</option>
+                <option value="custom">✏️ Özel Metin Yaz...</option>
+              </select>
+            </div>
+            <div id="wmCustomWrap" style="display:none;">
+              <label style="font-size:.76rem;font-weight:700;color:var(--text-secondary,#475569);display:block;margin-bottom:.3rem;">Özel Filigran Metni</label>
+              <input type="text" id="inputWmCustom" placeholder="Filigran metniniz" style="width:100%;padding:.5rem;border-radius:8px;border:1px solid var(--border,#cbd5e1);font-size:.84rem;background:var(--bg-card,#f8fafc);color:var(--text-primary,#0f172a);" />
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;">
+              <div>
+                <label style="font-size:.76rem;font-weight:700;color:var(--text-secondary,#475569);display:block;margin-bottom:.3rem;">Yerleşim Deseni</label>
+                <select id="selWmPattern" style="width:100%;padding:.45rem;border-radius:8px;border:1px solid var(--border);font-size:.8rem;background:var(--bg-card);color:var(--text-primary);">
+                  <option value="repeat" selected>Çapraz Tekrarlı (Tüm Görsel)</option>
+                  <option value="center">Tek Büyük (Ortada)</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:.76rem;font-weight:700;color:var(--text-secondary,#475569);display:block;margin-bottom:.3rem;">Belirginlik (Opaklık)</label>
+                <select id="selWmOpacity" style="width:100%;padding:.45rem;border-radius:8px;border:1px solid var(--border);font-size:.8rem;background:var(--bg-card);color:var(--text-primary);">
+                  <option value="0.15">Hafif (%15)</option>
+                  <option value="0.25" selected>Orta (%25)</option>
+                  <option value="0.45">Belirgin (%45)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:flex-end;gap:.6rem;">
+            <button type="button" id="btnWmCancel" class="btn btn-sm btn-ghost">Vazgeç</button>
+            <button type="button" id="btnWmApply" class="btn btn-sm btn-primary" style="font-weight:800;padding:.45rem 1.2rem;">Filigranı Bas 💧</button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(mOverlay);
+      const close = () => mOverlay.remove();
+      mOverlay.querySelector('#btnWmModalClose').addEventListener('click', close);
+      mOverlay.querySelector('#btnWmCancel').addEventListener('click', close);
+
+      const selPreset = mOverlay.querySelector('#selWmPreset');
+      const customWrap = mOverlay.querySelector('#wmCustomWrap');
+      selPreset.addEventListener('change', () => {
+        customWrap.style.display = selPreset.value === 'custom' ? 'block' : 'none';
+      });
+
+      mOverlay.querySelector('#btnWmApply').addEventListener('click', () => {
+        let text = selPreset.value;
+        if (text === 'custom') {
+          text = (mOverlay.querySelector('#inputWmCustom').value || '').trim();
+          if (!text) text = 'GİZLİDİR';
+        }
+        const pattern = mOverlay.querySelector('#selWmPattern').value;
+        const opacity = parseFloat(mOverlay.querySelector('#selWmOpacity').value) || 0.25;
+        close();
+
+        applyWatermark({
+          text,
+          pattern,
+          color: hexToRgba(currentColor || '#ef4444', opacity)
+        });
+      });
+    }
+
+    function applyWatermark({ text, pattern = 'repeat', color = 'rgba(239, 68, 68, 0.22)' }) {
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.font = '900 36px "Segoe UI", Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      if (pattern === 'repeat') {
+        const stepX = 280;
+        const stepY = 200;
+        for (let x = -canvas.width; x < canvas.width * 2; x += stepX) {
+          for (let y = -canvas.height; y < canvas.height * 2; y += stepY) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate((-30 * Math.PI) / 180);
+            ctx.fillText(text, 0, 0);
+            ctx.restore();
+          }
+        }
+      } else {
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate((-30 * Math.PI) / 180);
+        ctx.font = '900 68px "Segoe UI", Arial, sans-serif';
+        ctx.fillText(text, 0, 0);
+      }
+      ctx.restore();
+      saveState();
+      if (typeof window.toast === 'function') window.toast(`"${text}" filigranı eklendi.`, 'success');
+    }
+
+    // GÖRSEL İNCE AYARLARI MODALI
+    function showAdjustModal() {
+      const existing = document.getElementById('frpAnnotatorAdjustModal');
+      if (existing) existing.remove();
+
+      const mOverlay = document.createElement('div');
+      mOverlay.id = 'frpAnnotatorAdjustModal';
+      mOverlay.className = 'modal-overlay';
+      mOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.75);backdrop-filter:blur(6px);z-index:200080;display:flex;align-items:center;justify-content:center;padding:1rem;';
+
+      mOverlay.innerHTML = `
+        <div class="modal" style="max-width:440px;width:92vw;padding:1.4rem;border-radius:18px;background:var(--bg-surface,#ffffff);box-shadow:0 20px 50px rgba(0,0,0,0.4);">
+          <div style="font-size:1.05rem;font-weight:800;color:var(--text-primary,#0f172a);margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:.45rem;">
+              <span>🎛️</span>
+              <span>Görsel İnce Ayarları</span>
+            </div>
+            <button type="button" id="btnAdjClose" class="btn btn-sm btn-ghost" style="padding:.2rem .4rem;">✕</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:1rem;margin-bottom:1.25rem;">
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:.78rem;font-weight:700;color:var(--text-secondary,#475569);margin-bottom:.3rem;">
+                <span>✨ Parlaklık</span>
+                <span id="lblAdjBright">0</span>
+              </div>
+              <input type="range" id="rngAdjBright" min="-50" max="50" value="0" style="width:100%;accent-color:var(--accent,#2563eb);" />
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:.78rem;font-weight:700;color:var(--text-secondary,#475569);margin-bottom:.3rem;">
+                <span>🌓 Kontrast</span>
+                <span id="lblAdjContrast">0</span>
+              </div>
+              <input type="range" id="rngAdjContrast" min="-50" max="50" value="0" style="width:100%;accent-color:var(--accent,#2563eb);" />
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:.78rem;font-weight:700;color:var(--text-secondary,#475569);margin-bottom:.3rem;">
+                <span>🎨 Doygunluk (Saturation)</span>
+                <span id="lblAdjSat">%100</span>
+              </div>
+              <input type="range" id="rngAdjSat" min="0" max="200" value="100" style="width:100%;accent-color:var(--accent,#2563eb);" />
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <button type="button" id="btnAdjReset" class="btn btn-sm btn-ghost" style="font-size:.76rem;color:#d97706;">↺ Sıfırla</button>
+            <div style="display:flex;gap:.5rem;">
+              <button type="button" id="btnAdjCancel" class="btn btn-sm btn-ghost">Vazgeç</button>
+              <button type="button" id="btnAdjApply" class="btn btn-sm btn-primary" style="font-weight:800;padding:.45rem 1.2rem;">Uygula & Kaydet</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(mOverlay);
+      const close = () => mOverlay.remove();
+      mOverlay.querySelector('#btnAdjClose').addEventListener('click', close);
+      mOverlay.querySelector('#btnAdjCancel').addEventListener('click', close);
+
+      const rBright = mOverlay.querySelector('#rngAdjBright');
+      const rContrast = mOverlay.querySelector('#rngAdjContrast');
+      const rSat = mOverlay.querySelector('#rngAdjSat');
+      const lBright = mOverlay.querySelector('#lblAdjBright');
+      const lContrast = mOverlay.querySelector('#lblAdjContrast');
+      const lSat = mOverlay.querySelector('#lblAdjSat');
+
+      const updateLabels = () => {
+        lBright.textContent = (rBright.value > 0 ? '+' : '') + rBright.value;
+        lContrast.textContent = (rContrast.value > 0 ? '+' : '') + rContrast.value;
+        lSat.textContent = `%${rSat.value}`;
+      };
+
+      rBright.addEventListener('input', updateLabels);
+      rContrast.addEventListener('input', updateLabels);
+      rSat.addEventListener('input', updateLabels);
+
+      mOverlay.querySelector('#btnAdjReset').addEventListener('click', () => {
+        rBright.value = 0;
+        rContrast.value = 0;
+        rSat.value = 100;
+        updateLabels();
+      });
+
+      mOverlay.querySelector('#btnAdjApply').addEventListener('click', () => {
+        const b = parseInt(rBright.value, 10) || 0;
+        const c = parseInt(rContrast.value, 10) || 0;
+        const s = parseInt(rSat.value, 10) || 100;
+        close();
+
+        if (b === 0 && c === 0 && s === 100) return;
+
+        const filterStr = `brightness(${100 + b}%) contrast(${100 + c}%) saturate(${s}%)`;
+        const temp = document.createElement('canvas');
+        temp.width = canvas.width;
+        temp.height = canvas.height;
+        const tctx = temp.getContext('2d');
+        tctx.drawImage(canvas, 0, 0);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        ctx.filter = filterStr;
+        ctx.drawImage(temp, 0, 0);
+        ctx.restore();
+        ctx.filter = 'none';
+        saveState();
+        if (typeof window.toast === 'function') window.toast('Görsel renk ve ışık ayarları uygulandı.', 'success');
+      });
+    }
+
     // FİLTRE UYGULAMA
     overlay.querySelector('#selFilter').addEventListener('change', (e) => {
       const filter = e.target.value;
@@ -932,6 +1280,16 @@
 
       if (activeTool === 'step') {
         stampStepBadge(x, y);
+        return;
+      }
+
+      if (activeTool === 'sticker') {
+        stampSticker(x, y, activeSticker);
+        return;
+      }
+
+      if (activeTool === 'watermark') {
+        showWatermarkModal();
         return;
       }
 
@@ -1033,6 +1391,14 @@
       oCtx.lineCap = 'round';
       oCtx.lineJoin = 'round';
 
+      if (currentLineDash === 'dashed') {
+        oCtx.setLineDash([Math.max(8, currentLineWidth * 1.5), Math.max(5, currentLineWidth)]);
+      } else if (currentLineDash === 'dotted') {
+        oCtx.setLineDash([Math.max(3, currentLineWidth * 0.6), Math.max(4, currentLineWidth * 0.8)]);
+      } else {
+        oCtx.setLineDash([]);
+      }
+
       if (activeTool === 'line') {
         oCtx.beginPath();
         oCtx.moveTo(startX, startY);
@@ -1046,17 +1412,30 @@
         drawDimensionLine(oCtx, startX, startY, x, y, currentLineWidth);
       } else if (activeTool === 'circle') {
         oCtx.beginPath();
-        oCtx.arc(startX, startY, Math.sqrt(w * w + h * h), 0, Math.PI * 2);
+        const r = Math.sqrt(w * w + h * h);
+        oCtx.arc(startX, startY, r, 0, Math.PI * 2);
+        if (currentShapeFill === 'semi') {
+          oCtx.fillStyle = hexToRgba(currentColor, 0.35);
+          oCtx.fill();
+        } else if (currentShapeFill === 'solid') {
+          oCtx.fill();
+        }
         oCtx.stroke();
       } else if (activeTool === 'rect') {
+        if (currentShapeFill === 'semi') {
+          oCtx.fillStyle = hexToRgba(currentColor, 0.35);
+          oCtx.fillRect(startX, startY, w, h);
+        } else if (currentShapeFill === 'solid') {
+          oCtx.fillRect(startX, startY, w, h);
+        }
         oCtx.strokeRect(startX, startY, w, h);
       } else if (activeTool === 'roundRect') {
-        drawRoundRect(oCtx, startX, startY, w, h, 14);
+        drawRoundRect(oCtx, startX, startY, w, h, 14, currentShapeFill, currentColor);
       } else if (activeTool === 'filledRect') {
         oCtx.fillRect(startX, startY, w, h);
       } else if (activeTool === 'star') {
         const radius = Math.sqrt(w * w + h * h);
-        drawStar(oCtx, startX, startY, 5, radius, radius * 0.5);
+        drawStar(oCtx, startX, startY, 5, radius, radius * 0.5, currentShapeFill, currentColor);
       } else if (activeTool === 'callout') {
         drawCallout(oCtx, startX, startY, w, h);
       } else if (activeTool === 'spotlight') {
@@ -1095,6 +1474,14 @@
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
 
+      if (currentLineDash === 'dashed') {
+        ctx.setLineDash([Math.max(8, currentLineWidth * 1.5), Math.max(5, currentLineWidth)]);
+      } else if (currentLineDash === 'dotted') {
+        ctx.setLineDash([Math.max(3, currentLineWidth * 0.6), Math.max(4, currentLineWidth * 0.8)]);
+      } else {
+        ctx.setLineDash([]);
+      }
+
       if (activeTool === 'line') {
         ctx.beginPath();
         ctx.moveTo(startX, startY);
@@ -1108,17 +1495,30 @@
         drawDimensionLine(ctx, startX, startY, x, y, currentLineWidth);
       } else if (activeTool === 'circle') {
         ctx.beginPath();
-        ctx.arc(startX, startY, Math.sqrt(w * w + h * h), 0, Math.PI * 2);
+        const r = Math.sqrt(w * w + h * h);
+        ctx.arc(startX, startY, r, 0, Math.PI * 2);
+        if (currentShapeFill === 'semi') {
+          ctx.fillStyle = hexToRgba(currentColor, 0.35);
+          ctx.fill();
+        } else if (currentShapeFill === 'solid') {
+          ctx.fill();
+        }
         ctx.stroke();
       } else if (activeTool === 'rect') {
+        if (currentShapeFill === 'semi') {
+          ctx.fillStyle = hexToRgba(currentColor, 0.35);
+          ctx.fillRect(startX, startY, w, h);
+        } else if (currentShapeFill === 'solid') {
+          ctx.fillRect(startX, startY, w, h);
+        }
         ctx.strokeRect(startX, startY, w, h);
       } else if (activeTool === 'roundRect') {
-        drawRoundRect(ctx, startX, startY, w, h, 14);
+        drawRoundRect(ctx, startX, startY, w, h, 14, currentShapeFill, currentColor);
       } else if (activeTool === 'filledRect') {
         ctx.fillRect(startX, startY, w, h);
       } else if (activeTool === 'star') {
         const radius = Math.sqrt(w * w + h * h);
-        drawStar(ctx, startX, startY, 5, radius, radius * 0.5);
+        drawStar(ctx, startX, startY, 5, radius, radius * 0.5, currentShapeFill, currentColor);
       } else if (activeTool === 'callout') {
         drawCallout(ctx, startX, startY, w, h);
       } else if (activeTool === 'blur') {
@@ -1171,7 +1571,7 @@
         viewport.style.cursor = 'cell';
       } else if (tool === 'magnifier') {
         viewport.style.cursor = 'zoom-in';
-      } else if (tool === 'stamp') {
+      } else if (tool === 'stamp' || tool === 'sticker' || tool === 'watermark') {
         viewport.style.cursor = 'pointer';
       } else {
         viewport.style.cursor = 'crosshair';
@@ -1195,6 +1595,8 @@
       toolText: 'text',
       toolStamp: 'stamp',
       toolStep: 'step',
+      toolSticker: 'sticker',
+      toolWatermark: 'watermark',
       toolBlur: 'blur',
       toolRedact: 'redact',
       toolMosaic: 'mosaic',
@@ -1205,8 +1607,31 @@
     };
 
     Object.entries(toolMap).forEach(([btnId, toolName]) => {
-      overlay.querySelector(`#${btnId}`)?.addEventListener('click', () => setActiveTool(toolName));
+      overlay.querySelector(`#${btnId}`)?.addEventListener('click', () => {
+        if (toolName === 'watermark') {
+          showWatermarkModal();
+        } else if (toolName === 'sticker') {
+          if (activeTool === 'sticker') {
+            showStickerSelectionModal();
+          } else {
+            setActiveTool('sticker');
+          }
+        } else {
+          setActiveTool(toolName);
+        }
+      });
     });
+
+    // Çizgi Deseni ve Şekil Dolgusu Değişimi
+    overlay.querySelector('#selLineDash')?.addEventListener('change', (e) => {
+      currentLineDash = e.target.value;
+    });
+    overlay.querySelector('#selShapeFill')?.addEventListener('change', (e) => {
+      currentShapeFill = e.target.value;
+    });
+
+    // Görsel İnce Ayarları Butonu
+    overlay.querySelector('#btnOpenAdjustModal')?.addEventListener('click', showAdjustModal);
 
     // Renk Seçimi (Aktif halka düzeltmesi)
     const customColorWrap = overlay.querySelector('#annotatorCustomColorWrap');

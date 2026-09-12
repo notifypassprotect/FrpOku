@@ -102,3 +102,67 @@ test('Odalar ve Kanallar yönetimi Ayarlar sekmesine modüler olarak taşınmı�
   assert.doesNotMatch(adminModal, /\bprompt\(/);
 });
 
+test('Permissions-Policy mikrofon erişimine izin verir ve Web Audio API desteklenir', () => {
+  const serverSource = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+  assert.match(serverSource, /microphone=\(self\)/);
+  
+  const presence = fs.readFileSync(path.join(root, 'js', 'core', 'online_presence.js'), 'utf8');
+  assert.match(presence, /playMsnNudgeSound/);
+  assert.match(presence, /AudioContext/);
+});
+
+test('server.js ve online_presence.js içinde Grup Sohbeti ve MSN Titretme bulunur', () => {
+  const serverSource = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+  assert.match(serverSource, /\/api\/chat\/groups/);
+  assert.match(serverSource, /\/api\/chat\/nudge/);
+  assert.match(serverSource, /nudgeCooldowns/);
+
+  const presence = fs.readFileSync(path.join(root, 'js', 'core', 'online_presence.js'), 'utf8');
+  assert.match(presence, /fetchChatGroups/);
+  assert.match(presence, /openCreateGroupModal/);
+  assert.match(presence, /msn-shaking/);
+  assert.match(presence, /btnNudge/);
+  assert.doesNotMatch(presence, /\s+on(?:click|change|input|keydown|keyup|submit|load|error)\s*=/i);
+});
+
+test('server.js ve mailer.js içinde 4 Acil Erişim Anahtarı ve kurtarma rotası bulunur', () => {
+  const serverSource = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+  assert.match(serverSource, /recovery_keys/);
+  assert.match(serverSource, /\/api\/auth\/recover-with-key/);
+  assert.match(serverSource, /generateEmergencyRecoveryKey/);
+
+  const mailerSource = fs.readFileSync(path.join(root, 'lib', 'mailer.js'), 'utf8');
+  assert.match(mailerSource, /sendEmergencyRecoveryKeys/);
+  assert.match(mailerSource, /Acil Erişim & Kurtarma Anahtarlarınız/);
+});
+
+test('auth_portal.js modern split-screen, kurtarma anahtarı formu ve captcha doğrulaması içerir', () => {
+  const portalSource = fs.readFileSync(path.join(root, 'js', 'core', 'auth', 'auth_portal.js'), 'utf8');
+  assert.match(portalSource, /auth-split-wrapper/);
+  assert.match(portalSource, /authRecoveryPanel/);
+  assert.match(portalSource, /loginCaptchaContainer/);
+  assert.match(portalSource, /regKeysNotice/);
+  assert.doesNotMatch(portalSource, /\s+on(?:click|change|input|keydown|keyup|submit|load|error)\s*=/i);
+  assert.doesNotMatch(portalSource, /\balert\(/);
+});
+
+test('rich_note_editor.js içinde canlı not istatistikleri ve gelişmiş PDF okuyucu bulunur', () => {
+  const editor = fs.readFileSync(path.join(root, 'js', 'list', 'rich_note_editor.js'), 'utf8');
+  assert.match(editor, /richNoteStatsBar/);
+  assert.match(editor, /updateNoteStatistics/);
+  assert.match(editor, /btnPdfNightMode/);
+  assert.match(editor, /btnPdfFullscreen/);
+  assert.doesNotMatch(editor, /\s+on(?:click|change|input|keydown|keyup|submit|load|error)\s*=/i);
+});
+
+test('image_annotator.js içinde Filigran, Çıkartmalar, Şekil Dolgusu ve İnce Ayar araçları mevcuttur', () => {
+  const annotator = fs.readFileSync(path.join(root, 'js', 'list', 'image_annotator.js'), 'utf8');
+  assert.match(annotator, /toolWatermark/);
+  assert.match(annotator, /toolSticker/);
+  assert.match(annotator, /selShapeFill/);
+  assert.match(annotator, /selLineDash/);
+  assert.match(annotator, /btnOpenAdjustModal/);
+  assert.match(annotator, /showAdjustModal/);
+  assert.doesNotMatch(annotator, /\s+on(?:click|change|input|keydown|keyup|submit|load|error)\s*=/i);
+});
+

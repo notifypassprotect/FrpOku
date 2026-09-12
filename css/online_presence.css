@@ -241,38 +241,47 @@
   transition: border-color 0.15s;
 }
 
-/* ── NAV TABS (MODERN SEGMENTED PILL) ── */
+/* ── NAV TABS (MODERN KURUMSAL SEGMENTED PILL) ── */
+.frp-presence-tabs,
 .frp-presence-nav-tabs {
   display: flex;
   padding: 4px;
-  margin: 6px 8px;
+  margin: 6px 10px 8px 10px;
   background: var(--bg-card, #f1f5f9);
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid var(--border-light, #e2e8f0);
   gap: 4px;
 }
 
+.frp-presence-tab,
 .frp-presence-tab-btn {
   flex: 1;
-  padding: 0.4rem 0.5rem;
+  padding: 0.42rem 0.55rem;
   font-size: 0.76rem;
   font-weight: 700;
   color: var(--text-muted, #64748b);
   border: none;
   background: transparent;
   cursor: pointer;
-  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-  border-radius: 7px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
 }
 
-.frp-presence-tab-btn.active {
+.frp-presence-tab:hover,
+.frp-presence-tab-btn:hover {
   color: var(--text-primary, #0f172a);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.frp-presence-tab.active,
+.frp-presence-tab-btn.active {
+  color: #2563eb;
   background: var(--bg-surface, #ffffff);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 /* ── SEARCH BAR ── */
@@ -1278,5 +1287,322 @@
 @keyframes inappToastSlideIn {
   from { opacity: 0; transform: translateY(-16px) scale(0.96); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── MSN NUDGE (TİTREŞİM / DÜRTME) ── */
+@keyframes msnNudgeShake {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  10% { transform: translate(-10px, 4px) rotate(-1.5deg); }
+  20% { transform: translate(10px, -5px) rotate(1.5deg); }
+  30% { transform: translate(-8px, -4px) rotate(-1.2deg); }
+  40% { transform: translate(8px, 4px) rotate(1.2deg); }
+  50% { transform: translate(-6px, 2px) rotate(-0.8deg); }
+  60% { transform: translate(6px, -2px) rotate(0.8deg); }
+  70% { transform: translate(-4px, -1px) rotate(-0.5deg); }
+  80% { transform: translate(4px, 1px) rotate(0.5deg); }
+  90% { transform: translate(-2px, 0px) rotate(0deg); }
+}
+
+.msn-shaking {
+  animation: msnNudgeShake 0.65s cubic-bezier(0.36, 0.07, 0.19, 0.97) both !important;
+}
+
+.btn-nudge-action {
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  font-size: 1.05rem;
+}
+
+.btn-nudge-action:hover {
+  transform: scale(1.25) rotate(15deg);
+}
+
+.btn-nudge-action:disabled,
+.btn-nudge-action.cooling-down {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(0.8);
+  transform: none;
+}
+
+.frp-chat-msg.nudge-msg .frp-chat-bubble {
+  background: linear-gradient(135deg, #fef3c7 0%, #fee2e2 100%) !important;
+  border: 1px solid #fca5a5 !important;
+  color: #991b1b !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.15) !important;
+  padding: 0.6rem 0.9rem !important;
+  animation: nudgeBubblePulse 1.5s infinite;
+}
+
+@keyframes nudgeBubblePulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 4px 14px rgba(239, 68, 68, 0.15); }
+  50% { transform: scale(1.02); box-shadow: 0 6px 18px rgba(239, 68, 68, 0.28); }
+}
+
+/* ── GRUP SOHBETİ & YENİ GRUP BANNERI ── */
+.frp-group-create-banner {
+  margin: 8px 10px;
+  padding: 0.7rem 0.85rem;
+  background: linear-gradient(135deg, rgba(37,99,235,0.08), rgba(99,102,241,0.06));
+  border: 1.5px dashed rgba(37,99,235,0.35);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.frp-group-create-banner:hover {
+  background: linear-gradient(135deg, rgba(37,99,235,0.15), rgba(99,102,241,0.12));
+  border-color: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37,99,235,0.12);
+}
+
+.frp-group-create-left {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.frp-group-create-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.frp-group-create-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+}
+
+.frp-group-create-sub {
+  font-size: 0.68rem;
+  color: var(--text-muted, #64748b);
+}
+
+.frp-group-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 9999px;
+  background: rgba(99, 102, 241, 0.14);
+  color: #4f46e5;
+}
+
+/* ── MODAL: YENİ GRUP OLUŞTURMA PENCERESİ ── */
+.frp-group-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(8px);
+  z-index: 100005;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: groupModalFadeIn 0.2s ease-out;
+}
+
+@keyframes groupModalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.frp-group-modal-card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--bg-surface, #ffffff);
+  border-radius: 18px;
+  box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+  animation: groupModalCardSlide 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes groupModalCardSlide {
+  from { opacity: 0; transform: translateY(18px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.frp-group-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.1rem 1.25rem;
+  border-bottom: 1px solid var(--border-light, #e2e8f0);
+}
+
+.frp-group-modal-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text-primary, #0f172a);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.frp-group-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: var(--text-muted, #64748b);
+  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.frp-group-modal-close:hover {
+  background: var(--bg-raised, #f1f5f9);
+  color: var(--text-primary, #0f172a);
+}
+
+.frp-group-modal-body {
+  padding: 1.1rem 1.25rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.frp-group-field-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+  margin-bottom: 0.35rem;
+  display: block;
+}
+
+.frp-group-input {
+  width: 100%;
+  padding: 0.58rem 0.85rem;
+  font-size: 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--border, #cbd5e1);
+  background: var(--bg-surface, #ffffff);
+  color: var(--text-primary, #0f172a);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.frp-group-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.frp-group-members-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border-light, #e2e8f0);
+  border-radius: 10px;
+  background: var(--bg-card, #f8fafc);
+  padding: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.frp-group-member-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.frp-group-member-item:hover {
+  background: var(--bg-surface, #ffffff);
+}
+
+.frp-group-member-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.frp-group-member-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+}
+
+.frp-group-modal-footer {
+  padding: 0.85rem 1.25rem;
+  border-top: 1px solid var(--border-light, #e2e8f0);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  background: var(--bg-card, #f8fafc);
+}
+
+.frp-group-btn-cancel {
+  padding: 0.5rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--border, #cbd5e1);
+  background: var(--bg-surface, #ffffff);
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.frp-group-btn-cancel:hover {
+  background: var(--bg-raised, #f1f5f9);
+  color: var(--text-primary, #0f172a);
+}
+
+.frp-group-btn-submit {
+  padding: 0.5rem 1.1rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border-radius: 8px;
+  border: none;
+  background: #2563eb;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.frp-group-btn-submit:hover {
+  background: #1d4ed8;
+}
+
+/* ── KANAL SALT-OKUNUR BİLGİLENDİRME ÇUBUĞU ── */
+.frp-chat-readonly-notice {
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(245, 158, 11, 0.05));
+  border-top: 1px solid rgba(245, 158, 11, 0.25);
+  color: #b45309;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
 }
 

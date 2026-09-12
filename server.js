@@ -300,6 +300,12 @@ function verifyCaptcha(token, answer) {
   return String(answer).trim() === expectedAns;
 }
 
+function generateEmergencyRecoveryKey() {
+  const p1 = crypto.randomBytes(2).toString('hex').toUpperCase();
+  const p2 = crypto.randomBytes(2).toString('hex').toUpperCase();
+  return `FRP-RECOVER-${p1}-${p2}`;
+}
+
 function safeLogStr(str) {
   if (typeof str !== 'string') return String(str || '');
   return str.replace(/[\r\n\x00-\x1f\x7f]/g, '').slice(0, 150);
@@ -321,7 +327,7 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
+  res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=(self)');
   res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
   res.setHeader(
     'Content-Security-Policy',
@@ -484,8 +490,8 @@ app.post('/api/auth/register', authRateLimiter, async (req, res) => {
     return res.status(400).json({ success: false, reason: 'Ad soyad veya bölüm alanı izin verilen uzunlukta değildir.' });
   }
 
-  if (password.length < 10 || password.length > PASSWORD_MAX_LENGTH) {
-    return res.status(400).json({ success: false, reason: `Şifreniz 10-${PASSWORD_MAX_LENGTH} karakter arasında olmalıdır.` });
+  if (password.length < 6 || password.length > PASSWORD_MAX_LENGTH) {
+    return res.status(400).json({ success: false, reason: `Şifreniz en az 6, en fazla ${PASSWORD_MAX_LENGTH} karakter arasında olmalıdır.` });
   }
 
   try {
@@ -507,6 +513,18 @@ app.post('/api/auth/register', authRateLimiter, async (req, res) => {
       }
     }
 
+    const rawRecoveryKeys = [
+      generateEmergencyRecoveryKey(),
+      generateEmergencyRecoveryKey(),
+      generateEmergencyRecoveryKey(),
+      generateEmergencyRecoveryKey()
+    ];
+    const storedRecoveryKeys = rawRecoveryKeys.map(k => ({
+      keyHash: crypto.createHash('sha256').update(k).digest('hex'),
+      used: false,
+      usedAt: null
+    }));
+
     const newUserId = 'usr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
     const newRecord = {
       id: newUserId,
@@ -519,6 +537,8 @@ app.post('/api/auth/register', authRateLimiter, async (req, res) => {
       role: 'user',
       is_active: false, // Yönetici onayı bekliyor (false = pending)
       avatar: 'U',
+      recovery_keys: storedRecoveryKeys,
+      previous_password_hashes: [],
       created_at: new Date().toISOString(),
       last_login: null
     };
@@ -534,9 +554,20 @@ app.post('/api/auth/register', authRateLimiter, async (req, res) => {
 
     console.log(`Yeni Kullanıcı Kaydı Alındı (Admin Onayı Bekliyor): ${cleanUser} (${cleanName})`);
 
+    // Kullanıcıya 4 adet acil kurtarma anahtarını e-posta ile ilet
+    if (cleanEmail) {
+      mailer.sendEmergencyRecoveryKeys({
+        to: cleanEmail,
+        fullName: cleanName,
+        username: cleanUser,
+        keys: rawRecoveryKeys
+      }).catch(() => {});
+    }
+
     res.json({
       success: true,
       pendingApproval: true,
+      recoveryKeys: rawRecoveryKeys,
       message: 'Kayıt başvurunuz başarıyla alınmıştır. Sistem yöneticisi (Admin) onayladıktan sonra hesabınız açılacak ve giriş yapabileceksiniz.',
       user: {
         id: newRecord.id,
@@ -561,13 +592,28 @@ app.get('/api/auth/captcha', authRateLimiter, (req, res) => {
 
 // ── 2. KULLANICI GİRİŞİ (Login) ──────────────────────────────
 app.post('/api/auth/login', authRateLimiter, async (req, res) => {
-  const { identifier, password } = req.body;
+  const { identifier, password, captchaToken, captchaAnswer } = req.body;
   const ident = String(identifier || '').trim();
   if (!ident || !password || ident.length > 254 || String(password).length > PASSWORD_MAX_LENGTH) {
     return res.status(400).json({ success: false, reason: 'Lütfen kullanıcı bilgilerinizi ve şifrenizi giriniz.' });
   }
 
   const cleanIdent = ident.toLowerCase();
+  const failKey = `${cleanIdent}_${(req.ip || '127.0.0.1').replace(/^::ffff:/, '')}`;
+  const currentFailures = loginFailures.get(failKey) || 0;
+  const isCaptchaRequired = currentFailures >= 3;
+
+  if (isCaptchaRequired) {
+    if (!captchaToken || !captchaAnswer || !verifyCaptcha(captchaToken, captchaAnswer)) {
+      return res.status(400).json({
+        success: false,
+        requireCaptcha: true,
+        failedAttempts: currentFailures,
+        reason: '3 ve üzeri hatalı deneme nedeniyle güvenlik doğrulaması (Captcha) gereklidir. Lütfen soruyu doğru yanıtlayınız.'
+      });
+    }
+  }
+
   const phoneDigits = ident.replace(/\D/g, '');
   let user = null;
 
@@ -597,13 +643,32 @@ app.post('/api/auth/login', authRateLimiter, async (req, res) => {
     }
 
     if (!user) {
-      return res.status(401).json({ success: false, reason: 'Kullanıcı bilgileriniz veya şifreniz hatalı.' });
+      const newFailures = currentFailures + 1;
+      loginFailures.set(failKey, newFailures);
+      const requireNow = newFailures >= 3;
+      return res.status(401).json({
+        success: false,
+        requireCaptcha: requireNow,
+        failedAttempts: newFailures,
+        reason: requireNow ? '3 hatalı deneme yapıldı. Güvenlik doğrulaması (Captcha) gereklidir.' : 'Kullanıcı bilgileriniz veya şifreniz hatalı.'
+      });
     }
 
     const passwordCheck = await verifyPasswordHash(password, user.password_hash);
     if (!passwordCheck.valid) {
-      return res.status(401).json({ success: false, reason: 'Kullanıcı bilgileriniz veya şifreniz hatalı.' });
+      const newFailures = currentFailures + 1;
+      loginFailures.set(failKey, newFailures);
+      const requireNow = newFailures >= 3;
+      return res.status(401).json({
+        success: false,
+        requireCaptcha: requireNow,
+        failedAttempts: newFailures,
+        reason: requireNow ? '3 hatalı deneme yapıldı. Güvenlik doğrulaması (Captcha) gereklidir.' : 'Kullanıcı bilgileriniz veya şifreniz hatalı.'
+      });
     }
+
+    // Başarılı girişte başarısız sayaçları temizle
+    loginFailures.delete(failKey);
 
     // Başarılı girişte eski SHA-256 kaydını otomatik olarak scrypt'e yükselt.
     if (passwordCheck.needsRehash) {
@@ -650,6 +715,7 @@ app.post('/api/auth/login', authRateLimiter, async (req, res) => {
 
     const safeUser = { ...user };
     delete safeUser.password_hash;
+    delete safeUser.previous_password_hashes;
 
     const token = signToken({
       id: safeUser.id,
@@ -667,6 +733,96 @@ app.post('/api/auth/login', authRateLimiter, async (req, res) => {
   } catch (err) {
     console.error('Giriş hatası:', safeLogStr(err.message));
     res.status(503).json({ success: false, reason: 'Giriş servisi geçici olarak kullanılamıyor.' });
+  }
+});
+
+// ── 2.5. ACİL ERİŞİM ANAHTARI İLE ŞİFRE SIFIRLAMA & GİRİŞ ─────────
+app.post('/api/auth/recover-with-key', authRateLimiter, async (req, res) => {
+  const { identifier, recoveryKey, newPassword } = req.body || {};
+  const ident = String(identifier || '').trim().toLowerCase();
+  const rawKey = String(recoveryKey || '').trim().toUpperCase();
+  const pass = String(newPassword || '');
+
+  if (!ident || !rawKey || !pass) {
+    return res.status(400).json({ success: false, reason: 'Kullanıcı adı, acil erişim anahtarı ve yeni şifre gereklidir.' });
+  }
+
+  if (pass.length < 6 || pass.length > PASSWORD_MAX_LENGTH) {
+    return res.status(400).json({ success: false, reason: `Yeni şifreniz en az 6, en fazla ${PASSWORD_MAX_LENGTH} karakter olmalıdır.` });
+  }
+
+  try {
+    let user = null;
+    if (supabase) {
+      const { data, error } = await supabase.from('app_users').select('*').or(`username.eq.${ident},email.eq.${ident}`).limit(1);
+      if (error) throw error;
+      if (data && data.length) user = data[0];
+    } else {
+      const localUsers = getLocalUsers();
+      user = localUsers.find(u => (u.username || '').toLowerCase() === ident || (u.email || '').toLowerCase() === ident);
+    }
+
+    if (!user) {
+      return res.status(404).json({ success: false, reason: 'Kullanıcı hesabı bulunamadı.' });
+    }
+
+    const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex');
+    const keysList = Array.isArray(user.recovery_keys) ? user.recovery_keys : [];
+    const matchIdx = keysList.findIndex(k => k.keyHash === keyHash && !k.used);
+
+    if (matchIdx === -1) {
+      return res.status(400).json({ success: false, reason: 'Geçersiz veya daha önce kullanılmış acil erişim anahtarı!' });
+    }
+
+    // Anahtarı kullanıldı olarak işaretle
+    keysList[matchIdx].used = true;
+    keysList[matchIdx].usedAt = new Date().toISOString();
+
+    const newHash = await hashPassword(pass);
+    const nowIso = new Date().toISOString();
+    const prevHashes = [user.password_hash, ...(Array.isArray(user.previous_password_hashes) ? user.previous_password_hashes : [])].filter(Boolean).slice(0, 3);
+
+    const updates = {
+      password_hash: newHash,
+      password_changed_at: nowIso,
+      previous_password_hashes: prevHashes,
+      recovery_keys: keysList,
+      last_login: nowIso
+    };
+
+    await updateUserById(user.id, updates);
+
+    await recordAuditLog({
+      userId: user.id,
+      username: user.username,
+      role: user.role,
+      action: 'SECURITY_RECOVERY',
+      target: user.username,
+      details: 'Hesap acil erişim anahtarı ile kurtarıldı ve şifre sıfırlandı.',
+      ip: req.ip
+    });
+
+    const safeUser = { ...user, ...updates };
+    delete safeUser.password_hash;
+    delete safeUser.previous_password_hashes;
+
+    const token = signToken({
+      id: safeUser.id,
+      username: safeUser.username,
+      role: safeUser.role,
+      department: safeUser.department,
+      exp: Date.now() + 7 * 24 * 3600 * 1000
+    });
+
+    res.json({
+      success: true,
+      message: 'Hesabınız acil kurtarma anahtarı ile başarıyla kurtarıldı. Yeni şifreniz aktif.',
+      token,
+      user: safeUser
+    });
+  } catch (err) {
+    console.error('Acil kurtarma hatası:', err.message);
+    res.status(500).json({ success: false, reason: 'Kurtarma işlemi gerçekleştirilemedi.' });
   }
 });
 
@@ -940,8 +1096,8 @@ app.post('/api/admin/toggle-admin', adminRateLimiter, requireAdmin, async (req, 
 // ── 9. ADMİN: DOĞRUDAN ŞİFRE SIFIRLAMA ────────────────────────
 async function handleAdminPasswordReset(req, res) {
   const { userId, newPassword } = req.body;
-  if (!userId || !newPassword || newPassword.length < 10 || newPassword.length > PASSWORD_MAX_LENGTH) {
-    return res.status(400).json({ success: false, reason: `Lütfen 10-${PASSWORD_MAX_LENGTH} karakter arasında geçerli bir yeni şifre giriniz.` });
+  if (!userId || !newPassword || newPassword.length < 6 || newPassword.length > PASSWORD_MAX_LENGTH) {
+    return res.status(400).json({ success: false, reason: `Lütfen 6-${PASSWORD_MAX_LENGTH} karakter arasında geçerli bir yeni şifre giriniz.` });
   }
 
   try {
@@ -1023,8 +1179,8 @@ app.post('/api/auth/change-password', authRateLimiter, requireAuth, async (req, 
     return res.status(400).json({ success: false, reason: 'Lütfen mevcut ve yeni şifrenizi giriniz.' });
   }
 
-  if (newPassword.length < 10 || newPassword.length > PASSWORD_MAX_LENGTH) {
-    return res.status(400).json({ success: false, reason: `Yeni şifre 10-${PASSWORD_MAX_LENGTH} karakter arasında olmalıdır.` });
+  if (newPassword.length < 6 || newPassword.length > PASSWORD_MAX_LENGTH) {
+    return res.status(400).json({ success: false, reason: `Yeni şifre en az 6, en fazla ${PASSWORD_MAX_LENGTH} karakter arasında olmalıdır.` });
   }
 
   try {
@@ -1036,11 +1192,27 @@ app.post('/api/auth/change-password', authRateLimiter, requireAuth, async (req, 
       return res.status(400).json({ success: false, reason: 'Mevcut şifrenizi hatalı girdiniz!' });
     }
 
+    // Şifre Geçmişi Kontrolü: Mevcut şifre veya önceki 3 şifre ile aynı olamaz
+    const prevList = Array.isArray(user.previous_password_hashes) ? user.previous_password_hashes : [];
+    const hashesToCheck = [user.password_hash, ...prevList].filter(Boolean);
+    for (const h of hashesToCheck) {
+      const match = await verifyPasswordHash(newPassword, h);
+      if (match.valid) {
+        return res.status(400).json({
+          success: false,
+          reason: 'Yeni şifreniz, mevcut şifreniz veya daha önce kullandığınız son 3 şifrenizden biriyle aynı olamaz.'
+        });
+      }
+    }
+
     const newHash = await hashPassword(newPassword);
     const nowIso = new Date().toISOString();
+    const updatedPrevHashes = [user.password_hash, ...prevList].filter(Boolean).slice(0, 3);
+
     await updateUserById(userId, {
       password_hash: newHash,
-      password_changed_at: nowIso
+      password_changed_at: nowIso,
+      previous_password_hashes: updatedPrevHashes
     });
 
     const newToken = signToken({
@@ -2048,15 +2220,137 @@ async function scheduleChatEmailDigest(senderUser, receiverId, messageSnippet) {
   }
 }
 
+// ── GRUP SOHBETLERİ YÖNETİMİ (Kullanıcı Çoklu Grup Sohbeti) ─────
+const CHAT_GROUPS_STORE_PATH = path.join(__dirname, 'data', 'chat_groups.json');
+let chatGroupsCache = null;
+
+function getChatGroups() {
+  if (chatGroupsCache !== null) return chatGroupsCache;
+  try {
+    if (fs.existsSync(CHAT_GROUPS_STORE_PATH)) {
+      chatGroupsCache = JSON.parse(fs.readFileSync(CHAT_GROUPS_STORE_PATH, 'utf8'));
+    } else {
+      chatGroupsCache = [];
+    }
+  } catch {
+    chatGroupsCache = [];
+  }
+  return chatGroupsCache;
+}
+
+function saveChatGroups() {
+  try {
+    const dir = path.dirname(CHAT_GROUPS_STORE_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(CHAT_GROUPS_STORE_PATH, JSON.stringify(chatGroupsCache, null, 2), 'utf8');
+  } catch {}
+}
+
+app.get('/api/chat/groups', requireAuth, async (req, res) => {
+  try {
+    const myId = String(req.authUser.id);
+    const groups = getChatGroups();
+    const myGroups = groups.filter(g => Array.isArray(g.memberUserIds) && g.memberUserIds.map(String).includes(myId));
+    res.json({ success: true, groups: myGroups });
+  } catch {
+    res.status(500).json({ success: false, reason: 'Gruplar alınamadı.' });
+  }
+});
+
+app.post('/api/chat/groups', requireAuth, async (req, res) => {
+  try {
+    const { name, icon, memberUserIds } = req.body || {};
+    const cleanName = String(name || '').trim();
+    if (!cleanName) return res.status(400).json({ success: false, reason: 'Grup adı belirtilmelidir.' });
+
+    const myId = String(req.authUser.id);
+    const membersSet = new Set((Array.isArray(memberUserIds) ? memberUserIds : []).map(String));
+    membersSet.add(myId);
+
+    if (membersSet.size < 2) {
+      return res.status(400).json({ success: false, reason: 'Grup oluşturmak için en az bir kişi daha seçmelisiniz.' });
+    }
+
+    const groups = getChatGroups();
+    const newGroup = {
+      id: 'group_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      name: cleanName,
+      icon: String(icon || '👥').trim() || '👥',
+      memberUserIds: Array.from(membersSet),
+      createdBy: myId,
+      createdByName: req.authUser.full_name || req.authUser.username,
+      createdAt: new Date().toISOString()
+    };
+
+    groups.unshift(newGroup);
+    saveChatGroups();
+    res.json({ success: true, group: newGroup });
+  } catch {
+    res.status(500).json({ success: false, reason: 'Grup oluşturulamadı.' });
+  }
+});
+
+// MSN Nudge (Titreşim / Dürtme)
+const nudgeCooldowns = new Map();
+
+app.post('/api/chat/nudge', requireAuth, async (req, res) => {
+  try {
+    const { receiverId, groupId } = req.body || {};
+    const myId = String(req.authUser.id);
+    const targetKey = receiverId ? `${myId}_${receiverId}` : `${myId}_${groupId}`;
+
+    const lastNudge = nudgeCooldowns.get(targetKey) || 0;
+    if (Date.now() - lastNudge < 15 * 1000) {
+      const waitSec = Math.ceil((15 * 1000 - (Date.now() - lastNudge)) / 1000);
+      return res.status(429).json({ success: false, reason: `Lütfen tekrar titreşim göndermeden önce ${waitSec} saniye bekleyin.` });
+    }
+
+    nudgeCooldowns.set(targetKey, Date.now());
+
+    const messages = getChatMessages();
+    const senderName = req.authUser.full_name || req.authUser.username;
+    const nudgeMsg = {
+      id: 'nudge_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      senderId: myId,
+      senderName,
+      senderUsername: req.authUser.username,
+      senderAvatar: req.authUser.avatar || (req.authUser.username ? req.authUser.username[0].toUpperCase() : 'U'),
+      receiverId: receiverId ? String(receiverId) : null,
+      groupId: groupId ? String(groupId) : null,
+      roomId: null,
+      text: `📳 ${senderName} bir titreşim gönderdi!`,
+      attachment: null,
+      voice: null,
+      isNudge: true,
+      reactions: {},
+      isRead: false,
+      readAt: null,
+      createdAt: new Date().toISOString()
+    };
+
+    messages.push(nudgeMsg);
+    saveChatMessages();
+
+    res.json({ success: true, message: nudgeMsg });
+  } catch {
+    res.status(500).json({ success: false, reason: 'Titreşim gönderilemedi.' });
+  }
+});
+
 // Chat: Mesaj Gönderme
 app.post('/api/chat/send', requireAuth, async (req, res) => {
   try {
-    const { receiverId, roomId, text, attachment, voice } = req.body || {};
-    if (!text && !attachment && !voice) {
+    const { receiverId, roomId, groupId, text, attachment, voice, isNudge } = req.body || {};
+    if (!text && !attachment && !voice && !isNudge) {
       return res.status(400).json({ success: false, reason: 'Mesaj içeriği boş olamaz.' });
     }
-    if (!receiverId && !roomId) {
-      return res.status(400).json({ success: false, reason: 'Alıcı veya oda belirtilmelidir.' });
+    if (!receiverId && !roomId && !groupId) {
+      return res.status(400).json({ success: false, reason: 'Alıcı, oda veya grup belirtilmelidir.' });
+    }
+
+    // Odalardan / Kanallardan yalnızca yönetici (Admin) paylaşım yapabilir kuralı
+    if (roomId && req.authUser.role !== 'admin') {
+      return res.status(403).json({ success: false, reason: 'Bu kurumsal kanala yalnızca sistem yöneticileri (Admin) duyuru ve mesaj gönderebilir.' });
     }
 
     const messages = getChatMessages();
@@ -2068,9 +2362,11 @@ app.post('/api/chat/send', requireAuth, async (req, res) => {
       senderAvatar: req.authUser.avatar || (req.authUser.username ? req.authUser.username[0].toUpperCase() : 'U'),
       receiverId: receiverId ? String(receiverId) : null,
       roomId: roomId ? String(roomId) : null,
+      groupId: groupId ? String(groupId) : null,
       text: String(text || '').trim(),
       attachment: attachment || null,
       voice: voice || null,
+      isNudge: Boolean(isNudge),
       reactions: {},
       isRead: false,
       readAt: null,
@@ -2081,7 +2377,7 @@ app.post('/api/chat/send', requireAuth, async (req, res) => {
     saveChatMessages();
 
     // 1-e-1 sohbette okunmayan mesajlar için gecikmeli e-posta bildirimini planla
-    if (receiverId && !roomId) {
+    if (receiverId && !roomId && !groupId) {
       scheduleChatEmailDigest(req.authUser, receiverId, newMsg.text).catch(() => {});
     }
 
@@ -2109,6 +2405,7 @@ app.get('/api/chat/messages', requireAuth, async (req, res) => {
   try {
     const peerId = req.query.peerId ? String(req.query.peerId) : null;
     const roomId = req.query.roomId ? String(req.query.roomId) : null;
+    const groupId = req.query.groupId ? String(req.query.groupId) : null;
     const since = req.query.since ? new Date(req.query.since).getTime() : 0;
     const myId = String(req.authUser.id);
 
@@ -2118,6 +2415,9 @@ app.get('/api/chat/messages', requireAuth, async (req, res) => {
     let matched = all.filter(m => {
       if (roomId) {
         return m.roomId === roomId;
+      }
+      if (groupId) {
+        return m.groupId === groupId;
       }
       if (peerId) {
         const isMeToPeer = (String(m.senderId) === myId && String(m.receiverId) === peerId);
