@@ -3,8 +3,8 @@
 
 create table if not exists public.chat_messages (
   id uuid primary key default gen_random_uuid(),
-  sender_id uuid references public.app_users(id) on delete cascade,
-  receiver_id uuid references public.app_users(id) on delete cascade,
+  sender_id text references public.app_users(id) on delete cascade,
+  receiver_id text references public.app_users(id) on delete cascade,
   room_id text,
   text text not null default '',
   attachment jsonb default null,

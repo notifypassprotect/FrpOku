@@ -8,8 +8,8 @@ const root = path.join(__dirname, '..');
 test('006_chat_messages.sql doğru şema ve indeksleri tanımlar', () => {
   const sql = fs.readFileSync(path.join(root, 'supabase', 'migrations', '006_chat_messages.sql'), 'utf8');
   assert.match(sql, /create table if not exists public\.chat_messages/i);
-  assert.match(sql, /sender_id uuid/i);
-  assert.match(sql, /receiver_id uuid/i);
+  assert.match(sql, /sender_id text/i);
+  assert.match(sql, /receiver_id text/i);
   assert.match(sql, /reactions jsonb/i);
   assert.match(sql, /idx_chat_messages_unread/i);
 });
