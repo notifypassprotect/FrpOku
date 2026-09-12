@@ -163,7 +163,7 @@ function showPromptModal({
   cancelText = 'İptal',
   inputType = 'text',
   isTextarea = false,
-  badge = '✏️',
+  badge = '',
   maxWidth = '460px'
 }) {
   return new Promise(resolve => {

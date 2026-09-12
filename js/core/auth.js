@@ -139,24 +139,32 @@
  return null;
  }
 
- function logout() {
- currentUser = null;
- localStorage.removeItem(AUTH_STORAGE_KEY);
- localStorage.removeItem(REMEMBER_KEY);
- localStorage.removeItem('frpoku_auth_token');
- sessionStorage.removeItem(AUTH_STORAGE_KEY);
- try { sessionStorage.removeItem('frp_session_column_order'); } catch {}
- if (window.FrpStore && typeof window.FrpStore.clearSessionCache === 'function') {
-  window.FrpStore.clearSessionCache();
- }
- updateNavbarUserBadge();
- document.getElementById('btnAdminPendingRegistrations')?.remove();
- if (typeof window.showAuthFullScreenPortal === 'function') {
- window.showAuthFullScreenPortal('login');
- } else {
- window.location.reload();
- }
- }
+  function logout() {
+    const doClear = () => {
+      currentUser = null;
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+      localStorage.removeItem(REMEMBER_KEY);
+      localStorage.removeItem('frpoku_auth_token');
+      sessionStorage.removeItem(AUTH_STORAGE_KEY);
+      try { sessionStorage.removeItem('frp_session_column_order'); } catch {}
+      if (window.FrpStore && typeof window.FrpStore.clearSessionCache === 'function') {
+        window.FrpStore.clearSessionCache();
+      }
+      updateNavbarUserBadge();
+      document.getElementById('btnAdminPendingRegistrations')?.remove();
+      if (typeof window.showAuthFullScreenPortal === 'function') {
+        window.showAuthFullScreenPortal('login');
+      } else {
+        window.location.reload();
+      }
+    };
+
+    if (window.FrpCircuit && typeof window.FrpCircuit.showLogoutSplash === 'function') {
+      window.FrpCircuit.showLogoutSplash(doClear);
+    } else {
+      doClear();
+    }
+  }
 
  function isLoggedIn() { return!!getSession(); }
  function getUser() { return getSession(); }

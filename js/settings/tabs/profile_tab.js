@@ -169,14 +169,14 @@ window.FrpSettingsTabs.profile = {
 
             <div style="display:flex; justify-content:flex-end; margin-top:.2rem;">
               <button type="button" id="btnRequestEmailCode" class="btn btn-primary" style="padding:.55rem 1.35rem; font-weight:800; font-size:.84rem; border-radius:10px;">
-                📨 Doğrulama Kodu Gönder
+                Doğrulama Kodu Gönder
               </button>
             </div>
 
             <!-- 6 Haneli Kod Onay Alanı -->
             <div id="emailVerificationSection" style="display:none; margin-top:.35rem; padding:.85rem 1rem; background:rgba(37,99,235,0.05); border:1.5px dashed var(--accent); border-radius:10px;">
               <div style="font-size:.82rem; font-weight:800; color:var(--text-primary); margin-bottom:.2rem;">
-                ✉️ Doğrulama Kodu Yeni Adresinize Gönderildi
+                Doğrulama Kodu Yeni Adresinize Gönderildi
               </div>
               <div style="font-size:.74rem; color:var(--text-muted); margin-bottom:.6rem;">
                 Yeni e-posta gelen kutunuzu (ve spam klasörünü) kontrol edip 6 haneli kodu giriniz.
@@ -184,7 +184,7 @@ window.FrpSettingsTabs.profile = {
               <div style="display:flex; gap:.65rem; align-items:center; flex-wrap:wrap;">
                 <input type="text" id="profEmailVerificationCode" maxlength="6" class="master-search-input" style="width:140px; text-align:center; font-weight:800; font-size:1.15rem; letter-spacing:4px;" placeholder="123456" />
                 <button type="button" id="btnConfirmEmailCode" class="btn btn-primary" style="padding:.55rem 1.25rem; font-weight:800; font-size:.82rem; border-radius:8px;">
-                  ✅ Kodu Onayla & Güncelle
+                  Kodu Onayla ve Güncelle
                 </button>
               </div>
             </div>
@@ -289,7 +289,7 @@ window.FrpSettingsTabs.profile = {
       try {
         if (window.FrpAuth?.requestEmailChange) {
           const res = await window.FrpAuth.requestEmailChange(newEmail, currentPass);
-          if (btnReq) { btnReq.disabled = false; btnReq.textContent = '📨 Doğrulama Kodu Gönder'; }
+          if (btnReq) { btnReq.disabled = false; btnReq.textContent = 'Doğrulama Kodu Gönder'; }
 
           if (res.success) {
             if (verifySection) verifySection.style.display = 'block';
@@ -300,11 +300,11 @@ window.FrpSettingsTabs.profile = {
             showEmailAlert(res.reason || 'Doğrulama kodu gönderilemedi.', 'error');
           }
         } else {
-          if (btnReq) { btnReq.disabled = false; btnReq.textContent = '📨 Doğrulama Kodu Gönder'; }
+          if (btnReq) { btnReq.disabled = false; btnReq.textContent = 'Doğrulama Kodu Gönder'; }
           showEmailAlert('E-posta doğrulama servisi henüz hazır değil.', 'error');
         }
       } catch (err) {
-        if (btnReq) { btnReq.disabled = false; btnReq.textContent = '📨 Doğrulama Kodu Gönder'; }
+        if (btnReq) { btnReq.disabled = false; btnReq.textContent = 'Doğrulama Kodu Gönder'; }
         showEmailAlert('Hata: ' + err.message, 'error');
       }
     });
@@ -322,7 +322,7 @@ window.FrpSettingsTabs.profile = {
       try {
         if (window.FrpAuth?.confirmEmailChange) {
           const res = await window.FrpAuth.confirmEmailChange(code);
-          if (btnConf) { btnConf.disabled = false; btnConf.textContent = '✅ Kodu Onayla & Güncelle'; }
+          if (btnConf) { btnConf.disabled = false; btnConf.textContent = 'Kodu Onayla ve Güncelle'; }
 
           if (res.success) {
             const updatedEmail = res.email || (emailInput?.value || '').trim();
@@ -339,11 +339,11 @@ window.FrpSettingsTabs.profile = {
             showEmailAlert(res.reason || 'Geçersiz veya süresi dolmuş kod.', 'error');
           }
         } else {
-          if (btnConf) { btnConf.disabled = false; btnConf.textContent = '✅ Kodu Onayla & Güncelle'; }
+          if (btnConf) { btnConf.disabled = false; btnConf.textContent = 'Kodu Onayla ve Güncelle'; }
           showEmailAlert('E-posta onay servisi hazır değil.', 'error');
         }
       } catch (err) {
-        if (btnConf) { btnConf.disabled = false; btnConf.textContent = '✅ Kodu Onayla & Güncelle'; }
+        if (btnConf) { btnConf.disabled = false; btnConf.textContent = 'Kodu Onayla ve Güncelle'; }
         showEmailAlert('Hata: ' + err.message, 'error');
       }
     });

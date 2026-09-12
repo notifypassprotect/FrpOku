@@ -19,15 +19,19 @@
     <div class="circuit-progress-glow"></div>
   </div>
 
-  <!-- Futuristic Cyber Boot Loader Screen -->
+  <!-- Kurumsal Açılış Ekranı (Splash Loader) -->
   <div id="circuitAppBoot" class="circuit-boot-screen">
     <div class="circuit-boot-core">
-      <div class="circuit-ring"></div>
-      <div class="circuit-ring-inner"></div>
-      <div class="circuit-logo">⚡</div>
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <line x1="16" y1="13" x2="8" y2="13"></line>
+        <line x1="16" y1="17" x2="8" y2="17"></line>
+        <polyline points="10 9 9 9 8 9"></polyline>
+      </svg>
     </div>
-    <div class="circuit-boot-title">FRPOKU ENTERPRISE</div>
-    <div class="circuit-boot-status">SİSTEM BAĞLANTILARI KURULUYOR...</div>
+    <div class="circuit-boot-title">FrpOku Enterprise</div>
+    <div class="circuit-boot-status">Sistem bileşenleri hazırlanıyor...</div>
     <div class="circuit-boot-track">
       <div class="circuit-boot-fill"></div>
     </div>
@@ -140,48 +144,50 @@
           <div style="font-size:.72rem;color:var(--text-muted);">Hızlı Gezinme & İşlemler</div>
         </div>
       </div>
-      <button class="mobile-drawer-close" id="btnMobileDrawerClose" aria-label="Kapat">✕</button>
+      <button class="mobile-drawer-close" id="btnMobileDrawerClose" aria-label="Kapat">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
     </div>
     
     <div class="mobile-drawer-section">
       <div class="mobile-drawer-section-title">Hızlı Rapor Ekleme</div>
       <button class="mobile-drawer-item" id="btnMobAddSingle">
-        <span>📄</span> <span>Tek Dosya Ekle</span>
+        <span>Tek Dosya Ekle</span>
       </button>
       <button class="mobile-drawer-item" id="btnMobAddMulti">
-        <span>📑</span> <span>Çoklu Dosya Ekle</span>
+        <span>Çoklu Dosya Ekle</span>
       </button>
       <button class="mobile-drawer-item" id="btnMobAddFolder">
-        <span>📁</span> <span>Klasör Yükle</span>
+        <span>Klasör Yükle</span>
       </button>
     </div>
 
     <div class="mobile-drawer-section">
       <div class="mobile-drawer-section-title">Analiz & Rapor Araçları</div>
       <button class="mobile-drawer-item" id="btnMobDependencies">
-        <span>🗺️</span> <span>Tablo Bağımlılık Haritası</span>
+        <span>Tablo Bağımlılık Haritası</span>
       </button>
       <button class="mobile-drawer-item" id="btnMobParams">
-        <span>⚙️</span> <span>Tüm Parametreler</span>
+        <span>Tüm Parametreler</span>
       </button>
       <button class="mobile-drawer-item" id="btnMobSnippets">
-        <span>💾</span> <span>Kayıtlı SQL Kütüphanesi</span>
+        <span>Kayıtlı SQL Kütüphanesi</span>
       </button>
       <button class="mobile-drawer-item" id="btnMobTableAnalysis">
-        <span>📊</span> <span>Tablo Kullanım Analizi</span>
+        <span>Tablo Kullanım Analizi</span>
       </button>
     </div>
 
     <div class="mobile-drawer-section">
       <div class="mobile-drawer-section-title">Sistem, Profil & Ayarlar</div>
       <button class="mobile-drawer-item" id="btnMobRecent">
-        <span>🕒</span> <span>Son Açılan Raporlar</span>
+        <span>Son Açılan Raporlar</span>
       </button>
       <button class="mobile-drawer-item" id="btnMobDashboard" style="display:none;">
-        <span>📊</span> <span>Yönetim Paneli (Dashboard)</span>
+        <span>Yönetim Paneli (Dashboard)</span>
       </button>
       <button class="mobile-drawer-item" id="btnMobSettings">
-        <span>🎨</span> <span>Sistem & Görünüm Ayarları</span>
+        <span>Sistem & Görünüm Ayarları</span>
       </button>
     </div>
   </div>
@@ -332,6 +338,9 @@
     <div id="tableContextMenu" class="table-context-menu" style="display:none;">
       <div class="ctx-header" id="ctxMenuReportTitle">Rapor</div>
       <button class="ctx-item" data-action="view"><span>Görüntüle</span></button>
+      <button class="ctx-item" data-action="note" id="ctxBtnNote">
+        <span id="ctxTextNote">Not Ekle / Görüntüle</span>
+      </button>
       <button class="ctx-item" data-action="toggle-pool" id="ctxBtnTogglePool"><span id="ctxTextTogglePool">Ortak Havuzda Paylaş</span></button>
       <button class="ctx-item" data-action="clone-to-personal" id="ctxBtnClonePersonal" style="display:none;"><span>Kişisel Alanıma Kopyala</span></button>
       <button class="ctx-item" data-action="rename"><span>Adını Düzenle</span></button>
@@ -351,8 +360,11 @@
 <!-- YÜKLEME VE İLERLEME PENCERESİ (PROGRESS MODAL) -->
 <div class="modal-overlay" id="progressModal" style="display:none;z-index:99999;backdrop-filter:blur(12px);background:rgba(0,0,0,.6);">
   <div class="modal" style="max-width:440px;width:90vw;text-align:center;padding:1.8rem;border-radius:20px;box-shadow:0 24px 60px rgba(0,0,0,.45);border:1.5px solid var(--border);background:var(--bg-surface);">
-    <div style="position:relative;display:inline-flex;align-items:center;justify-content:center;width:64px;height:64px;border-radius:20px;background:var(--bg-raised);border:1.5px solid var(--border);margin-bottom:.8rem;box-shadow:var(--shadow-sm);">
-      <span style="font-size:2rem;animation:pulse 1.8s infinite;" id="progressIcon">⚡</span>
+    <div style="position:relative;display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:16px;background:rgba(37,99,235,0.1);border:1px solid rgba(37,99,235,0.25);margin-bottom:.8rem;color:var(--accent);">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="progressIcon" style="animation:spin 1.8s linear infinite;">
+        <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
+        <path d="M12 2a10 10 0 0 1 10 10"></path>
+      </svg>
     </div>
     <div class="modal-title" id="progressTitle" style="font-size:1.15rem;font-weight:800;margin-bottom:.35rem;color:var(--text-primary);">İşlem Yapılıyor...</div>
     <div style="font-size:.82rem;color:var(--text-muted);margin-bottom:1.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;padding:0 .5rem;" id="progressSub">Lütfen bekleyin</div>

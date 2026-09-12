@@ -276,7 +276,7 @@ function highlightSQL(raw) {
       let j = i + 1;
       while (j < len && /\d/.test(raw[j])) j++;
       const numPart = raw.slice(i+1, j);
-      out += `.<span class="syntax-error" title="⚠️ Hatalı Kolon / Alias İfadesi: '.${numPart}' (Sayısal kolon alias'ı olmaz)">${esc(numPart)}</span>`;
+      out += `.<span class="syntax-error" title="Hatalı Kolon / Alias İfadesi: '.${numPart}' (Sayısal kolon alias'ı olmaz)">${esc(numPart)}</span>`;
       i = j; continue;
     }
 
@@ -299,7 +299,7 @@ function highlightSQL(raw) {
         const afterDot = raw.slice(j + 1);
         const isHanging = /^(?:\s*[\r\n,);]|\s+(?:FROM|WHERE|JOIN|LEFT|RIGHT|INNER|OUTER|FULL|CROSS|SELECT|GROUP|ORDER|HAVING|UNION|AND|OR|ON)\b|$)/i.test(afterDot);
         if (isHanging) {
-          out += `<span class="syntax-error" title="⚠️ Eksik Kolon Adı: '${esc(word)}.' sonrasında alan adı veya '*' belirtilmemiş">${esc(word)}.</span>`;
+          out += `<span class="syntax-error" title="Eksik Kolon Adı: '${esc(word)}.' sonrasında alan adı veya '*' belirtilmemiş">${esc(word)}.</span>`;
           i = j + 1;
           continue;
         }
@@ -307,7 +307,7 @@ function highlightSQL(raw) {
 
       if (SQL_TYPO_MAP.has(up)) {
         const fix = SQL_TYPO_MAP.get(up);
-        out += `<span class="syntax-error" title="⚠️ Yazım Hatası (Typo): '${esc(word)}' -> Doğrusu: '${fix}'">${esc(word)}</span>`;
+        out += `<span class="syntax-error" title="Yazım Hatası (Typo): '${esc(word)}' -> Doğrusu: '${fix}'">${esc(word)}</span>`;
       } else if (SQL_KW.has(up)) {
         out += `<span class="sql-keyword">${esc(word)}</span>`;
       } else if (SQL_FN.has(up)) {
@@ -406,7 +406,7 @@ function highlightPascal(raw) {
       const up = word.toUpperCase();
       if (PAS_TYPO_MAP.has(up)) {
         const fix = PAS_TYPO_MAP.get(up);
-        out += `<span class="syntax-error" title="⚠️ Yazım Hatası: '${esc(word)}' -> Doğrusu: '${fix}'">${esc(word)}</span>`;
+        out += `<span class="syntax-error" title="Yazım Hatası: '${esc(word)}' -> Doğrusu: '${fix}'">${esc(word)}</span>`;
       } else if (PAS_KW.has(up)) {
         out += `<span class="pas-keyword">${esc(word)}</span>`;
       } else if (PAS_TYPE.has(up)) {

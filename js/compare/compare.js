@@ -559,7 +559,7 @@ async function initSelectors() {
   if (files.length < 2) {
     document.body.innerHTML = `
       <div style="display:flex;height:100vh;align-items:center;justify-content:center;flex-direction:column;gap:1.25rem;background:var(--bg-body);color:var(--text-primary);font-family:var(--font);">
-        <div style="font-size:3.5rem;">⚠️</div>
+        <div style="width:48px;height:48px;margin:0 auto;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(239,68,68,0.1);color:#ef4444;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></div>
         <div style="font-size:1.1rem;font-weight:800;">Karşılaştırma için en az 2 rapor gerekli.</div>
         <div style="font-size:.88rem;color:var(--text-muted);">Sistemde <strong>${files.length}</strong> rapor yüklü. En az 2 rapor yükleyin.</div>
         <button class="btn btn-primary" data-compare-action="open-index">← Ana Sayfaya Dön</button>

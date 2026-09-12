@@ -1716,7 +1716,7 @@ function esc(str) {
  selectedItem = newBand;
  render();
  pushUndoState();
- if (window.FrpNotify) window.FrpNotify.success(`Yeni Bant eklendi: '${newBand.name}' ➕`);
+ if (window.FrpNotify) window.FrpNotify.success(`Yeni Bant eklendi: '${newBand.name}'`);
  return;
  }
  } else if (type === 'checkbox') {
@@ -1809,8 +1809,8 @@ function esc(str) {
  selectedItem = newComp;
  render();
  pushUndoState();
- if (window.FrpNotify) window.FrpNotify.success(`'${newComp.name}' eklendi ➕`);
- else if (typeof toast === 'function') toast(`'${newComp.name}' eklendi ➕`, 'success');
+ if (window.FrpNotify) window.FrpNotify.success(`'${newComp.name}' eklendi`);
+ else if (typeof toast === 'function') toast(`'${newComp.name}' eklendi`, 'success');
  }
 
  // ── BİLEŞEN SİLME METODU ──────────────────────────────────

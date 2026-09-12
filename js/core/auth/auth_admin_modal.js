@@ -85,8 +85,8 @@
  <!-- Başlık Barı -->
  <div class="admin-modal-header">
  <div style="display:flex;align-items:center;gap:.75rem;">
- <div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg, #f59e0b, #ef4444);display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:#fff;box-shadow:0 4px 12px rgba(245,158,11,0.35);">
- 
+ <div style="width:42px;height:42px;border-radius:12px;background:var(--accent,#2563eb);display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 4px 12px rgba(37,99,235,0.25);">
+ <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
  </div>
  <div>
  <div style="font-size:1.15rem;font-weight:900;letter-spacing:-.01em;">Kullanıcı & Kayıt Onay Yönetimi</div>
@@ -187,8 +187,8 @@
  <div style="padding:1.1rem;border:1px solid var(--border,#cbd5e1);border-radius:14px;background:var(--bg-surface,#fff);">
  <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:.85rem;">
  <div>
- <div style="font-size:1rem;font-weight:900;display:flex;align-items:center;gap:.45rem;">
- <span>⚡ Sistem & Supabase Sağlığı</span>
+ <div style="font-size:1rem;font-weight:800;display:flex;align-items:center;gap:.45rem;">
+ <span>Sistem & Supabase Sağlığı</span>
  <span class="badge ${supa.connected ? 'badge-green' : 'badge-amber'}" style="font-size:.7rem;">
  ${supa.connected ? 'Bulut Bağlantısı Aktif' : (supa.mode === 'cloud' ? 'Bulut Gecikme Hatası' : 'Yerel Mod / Çevrimdışı')}
  </span>
@@ -197,7 +197,7 @@
  Gerçek zamanlı sunucu performansı, bellek ve veritabanı yanıt süresi
  </div>
  </div>
- <button type="button" id="btnRefreshHealth" class="btn btn-sm btn-ghost" style="font-size:.76rem;">🔄 Yenile</button>
+ <button type="button" id="btnRefreshHealth" class="btn btn-sm btn-ghost" style="font-size:.76rem;">Yenile</button>
  </div>
  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.65rem;font-size:.8rem;">
  <div style="background:var(--bg-card,#f8fafc);padding:.6rem .8rem;border-radius:10px;border:1px solid var(--border-light,#e2e8f0);">
@@ -231,7 +231,7 @@
  <div style="padding:1.1rem;border:1px solid var(--border,#cbd5e1);border-radius:14px;background:var(--bg-surface,#fff);">
  <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
  <div>
- <div style="font-size:1rem;font-weight:900;">SMTP Gönderim Durumu</div>
+ <div style="font-size:1rem;font-weight:800;">SMTP Gönderim Durumu</div>
  <div style="font-size:.78rem;color:var(--text-muted,#64748b);margin-top:.25rem;">E-posta bildirimleri (kayıt onayı, güvenlik uyarıları, doğrulama kodları)</div>
  </div>
  <span class="badge ${ready ? 'badge-green' : 'badge-amber'}">${ready ? 'Hazır' : mail.enabled ? 'Eksik Yapılandırma' : 'Kapalı'}</span>
@@ -241,21 +241,30 @@
  <div><strong>Gönderen:</strong> ${escHtml(mail.from || 'Tanımlanmadı')}</div>
  <div><strong>Mail Durumu:</strong> ${mail.enabled ? 'Aktif' : 'Pasif'}</div>
  </div>
+ ${!ready ? `
+ <div style="background:rgba(37,99,235,0.06);border:1px solid rgba(37,99,235,0.25);border-radius:10px;padding:12px 16px;margin-top:1rem;font-size:.78rem;line-height:1.6;color:var(--text-secondary,#334155);">
+ <strong style="color:var(--accent,#2563eb);">Render.com Ortam Değişkeni (Environment) Rehberi:</strong>
+ <div>Render Dashboard -> Web Service -> <strong>Environment</strong> sekmesine şu değişkenleri tanımlayınız:</div>
+ <div style="margin-top:6px;font-family:monospace;font-size:.74rem;background:var(--bg-raised,#f1f5f9);padding:6px 10px;border-radius:6px;word-break:break-all;">
+ MAIL_ENABLED=true | SMTP_HOST=smtp.gmail.com | SMTP_PORT=465 | SMTP_SECURE=true | SMTP_USER=... | SMTP_PASS=... | SMTP_FROM=...
+ </div>
+ ${mail.missing && mail.missing.length ? `<div style="color:#ef4444;margin-top:6px;font-weight:700;">Eksik veya Kapalı Değişkenler: ${escHtml(mail.missing.join(', '))}</div>` : ''}
+ </div>` : ''}
  </div>
 
  <!-- 3. Test E-postası ve Sistem Özeti Gönderimi -->
  <div style="padding:1.1rem;border:1px solid var(--border,#cbd5e1);border-radius:14px;background:var(--bg-surface,#fff);">
- <div style="font-size:.95rem;font-weight:900;margin-bottom:.3rem;">Manuel Test & Sistem Özeti E-postası</div>
+ <div style="font-size:.95rem;font-weight:800;margin-bottom:.3rem;">Manuel Test & Sistem Özeti E-postası</div>
  <div style="font-size:.78rem;color:var(--text-muted,#64748b);margin-bottom:.9rem;">
  SMTP altyapısını test edebilir veya tüm sistem metriklerini içeren özet raporu admin adresinize tetikleyebilirsiniz.
  </div>
  <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:.65rem;">
  <input type="email" id="adminMailTestAddress" class="master-search-input" placeholder="ornek@gmail.com" style="flex:1;min-width:220px;" />
  <button type="button" id="btnAdminMailTest" class="btn btn-primary" ${ready ? '' : 'disabled'}>
- ✉️ Test Maili Gönder
+ Test Maili Gönder
  </button>
- <button type="button" id="btnAdminSendDigest" class="btn btn-secondary" ${ready ? '' : 'disabled'} style="font-weight:800;">
- 📊 Sistem Özetini Gönder
+ <button type="button" id="btnAdminSendDigest" class="btn btn-secondary" ${ready ? '' : 'disabled'} style="font-weight:700;">
+ Sistem Özetini Gönder
  </button>
  </div>
  <div id="adminMailTestResult" style="font-size:.8rem;margin-top:.5rem;font-weight:600;color:var(--text-muted,#64748b);"></div>
@@ -284,7 +293,7 @@
  });
  const testData = await testResponse.json();
  resultEl.style.color = testData.success ? '#10b981' : '#ef4444';
- resultEl.textContent = testData.success ? '✅ Test e-postası başarıyla gönderildi.' : (testData.reason || 'E-posta gönderilemedi.');
+ resultEl.textContent = testData.success ? 'Test e-postası başarıyla gönderildi.' : (testData.reason || 'E-posta gönderilemedi.');
  } catch (error) {
  resultEl.style.color = '#ef4444';
  resultEl.textContent = 'Mail servisine ulaşılamadı.';
@@ -305,9 +314,9 @@
  });
  const data = await res.json();
  resultEl.style.color = data.success ? '#10b981' : '#ef4444';
- resultEl.textContent = data.success ? '✅ Sistem özeti başarıyla admin e-postasına gönderildi.' : (data.reason || 'Özet e-posta gönderilemedi.');
+ resultEl.textContent = data.success ? 'Sistem özeti başarıyla admin e-postasına gönderildi.' : (data.reason || 'Özet e-posta gönderilemedi.');
  if (data.success && typeof window.toast === 'function') {
- window.toast('Sistem özeti e-postası gönderildi!', 'success');
+ window.toast('Sistem özeti e-postası gönderildi.', 'success');
  }
  } catch (e) {
  resultEl.style.color = '#ef4444';
@@ -339,7 +348,7 @@
  const res = await fetch('/api/admin/pending-users', { headers });
  const data = await res.json();
  if (res.status === 401 || res.status === 403) {
- pendingFetchError = '🔐 Yetki hatası — Admin oturumunuz süresi dolmuş veya geçersiz. Lütfen çıkış yapıp tekrar giriş yapın.';
+ pendingFetchError = 'Yetki hatası — Admin oturumunuz süresi dolmuş veya geçersiz. Lütfen çıkış yapıp tekrar giriş yapın.';
  } else if (!res.ok) {
  pendingFetchError = `Sunucu hatası (${res.status}): ${data?.reason || 'Onay bekleyenler yüklenemedi.'}`;
  } else if (data && data.success && Array.isArray(data.users)) {
@@ -355,7 +364,9 @@
  if (pendingFetchError) {
  body.innerHTML = `
  <div style="text-align:center;padding:2.5rem;">
- <div style="font-size:2.5rem;margin-bottom:.75rem;">🔐</div>
+ <div style="width:48px;height:48px;margin:0 auto 1rem;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(239,68,68,0.1);color:#ef4444;">
+ <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+ </div>
  <div style="font-size:.95rem;font-weight:800;color:#ef4444;margin-bottom:.5rem;">Kayıtlar Yüklenemedi</div>
  <div style="font-size:.82rem;color:var(--text-muted,#64748b);max-width:360px;margin:0 auto 1.25rem;">${escHtml(pendingFetchError)}</div>
  <button type="button" class="btn btn-sm btn-primary" onclick="this.closest('.admin-modal-wrap').querySelector('#tabAdminPending').click()">Tekrar Dene</button>
@@ -366,7 +377,9 @@
  if (pendingUsers.length === 0) {
  body.innerHTML = `
  <div style="text-align:center;padding:3.5rem 1rem;">
- <div style="font-size:3.5rem;margin-bottom:1rem;animation:pulse 2s infinite;">✨</div>
+ <div style="width:52px;height:52px;margin:0 auto 1rem;display:flex;align-items:center;justify-content:center;border-radius:14px;background:rgba(37,99,235,0.08);color:var(--accent,#2563eb);">
+ <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+ </div>
  <div style="font-size:1.2rem;font-weight:800;margin-bottom:.4rem;color:var(--text-primary,#0f172a);">Onay Bekleyen Kayıt Yok</div>
  <div style="font-size:.85rem;color:var(--text-muted,#64748b);max-width:380px;margin:0 auto;">
  Şu anda sisteme katılmak için onay bekleyen yeni bir kullanıcı başvurusu bulunmuyor.
@@ -381,37 +394,38 @@
  <div style="font-size:.85rem;font-weight:700;color:var(--text-muted,#64748b);">
  Toplam <strong>${pendingUsers.length}</strong> kullanıcı onayı bekliyor:
  </div>
- <button type="button" id="btnRefreshPendingList" class="btn btn-sm btn-ghost" style="font-size:.78rem;"> Listeyi Yenile</button>
+ <button type="button" id="btnRefreshPendingList" class="btn btn-sm btn-ghost" style="font-size:.78rem;">Listeyi Yenile</button>
  </div>
  <div class="admin-card-grid" id="pendingGridList">
  `;
 
  pendingUsers.forEach(u => {
  const timeAgo = formatRelativeTime(u.created_at);
+ const initials = escHtml((u.full_name || u.username || 'U').slice(0, 2).toUpperCase());
  html += `
  <div class="admin-user-card" id="pendingCard_${u.id}">
  <div class="admin-user-info">
- <div class="admin-user-avatar">${u.avatar || ''}</div>
+ <div class="admin-user-avatar" style="font-weight:800;font-size:.88rem;background:var(--bg-raised,#e2e8f0);color:var(--text-primary,#1e293b);">${initials}</div>
  <div style="min-width:0;flex:1;">
  <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.2rem;">
  <span style="font-weight:900;font-size:1rem;color:var(--text-primary,#0f172a);">${escHtml(u.full_name || u.username)}</span>
  <span style="font-size:.78rem;font-weight:700;font-family:monospace;color:#2563eb;background:rgba(37,99,235,0.08);padding:.15rem.45rem;border-radius:6px;">@${escHtml(u.username)}</span>
- <span class="badge badge-amber" style="font-size:.7rem;">⏳ Onay Bekliyor</span>
+ <span class="badge badge-amber" style="font-size:.7rem;">Onay Bekliyor</span>
  </div>
  <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;font-size:.78rem;color:var(--text-secondary,#475569);">
- <span> ${escHtml(u.email || '-')}</span>
- ${u.phone? `<span> ${escHtml(u.phone)}</span>`: ''}
- <span> <strong>${escHtml(u.department || 'Bilgi İşlem')}</strong></span>
- <span style="color:var(--text-muted,#94a3b8);"> ${timeAgo}</span>
+ <span>${escHtml(u.email || '-')}</span>
+ ${u.phone? `<span>${escHtml(u.phone)}</span>`: ''}
+ <span><strong>${escHtml(u.department || 'Bilgi İşlem')}</strong></span>
+ <span style="color:var(--text-muted,#94a3b8);">${timeAgo}</span>
  </div>
  </div>
  </div>
   <div class="admin-actions">
   <button type="button" class="btn btn-sm btn-approve-user" data-id="${u.id}" data-name="${escHtml(u.full_name || u.username)}" title="Kullanıcıyı Onayla ve Hesabı Aç">
-  <span>✅</span> <span>Onayla</span>
+  <span>Onayla</span>
   </button>
   <button type="button" class="btn btn-sm btn-reject-user" data-id="${u.id}" data-name="${escHtml(u.full_name || u.username)}" title="Kayıt Başvurusunu Reddet">
-  <span>❌</span> <span>Reddet</span>
+  <span>Reddet</span>
   </button>
   </div>
  </div>
@@ -443,7 +457,7 @@
  if (card) card.remove();
  const emailStatus = data.notification?.email?.status;
  const emailNote = emailStatus === 'sent' ? ' Onay e-postası gönderildi.' : emailStatus === 'disabled' || emailStatus === 'not_configured' ? ' E-posta bildirimi henüz yapılandırılmadı.' : ' E-posta gönderilemedi.';
- if (typeof window.toast === 'function') window.toast(`✅ "${uName}" kullanıcısı başarıyla onaylandı!${emailNote}`, emailStatus === 'failed' ? 'warning' : 'success');
+ if (typeof window.toast === 'function') window.toast(`"${uName}" kullanıcısı başarıyla onaylandı!${emailNote}`, emailStatus === 'failed' ? 'warning' : 'success');
  renderPendingTab();
  } else {
  throw new Error(data.reason || 'Onaylanamadı');
@@ -491,7 +505,7 @@
  });
  const data = await res.json();
  if (res.status === 401 || res.status === 403) {
- fetchError = '🔐 Yetki hatası — Admin oturumunuz geçersiz. Lütfen çıkış yapıp tekrar giriş yapın.';
+ fetchError = 'Yetki hatası — Admin oturumunuz geçersiz. Lütfen çıkış yapıp tekrar giriş yapın.';
  } else if (!res.ok) {
  fetchError = `Sunucu hatası (${res.status}): ${data?.reason || 'Kullanıcılar yüklenemedi.'}`;
  } else if (data && data.success && Array.isArray(data.users)) {
@@ -507,7 +521,9 @@
  if (fetchError) {
  body.innerHTML = `
  <div style="text-align:center;padding:2.5rem;">
- <div style="font-size:2.5rem;margin-bottom:.75rem;">🔐</div>
+ <div style="width:48px;height:48px;margin:0 auto 1rem;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(239,68,68,0.1);color:#ef4444;">
+ <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+ </div>
  <div style="font-size:.95rem;font-weight:800;color:#ef4444;margin-bottom:.5rem;">Kullanıcılar Yüklenemedi</div>
  <div style="font-size:.82rem;color:var(--text-muted,#64748b);max-width:360px;margin:0 auto 1.25rem;">${escHtml(fetchError)}</div>
  <button type="button" class="btn btn-sm btn-primary" onclick="this.closest('.admin-modal-wrap').querySelector('#tabAdminAll').click()">Tekrar Dene</button>
@@ -517,8 +533,8 @@
 
  let html = `
  <div style="margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
- <input type="text" id="adminUserSearchInput" class="master-search-input" placeholder=" Kullanıcı adı, e-posta veya departmanda ara..." style="flex:1;max-width:320px;font-size:.84rem;padding:.45rem.8rem;" />
- <button type="button" id="btnRefreshAllUsers" class="btn btn-sm btn-ghost" style="font-size:.78rem;"> Listeyi Yenile</button>
+ <input type="text" id="adminUserSearchInput" class="master-search-input" placeholder="Kullanıcı adı, e-posta veya departmanda ara..." style="flex:1;max-width:320px;font-size:.84rem;padding:.45rem.8rem;" />
+ <button type="button" id="btnRefreshAllUsers" class="btn btn-sm btn-ghost" style="font-size:.78rem;">Listeyi Yenile</button>
  </div>
  <div class="admin-card-grid" id="allUsersGridList">
  `;
@@ -529,40 +545,41 @@
     const isPending = (u.is_active === false);
     const currentAdminId = window.FrpAuth && typeof window.FrpAuth.getUser === 'function' ? window.FrpAuth.getUser()?.id : null;
     const isSelf = (currentAdminId && String(u.id) === String(currentAdminId));
+    const initials = escHtml((u.full_name || u.username || 'U').slice(0, 2).toUpperCase());
 
     html += `
     <div class="admin-user-card" id="userCard_${u.id}">
       <div class="admin-user-info">
-        <div class="admin-user-avatar">${u.avatar || (isUsrAdmin ? '👑' : '👤')}</div>
+        <div class="admin-user-avatar" style="font-weight:800;font-size:.88rem;background:var(--bg-raised,#e2e8f0);color:var(--text-primary,#1e293b);">${initials}</div>
         <div style="min-width:0;flex:1;">
           <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.2rem;">
             <span style="font-weight:800;font-size:.95rem;color:var(--text-primary,#0f172a);">${escHtml(u.full_name || u.username)}</span>
             <span style="font-size:.78rem;font-weight:700;font-family:monospace;color:#2563eb;background:rgba(37,99,235,0.08);padding:.15rem.45rem;border-radius:6px;display:inline-flex;align-items:center;gap:.35rem;">
               @${escHtml(u.username)}
               <button type="button" class="btn btn-sm btn-edit-username" data-id="${u.id}" data-name="${escHtml(u.username)}" title="Kullanıcı Adını Değiştir" style="padding:2px 8px;font-size:.72rem;">
-                <span>✏️</span><span>Düzenle</span>
+                <span>Düzenle</span>
               </button>
             </span>
-            ${isUsrAdmin ? `<span class="badge badge-purple" style="font-size:.68rem;">👑 Admin</span>` : `<span class="badge badge-blue" style="font-size:.68rem;">Kullanıcı</span>`}
-            ${isFrozen ? `<span class="badge badge-red" style="font-size:.68rem;">❄️ Donduruldu</span>` : (isPending ? `<span class="badge badge-amber" style="font-size:.68rem;">⏳ Onay Bekliyor</span>` : `<span class="badge badge-green" style="font-size:.68rem;">✓ Aktif</span>`)}
+            ${isUsrAdmin ? `<span class="badge badge-purple" style="font-size:.68rem;">Yönetici</span>` : `<span class="badge badge-blue" style="font-size:.68rem;">Kullanıcı</span>`}
+            ${isFrozen ? `<span class="badge badge-red" style="font-size:.68rem;">Donduruldu</span>` : (isPending ? `<span class="badge badge-amber" style="font-size:.68rem;">Onay Bekliyor</span>` : `<span class="badge badge-green" style="font-size:.68rem;">Aktif</span>`)}
           </div>
           <div style="display:flex;align-items:center;gap:.8rem;flex-wrap:wrap;font-size:.75rem;color:var(--text-secondary,#64748b);">
-            <span>✉️ ${escHtml(u.email || '-')}</span>
-            ${u.phone ? `<span>📞 ${escHtml(u.phone)}</span>` : ''}
-            <span>🏢 ${escHtml(u.department || 'Bilgi İşlem')}</span>
+            <span>${escHtml(u.email || '-')}</span>
+            ${u.phone ? `<span>${escHtml(u.phone)}</span>` : ''}
+            <span>${escHtml(u.department || 'Bilgi İşlem')}</span>
           </div>
         </div>
       </div>
       <div class="admin-actions">
         <button type="button" class="btn btn-sm btn-admin-reset-pass" data-id="${u.id}" data-name="${escHtml(u.full_name || u.username)}" title="Şifre Sıfırla" style="font-size:.78rem;padding:.38rem .75rem;">
-          🔑 Şifre Sıfırla
+          Şifre Sıfırla
         </button>
         ${!isSelf ? `
           <button type="button" class="btn btn-sm btn-freeze-user" data-id="${u.id}" data-name="${escHtml(u.full_name || u.username)}" data-frozen="${isFrozen ? '1' : '0'}" title="${isFrozen ? 'Hesabı Aç' : 'Hesabı Dondur'}" style="font-size:.78rem;padding:.38rem .75rem;${isFrozen ? 'background:rgba(16,185,129,0.1);color:#10b981;border:1px solid rgba(16,185,129,0.3);' : 'background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.3);'}">
-            ${isFrozen ? '☀️ Hesabı Aç' : '❄️ Dondur'}
+            ${isFrozen ? 'Hesabı Aç' : 'Hesabı Dondur'}
           </button>
           <button type="button" class="btn btn-sm btn-delete-user" data-id="${u.id}" data-name="${escHtml(u.full_name || u.username)}" title="Kullanıcıyı Sil" style="font-size:.78rem;padding:.38rem .75rem;background:rgba(239,68,68,0.15);color:#dc2626;border:1px solid rgba(239,68,68,0.35);">
-            🗑️ Sil
+            Kullanıcıyı Sil
           </button>
         ` : ''}
       </div>
@@ -634,7 +651,7 @@
         body: JSON.stringify({ userId: uId, newPassword: newPass })
       }).then(r => r.json()).then(data => {
         if (data.success) {
-          if (typeof window.toast === 'function') window.toast(`"${uName}" şifresi başarıyla güncellendi! `, 'success');
+          if (typeof window.toast === 'function') window.toast(`"${uName}" şifresi başarıyla güncellendi!`, 'success');
         } else {
           alert(data.reason || 'Şifre güncellenemedi.');
         }
@@ -680,7 +697,7 @@
     btn.onclick = async () => {
       const uId = btn.getAttribute('data-id');
       const uName = btn.getAttribute('data-name');
-      if (!confirm(`⚠️ DİKKAT: "${uName}" kullanıcısını ve tüm verilerini kalıcı olarak silmek istediğinizden emin misiniz?\n\nBu işlem geri alınamaz!`)) return;
+      if (!confirm(`DİKKAT: "${uName}" kullanıcısını ve tüm verilerini kalıcı olarak silmek istediğinizden emin misiniz?\n\nBu işlem geri alınamaz!`)) return;
 
       btn.disabled = true;
       try {

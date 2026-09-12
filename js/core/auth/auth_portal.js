@@ -22,10 +22,11 @@
  color: #fff; font-family: inherit; text-align: center; animation: fadeIn.25s ease-out;
  `;
 
+ const initials = escHtml((user.full_name || user.username || 'U').slice(0, 2).toUpperCase());
  splash.innerHTML = `
  <div style="display:flex;flex-direction:column;align-items:center;gap:1.2rem;max-width:380px;padding:2rem;">
- <div style="width:76px;height:76px;background:linear-gradient(135deg, #3b82f6, #8b5cf6, #ec4899);border-radius:24px;display:flex;align-items:center;justify-content:center;font-size:2.4rem;box-shadow:0 0 45px rgba(59,130,246,.6);">
- ${user.avatar || (user.role === 'admin'? '': '⚡')}
+ <div style="width:72px;height:72px;background:linear-gradient(135deg, #2563eb, #3b82f6);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;font-weight:900;color:#fff;box-shadow:0 8px 30px rgba(37,99,235,.4);">
+ ${initials}
  </div>
  <div>
  <div style="font-size:1.4rem;font-weight:900;margin-bottom:.3rem;color:#f8fafc;">Hoş Geldiniz, ${escHtml(user.full_name || user.username)}</div>
@@ -142,10 +143,10 @@
  background: #f8fafc; border: 1.5px solid #cbd5e1;
  color: #0f172a; font-size:.88rem; outline: none; transition: all.15s; box-sizing: border-box;
  " />
- <button type="button" id="toggleLoginPass" style="
- position:absolute;right:.65rem;top:50%;transform:translateY(-50%);
- background:none;border:none;color:#64748b;cursor:pointer;font-size:.95rem;
- ">️</button>
+  <button type="button" id="toggleLoginPass" style="
+  position:absolute;right:.65rem;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:#64748b;cursor:pointer;font-size:.74rem;font-weight:700;
+  ">Göster</button>
  </div>
  </div>
 
@@ -156,13 +157,13 @@
  </label>
  </div>
 
-  <div id="loginCaptchaContainer" style="display:none;margin-bottom:.9rem;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:10px;padding:.75rem;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem;">
-      <label style="font-size:.76rem;font-weight:700;color:#334155;">
-        🤖 Güvenlik Doğrulaması (Captcha)
-      </label>
-      <button type="button" id="btnRefreshCaptcha" title="Soruyu Yenile" style="background:none;border:none;cursor:pointer;font-size:.9rem;color:#475569;">🔄 Yenile</button>
-    </div>
+   <div id="loginCaptchaContainer" style="display:none;margin-bottom:.9rem;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:10px;padding:.75rem;">
+     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem;">
+       <label style="font-size:.76rem;font-weight:700;color:#334155;">
+         Güvenlik Doğrulaması (Captcha)
+       </label>
+       <button type="button" id="btnRefreshCaptcha" title="Soruyu Yenile" style="background:none;border:none;cursor:pointer;font-size:.76rem;font-weight:600;color:var(--accent,#2563eb);">Yenile</button>
+     </div>
     <div style="display:flex;align-items:center;gap:.65rem;margin-bottom:.35rem;">
       <span id="loginCaptchaQuestion" style="font-size:.95rem;font-weight:700;color:#1e293b;background:#e2e8f0;padding:.3rem.65rem;border-radius:6px;letter-spacing:1px;">?</span>
       <input type="text" id="loginCaptchaAnswer" placeholder="Sonuç nedir?" style="
@@ -252,7 +253,7 @@
  </div>
 
  <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:.55rem.75rem;margin-bottom:.85rem;font-size:.74rem;color:#1e40af;line-height:1.4;">
- ℹ️ Kayıt başvurusu yapıldıktan sonra sistem yöneticisi onayı ile hesabınız aktifleştirilecektir.
+ Kayıt başvurusu yapıldıktan sonra sistem yöneticisi onayı ile hesabınız aktifleştirilecektir.
  </div>
 
  <button type="submit" id="btnRegisterSubmit" style="
@@ -391,17 +392,19 @@
  portal.querySelector('#btnBackToLoginFromForgot').onclick = () => switchTab('login');
  bindFooterLinks();
 
- const togglePass = portal.querySelector('#toggleLoginPass');
- const passInput = portal.querySelector('#loginPassword');
- togglePass.onclick = () => {
- if (passInput.type === 'password') {
- passInput.type = 'text';
- togglePass.textContent = '';
- } else {
- passInput.type = 'password';
- togglePass.textContent = '️';
- }
- };
+  const togglePass = portal.querySelector('#toggleLoginPass');
+  const passInput = portal.querySelector('#loginPassword');
+  if (togglePass && passInput) {
+    togglePass.onclick = () => {
+      if (passInput.type === 'password') {
+        passInput.type = 'text';
+        togglePass.textContent = 'Gizle';
+      } else {
+        passInput.type = 'password';
+        togglePass.textContent = 'Göster';
+      }
+    };
+  }
 
  const captchaContainer = portal.querySelector('#loginCaptchaContainer');
  const captchaQuestion = portal.querySelector('#loginCaptchaQuestion');
@@ -440,10 +443,10 @@
  const ident = (portal.querySelector('#loginIdentifier').value || '').trim();
  const pass = portal.querySelector('#loginPassword').value;
 
- if (!ident || !pass) {
- showAlert('⚠️ Lütfen tüm alanları doldurunuz.', 'warning');
- return;
- }
+  if (!ident || !pass) {
+  showAlert('Lütfen tüm alanları doldurunuz.', 'warning');
+  return;
+  }
 
  const captchaAnswer = captchaAnswerInput?.value ? captchaAnswerInput.value.trim() : '';
  const captchaToken = captchaTokenInput?.value || '';
@@ -482,9 +485,9 @@
  if (res.requireCaptcha) {
  await loadCaptcha();
  }
- if (res.isFrozen) {
- showAlert('❄️ Bu hesap dondurulmuştur. Lütfen sistem yöneticisi ile iletişime geçin.', 'error');
- } else {
+  if (res.isFrozen) {
+  showAlert('Bu hesap dondurulmuştur. Lütfen sistem yöneticisi ile iletişime geçin.', 'error');
+  } else {
  showAlert(res.reason || 'Giriş başarısız oldu.', res.pendingApproval ? 'warning' : 'error');
  }
  }

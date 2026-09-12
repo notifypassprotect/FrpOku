@@ -521,7 +521,7 @@
  if (/\bALTER\s+TABLE\b/i.test(upper)) {
  securityRisks.push({
  level: 'HIGH',
- badge: '⚠️ YÜKSEK',
+ badge: 'YÜKSEK',
  title: 'ALTER TABLE Komutu Tespit Edildi',
  text: "Veritabanı tablosunun yapısını değiştiren 'ALTER TABLE' komutu bulundu."
  });
@@ -530,7 +530,7 @@
  if (/\b(GRANT|REVOKE)\b/i.test(upper)) {
  securityRisks.push({
  level: 'HIGH',
- badge: '⚠️ YÜKSEK',
+ badge: 'YÜKSEK',
  title: 'Yetki Değiştirme Komutu Tespit Edildi',
  text: "Kullanıcı yetkisi tanımlayan/kaldıran GRANT/REVOKE komutu tespit edildi."
  });
@@ -549,7 +549,7 @@
  if (hasUpdate &&!hasWhere) {
  securityRisks.push({
  level: 'HIGH',
- badge: '⚠️ YÜKSEK',
+ badge: 'YÜKSEK',
  title: "WHERE Koşulsuz UPDATE!",
  text: "UPDATE sorgusu WHERE koşulu içermiyor! Tablodaki tüm satırların güncellenmesine neden olabilir."
  });

@@ -292,7 +292,7 @@ function renderDashboard() {
     if (files.length === 0) {
       wrap.innerHTML = `
       <div style="text-align:center;padding:5rem;color:var(--text-muted);">
-        <div style="font-size:3rem;margin-bottom:1rem;">📭</div>
+        <div style="font-size:1.1rem;font-weight:700;color:var(--text-muted);margin-bottom:1rem;">Kayıt Yok</div>
         <div style="font-size:1.1rem;font-weight:600;">Henüz rapor yüklenmedi</div>
         <div style="margin-top:1rem;"><a href="index.html" class="btn btn-primary btn-sm">← Rapora Git</a></div>
       </div>`;
@@ -421,7 +421,7 @@ function renderDashboard() {
  <div class="dash-card-label">Pascal Script</div>
  </div>
  <div class="dash-card" style="--card-accent:#f97316;">
- <div class="dash-card-icon">⚙️</div>
+ <div class="dash-card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></div>
  <div class="dash-card-value">${totalParams}</div>
  <div class="dash-card-label">Benzersiz Parametre</div>
  </div>
@@ -444,7 +444,7 @@ function renderDashboard() {
  <!-- PARAMETRE ANALİTİĞİ -->
  ${paramAnalytics.length > 0? `
  <div class="dash-table-wrap">
- <div class="dash-table-header">⚙️ SQL Parametre Kullanım Analitiği (Top ${Math.min(15, paramAnalytics.length)}) <span style="font-size:.72rem;color:var(--text-muted);font-weight:400;">— Hangi parametrenin kaç raporda geçtiğini görün</span></div>
+ <div class="dash-table-header">SQL Parametre Kullanım Analitiği (Top ${Math.min(15, paramAnalytics.length)}) <span style="font-size:.72rem;color:var(--text-muted);font-weight:400;">— Hangi parametrenin kaç raporda geçtiğini görün</span></div>
  <table class="dash-tbl">
  <thead><tr><th>#</th><th>Parametre Adı</th><th>Kullanım Sayısı</th><th>Bağımlı Rapor Sayısı</th><th>Örnek Raporlar</th></tr></thead>
  <tbody>
@@ -465,7 +465,7 @@ function renderDashboard() {
   ${userAnalytics.length > 0 ? `
   <div class="dash-table-wrap">
     <div class="dash-table-header">
-      <span>👤 Kullanıcı Bazlı Rapor Yükleme & Katkı İstatistiği</span>
+      <span>Kullanıcı Bazlı Rapor Yükleme & Katkı İstatistiği</span>
       <span style="font-size:.72rem;color:var(--text-muted);font-weight:400;">(${userAnalytics.length} Kullanıcı) — Hangi personelin sisteme kaç rapor yüklediğini ve havuza katkısını inceleyin</span>
     </div>
     <table class="dash-tbl">
@@ -562,7 +562,7 @@ function renderDashboard() {
     if (wrap) {
       wrap.innerHTML = `
         <div style="text-align:center;padding:4rem 1.5rem;color:var(--text-muted);">
-          <div style="font-size:3rem;margin-bottom:1rem;">⚠️</div>
+          <div style="width:48px;height:48px;margin:0 auto 1rem;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(239,68,68,0.1);color:#ef4444;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></div>
           <div style="font-size:1.1rem;font-weight:700;color:var(--red);">İstatistikler hesaplanırken bir sorun oluştu</div>
           <div style="font-size:.82rem;margin-top:.4rem;color:var(--text-secondary);">${esc(err?.message || 'Bilinmeyen hata')}</div>
           <div style="margin-top:1.5rem;">

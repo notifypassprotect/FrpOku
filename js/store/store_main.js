@@ -148,6 +148,41 @@
     if (raw) JSON.parse(raw).forEach(id => _pendingSyncIds.add(String(id)));
   } catch (e) {}
 
+  const USER_NOTES_KEY = 'frpoku_user_notes';
+  function _getUserNotesMap() {
+    try {
+      const raw = localStorage.getItem(USER_NOTES_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  }
+  function _saveUserNote(id, note) {
+    try {
+      const map = _getUserNotesMap();
+      const strId = String(id);
+      if (note && String(note).trim()) {
+        map[strId] = { note: String(note).trim(), updated_at: new Date().toISOString() };
+      } else {
+        delete map[strId];
+      }
+      localStorage.setItem(USER_NOTES_KEY, JSON.stringify(map));
+    } catch {}
+  }
+
+  const USER_PIN_OVERRIDES_KEY = 'frpoku_user_pin_overrides';
+  function _getUserPinOverrides() {
+    try {
+      const raw = localStorage.getItem(USER_PIN_OVERRIDES_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  }
+  function _saveUserPinOverride(id, isPinned) {
+    try {
+      const map = _getUserPinOverrides();
+      map[String(id)] = Boolean(isPinned);
+      localStorage.setItem(USER_PIN_OVERRIDES_KEY, JSON.stringify(map));
+    } catch {}
+  }
+
   function _savePendingSyncIds() {
     try {
       localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify([..._pendingSyncIds]));
@@ -291,20 +326,42 @@
             const cloudFiles = activeSettled.value;
             if (Array.isArray(cloudFiles)) {
               const localMap = new Map((_read() || []).map(f => [String(f.id), f]));
+              const userNotes = _getUserNotesMap();
+              const pinOverrides = _getUserPinOverrides();
+
               loadedFiles = cloudFiles.map(cf => {
                 const cfId = String(cf.id);
-                if (_pendingSyncIds.has(cfId) && localMap.has(cfId)) {
-                  const local = localMap.get(cfId);
+                const local = localMap.get(cfId);
+                let item = cf;
+
+                if (_pendingSyncIds.has(cfId) && local) {
                   if ((Number(local?.version) || 0) > (Number(cf?.version) || 0)) {
-                    return local;
+                    item = local;
+                  } else {
+                    _pendingSyncIds.delete(cfId);
+                    _savePendingSyncIds();
                   }
-                  // Buluttaki sürüm yerelle aynı veya daha güncel; bayat bekleyen kuyruğu temizle:
-                  _pendingSyncIds.delete(cfId);
-                  _savePendingSyncIds();
-                  return cf;
                 }
-                return cf;
+
+                // Kullanıcı notunun buluttaki boş veriyle ezilmesini önle
+                if (userNotes[cfId]?.note && (!item.userNote || !item.userNote.trim())) {
+                  item.userNote = userNotes[cfId].note;
+                  item.user_note = userNotes[cfId].note;
+                } else if (local?.userNote && local.userNote.trim() && (!item.userNote || !item.userNote.trim())) {
+                  item.userNote = local.userNote;
+                  item.user_note = local.userNote;
+                  _saveUserNote(cfId, local.userNote);
+                }
+
+                // Kullanıcının sabitleme tercihini koru
+                if (pinOverrides[cfId] !== undefined) {
+                  item.isPinned = Boolean(pinOverrides[cfId]);
+                  item.is_pinned = Boolean(pinOverrides[cfId]);
+                }
+
+                return item;
               });
+
               localMap.forEach((localFile, lId) => {
                 if (_pendingSyncIds.has(lId) && !loadedFiles.some(f => String(f.id) === lId)) {
                   loadedFiles.push(localFile);
@@ -985,10 +1042,15 @@
   // ── 6. Not, Meta, Kod Güncelleme ────────────────────────────
   function updateNote(id, note) {
     const files = _read();
-    const idx = files.findIndex(f => f.id === id);
+    const strId = String(id);
+    const idx = files.findIndex(f => String(f.id) === strId);
+    const cleanNote = String(note || '').trim();
+    _saveUserNote(strId, cleanNote);
     if (idx >= 0) {
-      files[idx].userNote = note;
-      files[idx].user_note = note;
+      files[idx].userNote = cleanNote;
+      files[idx].user_note = cleanNote;
+      files[idx].version = (Number(files[idx].version) || 1) + 1;
+      files[idx].updated_at = new Date().toISOString();
       _write(files);
       _audit('NOTE_UPDATE', files[idx].name || id, 'Rapor kullanıcı notu güncellendi.');
       return true;
@@ -1130,13 +1192,18 @@
 
   function togglePin(id) {
     const files = _read();
-    const idx = files.findIndex(f => f.id === id);
+    const strId = String(id);
+    const idx = files.findIndex(f => String(f.id) === strId);
     if (idx >= 0) {
-      files[idx].isPinned = !files[idx].isPinned;
-      files[idx].is_pinned = files[idx].isPinned;
+      const nextPin = !Boolean(files[idx].isPinned || files[idx].is_pinned);
+      files[idx].isPinned = nextPin;
+      files[idx].is_pinned = nextPin;
+      files[idx].version = (Number(files[idx].version) || 1) + 1;
+      files[idx].updated_at = new Date().toISOString();
+      _saveUserPinOverride(strId, nextPin);
       _write(files);
-      _audit('REPORT_PIN', files[idx].name || id, files[idx].isPinned ? 'Rapor üste sabitlendi.' : 'Rapor sabitlemesi kaldırıldı.');
-      return files[idx].isPinned;
+      _audit('REPORT_PIN', files[idx].name || id, nextPin ? 'Rapor üste sabitlendi.' : 'Rapor sabitlemesi kaldırıldı.');
+      return nextPin;
     }
     return false;
   }

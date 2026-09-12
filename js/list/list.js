@@ -473,7 +473,7 @@ function updateUserList() {
   userSelect.innerHTML = '<option value="">Tüm Kullanıcılar</option>' +
     Array.from(userCounts.entries())
       .sort((a, b) => a[0].localeCompare(b[0], 'tr'))
-      .map(([name, count]) => `<option value="${escHtml(name)}" ${name === curVal ? 'selected' : ''}>👤 ${escHtml(name)} (${count})</option>`)
+      .map(([name, count]) => `<option value="${escHtml(name)}" ${name === curVal ? 'selected' : ''}>${escHtml(name)} (${count})</option>`)
       .join('');
 
   if (curVal && !userCounts.has(curVal)) {
@@ -879,6 +879,10 @@ function setupContextMenu() {
     const textTogglePool = document.getElementById('ctxTextTogglePool');
     if (textTogglePool) textTogglePool.textContent = isPublic ? 'Havuzdan Kaldır' : 'Ortak Havuzda Paylaş';
 
+    const hasNote = !!(file.userNote || file.user_note);
+    const textNote = document.getElementById('ctxTextNote');
+    if (textNote) textNote.textContent = hasNote ? 'Notu Görüntüle / Düzenle' : 'Not Ekle';
+
     // Konumlandırma
     ctxMenu.style.display = 'flex';
     const x = Math.min(e.clientX, window.innerWidth - 220);
@@ -912,6 +916,13 @@ function setupContextMenu() {
       switch (action) {
         case 'view':
           openDetail(id);
+          break;
+        case 'note':
+          if (typeof openReportNoteModal === 'function') {
+            openReportNoteModal(id);
+          } else if (window.FrpListModals && typeof window.FrpListModals.openReportNoteModal === 'function') {
+            window.FrpListModals.openReportNoteModal(id);
+          }
           break;
         case 'toggle-pool':
           if (FrpStore.togglePublicPool) {

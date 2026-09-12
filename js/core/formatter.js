@@ -221,7 +221,7 @@
       if (h.warnings && h.warnings.length) {
         lines.push('');
         lines.push('### Uyarılar');
-        h.warnings.forEach(w => lines.push(`- ⚠️ ${w}`));
+        h.warnings.forEach(w => lines.push(`- ${w}`));
       }
       lines.push('');
     }

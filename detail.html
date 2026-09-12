@@ -351,15 +351,19 @@
     <div class="circuit-progress-glow"></div>
   </div>
 
-  <!-- Futuristic Cyber Boot Loader Screen -->
+  <!-- Kurumsal Açılış Ekranı (Splash Loader) -->
   <div id="circuitAppBoot" class="circuit-boot-screen">
     <div class="circuit-boot-core">
-      <div class="circuit-ring"></div>
-      <div class="circuit-ring-inner"></div>
-      <div class="circuit-logo">⚡</div>
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <line x1="16" y1="13" x2="8" y2="13"></line>
+        <line x1="16" y1="17" x2="8" y2="17"></line>
+        <polyline points="10 9 9 9 8 9"></polyline>
+      </svg>
     </div>
-    <div class="circuit-boot-title">FRPOKU DETAY</div>
-    <div class="circuit-boot-status">RAPOR BİLEŞENLERİ YÜKLENİYOR...</div>
+    <div class="circuit-boot-title">FrpOku Detay</div>
+    <div class="circuit-boot-status">Rapor bileşenleri yükleniyor...</div>
     <div class="circuit-boot-track">
       <div class="circuit-boot-fill"></div>
     </div>
@@ -367,49 +371,61 @@
 
 <div class="app-wrap">
 
- <!-- ═══════════════ TOP BAR ═══════════════ -->
- <nav class="topbar">
- <div class="detail-topbar-left">
- <button class="btn-back" id="btnBack">← Listeye Dön</button>
- <div class="brand">
- <div>
- <div id="pageTitle">Rapor Detayı</div>
- <div class="brand-sub" id="pageSubTitle">FrpOku</div>
- </div>
- </div>
- <button class="star-btn" id="btnFavDetail" title="Favorilere Ekle/Çıkar" style="margin-left:.5rem;">★</button>
- <button class="pin-btn" id="btnPinDetail" title="Üste Sabitle/Kaldır" style="margin-left:.3rem;padding:.2rem.45rem;font-size:.74rem;font-weight:700;border-radius:6px;border:1px solid var(--border);background:var(--bg-raised);color:var(--text-secondary);cursor:pointer;opacity:.6;transition:opacity.15s;">Sabitle</button>
- <button class="btn btn-sm" id="btnTogglePoolDetail" style="display:none;margin-left:.5rem;padding:.3rem.65rem;font-size:.76rem;border-radius:8px;font-weight:700;">Havuzda Paylaş</button>
- </div>
+  <!-- ═══════════════ TOP BAR ═══════════════ -->
+  <nav class="topbar">
+    <div class="detail-topbar-left">
+      <button class="btn btn-sm btn-back" id="btnBack" title="Listeye Dön" style="font-weight:700;gap:.35rem;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        <span>Listeye Dön</span>
+      </button>
+      <span style="width:1px;height:24px;background:var(--border-light);margin:0 .25rem;"></span>
+      <div class="brand" style="gap:.5rem;">
+        <div>
+          <div id="pageTitle" title="Rapor Detayı">Rapor Detayı</div>
+          <div class="brand-sub" id="pageSubTitle">FrpOku Portal</div>
+        </div>
+      </div>
+      <button class="btn btn-sm" id="btnFavDetail" title="Favorilere Ekle/Çıkar" style="width:36px;padding:0;color:var(--text-secondary);" aria-label="Favori">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+      </button>
+      <button class="btn btn-sm" id="btnPinDetail" title="Üste Sabitle/Kaldır" style="width:36px;padding:0;color:var(--text-secondary);" aria-label="Sabitle">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a1 1 0 0 0 0-2H8a1 1 0 0 0 0 2h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path></svg>
+      </button>
+      <button class="btn btn-sm btn-primary" id="btnTogglePoolDetail" style="display:none;font-weight:700;">Havuzda Paylaş</button>
+    </div>
 
- <div class="topbar-right">
- <!-- Son İndirilenler -->
- <button class="btn btn-sm" id="btnRecentDownloadsDetail" title="Son İndirilen Dosyalar ve İndirme Geçmişi">Son İndirilenler</button>
+    <div class="topbar-right">
+      <!-- Son İndirilenler -->
+      <button class="btn btn-sm" id="btnRecentDownloadsDetail" title="Son İndirilen Dosyalar ve İndirme Geçmişi">Son İndirilenler</button>
 
- <!-- Sorgu Kütüphanesi -->
- <button class="btn btn-sm" id="btnSnippets" title="Kaydedilmiş SQL Sorgu Kütüphanesi">Sorgu Kütüphanesi</button>
+      <!-- Sorgu Kütüphanesi -->
+      <button class="btn btn-sm" id="btnSnippets" title="Kaydedilmiş SQL Sorgu Kütüphanesi">Sorgu Kütüphanesi</button>
 
- <!-- Tema Butonu -->
- <button class="theme-switch-pill" id="btnThemeToggle" title="Gece / Gündüz Teması">Koyu Mod</button>
+      <!-- Tema Butonu -->
+      <button class="theme-switch-pill" id="btnThemeToggle" title="Gece / Gündüz Teması">Koyu Mod</button>
 
- <!-- KOD İÇİ CANLI ARAMA -->
- <div class="code-search-box">
- <span class="search-icon" style="font-size:.78rem;"></span>
- <input type="text" class="search-input" id="codeSearchInput" placeholder="Kodda ara..." autocomplete="off" />
- <span class="result-count" id="codeSearchCount" style="font-size:.7rem;margin:0.2rem;"></span>
- <button class="search-nav-btn" id="codeSearchPrev" title="Önceki">◀</button>
- <button class="search-nav-btn" id="codeSearchNext" title="Sonraki">▶</button>
- </div>
+      <!-- KOD İÇİ CANLI ARAMA -->
+      <div class="code-search-box">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.6;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" class="search-input" id="codeSearchInput" placeholder="Kodda ara..." autocomplete="off" />
+        <span class="result-count" id="codeSearchCount" style="font-size:.7rem;margin:0 0.2rem;font-weight:700;color:var(--accent);"></span>
+        <button class="search-nav-btn" id="codeSearchPrev" title="Önceki" aria-label="Önceki">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <button class="search-nav-btn" id="codeSearchNext" title="Sonraki" aria-label="Sonraki">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </button>
+      </div>
 
- <!-- Yazı boyutu -->
- <div class="font-ctrl">
- <span class="font-ctrl-label">Yazı</span>
- <button class="font-ctrl-btn" id="fontDec" title="Küçült">−</button>
- <span class="font-ctrl-val" id="fontSizeVal">13px</span>
- <button class="font-ctrl-btn" id="fontInc" title="Büyüt">+</button>
- </div>
- </div>
- </nav>
+      <!-- Yazı boyutu -->
+      <div class="font-ctrl">
+        <span class="font-ctrl-label">Yazı</span>
+        <button class="font-ctrl-btn" id="fontDec" title="Küçült">−</button>
+        <span class="font-ctrl-val" id="fontSizeVal">13px</span>
+        <button class="font-ctrl-btn" id="fontInc" title="Büyüt">+</button>
+      </div>
+    </div>
+  </nav>
 
  <!-- MOBİL GÖRÜNÜM SEKMELERİ (KODLAR VS BİLGİLER) -->
  <div class="mobile-detail-nav" id="mobileDetailNav">
@@ -447,12 +463,14 @@
  </div>
 
  <!-- Hata / Yükleniyor -->
- <div class="dropzone-wrap" id="errorWrap" style="display:none;">
- <div style="text-align:center;color:var(--text-muted);">
- <div style="font-size:3rem;margin-bottom:1rem;">⚠️</div>
- <div id="errorMsg" style="font-size:1rem;font-weight:600;color:var(--text-secondary);"></div>
- <div style="margin-top:1rem;">
- <button class="btn btn-primary btn-sm" data-detail-action="open-index">← Listeye Dön</button>
+  <div class="dropzone-wrap" id="errorWrap" style="display:none;">
+  <div style="text-align:center;color:var(--text-muted);">
+  <div style="margin-bottom:1rem;color:#ef4444;display:flex;justify-content:center;">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+  </div>
+  <div id="errorMsg" style="font-size:1rem;font-weight:600;color:var(--text-secondary);"></div>
+  <div style="margin-top:1rem;">
+  <button class="btn btn-primary btn-sm" data-detail-action="open-index">Listeye Dön</button>
  </div>
  </div>
  </div>

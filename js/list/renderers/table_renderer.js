@@ -57,7 +57,7 @@ window.FrpListRenderers = window.FrpListRenderers || {};
         if (prefs.showSqlRiskBadge !== false && Array.isArray(file.queries)) {
           const hasRisk = file.queries.some(q => /\b(DROP|TRUNCATE|ALTER)\s+(TABLE|DATABASE|VIEW|PROCEDURE|INDEX)\b/i.test(q.sql || ''));
           if (hasRisk) {
-            riskBadge = `<span class="badge" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);font-size:.68rem;padding:1px 5px;border-radius:6px;margin-left:.25rem;" title="Bu raporda DROP/TRUNCATE/ALTER komutları tespit edildi!">⚠️ Risk</span>`;
+            riskBadge = `<span class="badge" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);font-size:.68rem;padding:1px 5px;border-radius:6px;margin-left:.25rem;" title="Bu raporda DROP/TRUNCATE/ALTER komutları tespit edildi!">Risk</span>`;
           }
         }
         const oName = file.ownerName || file.owner_name || (file.userId === 'usr_admin_root' ? 'Admin' : 'Sistem');

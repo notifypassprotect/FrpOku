@@ -29,7 +29,7 @@ function ensureToastElement() {
 
 function showToast(message, type = 'info', duration = 3500) {
   const toast = ensureToastElement();
-  const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
+  const icons = { success: '', error: '', warning: '', info: '' };
   toast.className = '';
   toast.classList.add(type);
   toast.innerHTML = `<span>${icons[type] || icons.info}</span><span>${escHtml(message)}</span>`;

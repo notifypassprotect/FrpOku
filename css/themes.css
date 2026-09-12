@@ -437,7 +437,7 @@
 .code-theme-solarized-dark .pas-proc { color: #268bd2 !important; font-weight: 700; }
 
 /* ══════════════════════════════════════════════════════════
-   TEMA 14 — Midnight Amethyst 🔮
+   TEMA 14 — Midnight Amethyst
    ══════════════════════════════════════════════════════════ */
 .ui-theme-midnight-amethyst {
   --accent: #9333ea;
@@ -473,7 +473,7 @@
 .code-theme-midnight-amethyst .pas-proc { color: #e879f9 !important; font-weight: 700; }
 
 /* ══════════════════════════════════════════════════════════
-   TEMA 15 — Nordic Frost ❄️
+   TEMA 15 — Nordic Frost
    ══════════════════════════════════════════════════════════ */
 .ui-theme-nordic-frost {
   --accent: #0284c7;
@@ -509,7 +509,7 @@
 .code-theme-nordic-frost .pas-proc { color: #7dd3fc !important; font-weight: 700; }
 
 /* ══════════════════════════════════════════════════════════
-   TEMA 16 — Aurora Emerald 🌌
+   TEMA 16 — Aurora Emerald
    ══════════════════════════════════════════════════════════ */
 .ui-theme-aurora-emerald {
   --accent: #059669;

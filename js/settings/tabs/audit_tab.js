@@ -223,7 +223,7 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
                 </div>
                 ${repId && existsInStore ? `
                   <button type="button" class="btn btn-sm btn-primary btn-go-report-detail" data-rep-id="${escHtml(repId)}" style="padding:.28rem .7rem;font-size:.74rem;font-weight:700;white-space:nowrap;flex-shrink:0;">
-                    Rapora Git ➔
+                    Rapora Git
                   </button>
                 ` : `
                   <span class="badge badge-gray" style="font-size:.68rem;padding:.2rem .5rem;flex-shrink:0;">Kayıt / Arşiv</span>
@@ -236,7 +236,7 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
     ` : '';
 
     const categoryNames = {
-      auth: 'Oturum & Kimlik Doğrulama',
+      auth: 'Kullanıcı & Giriş',
       files: 'Rapor & Dosya Aktarımı',
       edits: 'Kod & Tasarım Düzenleme',
       pool: 'Ortak Rapor Havuzu',
@@ -247,12 +247,12 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
     };
     const categoryLabel = categoryNames[actInfo.group] || 'Genel İşlem';
 
-    let severityBadge = '<span class="badge badge-green" style="font-size:.68rem;">✓ Başarılı İşlem</span>';
+    let severityBadge = '<span class="badge badge-green" style="font-size:.68rem;">Başarılı İşlem</span>';
     const actUpper = String(log.action || '').toUpperCase();
     if (['TRASH_PURGE', 'TRASH_EMPTY', 'DATA_RESET', 'REPORT_CLEAR_ALL'].includes(actUpper)) {
-      severityBadge = '<span class="badge badge-red" style="font-size:.68rem;">⚠️ Kritik İşlem</span>';
+      severityBadge = '<span class="badge badge-red" style="font-size:.68rem;">Kritik İşlem</span>';
     } else if (['REPORT_DELETE', 'TRASH_MOVE', 'PASSWORD_CHANGE', 'POOL_REMOVE'].includes(actUpper)) {
-      severityBadge = '<span class="badge badge-amber" style="font-size:.68rem;">⚡ Dikkat</span>';
+      severityBadge = '<span class="badge badge-amber" style="font-size:.68rem;">Dikkat</span>';
     }
 
     const logJsonStr = JSON.stringify(log, null, 2);
@@ -300,7 +300,7 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
         <div style="margin-bottom:1.2rem;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.45rem;">
             <div style="font-size:.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.3px;">Açıklama & Detaylar</div>
-            <button type="button" class="btn btn-sm btn-ghost" id="btnCopyLogDetails" style="font-size:.72rem;padding:2px 8px;" title="Açıklama Metnini Kopyala">📋 Kopyala</button>
+            <button type="button" class="btn btn-sm btn-ghost" id="btnCopyLogDetails" style="font-size:.72rem;padding:2px 8px;" title="Açıklama Metnini Kopyala">Kopyala</button>
           </div>
           <div style="background:var(--bg-raised);padding:.85rem 1rem;border-radius:10px;border:1px solid var(--border);font-size:.84rem;line-height:1.6;color:var(--text-secondary);word-break:break-word;max-height:180px;overflow-y:auto;">
             ${escHtml(log.details || 'Açıklama bulunmuyor.')}
@@ -310,8 +310,8 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
         <!-- Gelişmiş Teknik Detay & JSON Akordiyonu -->
         <details style="margin-bottom:1.4rem;background:var(--bg-raised);border:1px solid var(--border);border-radius:10px;padding:.6rem .85rem;font-size:.8rem;">
           <summary style="font-weight:800;cursor:pointer;color:var(--text-primary);display:flex;align-items:center;justify-content:space-between;user-select:none;">
-            <span>🔍 Ham Veri & JSON (Teknik Denetim Bilgisi)</span>
-            <button type="button" class="btn btn-sm btn-ghost" id="btnCopyLogJson" style="font-size:.72rem;padding:2px 8px;">📋 JSON Kopyala</button>
+            <span>Ham Veri & JSON (Teknik Denetim Bilgisi)</span>
+            <button type="button" class="btn btn-sm btn-ghost" id="btnCopyLogJson" style="font-size:.72rem;padding:2px 8px;">JSON Kopyala</button>
           </summary>
           <pre style="margin-top:.7rem;padding:.75rem;background:var(--bg-surface);border:1px solid var(--border-light);border-radius:8px;font-family:var(--mono);font-size:.72rem;color:var(--text-secondary);overflow-x:auto;max-height:180px;line-height:1.4;">${escHtml(logJsonStr)}</pre>
         </details>
@@ -319,8 +319,8 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
         <!-- Hızlı Filtre ve Kapat Aksiyonları -->
         <div style="display:flex;justify-content:space-between;align-items:center;gap:.6rem;flex-wrap:wrap;border-top:1px solid var(--border-light);padding-top:1rem;">
           <div style="display:flex;gap:.4rem;flex-wrap:wrap;">
-            ${log.username ? `<button type="button" class="btn btn-sm btn-ghost" id="btnFilterByUser" style="font-size:.75rem;font-weight:700;border:1px solid var(--border);">👤 @${escHtml(log.username)} Filtrele</button>` : ''}
-            <button type="button" class="btn btn-sm btn-ghost" id="btnFilterByAction" style="font-size:.75rem;font-weight:700;border:1px solid var(--border);">⚡ Bu İşlemi Filtrele</button>
+            ${log.username ? `<button type="button" class="btn btn-sm btn-ghost" id="btnFilterByUser" style="font-size:.75rem;font-weight:700;border:1px solid var(--border);">@${escHtml(log.username)} Filtrele</button>` : ''}
+            <button type="button" class="btn btn-sm btn-ghost" id="btnFilterByAction" style="font-size:.75rem;font-weight:700;border:1px solid var(--border);">Bu İşlemi Filtrele</button>
           </div>
           <button type="button" class="btn btn-sm btn-primary btn-close-detail" style="padding:.5rem 1.4rem;font-weight:800;border-radius:9px;font-size:.84rem;">Kapat</button>
         </div>

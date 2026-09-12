@@ -22,9 +22,9 @@
     { id: 'deep-ocean',       label: 'Deep Ocean Blue' },
     { id: 'solarized-light',  label: 'Solarized Light' },
     { id: 'solarized-dark',   label: 'Solarized Dark' },
-    { id: 'midnight-amethyst',label: 'Midnight Amethyst 🔮' },
-    { id: 'nordic-frost',     label: 'Nordic Frost ❄️' },
-    { id: 'aurora-emerald',   label: 'Aurora Emerald 🌌' }
+    { id: 'midnight-amethyst',label: 'Midnight Amethyst' },
+    { id: 'nordic-frost',     label: 'Nordic Frost' },
+    { id: 'aurora-emerald',   label: 'Aurora Emerald' }
   ];
 
   function getCodeTheme() {
@@ -102,7 +102,7 @@
 
     if (!skipStorage && typeof window.toast === 'function') {
       const th = CODE_THEMES.find(t => t.id === target);
-      if (th) window.toast(`🎨 Tema uygulandı: ${th.label}`, 'info', 2000);
+      if (th) window.toast(`Tema uygulandı: ${th.label}`, 'info', 2000);
     }
   }
 

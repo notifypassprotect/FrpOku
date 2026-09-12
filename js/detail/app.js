@@ -341,7 +341,7 @@ function renderSidebar(file) {
  }
  if (descArea) descArea.style.display = 'none';
  if (descActions) descActions.style.display = 'none';
- showToast('Açıklama güncellendi. ✏️', 'success');
+ showToast('Açıklama güncellendi.', 'success');
  });
  }
  if (btnCancelDesc) {
@@ -375,9 +375,9 @@ function renderSidebar(file) {
       file.userNote = note;
       file.user_note = note;
       currentFile = FrpStore.getById(file.id) || file;
- this.textContent = '✅ Kaydedildi';
+ this.textContent = 'Kaydedildi';
  this.classList.add('saved');
- setTimeout(() => { this.textContent = ' Kaydet'; this.classList.remove('saved'); }, 2000);
+ setTimeout(() => { this.textContent = 'Kaydet'; this.classList.remove('saved'); }, 2000);
  showToast('Not kaydedildi.', 'success');
  });
  }
@@ -419,7 +419,7 @@ if (favDetailBtn) {
  const isFav = FrpStore.toggleFavorite(currentFile.id);
  currentFile = FrpStore.getById(currentFile.id);
  favDetailBtn.classList.toggle('active', isFav);
- showToast(isFav? 'Favorilere eklendi ⭐': 'Favorilerden çıkarıldı', 'info');
+ showToast(isFav? 'Favorilere eklendi': 'Favorilerden çıkarıldı', 'info');
  });
 }
 
@@ -690,7 +690,7 @@ function syncEditorBackdrop(tabId) {
  let gutterHtml = '';
  for (let i = 1; i <= total; i++) {
  const isErr = errorLineSet.has(i);
- gutterHtml += `<div class="editor-gutter-line ${isErr? 'gutter-err': ''}" data-line="${i}" title="${isErr? '⚠️ Bu satırda sözdizimi uyarısı var': `Satır ${i}`}">${i}</div>`;
+ gutterHtml += `<div class="editor-gutter-line ${isErr? 'gutter-err': ''}" data-line="${i}" title="${isErr? 'Bu satırda sözdizimi uyarısı var': `Satır ${i}`}">${i}</div>`;
  }
  gutter.innerHTML = gutterHtml;
  gutter.scrollTop = editArea.scrollTop;
@@ -727,7 +727,7 @@ function updateSyntaxErrorNotice(tabId, existingErrors) {
  errNotice.innerHTML = `
  <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:.5rem;flex-wrap:wrap;">
  <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;flex:1;">
- <span style="font-weight:800;color:var(--red);display:flex;align-items:center;gap:.3rem;font-size:.78rem;">⚠️ Sözdizimi (${errors.length}):</span>
+ <span style="font-weight:800;color:var(--red);display:flex;align-items:center;gap:.3rem;font-size:.78rem;">Sözdizimi (${errors.length}):</span>
  <div style="display:flex;gap:.35rem;flex-wrap:wrap;flex:1;">
  ${errors.slice(0, 6).map(e => `
  <span style="font-family:var(--mono);font-size:.74rem;background:rgba(239,68,68,.15);color:var(--red);padding:.15rem.5rem;border-radius:6px;border:1px solid rgba(239,68,68,.3);cursor:pointer;"
@@ -755,7 +755,7 @@ function openAllSyntaxErrorsModal(tabId) {
 
  const errors = typeof findSyntaxErrors === 'function'? findSyntaxErrors(editArea.value, tabCfg.type): [];
  if (errors.length === 0) {
- showToast('Tebrikler! Sözdizimi hatası bulunamadı. ✅', 'success');
+ showToast('Tebrikler! Sözdizimi hatası bulunamadı.', 'success');
  return;
  }
 
@@ -772,7 +772,7 @@ function openAllSyntaxErrorsModal(tabId) {
  ${e.suggestion? `<div style="font-size:.74rem;color:var(--accent);margin-top:.2rem;font-weight:600;"> Öneri: ${esc(e.suggestion)}</div>`: ''}
  </div>
  <button type="button" class="btn btn-sm btn-primary" style="font-size:.74rem;padding:.25rem.6rem;flex-shrink:0;">
- Git ➔
+ Git
  </button>
  </div>
  `).join('');
@@ -927,7 +927,7 @@ function showSelectionReplacePopover(tabId) {
  syncEditorBackdrop(tabId);
  hasUnsavedChanges = true;
  closePopover();
- showToast(`İfade ${replaceAll? 'tüm kodda': 'seçilen yerde'} değiştirildi. ✏️`, 'info');
+ showToast(`İfade ${replaceAll? 'tüm kodda': 'seçilen yerde'} değiştirildi.`, 'info');
  };
 
  if (input) {
@@ -990,7 +990,7 @@ function toggleEditMode(tabId) {
 
  if (draftContent) {
  editArea.value = draftContent;
- showToast('Taslak kod yüklendi. ', 'info');
+ showToast('Taslak kod yüklendi.', 'info');
  } else if (tabCfg) {
  editArea.value = tabCfg.rawCode || '';
  }
@@ -1047,7 +1047,7 @@ function toggleEditMode(tabId) {
  editArea.value = prevVal;
  if (currentFile) sessionStorage.setItem(`draft_${currentFile.id}_${tabId}`, prevVal);
  syncEditorBackdrop(tabId);
- showToast('Geri alındı (Undo) ↩️', 'info');
+ showToast('Geri alındı (Undo)', 'info');
  }
  return;
  }
@@ -1059,7 +1059,7 @@ function toggleEditMode(tabId) {
  editArea.value = nextVal;
  if (currentFile) sessionStorage.setItem(`draft_${currentFile.id}_${tabId}`, nextVal);
  syncEditorBackdrop(tabId);
- showToast('Yeniden uygulandı (Redo) ↪️', 'info');
+ showToast('Yeniden uygulandı (Redo)', 'info');
  }
  return;
  }
@@ -1082,7 +1082,7 @@ function toggleEditMode(tabId) {
  if (editWrap) editWrap.style.display = 'flex';
  editArea.style.display = 'block';
  if (editTool) editTool.style.display = 'flex';
- if (editBtn) editBtn.textContent = '️ Görüntüle';
+ if (editBtn) editBtn.textContent = 'Görüntüle';
 
  syncEditorBackdrop(tabId);
  }
@@ -1104,7 +1104,7 @@ function cancelEditMode(tabId) {
  if (editTool) editTool.style.display = 'none';
  if (errNotice) errNotice.style.display = 'none';
  removeSelectionReplacePopover(tabId);
- if (editBtn) editBtn.textContent = '✏️ Düzenle';
+ if (editBtn) editBtn.textContent = 'Düzenle';
  hasUnsavedChanges = false;
  if (tabId === 'tab_pascal') refreshPascalSyntaxButtonState();
 }
@@ -1133,7 +1133,7 @@ async function saveEditMode(tabId, options = {}) {
  FrpStore.updateCode(cloned.id, { pascalScript: newCode });
  }
  currentFile = FrpStore.getById(cloned.id) || cloned;
- showToast('Ortak havuzdaki rapor kişisel alanınıza kopyalanarak kaydedildi! ', 'success');
+ showToast('Ortak havuzdaki rapor kişisel alanınıza kopyalanarak kaydedildi.', 'success');
  if (options.navigateToClone !== false) {
  setTimeout(() => { window.location.href = `detail.html?id=${encodeURIComponent(currentFile.id)}`; }, 700);
  }
@@ -1146,7 +1146,7 @@ async function saveEditMode(tabId, options = {}) {
  currentFile = FrpStore.getById(currentFile.id);
  tabCfg.rawCode = newCode;
  if (viewScroll) viewScroll.innerHTML = buildLineTable(newCode, tabCfg.highlightFn);
- showToast('SQL sorgusu kaydedildi. ', 'success');
+ showToast('SQL sorgusu kaydedildi.', 'success');
  if (window.FrpAudit) {
  window.FrpAudit.logAction({
  action: 'SQL_EDIT',
@@ -1159,7 +1159,7 @@ async function saveEditMode(tabId, options = {}) {
  currentFile = FrpStore.getById(currentFile.id);
  tabCfg.rawCode = newCode;
  if (viewScroll) viewScroll.innerHTML = buildLineTable(newCode, tabCfg.highlightFn);
- showToast('PascalScript kaydedildi. ', 'success');
+ showToast('PascalScript kaydedildi.', 'success');
  if (window.FrpAudit) {
  window.FrpAudit.logAction({
  action: 'PASCAL_EDIT',
@@ -1259,14 +1259,14 @@ async function copyTabCode(tabId, btn) {
 
  if (ok) {
  if (btn) {
- btn.textContent = '✅ Kopyalandı!';
+ btn.textContent = 'Kopyalandı';
  btn.classList.add('copied');
  setTimeout(() => {
- btn.textContent = ' Kopyala';
+ btn.textContent = 'Kopyala';
  btn.classList.remove('copied');
  }, 2000);
  }
- showToast('Kod panoya kopyalandı! ', 'success');
+ showToast('Kod panoya kopyalandı.', 'success');
  } else {
  showToast('Panoya kopyalama başarısız oldu.', 'error');
  }
@@ -1420,7 +1420,7 @@ function showError(msg) {
  if (sb) {
  sb.innerHTML = `
  <div class="sidebar-empty" style="padding:1.5rem 1rem;text-align:center;">
- <div class="sidebar-empty-icon" style="font-size:2rem;margin-bottom:.5rem;">⚠️</div>
+ <div class="sidebar-empty-icon" style="display:flex;align-items:center;justify-content:center;color:#ef4444;margin-bottom:.5rem;"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></div>
  <div class="sidebar-empty-title" style="font-size:.85rem;font-weight:700;color:var(--red);line-height:1.4;">${esc(msg)}</div>
  <div style="margin-top:.8rem;">
  <button class="btn btn-sm btn-primary" data-detail-action="open-index">← Ana Sayfaya Dön</button>
@@ -1728,7 +1728,7 @@ function minifySqlInTab(tabId) {
  cfg._isUpper = false;
  cfg._formatApplied = false;
  cfg._formatOriginalCode = null;
- showToast('SQL tek satıra indirildi ⚡ (Tekrar basarak geri alabilirsiniz)', 'success');
+ showToast('SQL tek satıra indirildi (Tekrar basarak geri alabilirsiniz)', 'success');
  }
 }
 
@@ -2157,7 +2157,7 @@ function refreshPascalSyntaxButtonState() {
  } else {
  btn.classList.remove('flash-red-btn');
  btn.innerHTML = ' Sözdizimi Kontrol';
- btn.title = 'PascalScript Sözdizimi Kontrolü (Hata Yok ✅)';
+ btn.title = 'PascalScript Sözdizimi Kontrolü (Hata Yok)';
  }
 }
 
@@ -2170,7 +2170,7 @@ function checkPascalSyntaxInTab() {
  refreshPascalSyntaxButtonState();
 
  if (res.errors.length === 0 && res.warnings.length === 0) {
- showToast('PascalScript sözdiziminde belirgin bir hata bulunamadı. ✅', 'success');
+ showToast('PascalScript sözdiziminde belirgin bir hata bulunamadı.', 'success');
  return;
  }
 
@@ -2178,8 +2178,8 @@ function checkPascalSyntaxInTab() {
  <div style="color:var(--red);margin-bottom:.35rem;cursor:pointer;background:rgba(220,38,38,0.08);padding:.45rem.75rem;border-radius:6px;border:1px solid rgba(220,38,38,0.2);"
  data-detail-action="scroll-pascal" data-line="${e.line}" data-close-modal="true"
  title="Tıklayarak Satır ${e.line}'e sıçrayın">
- ❌ ${esc(typeof e === 'object'? e.text: e)}
- <span style="float:right;font-size:.7rem;text-decoration:underline;font-weight:700;">[Satır ${e.line || 1}'e Git ➔]</span>
+ Hata: ${esc(typeof e === 'object'? e.text: e)}
+ <span style="float:right;font-size:.7rem;text-decoration:underline;font-weight:700;">[Satır ${e.line || 1}'e Git]</span>
  </div>
  `).join('');
 
@@ -2187,8 +2187,8 @@ function checkPascalSyntaxInTab() {
  <div style="color:var(--orange);margin-bottom:.35rem;cursor:pointer;background:rgba(245,158,11,0.08);padding:.45rem.75rem;border-radius:6px;border:1px solid rgba(245,158,11,0.2);"
  data-detail-action="scroll-pascal" data-line="${w.line}" data-close-modal="true"
  title="Tıklayarak Satır ${w.line}'e sıçrayın">
- ⚠️ ${esc(typeof w === 'object'? w.text: w)}
- <span style="float:right;font-size:.7rem;text-decoration:underline;font-weight:700;">[Satır ${w.line || 1}'e Git ➔]</span>
+ Uyarı: ${esc(typeof w === 'object'? w.text: w)}
+ <span style="float:right;font-size:.7rem;text-decoration:underline;font-weight:700;">[Satır ${w.line || 1}'e Git]</span>
  </div>
  `).join('');
 
@@ -2358,7 +2358,7 @@ async function openParamInjector(queryIndex) {
  `;
 
  showModal({
- title: `⚡ ${esc(queryName)} — SQL Parametre Injector / Testi`,
+ title: `${esc(queryName)} — SQL Parametre Testi`,
  body,
  confirmText: 'Kapat',
  maxWidth: '680px'
@@ -2406,7 +2406,7 @@ async function openParamInjector(queryIndex) {
  btnCopy.addEventListener('click', function () {
  if (resultArea) {
  navigator.clipboard.writeText(resultArea.value).then(() => {
- this.textContent = '✅ Kopyalandı!';
+ this.textContent = 'Kopyalandı';
  setTimeout(() => this.textContent = ' Ham SQL\'i Kopyala', 2000);
  showToast('Ham SQL panoya kopyalandı.', 'success');
  });
@@ -2647,7 +2647,7 @@ async function exportFrpOrSqlWithVersion(tabId, queryIndex) {
  <!-- Hızlı Versiyon Ön Ayarları -->
  <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.85rem;">
  <button type="button" class="btn btn-sm btn-ghost btn-ver-preset" data-ver="${suggestedVerNum}" style="font-size:.75rem;padding:.25rem.6rem;background:rgba(37,99,235,0.08);color:#2563eb;font-weight:700;">
- ➕ +1 Artır (${suggestedVerNum})
+ +1 Artır (${suggestedVerNum})
  </button>
  <button type="button" class="btn btn-sm btn-ghost btn-ver-preset" data-ver="v${suggestedVerNum}" style="font-size:.75rem;padding:.25rem.6rem;background:rgba(16,185,129,0.08);color:#059669;font-weight:700;">
  ️ v${suggestedVerNum}

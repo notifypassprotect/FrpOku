@@ -961,7 +961,7 @@ async function handleAdminUsernameChange(req, res) {
       role: 'admin',
       action: 'USER_UPDATE',
       target: `@${cleanUser}`,
-      details: `Kullanıcı adı değiştirildi: @${oldUsername} ➔ @${cleanUser}`,
+      details: `Kullanıcı adı değiştirildi: @${oldUsername} -> @${cleanUser}`,
       ip: req.ip
     });
     res.json({ success: true, message: 'Kullanıcı adı güncellendi.', username: cleanUser });
@@ -2028,7 +2028,7 @@ app.post('/api/admin/freeze-user', adminRateLimiter, requireAdmin, async (req, r
       role: 'admin',
       action: isFrozen ? 'USER_FROZEN' : 'USER_UNFROZEN',
       target: updatedUser.username,
-      details: `Hesap durumu: ${isFrozen ? '❄️ donduruldu' : '☀️ aktifleştirildi'}`,
+      details: `Hesap durumu: ${isFrozen ? 'donduruldu' : 'aktifleştirildi'}`,
       ip: req.ip
     });
 

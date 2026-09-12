@@ -35,8 +35,8 @@ window.FrpListModals = window.FrpListModals || {};
           title: 'SQL Parametre Yönetim Paneli',
           body: `
             <div style="padding:2rem;text-align:center;display:flex;flex-direction:column;align-items:center;gap:1rem;">
-              <div style="width:52px;height:52px;border-radius:50%;background:rgba(59,130,246,0.12);display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:var(--accent);">
-                ⚡
+              <div style="width:52px;height:52px;border-radius:50%;background:rgba(59,130,246,0.12);display:flex;align-items:center;justify-content:center;color:var(--accent);">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
               </div>
               <div>
                 <h4 style="margin:0 0 .4rem 0;font-size:1.05rem;font-weight:700;color:var(--text-primary);">SQL Parametresi Bulunamadı</h4>
@@ -714,6 +714,94 @@ window.FrpListModals = window.FrpListModals || {};
     }
   };
 
+  // 6. Rapor Not Ekleme / Görüntüleme Modalı
+  window.FrpListModals.openReportNoteModal = async function(fileId) {
+    if (!fileId) return;
+    const file = (FrpStore && FrpStore.getById ? FrpStore.getById(fileId) : null);
+    if (!file) return;
+
+    const currentNote = file.userNote || file.user_note || '';
+    const reportName = file.meta?.reportName || file.name || 'Rapor';
+
+    const existing = document.getElementById('reportNoteModalOverlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'reportNoteModalOverlay';
+    overlay.style.cssText = `
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px);
+      z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 1rem; animation: fadeIn .15s ease-out;
+    `;
+
+    overlay.innerHTML = `
+      <div class="modal" style="max-width: 540px; width: 92vw; padding: 1.5rem; border-radius: 16px; background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); box-shadow: 0 20px 50px rgba(0,0,0,0.3);">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; border-bottom: 1px solid var(--border-light, #e2e8f0); padding-bottom: .75rem;">
+          <div style="display: flex; align-items: center; gap: .65rem;">
+            <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(37,99,235,0.1); color: var(--accent, #2563eb); display: flex; align-items: center; justify-content: center;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            </div>
+            <div>
+              <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary, #0f172a);">${currentNote ? 'Rapor Notunu Görüntüle / Düzenle' : 'Rapora Not Ekle'}</div>
+              <div style="font-size: .78rem; color: var(--text-muted, #64748b); max-width: 380px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escHtml(reportName)}</div>
+            </div>
+          </div>
+          <button type="button" id="btnReportNoteClose" class="btn btn-sm btn-ghost" style="font-size: 1.2rem; width: 32px; height: 32px; padding: 0; border-radius: 50%;">✕</button>
+        </div>
+
+        <div style="margin-bottom: 1.2rem;">
+          <label style="display: block; font-size: .8rem; font-weight: 700; color: var(--text-secondary, #475569); margin-bottom: .4rem;">Kişisel Notunuz</label>
+          <textarea id="reportNoteTextarea" placeholder="Bu rapora özel notlarınızı buraya yazabilirsiniz (kalıcı olarak kaydedilir)..." style="width: 100%; min-height: 140px; padding: .75rem; border-radius: 10px; border: 1px solid var(--border, #cbd5e1); font-family: inherit; font-size: .88rem; line-height: 1.5; resize: vertical; background: var(--bg-card, #f8fafc); color: var(--text-primary, #0f172a); box-sizing: border-box;">${escHtml(currentNote)}</textarea>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap;">
+          <div>
+            ${currentNote ? `
+              <button type="button" id="btnReportNoteDelete" class="btn btn-sm btn-ghost" style="color: #ef4444; font-weight: 700;">Notu Sil</button>
+            ` : ''}
+          </div>
+          <div style="display: flex; align-items: center; gap: .6rem;">
+            <button type="button" id="btnReportNoteCancel" class="btn btn-sm btn-ghost" style="padding: .45rem 1rem;">Kapat</button>
+            <button type="button" id="btnReportNoteSave" class="btn btn-sm btn-primary" style="padding: .45rem 1.4rem; font-weight: 700;">Kaydet</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const textarea = overlay.querySelector('#reportNoteTextarea');
+    setTimeout(() => { if (textarea) textarea.focus(); }, 60);
+
+    const close = () => overlay.remove();
+    overlay.querySelector('#btnReportNoteClose').onclick = close;
+    overlay.querySelector('#btnReportNoteCancel').onclick = close;
+    overlay.onclick = (e) => { if (e.target === overlay) close(); };
+
+    const deleteBtn = overlay.querySelector('#btnReportNoteDelete');
+    if (deleteBtn) {
+      deleteBtn.onclick = async () => {
+        if (confirm('Bu rapora ait notu silmek istediğinize emin misiniz?')) {
+          await FrpStore.updateNote(fileId, '');
+          if (typeof window.toast === 'function') window.toast('Rapor notu silindi.', 'info');
+          if (typeof window.refreshAll === 'function') window.refreshAll();
+          close();
+        }
+      };
+    }
+
+    const saveBtn = overlay.querySelector('#btnReportNoteSave');
+    saveBtn.onclick = async () => {
+      const val = textarea.value.trim();
+      await FrpStore.updateNote(fileId, val);
+      if (typeof window.toast === 'function') {
+        window.toast(val ? 'Rapor notu kaydedildi.' : 'Rapor notu temizlendi.', 'success');
+      }
+      if (typeof window.refreshAll === 'function') window.refreshAll();
+      close();
+    };
+  };
+
   // Kısayol aliasları
   window.openParamsModal = window.FrpListModals.openParamsModal;
   window.openDependenciesModal = window.FrpListModals.openDependenciesModal;
@@ -721,4 +809,5 @@ window.FrpListModals = window.FrpListModals || {};
   window.openTableUsageModal = window.FrpListModals.openTableUsageModal;
   window.openRecentModal = window.FrpListModals.openRecentModal;
   window.openDownloadHistoryModal = window.FrpListModals.openDownloadHistoryModal;
+  window.openReportNoteModal = window.FrpListModals.openReportNoteModal;
 })();

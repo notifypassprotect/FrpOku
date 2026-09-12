@@ -390,7 +390,7 @@ function renderSidebar(file) {
       }
       if (descArea) descArea.style.display = 'none';
       if (descActions) descActions.style.display = 'none';
-      showToast('Açıklama güncellendi. ✏️', 'success');
+      showToast('Açıklama güncellendi.', 'success');
     });
   }
   if (btnCancelDesc) {
