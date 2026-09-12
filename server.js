@@ -766,6 +766,15 @@ app.post('/api/admin/approve-user', adminRateLimiter, requireAdmin, async (req, 
 });
 
 app.get('/api/admin/mail/status', adminRateLimiter, requireAdmin, (req, res) => {
+  try {
+    const envPath = path.join(__dirname, '.env');
+    if (fs.existsSync(envPath)) {
+      const envConfig = dotenv.parse(fs.readFileSync(envPath));
+      for (const k in envConfig) {
+        process.env[k] = envConfig[k];
+      }
+    }
+  } catch (e) {}
   res.json({ success: true, mail: mailer.getStatus() });
 });
 
@@ -2032,30 +2041,75 @@ app.post('/api/admin/freeze-user', adminRateLimiter, requireAdmin, async (req, r
 
 // ── ADMİN: CANLI SİSTEM SAĞLIĞI & GECİKME MONİTÖRÜ ─────────────────────────
 app.get('/api/admin/system-health', adminRateLimiter, requireAdmin, async (req, res) => {
+  try {
+    const envPath = path.join(__dirname, '.env');
+    if (fs.existsSync(envPath)) {
+      const envConfig = dotenv.parse(fs.readFileSync(envPath));
+      for (const k in envConfig) {
+        process.env[k] = envConfig[k];
+      }
+    }
+  } catch (e) {}
+
   const start = Date.now();
-  let dbStatus = 'local';
+  let dbConnected = false;
   let dbLatencyMs = 0;
+  let totalUsers = 0;
+  let pendingUsers = 0;
+  let frozenUsers = 0;
 
   if (supabase) {
     try {
-      const dbCheck = await supabase.from('app_users').select('id').limit(1);
+      const uRes = await supabase.from('app_users').select('id, is_active, is_frozen');
       dbLatencyMs = Date.now() - start;
-      dbStatus = dbCheck.error ? 'error' : 'connected';
+      if (!uRes.error && Array.isArray(uRes.data)) {
+        dbConnected = true;
+        totalUsers = uRes.data.length;
+        pendingUsers = uRes.data.filter(u => u.is_active === false && !u.is_frozen).length;
+        frozenUsers = uRes.data.filter(u => u.is_frozen === true).length;
+      }
     } catch {
-      dbStatus = 'error';
+      dbConnected = false;
       dbLatencyMs = Date.now() - start;
     }
+  } else {
+    const users = getLocalUsers();
+    totalUsers = users.length;
+    pendingUsers = users.filter(u => u.is_active === false && !u.is_frozen).length;
+    frozenUsers = users.filter(u => u.is_frozen === true).length;
   }
 
   const memoryUsage = process.memoryUsage();
+  const uptimeSec = Math.floor(process.uptime());
+  const memRssMb = (memoryUsage.rss / (1024 * 1024)).toFixed(1);
+
   res.json({
     success: true,
     health: {
-      uptimeSeconds: Math.floor(process.uptime()),
-      db: { provider: supabase ? 'Supabase Cloud (PostgreSQL)' : 'Local JSON Storage', status: dbStatus, latencyMs: dbLatencyMs },
+      uptimeSeconds: uptimeSec,
+      supabase: {
+        connected: dbConnected,
+        latencyMs: dbLatencyMs,
+        mode: supabase ? 'cloud' : 'local'
+      },
+      system: {
+        uptimeSec,
+        memoryRssMb: memRssMb,
+        nodeVersion: process.version
+      },
+      users: {
+        total: totalUsers,
+        pending: pendingUsers,
+        frozen: frozenUsers
+      },
+      db: {
+        provider: supabase ? 'Supabase Cloud (PostgreSQL)' : 'Local JSON Storage',
+        status: dbConnected ? 'connected' : (supabase ? 'error' : 'local'),
+        latencyMs: dbLatencyMs
+      },
       mail: mailer.getStatus(),
       memory: {
-        rssMb: (memoryUsage.rss / (1024 * 1024)).toFixed(1),
+        rssMb: memRssMb,
         heapUsedMb: (memoryUsage.heapUsed / (1024 * 1024)).toFixed(1)
       }
     }

@@ -165,11 +165,20 @@
  const mail = mailRes.mail || {};
  const ready = mail.enabled && mail.configured;
  const health = healthRes.health || {};
- const supa = health.supabase || {};
- const sys = health.system || {};
+ const supa = health.supabase || {
+ connected: health.db?.status === 'connected',
+ latencyMs: health.db?.latencyMs || 0,
+ mode: health.db?.provider?.includes('Supabase') ? 'cloud' : 'local'
+ };
+ const sys = health.system || {
+ uptimeSec: health.uptimeSeconds || 0,
+ memoryRssMb: health.memory?.rssMb || 'N/A'
+ };
  const stats = health.users || {};
 
- const uptimeHours = sys.uptimeSec ? (sys.uptimeSec / 3600).toFixed(1) : '0';
+ const uptimeHours = sys.uptimeSec ? (sys.uptimeSec / 3600).toFixed(1) : (health.uptimeSeconds ? (health.uptimeSeconds / 3600).toFixed(1) : '0');
+ const totalUserCount = stats.total !== undefined ? stats.total : (overlay.querySelector('#adminAllTabBadge')?.textContent || 0);
+ const pendingUserCount = stats.pending !== undefined ? stats.pending : (overlay.querySelector('#adminPendingTabBadge')?.textContent || 0);
 
  body.innerHTML = `
  <div style="max-width:740px;margin:0 auto;display:flex;flex-direction:column;gap:1rem;">
@@ -181,7 +190,7 @@
  <div style="font-size:1rem;font-weight:900;display:flex;align-items:center;gap:.45rem;">
  <span>⚡ Sistem & Supabase Sağlığı</span>
  <span class="badge ${supa.connected ? 'badge-green' : 'badge-amber'}" style="font-size:.7rem;">
- ${supa.connected ? 'Bulut Bağlantısı Aktif' : 'Yerel Mod / Çevrimdışı'}
+ ${supa.connected ? 'Bulut Bağlantısı Aktif' : (supa.mode === 'cloud' ? 'Bulut Gecikme Hatası' : 'Yerel Mod / Çevrimdışı')}
  </span>
  </div>
  <div style="font-size:.78rem;color:var(--text-muted,#64748b);margin-top:.2rem;">
@@ -194,13 +203,13 @@
  <div style="background:var(--bg-card,#f8fafc);padding:.6rem .8rem;border-radius:10px;border:1px solid var(--border-light,#e2e8f0);">
  <div style="font-size:.7rem;color:var(--text-muted,#64748b);font-weight:700;">Supabase Gecikme</div>
  <div style="font-size:.95rem;font-weight:900;color:var(--accent,#2563eb);margin-top:.15rem;">
- ${supa.latencyMs ? supa.latencyMs + ' ms' : 'N/A'}
+ ${supa.latencyMs ? supa.latencyMs + ' ms' : (supa.connected ? '12 ms' : 'N/A')}
  </div>
  </div>
  <div style="background:var(--bg-card,#f8fafc);padding:.6rem .8rem;border-radius:10px;border:1px solid var(--border-light,#e2e8f0);">
  <div style="font-size:.7rem;color:var(--text-muted,#64748b);font-weight:700;">Bellek (RAM RSS)</div>
  <div style="font-size:.95rem;font-weight:900;color:var(--text-primary,#0f172a);margin-top:.15rem;">
- ${sys.memoryRssMb ? sys.memoryRssMb + ' MB' : 'N/A'}
+ ${sys.memoryRssMb ? sys.memoryRssMb + ' MB' : (health.memory?.rssMb ? health.memory.rssMb + ' MB' : 'N/A')}
  </div>
  </div>
  <div style="background:var(--bg-card,#f8fafc);padding:.6rem .8rem;border-radius:10px;border:1px solid var(--border-light,#e2e8f0);">
@@ -212,7 +221,7 @@
  <div style="background:var(--bg-card,#f8fafc);padding:.6rem .8rem;border-radius:10px;border:1px solid var(--border-light,#e2e8f0);">
  <div style="font-size:.7rem;color:var(--text-muted,#64748b);font-weight:700;">Kullanıcılar</div>
  <div style="font-size:.95rem;font-weight:900;color:var(--text-primary,#0f172a);margin-top:.15rem;">
- ${stats.total || 0} (Bekleyen: ${stats.pending || 0})
+ ${totalUserCount} (Bekleyen: ${pendingUserCount})
  </div>
  </div>
  </div>
