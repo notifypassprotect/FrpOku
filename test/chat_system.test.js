@@ -213,4 +213,34 @@ test('profile_tab.js avatar kirpma, zoom, hazir yonetici avatarlari ve bas harfl
   assert.doesNotMatch(profileTab, /\s+on(?:click|change|input|keydown|keyup|submit|load|error)\s*=/i);
 });
 
+test('themes.js sayfa yenilenmesinde toast mesajini sessiz tutar ve secim degistiginde gosterir', () => {
+  const themesSrc = fs.readFileSync(path.join(root, 'js', 'core', 'themes.js'), 'utf8');
+  assert.match(themesSrc, /function applyCodeTheme\(themeId, skipStorage = false, showToast = false\)/);
+  assert.match(themesSrc, /if \(showToast && typeof window\.toast === 'function'\)/);
+  assert.match(themesSrc, /applyCodeTheme\(savedCode, true, false\)/);
+});
+
+test('online_presence.js ve online_presence.css gorsel lightbox, kalici reaksiyonlar ve dinamik pencere hizalama icerir', () => {
+  const css = fs.readFileSync(path.join(root, 'css', 'online_presence.css'), 'utf8');
+  const presence = fs.readFileSync(path.join(root, 'js', 'core', 'online_presence.js'), 'utf8');
+  const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+
+  // CSS Genişlik & Lightbox
+  assert.match(css, /\.frp-lightbox-modal/);
+  assert.match(css, /\.frp-chat-img-thumb-wrap/);
+  assert.match(css, /\.frp-chat-window\.minimized/);
+
+  // JS Lightbox & Reaksiyon & Hizalama
+  assert.match(presence, /openImageLightbox/);
+  assert.match(presence, /renderAvatarContent/);
+  assert.match(presence, /maxExpanded/);
+  assert.match(presence, /frpoku:avatarChanged/);
+
+  // Server Avatar & Reaksiyon kalıcılığı
+  assert.match(server, /getUserAvatars/);
+  assert.match(server, /saveUserAvatar/);
+  assert.match(server, /supabase\.from\('chat_messages'\)\.update\(\{ reactions: msg\.reactions \}\)/);
+});
+
+
 

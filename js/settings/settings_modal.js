@@ -323,17 +323,18 @@ window.openSettingsModal = function(initialTab = 'appearance') {
         }
 
         if (window.FrpAuth?.updateProfile) {
-          Promise.race([
-            window.FrpAuth.updateProfile({
+          try {
+            await window.FrpAuth.updateProfile({
               name: `${stagedProfile.firstName || ''} ${stagedProfile.lastName || ''}`.trim(),
               phone: stagedProfile.phone,
               department: stagedProfile.department,
               email_chat_digest: stagedProfile.emailChatDigest,
               avatar: stagedProfile.avatar
-            }),
-            new Promise(res => setTimeout(res, 800))
-          ]).catch(() => {});
+            });
+          } catch (e) {}
         }
+
+        window.dispatchEvent(new CustomEvent('frpoku:avatarChanged', { detail: { avatar: stagedProfile.avatar } }));
 
         btn.innerHTML = `<span style="display:flex;align-items:center;gap:.35rem;"><span>✓</span><span>Kaydedildi</span></span>`;
         btn.style.background = 'linear-gradient(135deg, #059669, #10b981)';

@@ -1493,6 +1493,7 @@ app.post('/api/auth/update-profile', authRateLimiter, requireAuth, async (req, r
     if (avatar !== undefined) {
       if (typeof avatar === 'string' && avatar.length <= 600000) {
         updates.avatar = avatar;
+        saveUserAvatar(userId, req.authUser.username, avatar);
       }
     }
     if (email !== undefined) return res.status(409).json({ success: false, reason: 'E-posta adresi doğrulama kodu kullanılmadan değiştirilemez.' });
@@ -2271,6 +2272,36 @@ function removeUserPresence(userId) {
   activePresence.delete(String(userId));
 }
 
+// ── KULLANICI PROFİL RESİMLERİ & AVATAR DEPOSU (KALICI & YEDEKLİ) ──
+const USER_AVATARS_FILE = path.join(__dirname, 'data', 'user_avatars.json');
+let userAvatarsCache = null;
+
+function getUserAvatars() {
+  if (userAvatarsCache !== null) return userAvatarsCache;
+  try {
+    if (fs.existsSync(USER_AVATARS_FILE)) {
+      userAvatarsCache = JSON.parse(fs.readFileSync(USER_AVATARS_FILE, 'utf8'));
+    } else {
+      userAvatarsCache = {};
+    }
+  } catch {
+    userAvatarsCache = {};
+  }
+  return userAvatarsCache;
+}
+
+function saveUserAvatar(userId, username, avatar) {
+  const avatars = getUserAvatars();
+  if (userId) avatars[String(userId)] = avatar;
+  if (username) avatars[String(username).toLowerCase()] = avatar;
+  userAvatarsCache = avatars;
+  try {
+    const d = path.dirname(USER_AVATARS_FILE);
+    if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+    fs.writeFileSync(USER_AVATARS_FILE, JSON.stringify(avatars, null, 2), 'utf8');
+  } catch {}
+}
+
 async function getAllUsersWithPresence() {
   const now = Date.now();
   const threshold = 45 * 1000;
@@ -2283,13 +2314,21 @@ async function getAllUsersWithPresence() {
     }
   }
 
+  const avatarStore = getUserAvatars();
   let allUsers = [];
   if (supabase) {
     try {
-      const { data } = await supabase
+      let { data, error } = await supabase
         .from('app_users')
         .select('id, username, full_name, department, role, avatar, is_active, last_seen, last_login')
         .eq('is_active', true);
+      if (error && String(error.message || '').includes('avatar')) {
+        const retry = await supabase
+          .from('app_users')
+          .select('id, username, full_name, department, role, is_active, last_seen, last_login')
+          .eq('is_active', true);
+        data = retry.data;
+      }
       if (data && data.length) allUsers = data;
     } catch {}
   }
@@ -2304,13 +2343,14 @@ async function getAllUsersWithPresence() {
     const isOnline = Boolean(active) && rawStatus !== 'invisible';
     const status = isOnline ? rawStatus : 'offline';
     const lastSeenTime = active ? new Date(active.lastSeen).toISOString() : (u.last_seen || u.last_login || null);
+    const resolvedAvatar = avatarStore[strId] || avatarStore[(u.username || '').toLowerCase()] || u.avatar || '';
     return {
       id: strId,
       username: u.username || '',
       fullName: u.full_name || u.fullName || u.username || '',
       department: u.department || '',
       role: u.role || 'user',
-      avatar: u.avatar || (u.username ? u.username[0].toUpperCase() : 'U'),
+      avatar: resolvedAvatar || (u.username ? u.username[0].toUpperCase() : 'U'),
       isOnline,
       status,
       lastSeen: lastSeenTime
@@ -2886,15 +2926,35 @@ app.post('/api/chat/mark-read', requireAuth, async (req, res) => {
 app.post('/api/chat/react', requireAuth, async (req, res) => {
   try {
     const { messageId, emoji } = req.body || {};
-    if (!messageId || !emoji) return res.status(400).json({ success: false });
+    if (!messageId || !emoji) return res.status(400).json({ success: false, reason: 'Eksik parametre' });
 
     const all = getChatMessages();
-    const msg = all.find(m => m.id === messageId);
+    let msg = all.find(m => String(m.id) === String(messageId));
+
+    if (!msg && supabase) {
+      const { data } = await supabase.from('chat_messages').select('*').eq('id', String(messageId)).limit(1);
+      if (data && data[0]) {
+        msg = {
+          id: data[0].id,
+          senderId: data[0].sender_id,
+          receiverId: data[0].receiver_id,
+          roomId: data[0].room_id,
+          groupId: data[0].group_id,
+          text: data[0].text,
+          attachment: data[0].attachment,
+          voice: data[0].voice,
+          reactions: data[0].reactions || {},
+          createdAt: data[0].created_at
+        };
+        all.push(msg);
+      }
+    }
+
     if (!msg) return res.status(404).json({ success: false, reason: 'Mesaj bulunamadı.' });
 
-    if (!msg.reactions) msg.reactions = {};
+    if (!msg.reactions || typeof msg.reactions !== 'object') msg.reactions = {};
     const myId = String(req.authUser.id);
-    const existing = msg.reactions[emoji] || [];
+    const existing = Array.isArray(msg.reactions[emoji]) ? msg.reactions[emoji] : [];
 
     if (existing.includes(myId)) {
       // Kaldır
@@ -2906,8 +2966,13 @@ app.post('/api/chat/react', requireAuth, async (req, res) => {
     }
 
     saveChatMessages();
+
+    if (supabase) {
+      supabase.from('chat_messages').update({ reactions: msg.reactions }).eq('id', msg.id).then(() => {}).catch(() => {});
+    }
+
     res.json({ success: true, reactions: msg.reactions });
-  } catch {
+  } catch (err) {
     res.status(500).json({ success: false, reason: 'Reaksiyon verilemedi.' });
   }
 });

@@ -156,6 +156,92 @@
     return text.slice(0, 2).toLocaleUpperCase('tr-TR');
   }
 
+  function renderAvatarContent(avatar, initials, isSmall = false) {
+    if (avatar && (avatar.startsWith('data:image/') || avatar.startsWith('http'))) {
+      return `<img src="${avatar}" alt="Avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
+    }
+    if (avatar && avatar.length <= 14 && !/^[a-zA-Z0-9_]{1,3}$/.test(avatar.trim())) {
+      return `<span style="font-size:${isSmall ? '0.92rem' : '1.18rem'};display:flex;align-items:center;justify-content:center;width:100%;height:100%;">${avatar}</span>`;
+    }
+    return `<span style="font-size:${isSmall ? '0.72rem' : '0.85rem'};font-weight:800;color:#ffffff;">${escHtml(initials)}</span>`;
+  }
+
+  // ── GÖRSEL LIGHTBOX / BÜYÜTME & İNDİRME MODALI ──
+  function openImageLightbox({ src, name, size }) {
+    const existing = document.querySelector('.frp-lightbox-modal');
+    if (existing) existing.remove();
+
+    const fileName = name || 'gorsel.png';
+    let currentZoom = 1;
+
+    const modal = document.createElement('div');
+    modal.className = 'frp-lightbox-modal';
+    modal.innerHTML = `
+      <div class="frp-lightbox-bar">
+        <div class="frp-lightbox-title">
+          <span>🖼️</span>
+          <span style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(fileName)}</span>
+          ${size ? `<span style="font-size:0.75rem;opacity:0.75;">(${size})</span>` : ''}
+        </div>
+        <div class="frp-lightbox-tools">
+          <button type="button" class="frp-lightbox-btn btn-zoom-in" title="Yakınlaştır">🔍 +</button>
+          <button type="button" class="frp-lightbox-btn btn-zoom-out" title="Uzaklaştır">🔍 -</button>
+          <button type="button" class="frp-lightbox-btn btn-zoom-reset" title="Varsayılan Boyut">1:1</button>
+          ${typeof window.openImageAnnotator === 'function' ? `<button type="button" class="frp-lightbox-btn btn-annotate" title="Çiz & Düzenle">✏️ Düzenle</button>` : ''}
+          <button type="button" class="frp-lightbox-btn btn-download" title="Görseli İndir">⬇️ İndir</button>
+          <button type="button" class="frp-lightbox-btn btn-close-lightbox" title="Kapat (ESC)">✕ Kapat</button>
+        </div>
+      </div>
+      <div class="frp-lightbox-body">
+        <img src="${src}" alt="${escHtml(fileName)}" class="frp-lightbox-img" draggable="false" />
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const img = modal.querySelector('.frp-lightbox-img');
+    const updateZoom = (z) => {
+      currentZoom = Math.max(0.4, Math.min(4.0, z));
+      if (img) img.style.transform = `scale(${currentZoom})`;
+    };
+
+    modal.querySelector('.btn-zoom-in')?.addEventListener('click', (e) => { e.stopPropagation(); updateZoom(currentZoom + 0.25); });
+    modal.querySelector('.btn-zoom-out')?.addEventListener('click', (e) => { e.stopPropagation(); updateZoom(currentZoom - 0.25); });
+    modal.querySelector('.btn-zoom-reset')?.addEventListener('click', (e) => { e.stopPropagation(); updateZoom(1.0); });
+
+    modal.querySelector('.btn-download')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const a = document.createElement('a');
+      a.href = src;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    });
+
+    modal.querySelector('.btn-annotate')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      modal.remove();
+      if (typeof window.openImageAnnotator === 'function') {
+        window.openImageAnnotator({ imageUrl: src, imageName: fileName });
+      }
+    });
+
+    const closeModal = () => modal.remove();
+    modal.querySelector('.btn-close-lightbox')?.addEventListener('click', closeModal);
+    modal.querySelector('.frp-lightbox-body')?.addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) closeModal();
+    });
+
+    const onKey = (ev) => {
+      if (ev.key === 'Escape') {
+        closeModal();
+        window.removeEventListener('keydown', onKey);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+  }
+
   // ── IN-APP CANLI BİLDİRİM BANNERI (İŞLETİM SİSTEMİ BİLDİRİMİ YERİNE DAHA ŞIK) ──
   function showInAppChatNotification({ senderName, senderInitials, senderGradient, messageText, onOpen }) {
     let container = document.getElementById('frpInAppToastContainer');
@@ -732,14 +818,7 @@
       const name = u.fullName || u.username || 'Kullanıcı';
       const initials = getCleanInitials(u.fullName, u.username);
       const gradient = getAvatarGradient(name);
-      let userAvatarInner = '';
-      if (u.avatar && (u.avatar.startsWith('data:image/') || u.avatar.startsWith('http'))) {
-        userAvatarInner = `<img src="${u.avatar}" alt="Avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
-      } else if (u.avatar && u.avatar.length <= 4 && u.avatar.trim()) {
-        userAvatarInner = `<span style="font-size:1.15rem;display:flex;align-items:center;justify-content:center;width:100%;height:100%;">${u.avatar}</span>`;
-      } else {
-        userAvatarInner = `<span style="font-size:0.85rem;font-weight:800;color:#ffffff;">${escHtml(initials)}</span>`;
-      }
+      const userAvatarInner = renderAvatarContent(u.avatar, initials);
 
       li.innerHTML = `
         <div class="frp-presence-avatar-wrap">
@@ -1000,13 +1079,43 @@
     });
   }
 
-  // ── DİNAMİK PENCERE HİZALAMA (BOŞLUKSUZ YENİDEN YERLEŞİM) ──
+  // ── DİNAMİK PENCERE HİZALAMA (BOŞLUKSUZ & TAŞMAYI ÖNLEYEN YERLEŞİM) ──
   function realignChatWindows() {
-    let idx = 0;
-    activeChatWindows.forEach((winObj) => {
-      const rightOffset = 345 + (idx * 345);
-      winObj.el.style.right = `${rightOffset}px`;
-      idx++;
+    const isDockOpen = panel && panel.classList.contains('open');
+    const baseOffset = isDockOpen ? 355 : 24;
+    const vpWidth = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 1920;
+
+    // Ekrana sığabilecek maksimum açık (genişletilmiş) pencere sayısı
+    const maxExpanded = Math.max(1, Math.min(3, Math.floor((vpWidth - baseOffset - 60) / 365)));
+
+    const windowsArr = Array.from(activeChatWindows.values());
+    const expandedWins = windowsArr.filter(w => !w.el.classList.contains('minimized'));
+
+    // Çok fazla pencere varsa en eskileri otomatik minimize et
+    if (expandedWins.length > maxExpanded) {
+      const toMinimizeCount = expandedWins.length - maxExpanded;
+      for (let i = 0; i < toMinimizeCount; i++) {
+        expandedWins[i].el.classList.add('minimized');
+      }
+    }
+
+    let currentRight = baseOffset;
+    windowsArr.forEach((winObj) => {
+      const isMin = winObj.el.classList.contains('minimized');
+      const winWidth = isMin ? 220 : 350;
+
+      // Sol kenardan taşmayı önle
+      if (currentRight + winWidth > vpWidth - 16) {
+        if (!isMin) {
+          winObj.el.classList.add('minimized');
+        }
+      }
+
+      winObj.el.style.right = `${currentRight}px`;
+      winObj.el.style.transition = 'right 0.25s cubic-bezier(0.16, 1, 0.3, 1), height 0.2s ease, width 0.2s ease';
+
+      const step = winObj.el.classList.contains('minimized') ? 228 : 358;
+      currentRight += step;
     });
   }
 
@@ -1025,14 +1134,15 @@
     if (activeChatWindows.has(chatId)) {
       const activeObj = activeChatWindows.get(chatId);
       activeObj.el.classList.remove('minimized');
+      realignChatWindows();
       const inp = activeObj.el.querySelector('.frp-chat-input');
       if (inp) inp.focus();
       return;
     }
 
-    // Ekrandaki pencerelere göre sağ konumu hesapla
-    const openIndex = activeChatWindows.size;
-    const rightOffset = 345 + (openIndex * 345);
+    const isDockOpen = panel && panel.classList.contains('open');
+    const baseOffset = isDockOpen ? 355 : 24;
+    const rightOffset = baseOffset + (activeChatWindows.size * 358);
 
     const chatEl = document.createElement('div');
     chatEl.className = 'frp-chat-window';
@@ -1062,12 +1172,10 @@
           : (targetUser.isSelfNote ? 'linear-gradient(135deg, #2563eb, #6366f1)' : getAvatarGradient(chatTitle)));
 
     let userAvatarInner = '';
-    if (targetUser && targetUser.avatar && (targetUser.avatar.startsWith('data:image/') || targetUser.avatar.startsWith('http'))) {
-      userAvatarInner = `<img src="${targetUser.avatar}" alt="Avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
-    } else if (targetUser && targetUser.avatar && targetUser.avatar.length <= 4 && targetUser.avatar.trim()) {
-      userAvatarInner = `<span style="font-size:1.15rem;display:flex;align-items:center;justify-content:center;width:100%;height:100%;">${targetUser.avatar}</span>`;
+    if (isRoom || isGroup || targetUser?.isSelfNote) {
+      userAvatarInner = `<span style="font-size:1rem; font-weight:800; color:#ffffff;">${escHtml(userInitials)}</span>`;
     } else {
-      userAvatarInner = `<span style="font-size:${isRoom || isGroup || targetUser?.isSelfNote ? '1rem' : '0.82rem'}; font-weight:800; color:#ffffff;">${escHtml(userInitials)}</span>`;
+      userAvatarInner = renderAvatarContent(targetUser?.avatar, userInitials);
     }
 
     const isReadOnlyRoom = isRoom && !isAdmin;
@@ -1356,14 +1464,7 @@
             const initials = getCleanInitials(mem.fullName, mem.username);
             const gradient = getAvatarGradient(mem.fullName || mem.username);
 
-            let memAvatar = '';
-            if (mem.avatar && (mem.avatar.startsWith('data:image/') || mem.avatar.startsWith('http'))) {
-              memAvatar = `<img src="${mem.avatar}" alt="Avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
-            } else if (mem.avatar && mem.avatar.length <= 4 && mem.avatar.trim()) {
-              memAvatar = `<span>${mem.avatar}</span>`;
-            } else {
-              memAvatar = `<span>${escHtml(initials)}</span>`;
-            }
+            const memAvatar = renderAvatarContent(mem.avatar, initials, true);
 
             memDiv.innerHTML = `
               <div style="display:flex; align-items:center; gap:0.55rem; min-width:0;">
@@ -1659,11 +1760,7 @@
               if (isImg) {
                 item.innerHTML = `<img src="${m.attachment.dataUrl}" alt="${escHtml(m.attachment.name)}" />`;
                 item.addEventListener('click', () => {
-                  if (typeof window.openImageAnnotator === 'function') {
-                    window.openImageAnnotator({ imageUrl: m.attachment.dataUrl, imageName: m.attachment.name });
-                  } else {
-                    window.open(m.attachment.dataUrl, '_blank');
-                  }
+                  openImageLightbox({ src: m.attachment.dataUrl, name: m.attachment.name });
                 });
               } else {
                 item.innerHTML = `
@@ -2179,8 +2276,12 @@
       if (m.attachment && m.attachment.dataUrl && !isAudioAttachment) {
         if ((m.attachment.type || '').startsWith('image/')) {
           contentHtml += `
-            <div style="margin-top: 6px; border-radius: 8px; overflow: hidden; max-width: 220px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
-              <img src="${m.attachment.dataUrl}" alt="${escHtml(m.attachment.name || 'Görsel')}" style="width: 100%; display: block; cursor: pointer;" />
+            <div class="frp-chat-img-thumb-wrap" title="Büyütmek için tıklayın">
+              <img src="${m.attachment.dataUrl}" alt="${escHtml(m.attachment.name || 'Görsel')}" />
+              <div class="frp-chat-img-overlay">
+                <button type="button" class="frp-chat-img-action-btn btn-open-img-lightbox" title="Büyüt ve Önizle">🔍 Önizle</button>
+                <button type="button" class="frp-chat-img-action-btn btn-download-img" title="Görseli İndir">⬇️ İndir</button>
+              </div>
             </div>
           `;
         } else {
@@ -2263,11 +2364,33 @@
         </div>
       `;
 
+      // Görsel önizleme ve indirme tıklama olayları
+      const imgThumb = msgDiv.querySelector('.frp-chat-img-thumb-wrap');
+      if (imgThumb && m.attachment) {
+        imgThumb.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          openImageLightbox({ src: m.attachment.dataUrl, name: m.attachment.name });
+        });
+        const btnDownload = imgThumb.querySelector('.btn-download-img');
+        if (btnDownload) {
+          btnDownload.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            const a = document.createElement('a');
+            a.href = m.attachment.dataUrl;
+            a.download = m.attachment.name || 'gorsel.png';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+          });
+        }
+      }
+
       // Event binding
       msgDiv.querySelectorAll('.btn-react').forEach(rbtn => {
-        rbtn.addEventListener('click', (ev) => {
+        rbtn.addEventListener('click', async (ev) => {
           ev.stopPropagation();
           const emoji = rbtn.dataset.emoji;
+          const targetMsgId = msgDiv.dataset.msgId || m.id;
 
           // Anında iyimser reaksiyon güncellemesi
           let reactionsWrap = msgDiv.querySelector('.frp-chat-reactions-row');
@@ -2297,11 +2420,19 @@
             reactionsWrap.appendChild(newPill);
           }
 
-          fetch('/api/chat/react', {
-            method: 'POST',
-            headers: window.FrpAuth.getAuthHeaders ? window.FrpAuth.getAuthHeaders() : { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ messageId: m.id, emoji })
-          }).then(() => loadMessages()).catch(() => {});
+          try {
+            const res = await fetch('/api/chat/react', {
+              method: 'POST',
+              headers: window.FrpAuth.getAuthHeaders ? window.FrpAuth.getAuthHeaders() : { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ messageId: targetMsgId, emoji })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (data && data.success && data.reactions) {
+              m.reactions = data.reactions;
+              const cur = currentMessages.find(x => x.id === targetMsgId);
+              if (cur) cur.reactions = data.reactions;
+            }
+          } catch (e) {}
         });
       });
 
@@ -2424,7 +2555,17 @@
       }
     });
 
-    window.addEventListener('focus', () => {
+    window.addEventListener('resize', realignChatWindows);
+
+    window.addEventListener('frpoku:avatarChanged', (e) => {
+      const newAvatar = e.detail?.avatar;
+      const curAuth = window.FrpAuth && window.FrpAuth.getUser ? window.FrpAuth.getUser() : null;
+      if (curAuth) {
+        curAuth.avatar = newAvatar;
+        const selfUser = cachedUsers.find(u => String(u.id) === String(curAuth.id));
+        if (selfUser) selfUser.avatar = newAvatar;
+        if (currentTab === 'users') renderUsers();
+      }
       sendHeartbeat();
     });
 

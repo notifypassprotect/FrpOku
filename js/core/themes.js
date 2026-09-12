@@ -51,7 +51,7 @@
     return t === 'dark' ? 'dark' : 'light';
   }
 
-  function applyCodeTheme(themeId, skipStorage = false) {
+  function applyCodeTheme(themeId, skipStorage = false, showToast = false) {
     const valid = CODE_THEMES.some(t => t.id === themeId);
     const target = valid ? themeId : (getGlobalTheme() === 'dark' ? 'frpoku-dark' : 'frpoku-light');
 
@@ -111,27 +111,27 @@
     // Custom event fırlat
     window.dispatchEvent(new CustomEvent('frpoku:themeChanged', { detail: { themeId: target, uiTheme } }));
 
-    if (!skipStorage && typeof window.toast === 'function') {
+    if (showToast && typeof window.toast === 'function') {
       const th = CODE_THEMES.find(t => t.id === target);
       if (th) window.toast(`Tema uygulandı: ${th.label}`, 'info', 2000);
     }
   }
 
-  function setTheme(theme) {
+  function setTheme(theme, showToast = false) {
     const isDark = theme === 'dark';
     const targetCodeTheme = isDark ? 'frpoku-dark' : 'frpoku-light';
-    applyCodeTheme(targetCodeTheme);
+    applyCodeTheme(targetCodeTheme, false, showToast);
   }
 
   function initCodeTheme() {
     const savedGlobal = getGlobalTheme();
     const isDark = savedGlobal === 'dark';
-    const savedCode = localStorage.getItem(THEME_CODE_KEY);
+    const savedCode = localStorage.getItem(_scopedUserKey(THEME_CODE_KEY)) || localStorage.getItem(THEME_CODE_KEY);
     
     if (savedCode) {
-      applyCodeTheme(savedCode);
+      applyCodeTheme(savedCode, true, false);
     } else {
-      applyCodeTheme(isDark ? 'frpoku-dark' : 'frpoku-light');
+      applyCodeTheme(isDark ? 'frpoku-dark' : 'frpoku-light', true, false);
     }
   }
 
@@ -155,7 +155,7 @@
 
     const sel = wrap.querySelector('.theme-selector-select');
     sel.addEventListener('change', () => {
-      applyCodeTheme(sel.value);
+      applyCodeTheme(sel.value, false, true);
     });
 
     return wrap;
