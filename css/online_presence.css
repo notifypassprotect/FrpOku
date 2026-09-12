@@ -1179,7 +1179,7 @@
   position: fixed;
   top: 24px;
   right: 24px;
-  z-index: 200060;
+  z-index: 999999 !important;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1620,4 +1620,3 @@
   justify-content: center;
   gap: 0.4rem;
 }
-

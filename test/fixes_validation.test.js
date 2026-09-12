@@ -118,3 +118,15 @@ test('Ortak havuz kullanıcı filtresi index.html ve list.js içinde mevcuttur',
   assert.match(listJs, /selectedUser/, 'list.js selectedUser değişkeni içermeli');
   assert.match(listJs, /updateUserList/, 'list.js updateUserList fonksiyonu içermeli');
 });
+
+test('tüm toast katmanları tam ekran modalların üzerinde gösterilir', () => {
+  const detailHtml = fs.readFileSync(path.join(__dirname, '..', 'detail.html'), 'utf8');
+  const listCss = fs.readFileSync(path.join(__dirname, '..', 'css', 'list.css'), 'utf8');
+  const presenceCss = fs.readFileSync(path.join(__dirname, '..', 'css', 'online_presence.css'), 'utf8');
+  const styleCss = fs.readFileSync(path.join(__dirname, '..', 'css', 'style.css'), 'utf8');
+
+  assert.match(detailHtml, /#toastDetail[\s\S]*?z-index:\s*999999\s*!important/);
+  assert.match(listCss, /\.toast-stack[\s\S]*?z-index:\s*999999\s*!important/);
+  assert.match(presenceCss, /\.frp-inapp-toast-container[\s\S]*?z-index:\s*999999\s*!important/);
+  assert.match(styleCss, /\.frp-toast-container[\s\S]*?z-index:\s*999999/);
+});
