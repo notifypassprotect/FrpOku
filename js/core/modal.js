@@ -20,6 +20,7 @@ function showModal({
   closeOnBackdrop = true,
   buttons = null
 }) {
+  return new Promise((resolve) => {
     // Prevent duplicate modals with the same title
     const existingSame = Array.from(document.querySelectorAll('.modal-overlay .modal-title')).find(el => el.textContent.trim() === String(title || '').trim());
     if (existingSame) {

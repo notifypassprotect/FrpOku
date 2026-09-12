@@ -331,7 +331,8 @@ app.use((req, res, next) => {
     "font-src 'self' https://fonts.gstatic.com data:; " +
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co; " +
     "img-src 'self' data: blob: https:; " +
-    "object-src 'none'; " +
+    "frame-src 'self' blob: data: https:; " +
+    "object-src 'self' blob: data:; " +
     "base-uri 'self'; " +
     "form-action 'self'; " +
     "frame-ancestors 'self';"
@@ -395,7 +396,9 @@ function sendScriptSafePage(res, page) {
     "font-src 'self' https://fonts.gstatic.com data:; " +
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co; " +
     "img-src 'self' data: blob: https:; " +
-    "worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self';"
+    "frame-src 'self' blob: data: https:; " +
+    "object-src 'self' blob: data:; " +
+    "worker-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self';"
   );
   res.sendFile(path.join(__dirname, page));
 }
@@ -413,7 +416,9 @@ function sendNoncePage(res, page) {
       "font-src 'self' https://fonts.gstatic.com data:; " +
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co; " +
       "img-src 'self' data: blob: https:; " +
-      "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self';"
+      "frame-src 'self' blob: data: https:; " +
+      "object-src 'self' blob: data:; " +
+      "base-uri 'self'; form-action 'self'; frame-ancestors 'self';"
     );
     const html = source.replace(/<script(?![^>]*\bsrc=)([^>]*)>/gi, `<script nonce="${nonce}"$1>`);
     res.type('html').send(html);
@@ -1810,19 +1815,15 @@ app.get('/api/reports/:id/attachments/:filename', requireAuth, async (req, res) 
 });
 
 // ── ÇEVRİMİÇİ KULLANICI & VARLIK (PRESENCE) YÖNETİMİ ──────────
-const activePresence = new Map(); // userId -> { userId, username, fullName, department, role, avatar, lastSeen }
+const activePresence = new Map(); // userId -> { userId, customStatus, lastSeen }
 
-function recordUserPresence(user) {
+function recordUserPresence(user, customStatus = 'online') {
   if (!user || !user.id) return;
-  const id = String(user.id);
-  activePresence.set(id, {
-    userId: id,
-    username: user.username || '',
-    fullName: user.full_name || user.fullName || user.username || '',
-    department: user.department || '',
-    role: user.role || 'user',
-    avatar: user.avatar || (user.username ? user.username[0].toUpperCase() : 'U'),
-    lastSeen: Date.now()
+  const validStatus = ['online', 'busy', 'dnd', 'invisible'].includes(customStatus) ? customStatus : 'online';
+  activePresence.set(String(user.id), {
+    userId: String(user.id),
+    lastSeen: Date.now(),
+    customStatus: validStatus
   });
 }
 
@@ -1860,7 +1861,9 @@ async function getAllUsersWithPresence() {
   return allUsers.map(u => {
     const strId = String(u.id);
     const active = activeMap.get(strId);
-    const isOnline = Boolean(active);
+    const rawStatus = active ? (active.customStatus || 'online') : 'offline';
+    const isOnline = Boolean(active) && rawStatus !== 'invisible';
+    const status = isOnline ? rawStatus : 'offline';
     const lastSeenTime = active ? new Date(active.lastSeen).toISOString() : (u.last_seen || u.last_login || null);
     return {
       id: strId,
@@ -1870,6 +1873,7 @@ async function getAllUsersWithPresence() {
       role: u.role || 'user',
       avatar: u.avatar || (u.username ? u.username[0].toUpperCase() : 'U'),
       isOnline,
+      status,
       lastSeen: lastSeenTime
     };
   }).sort((a, b) => {
@@ -1881,9 +1885,10 @@ async function getAllUsersWithPresence() {
 
 app.post('/api/presence/heartbeat', requireAuth, async (req, res) => {
   try {
-    recordUserPresence(req.authUser);
+    const customStatus = req.body?.customStatus || 'online';
+    recordUserPresence(req.authUser, customStatus);
     if (supabase) {
-      supabase.from('app_users').update({ last_seen: new Date().toISOString(), is_online: true }).eq('id', req.authUser.id).then(() => {}).catch(() => {});
+      supabase.from('app_users').update({ last_seen: new Date().toISOString(), is_online: customStatus !== 'invisible' }).eq('id', req.authUser.id).then(() => {}).catch(() => {});
     }
     const users = await getAllUsersWithPresence();
     res.json({ success: true, users });

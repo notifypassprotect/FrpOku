@@ -737,25 +737,32 @@
  showAdminCustomConfirm({
  title: 'Başvuruyu Reddet',
  message: `"${uName}" kullanıcısının kayıt başvurusunu reddetmek istediğinize emin misiniz?`,
- details: 'Bu işlem onay bekleyen başvuruyu kalıcı olarak sistemden kaldıracaktır.',
- confirmText: 'Başvuruyu Reddet',
- cancelText: 'Vazgeç',
- isDanger: true,
- onConfirm: async () => {
- try {
- const res = await fetch('/api/admin/reject-user', {
- method: 'POST',
- headers: (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') ? window.FrpAuth.getAuthHeaders() : {},
- body: JSON.stringify({ userId: uId, deletePermanently: true })
- });
- const data = await res.json();
- if (data.success) {
- if (typeof window.toast === 'function') window.toast(`"${uName}" başvurusu reddedildi.`, 'info');
- renderPendingTab();
- }
- };
- });
- }
+        details: 'Bu işlem onay bekleyen başvuruyu kalıcı olarak sistemden kaldıracaktır.',
+        confirmText: 'Başvuruyu Reddet',
+        cancelText: 'Vazgeç',
+        isDanger: true,
+        onConfirm: async () => {
+          try {
+            const res = await fetch('/api/admin/reject-user', {
+              method: 'POST',
+              headers: (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') ? window.FrpAuth.getAuthHeaders() : {},
+              body: JSON.stringify({ userId: uId, deletePermanently: true })
+            });
+            const data = await res.json();
+            if (data.success) {
+              if (typeof window.toast === 'function') window.toast(`"${uName}" başvurusu reddedildi.`, 'info');
+              renderPendingTab();
+            } else {
+              alert(data.reason || 'Başvuru reddedilemedi.');
+            }
+          } catch (e) {
+            alert('Hata: ' + e.message);
+          }
+        }
+      });
+    };
+  });
+  }
 
  // ── Sekme 2: Tüm Kullanıcılar ──
  async function renderAllUsersTab() {
