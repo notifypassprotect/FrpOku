@@ -54,6 +54,7 @@ test('istemci çıktısında data içindeki sahte yetki alanlarını authoritati
 test('yeni rapor sürüm 1 ile başlar ve doğru sürüm bir artırılır', () => {
   assert.equal(nextReportVersion(null, 0), 1);
   assert.equal(nextReportVersion({ version: 4 }, 4), 5);
+  assert.equal(nextReportVersion({ data: { version: 6 } }, 6), 7);
 });
 
 test('eski sürümle rapor yazma girişimi conflict üretir', () => {
@@ -68,7 +69,7 @@ test('rapor istemci çıktısına authoritative sürüm eklenir', () => {
   assert.equal(reportRowToClient({ id: 'rep_1', user_id: owner.id, version: 7 }).version, 7);
 });
 
-test('toSupabaseReportRow desteklenen version kolonunu ve data içeriğini korur', () => {
+test('toSupabaseReportRow eski şemada olmayan version kolonunu filtreler, data içeriğini korur', () => {
   const { toSupabaseReportRow } = require('../lib/report_access');
   const fullRow = {
     id: 'rep_123',
@@ -86,7 +87,7 @@ test('toSupabaseReportRow desteklenen version kolonunu ve data içeriğini korur
   assert.equal(sanitized.user_id, owner.id);
   assert.equal(sanitized.is_public, undefined);
   assert.equal(sanitized.owner_name, undefined);
-  assert.equal(sanitized.version, 3);
+  assert.equal(sanitized.version, undefined);
   assert.equal(sanitized.data.is_public, true);
   assert.equal(sanitized.data.version, 3);
 });

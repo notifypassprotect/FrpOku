@@ -20,8 +20,9 @@ test('tekil rapor endpointi version koşullu güncelleme yapar', () => {
   assert.match(source, /app\.put\('\/api\/reports\/:id'/);
   assert.match(source, /\.eq\('version', currentVersion\)/);
   assert.match(source, /REPORT_CONFLICT/);
-  assert.match(source, /user_id, version, meta:data->meta/);
-  assert.match(reportAccessSource, /'version', 'created_at', 'updated_at'/);
+  assert.match(source, /data->version/);
+  assert.match(reportAccessSource, /existing\.version != null \? existing\.version : existing\.data\?\.version/);
+  assert.doesNotMatch(reportAccessSource, /'version', 'created_at', 'updated_at'/);
 });
 
 test('Supabase doğrudan yazmaları hata kontrolü olmadan await edilmez', () => {
