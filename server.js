@@ -8,7 +8,7 @@ const { isValidEmail, isValidText, isValidUsername, normalizeEmail, normalizePho
 const { createMailer } = require('./lib/mailer');
 const { PASSWORD_MAX_LENGTH, hashPassword, verifyPassword: verifyPasswordHash } = require('./lib/passwords');
 const { createRateLimiter } = require('./lib/rate_limiter');
-const { buildOwnedReportRow, canManageReport, canReadReport, nextReportVersion, reportId, reportRowToClient, reportRowToSummaryClient, toSupabaseReportRow } = require('./lib/report_access');
+const { buildOwnedReportRow, canManageReport, canEditReportNote, canReadReport, nextReportVersion, reportId, reportRowToClient, reportRowToSummaryClient, toSupabaseReportRow } = require('./lib/report_access');
 const { createSessionAuth } = require('./lib/session_auth');
 const { createStagingAccessMiddleware } = require('./lib/staging_access');
 
@@ -1291,7 +1291,7 @@ async function getReportRecord(id) {
   }) || null;
 }
 
-const SUMMARY_SELECT_COLUMNS = 'id, name, file_size, category, tags, is_favorite, is_pinned, sql_count, memo_count, dataset_count, page_count, has_script, created_at, updated_at, user_note, is_deleted, deleted_at, user_id, meta:data->meta, data->isPublic, data->is_public, data->inPool, data->in_pool, data->ownerName, data->ownerUsername, data->ownerDepartment, data->sharedAt, data->version, tableNames:data->tableNames, queryNames:data->queryNames, paramNames:data->paramNames, datasets:data->datasets';
+const SUMMARY_SELECT_COLUMNS = 'id, name, file_size, category, tags, is_favorite, is_pinned, sql_count, memo_count, dataset_count, page_count, has_script, created_at, updated_at, user_note, is_deleted, deleted_at, user_id, meta:data->meta, data->isPublic, data->is_public, data->inPool, data->in_pool, data->ownerName, data->ownerUsername, data->ownerDepartment, data->sharedAt, data->version, data->noteHtml, data->attachments, tableNames:data->tableNames, queryNames:data->queryNames, paramNames:data->paramNames, datasets:data->datasets';
 
 async function loadVisibleReports(user, isDeleted, { summaryOnly = true } = {}) {
   if (supabase) {
@@ -1642,6 +1642,268 @@ app.post('/api/reports/bulk-toggle-pool', apiWriteRateLimiter, requireAuth, asyn
     res.json({ success: true, count: reportIds.length, isPublic });
   } catch (error) {
     res.status(503).json({ success: false, reason: 'Ortak havuz durumu güncellenemedi.' });
+  }
+});
+
+// ── RAPOR ZENGİN NOTU & DOSYA EKLERİ (RICH NOTES & ATTACHMENTS) ─
+const ATTACHMENTS_DIR = path.join(__dirname, 'data', 'attachments');
+
+app.patch('/api/reports/:id/note', apiWriteRateLimiter, requireAuth, async (req, res) => {
+  const id = String(req.params.id || '').trim();
+  if (!id) return res.status(400).json({ success: false, reason: 'Rapor kimliği gereklidir.' });
+
+  try {
+    const existing = await getReportRecord(id);
+    if (!existing) return res.status(404).json({ success: false, reason: 'Rapor bulunamadı.' });
+    if (!canEditReportNote(req.authUser, existing)) {
+      return res.status(403).json({ success: false, reason: 'Bu rapora not ekleme yetkiniz bulunmamaktadır.' });
+    }
+
+    const { userNote, noteHtml, attachments } = req.body || {};
+    const cleanNote = String(userNote || '').slice(0, 500000);
+    const cleanHtml = String(noteHtml || '').slice(0, 500000);
+    const cleanAttachments = Array.isArray(attachments) ? attachments.slice(0, 50) : (existing.data?.attachments || []);
+
+    const now = new Date().toISOString();
+
+    if (supabase) {
+      const current = reportRowToClient(existing);
+      const data = {
+        ...current,
+        userNote: cleanNote,
+        user_note: cleanNote,
+        noteHtml: cleanHtml,
+        note_html: cleanHtml,
+        attachments: cleanAttachments,
+        noteAttachments: cleanAttachments
+      };
+      const updatePayload = {
+        user_note: cleanNote,
+        data,
+        updated_at: now
+      };
+      try {
+        const fullPayload = { ...updatePayload, note_html: cleanHtml, note_attachments: cleanAttachments };
+        const res1 = await supabase.from('reports').update(fullPayload).eq('id', id).select('*').limit(1);
+        if (res1.error) throw res1.error;
+      } catch {
+        const res2 = await supabase.from('reports').update(updatePayload).eq('id', id).select('*').limit(1);
+        if (res2.error) throw res2.error;
+      }
+    } else {
+      const reports = readLocalReports();
+      const idx = reports.findIndex(r => reportId(r) === id);
+      if (idx >= 0) {
+        reports[idx].user_note = cleanNote;
+        reports[idx].userNote = cleanNote;
+        reports[idx].note_html = cleanHtml;
+        reports[idx].noteHtml = cleanHtml;
+        reports[idx].attachments = cleanAttachments;
+        reports[idx].noteAttachments = cleanAttachments;
+        reports[idx].updated_at = now;
+        writeLocalReports(reports);
+      }
+    }
+
+    recordAuditLog({
+      userId: req.authUser.id,
+      username: req.authUser.username,
+      fullName: req.authUser.full_name,
+      role: req.authUser.role,
+      action: 'NOTE_UPDATE',
+      target: existing.name || id,
+      details: 'Rapor zengin notu ve ekleri güncellendi.',
+      ip: req.ip
+    });
+
+    res.json({
+      success: true,
+      userNote: cleanNote,
+      noteHtml: cleanHtml,
+      attachments: cleanAttachments
+    });
+  } catch (err) {
+    console.warn('Rapor notu kaydedilemedi:', safeLogStr(err.message));
+    res.status(500).json({ success: false, reason: 'Rapor notu kaydedilemedi: ' + err.message });
+  }
+});
+
+app.post('/api/reports/:id/attachments', apiWriteRateLimiter, requireAuth, async (req, res) => {
+  const reportIdParam = String(req.params.id || '').trim();
+  if (!reportIdParam) return res.status(400).json({ success: false, reason: 'Rapor kimliği gereklidir.' });
+
+  try {
+    const report = await getReportRecord(reportIdParam);
+    if (!report) return res.status(404).json({ success: false, reason: 'Rapor bulunamadı.' });
+    if (!canEditReportNote(req.authUser, report)) {
+      return res.status(403).json({ success: false, reason: 'Bu rapora ek yükleme yetkiniz yok.' });
+    }
+
+    const { filename, mimeType, base64Data } = req.body || {};
+    if (!filename || !base64Data) {
+      return res.status(400).json({ success: false, reason: 'Dosya adı ve içeriği gereklidir.' });
+    }
+
+    const baseName = path.basename(filename).replace(/[^a-zA-Z0-9.\-_ğüşıöçĞÜŞİÖÇ]/g, '_');
+    const safeName = Date.now() + '_' + baseName;
+    const targetDir = path.resolve(ATTACHMENTS_DIR, reportIdParam);
+    if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+
+    const buffer = Buffer.from(base64Data.replace(/^data:[^;]+;base64,/, ''), 'base64');
+    if (buffer.length > 15 * 1024 * 1024) {
+      return res.status(400).json({ success: false, reason: 'Dosya boyutu 15 MB sınırını aşamaz.' });
+    }
+
+    const targetFile = path.resolve(targetDir, safeName);
+    if (!targetFile.startsWith(targetDir)) {
+      return res.status(400).json({ success: false, reason: 'Geçersiz dosya adı.' });
+    }
+    fs.writeFileSync(targetFile, buffer);
+
+    const attachmentItem = {
+      id: 'att_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      name: baseName,
+      size: buffer.length,
+      type: mimeType || 'application/octet-stream',
+      url: `/api/reports/${encodeURIComponent(reportIdParam)}/attachments/${encodeURIComponent(safeName)}`,
+      uploadedAt: new Date().toISOString(),
+      uploadedBy: req.authUser.full_name || req.authUser.username
+    };
+
+    res.json({ success: true, attachment: attachmentItem });
+  } catch (err) {
+    console.warn('Ek yükleme hatası:', safeLogStr(err.message));
+    res.status(500).json({ success: false, reason: 'Ek yüklenemedi: ' + err.message });
+  }
+});
+
+app.get('/api/reports/:id/attachments/:filename', requireAuth, async (req, res) => {
+  const reportIdParam = String(req.params.id || '').trim();
+  const filename = path.basename(String(req.params.filename || '').trim());
+  if (!reportIdParam || !filename) return res.status(400).send('Geçersiz dosya isteği.');
+
+  try {
+    const report = await getReportRecord(reportIdParam);
+    if (!report || !canReadReport(req.authUser, report)) {
+      return res.status(403).send('Bu eki görüntüleme yetkiniz yok.');
+    }
+
+    const targetDir = path.resolve(ATTACHMENTS_DIR, reportIdParam);
+    const filePath = path.resolve(targetDir, filename);
+    if (!filePath.startsWith(targetDir) || !fs.existsSync(filePath)) {
+      return res.status(404).send('Ek dosya bulunamadı.');
+    }
+
+    res.sendFile(filePath);
+  } catch (err) {
+    res.status(500).send('Dosya getirilemedi.');
+  }
+});
+
+// ── ÇEVRİMİÇİ KULLANICI & VARLIK (PRESENCE) YÖNETİMİ ──────────
+const activePresence = new Map(); // userId -> { userId, username, fullName, department, role, avatar, lastSeen }
+
+function recordUserPresence(user) {
+  if (!user || !user.id) return;
+  const id = String(user.id);
+  activePresence.set(id, {
+    userId: id,
+    username: user.username || '',
+    fullName: user.full_name || user.fullName || user.username || '',
+    department: user.department || '',
+    role: user.role || 'user',
+    avatar: user.avatar || (user.username ? user.username[0].toUpperCase() : 'U'),
+    lastSeen: Date.now()
+  });
+}
+
+function removeUserPresence(userId) {
+  if (!userId) return;
+  activePresence.delete(String(userId));
+}
+
+async function getAllUsersWithPresence() {
+  const now = Date.now();
+  const threshold = 45 * 1000;
+  const activeMap = new Map();
+  for (const [id, data] of activePresence.entries()) {
+    if (now - data.lastSeen <= threshold) {
+      activeMap.set(String(id), data);
+    } else {
+      activePresence.delete(id);
+    }
+  }
+
+  let allUsers = [];
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from('app_users')
+        .select('id, username, full_name, department, role, avatar, is_active, last_seen, last_login')
+        .eq('is_active', true);
+      if (data && data.length) allUsers = data;
+    } catch {}
+  }
+  if (!allUsers.length) {
+    allUsers = getLocalUsers().filter(u => u.is_active !== false);
+  }
+
+  return allUsers.map(u => {
+    const strId = String(u.id);
+    const active = activeMap.get(strId);
+    const isOnline = Boolean(active);
+    const lastSeenTime = active ? new Date(active.lastSeen).toISOString() : (u.last_seen || u.last_login || null);
+    return {
+      id: strId,
+      username: u.username || '',
+      fullName: u.full_name || u.fullName || u.username || '',
+      department: u.department || '',
+      role: u.role || 'user',
+      avatar: u.avatar || (u.username ? u.username[0].toUpperCase() : 'U'),
+      isOnline,
+      lastSeen: lastSeenTime
+    };
+  }).sort((a, b) => {
+    if (a.isOnline && !b.isOnline) return -1;
+    if (!a.isOnline && b.isOnline) return 1;
+    return (a.fullName || a.username).localeCompare(b.fullName || b.username, 'tr');
+  });
+}
+
+app.post('/api/presence/heartbeat', requireAuth, async (req, res) => {
+  try {
+    recordUserPresence(req.authUser);
+    if (supabase) {
+      supabase.from('app_users').update({ last_seen: new Date().toISOString(), is_online: true }).eq('id', req.authUser.id).then(() => {}).catch(() => {});
+    }
+    const users = await getAllUsersWithPresence();
+    res.json({ success: true, users });
+  } catch (err) {
+    res.status(500).json({ success: false, reason: 'Presence güncellenemedi.' });
+  }
+});
+
+app.get('/api/presence/users', requireAuth, async (req, res) => {
+  try {
+    const users = await getAllUsersWithPresence();
+    res.json({ success: true, users });
+  } catch (err) {
+    res.status(500).json({ success: false, reason: 'Kullanıcılar alınamadı.' });
+  }
+});
+
+app.post('/api/presence/offline', async (req, res) => {
+  try {
+    const userId = req.body?.userId;
+    if (userId) {
+      removeUserPresence(userId);
+      if (supabase) {
+        supabase.from('app_users').update({ is_online: false, last_seen: new Date().toISOString() }).eq('id', String(userId)).then(() => {}).catch(() => {});
+      }
+    }
+    res.json({ success: true });
+  } catch {
+    res.json({ success: true });
   }
 });
 

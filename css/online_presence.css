@@ -1,0 +1,337 @@
+/* ============================================================
+   online_presence.css — Facebook Tarzı Çevrimiçi Kullanıcı Paneli
+   ============================================================ */
+
+.frp-presence-dock {
+  position: fixed;
+  bottom: 20px;
+  right: 24px;
+  z-index: 99999;
+  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+  user-select: none;
+}
+
+/* ── KAPALI / PİLL DURUMU ── */
+.frp-presence-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 1.1rem;
+  background: var(--bg-surface, #ffffff);
+  color: var(--text-primary, #0f172a);
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 9999px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(12px);
+}
+
+.frp-presence-pill:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px -4px rgba(0, 0, 0, 0.22);
+  border-color: var(--accent, #2563eb);
+}
+
+.frp-presence-pill-pulse {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+.frp-presence-pill-pulse::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: #10b981;
+  opacity: 0.6;
+  animation: presencePulse 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes presencePulse {
+  0% { transform: scale(0.9); opacity: 0.8; }
+  70% { transform: scale(2.2); opacity: 0; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+.frp-presence-pill-text {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.frp-presence-pill-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+/* ── AÇILIR PANEL ── */
+.frp-presence-panel {
+  display: none;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  max-height: 520px;
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 16px;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.25), 0 0 1px 1px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  flex-direction: column;
+  animation: presenceSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: blur(16px);
+}
+
+.frp-presence-panel.open {
+  display: flex;
+}
+
+@keyframes presenceSlideUp {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── PANEL HEADER ── */
+.frp-presence-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  background: var(--bg-surface, #ffffff);
+  border-bottom: 1px solid var(--border-light, #e2e8f0);
+}
+
+.frp-presence-title-area {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.frp-presence-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-primary, #0f172a);
+}
+
+.frp-presence-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.frp-presence-btn-icon {
+  background: none;
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.frp-presence-btn-icon:hover {
+  background: var(--bg-raised, #f1f5f9);
+  color: var(--text-primary, #0f172a);
+}
+
+/* ── SEARCH BAR ── */
+.frp-presence-search-wrap {
+  padding: 0.5rem 0.85rem;
+  border-bottom: 1px solid var(--border-light, #e2e8f0);
+  background: var(--bg-card, #f8fafc);
+}
+
+.frp-presence-search-input {
+  width: 100%;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.8rem;
+  border-radius: 8px;
+  border: 1px solid var(--border, #cbd5e1);
+  background: var(--bg-surface, #ffffff);
+  color: var(--text-primary, #0f172a);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.frp-presence-search-input:focus {
+  border-color: var(--accent, #2563eb);
+}
+
+/* ── KULLANICI LİSTESİ ── */
+.frp-presence-list {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 360px;
+  padding: 0.35rem 0.45rem;
+  list-style: none;
+  margin: 0;
+}
+
+.frp-presence-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.frp-presence-item:hover {
+  background: var(--bg-raised, #f1f5f9);
+}
+
+.frp-presence-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+}
+
+.frp-presence-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent, #2563eb), #6366f1);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.frp-presence-status-dot {
+  position: absolute;
+  bottom: 0px;
+  right: 0px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-surface, #ffffff);
+}
+
+.frp-presence-status-dot.online {
+  background: #10b981;
+}
+
+.frp-presence-status-dot.offline {
+  background: #94a3b8;
+}
+
+.frp-presence-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.frp-presence-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.frp-presence-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.frp-presence-time {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+  flex-shrink: 0;
+}
+
+.frp-presence-time.online {
+  color: #10b981;
+}
+
+.frp-presence-sub {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  color: var(--text-muted, #64748b);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.frp-presence-dept-badge {
+  display: inline-block;
+  padding: 0.08rem 0.35rem;
+  border-radius: 4px;
+  background: var(--bg-raised, #e2e8f0);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+/* ── BOŞ DURUM ── */
+.frp-presence-empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--text-muted, #64748b);
+  font-size: 0.82rem;
+}
+
+/* ── FOOTER ── */
+.frp-presence-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.9rem;
+  background: var(--bg-card, #f8fafc);
+  border-top: 1px solid var(--border-light, #e2e8f0);
+  font-size: 0.75rem;
+  color: var(--text-muted, #64748b);
+}
+
+/* ── MINI SOHBET ÖN HAZIRLIK MODALI ── */
+.frp-chat-placeholder-modal {
+  position: fixed;
+  bottom: 80px;
+  right: 360px;
+  width: 290px;
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 14px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.2);
+  padding: 1rem;
+  z-index: 100000;
+  animation: presenceSlideUp 0.18s ease-out;
+}
+
+.frp-chat-placeholder-title {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--text-primary, #0f172a);
+  margin-bottom: 0.3rem;
+}
+
+.frp-chat-placeholder-sub {
+  font-size: 0.78rem;
+  color: var(--text-muted, #64748b);
+  line-height: 1.4;
+  margin-bottom: 0.8rem;
+}

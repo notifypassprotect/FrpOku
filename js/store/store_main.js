@@ -1044,7 +1044,7 @@
   }
 
   // ── 6. Not, Meta, Kod Güncelleme ────────────────────────────
-  function updateNote(id, note) {
+  function updateNote(id, note, extra = {}) {
     const files = _read();
     const strId = String(id);
     const idx = files.findIndex(f => String(f.id) === strId);
@@ -1053,6 +1053,17 @@
     if (idx >= 0) {
       files[idx].userNote = cleanNote;
       files[idx].user_note = cleanNote;
+      if (extra && typeof extra === 'object') {
+        if (extra.noteHtml !== undefined) {
+          files[idx].noteHtml = extra.noteHtml;
+          files[idx].note_html = extra.noteHtml;
+        }
+        if (Array.isArray(extra.attachments)) {
+          files[idx].attachments = extra.attachments;
+          files[idx].noteAttachments = extra.attachments;
+          files[idx].note_attachments = extra.attachments;
+        }
+      }
       files[idx].updated_at = new Date().toISOString();
       _write(files);
       _audit('NOTE_UPDATE', files[idx].name || id, 'Rapor kullanıcı notu güncellendi.');

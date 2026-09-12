@@ -139,7 +139,23 @@
  return null;
  }
 
+  function updateSession(updatedUser) {
+    currentUser = getSession();
+    if (currentUser && updatedUser) {
+      currentUser = { ...currentUser, ...updatedUser };
+      const isRem = localStorage.getItem(REMEMBER_KEY) === '1';
+      setSession(currentUser, isRem);
+    }
+    return currentUser;
+  }
+
   function logout() {
+    try {
+      if (window.FrpPresence && typeof window.FrpPresence.leave === 'function') {
+        window.FrpPresence.leave();
+      }
+    } catch {}
+
     const doClear = () => {
       currentUser = null;
       localStorage.removeItem(AUTH_STORAGE_KEY);
@@ -413,12 +429,6 @@
  requestEmailChange,
  confirmEmailChange,
  updateProfile,
- updateSession(updatedUser) {
- if (currentUser && updatedUser) {
- currentUser = {...currentUser,...updatedUser };
- const isRem = localStorage.getItem(REMEMBER_KEY) === '1';
- setSession(currentUser, isRem);
- }
- }
+ updateSession
  };
 })();
