@@ -1644,7 +1644,7 @@ function esc(str) {
  }
  }
 
- // ── BİLEŞEN EKLEME METODU (Genişletilmiş 14 Nesne Türü) ──
+ // ── BİLEŞEN EKLEME METODU (Genişletilmiş 18 Nesne Türü) ──
  function addNewComponent(type) {
  if (!isDesignEditing) return;
  const activePage = allPages[activePageIndex];
@@ -1668,6 +1668,58 @@ function esc(str) {
  fontSize: 10,
  fontColor: '-16777208',
  fillBackColor: 'clNone'
+ };
+ } else if (type === 'sysmemo') {
+ newComp = {
+ name: `SysMemo${randomId}`,
+ type: 'TfrxSysMemoView',
+ left: 60,
+ top: 30,
+ width: 150,
+ height: 24,
+ text: '[Page#] / [TotalPages#]',
+ fontName: 'Arial',
+ fontSize: 9,
+ fontColor: '-16777208',
+ fillBackColor: 'clNone'
+ };
+ } else if (type === 'gradient') {
+ newComp = {
+ name: `Gradient${randomId}`,
+ type: 'TfrxGradientView',
+ left: 60,
+ top: 30,
+ width: 180,
+ height: 60,
+ text: 'Gradyan Alanı',
+ startColor: '16777215',
+ endColor: '12632256',
+ gradientStyle: 'gsHorizontal'
+ };
+ } else if (type === 'subreport') {
+ newComp = {
+ name: `Subreport${randomId}`,
+ type: 'TfrxSubreport',
+ left: 60,
+ top: 30,
+ width: 220,
+ height: 80,
+ text: 'Alt Rapor',
+ pageName: ''
+ };
+ } else if (type === 'crosstab') {
+ newComp = {
+ name: `CrossTab${randomId}`,
+ type: 'TfrxCrossView',
+ left: 60,
+ top: 30,
+ width: 280,
+ height: 130,
+ text: 'Çapraz Tablo',
+ dataSet: file.queries?.[0]?.name || '',
+ rowFields: '',
+ columnFields: '',
+ cellFields: ''
  };
  } else if (type === 'picture') {
  newComp = {
@@ -2162,6 +2214,10 @@ function esc(str) {
 
  // 4. Genişletilmiş Bileşen Paleti Butonları
  containerEl.querySelector('#btnToolAddMemo')?.addEventListener('click', () => addNewComponent('memo'));
+ containerEl.querySelector('#btnToolAddSysMemo')?.addEventListener('click', () => addNewComponent('sysmemo'));
+ containerEl.querySelector('#btnToolAddGradient')?.addEventListener('click', () => addNewComponent('gradient'));
+ containerEl.querySelector('#btnToolAddSubreport')?.addEventListener('click', () => addNewComponent('subreport'));
+ containerEl.querySelector('#btnToolAddCrosstab')?.addEventListener('click', () => addNewComponent('crosstab'));
  containerEl.querySelector('#btnToolAddPicture')?.addEventListener('click', () => addNewComponent('picture'));
  containerEl.querySelector('#btnToolAddLine')?.addEventListener('click', () => addNewComponent('line'));
  containerEl.querySelector('#btnToolAddBarcode')?.addEventListener('click', () => addNewComponent('barcode'));
