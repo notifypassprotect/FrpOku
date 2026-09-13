@@ -31,6 +31,7 @@ const { registerChatNudgeRoute } = require('./server/routes/chat_nudge');
 const { registerChatSendRoute } = require('./server/routes/chat_send');
 const { registerChatMessageListRoute } = require('./server/routes/chat_messages');
 const { registerChatStateRoutes } = require('./server/routes/chat_state');
+const { registerChatMutationRoutes } = require('./server/routes/chat_mutations');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -2051,133 +2052,7 @@ registerChatMessageListRoute(app, { activeChatTyping, canAccessChatGroup, canAcc
 registerChatStateRoutes(app, { activeChatTyping, canAccessChatGroup, canAccessChatRoom, clearChatEmailTimer, ensureChatMessagesHydrated, getChatMessages, requireAuth, safeLogStr, saveChatMessages, supabase });
 
 // Chat: Reaksiyon Ekleme / Kaldırma
-app.post('/api/chat/react', requireAuth, async (req, res) => {
-  try {
-    await ensureChatMessagesHydrated();
-    const { messageId, emoji } = req.body || {};
-    if (!messageId || !emoji) return res.status(400).json({ success: false, reason: 'Eksik parametre' });
-
-    const all = getChatMessages();
-    let msg = all.find(m => String(m.id) === String(messageId));
-
-    if (!msg && supabase) {
-      const { data } = await supabase.from('chat_messages').select('*').eq('id', String(messageId)).limit(1);
-      if (data && data[0]) {
-        msg = {
-          id: data[0].id,
-          senderId: data[0].sender_id,
-          receiverId: data[0].receiver_id,
-          roomId: data[0].room_id,
-          groupId: data[0].group_id,
-          text: data[0].text,
-          attachment: data[0].attachment,
-          voice: data[0].voice,
-          reactions: data[0].reactions || {},
-          createdAt: data[0].created_at
-        };
-        all.push(msg);
-      }
-    }
-
-    if (!msg) return res.status(404).json({ success: false, reason: 'Mesaj bulunamadı.' });
-    if (!canAccessChatMessage(req.authUser, msg)) {
-      return res.status(403).json({ success: false, reason: 'Bu mesaja erişim yetkiniz yok.' });
-    }
-
-    if (!msg.reactions || typeof msg.reactions !== 'object') msg.reactions = {};
-    const myId = String(req.authUser.id);
-    const existing = Array.isArray(msg.reactions[emoji]) ? msg.reactions[emoji] : [];
-
-    if (existing.includes(myId)) {
-      // Kaldır
-      msg.reactions[emoji] = existing.filter(id => id !== myId);
-      if (msg.reactions[emoji].length === 0) delete msg.reactions[emoji];
-    } else {
-      // Ekle
-      msg.reactions[emoji] = [...existing, myId];
-    }
-
-    saveChatMessages();
-
-    if (supabase) {
-      supabase.from('chat_messages').update({ reactions: msg.reactions }).eq('id', msg.id).then(() => {}).catch(() => {});
-    }
-
-    res.json({ success: true, reactions: msg.reactions });
-  } catch (err) {
-    res.status(500).json({ success: false, reason: 'Reaksiyon verilemedi.' });
-  }
-});
-
-// Chat: Mesaj Silme (Geri Çekme)
-app.delete('/api/chat/messages/:id', requireAuth, async (req, res) => {
-  try {
-    await ensureChatMessagesHydrated();
-    const all = getChatMessages();
-    const idx = all.findIndex(m => m.id === req.params.id);
-    if (idx === -1) return res.status(404).json({ success: false, reason: 'Mesaj bulunamadı.' });
-    const msg = all[idx];
-    const myId = String(req.authUser.id);
-    if (!canAccessChatMessage(req.authUser, msg)) {
-      return res.status(403).json({ success: false, reason: 'Bu mesaja erişim yetkiniz yok.' });
-    }
-    if (String(msg.senderId) !== myId && req.authUser.role !== 'admin') {
-      return res.status(403).json({ success: false, reason: 'Yalnızca kendi mesajınızı silebilirsiniz.' });
-    }
-    all.splice(idx, 1);
-    saveChatMessages();
-    if (supabase) {
-      supabase.from('chat_messages').delete().eq('id', req.params.id).then(() => {}).catch(() => {});
-    }
-    res.json({ success: true });
-  } catch {
-    res.status(500).json({ success: false, reason: 'Mesaj silinemedi.' });
-  }
-});
-
-// Chat: Tüm Sohbeti Temizle / Sil (Conversation Delete)
-app.delete('/api/chat/conversations/:id', requireAuth, async (req, res) => {
-  try {
-    await ensureChatMessagesHydrated();
-    const targetId = String(req.params.id || '');
-    const type = req.query.type || 'peer'; // 'peer', 'room', 'group'
-    const myId = String(req.authUser.id);
-    const isAdmin = req.authUser.role === 'admin';
-
-    const all = getChatMessages();
-    let toDeleteIds = [];
-
-    if (type === 'room') {
-      if (!isAdmin) {
-        return res.status(403).json({ success: false, reason: 'Yalnızca yöneticiler oda geçmişini silebilir.' });
-      }
-      toDeleteIds = all.filter(m => m.roomId === targetId).map(m => m.id);
-    } else if (type === 'group') {
-      if (!isAdmin) {
-        return res.status(403).json({ success: false, reason: 'Yalnızca yöneticiler grup geçmişini silebilir.' });
-      }
-      toDeleteIds = all.filter(m => m.groupId === targetId).map(m => m.id);
-    } else {
-      // 1-e-1 Özel Sohbet (Peer / DM)
-      toDeleteIds = all.filter(m => 
-        (String(m.senderId) === myId && String(m.receiverId) === targetId) ||
-        (String(m.senderId) === targetId && String(m.receiverId) === myId)
-      ).map(m => m.id);
-    }
-
-    if (toDeleteIds.length > 0) {
-      const deleteSet = new Set(toDeleteIds);
-      replaceChatMessages(all.filter(m => !deleteSet.has(m.id)));
-      if (supabase) {
-        supabase.from('chat_messages').delete().in('id', toDeleteIds).then(() => {}).catch(() => {});
-      }
-    }
-
-    res.json({ success: true, count: toDeleteIds.length });
-  } catch {
-    res.status(500).json({ success: false, reason: 'Sohbet geçmişi silinemedi.' });
-  }
-});
+registerChatMutationRoutes(app, { canAccessChatMessage, ensureChatMessagesHydrated, getChatMessages, replaceChatMessages, requireAuth, saveChatMessages, supabase });
 
 // ── DEPARTMAN ODALARI YÖNETİMİ ──────────────────
 const CHAT_ROOMS_STORE_PATH = path.join(__dirname, 'data', 'chat_rooms.json');
