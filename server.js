@@ -15,6 +15,8 @@ const { validateEnvironment } = require('./lib/environment');
 const { createJsonStore } = require('./lib/json_store');
 const { protectInternalFiles, securityHeaders } = require('./server/middleware/security');
 const { registerSystemRoutes } = require('./server/routes/system');
+const { createAuthSecurity } = require('./server/services/auth_security');
+const { boundedSetting, plainObject, safeLogStr } = require('./server/services/value_utils');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -219,50 +221,7 @@ const { signToken, requireAuth, requireAdmin } = createSessionAuth({
 // ── E-POSTA DOĞRULAMA & BRUTE-FORCE / CAPTCHA KORUMASI ─────
 const pendingEmailVerifications = new Map();
 const loginFailures = new Map();
-
-function generateCaptcha() {
-  const a = Math.floor(Math.random() * 8) + 1;
-  const b = Math.floor(Math.random() * 8) + 1;
-  const ans = String(a + b);
-  const exp = Date.now() + 5 * 60 * 1000;
-  const sig = crypto.createHmac('sha256', SESSION_SECRET).update(`${ans}:${exp}`).digest('hex');
-  return {
-    question: `${a} + ${b} = ?`,
-    token: `${ans}:${exp}:${sig}`
-  };
-}
-
-function verifyCaptcha(token, answer) {
-  if (!token || !answer) return false;
-  const parts = String(token).split(':');
-  if (parts.length !== 3) return false;
-  const [expectedAns, expStr, sig] = parts;
-  const exp = Number(expStr);
-  if (!Number.isFinite(exp) || Date.now() > exp) return false;
-  const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(`${expectedAns}:${expStr}`).digest('hex');
-  if (sig !== expectedSig) return false;
-  return String(answer).trim() === expectedAns;
-}
-
-function generateEmergencyRecoveryKey() {
-  const p1 = crypto.randomBytes(2).toString('hex').toUpperCase();
-  const p2 = crypto.randomBytes(2).toString('hex').toUpperCase();
-  return `FRP-RECOVER-${p1}-${p2}`;
-}
-
-function safeLogStr(str) {
-  if (typeof str !== 'string') return String(str || '');
-  return str.replace(/[\r\n\x00-\x1f\x7f]/g, '').slice(0, 150);
-}
-
-function boundedSetting(value, maxLength, fallback = '') {
-  const text = String(value ?? fallback).trim();
-  return text.slice(0, maxLength) || fallback;
-}
-
-function plainObject(value) {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
+const { generateCaptcha, generateEmergencyRecoveryKey, verifyCaptcha } = createAuthSecurity(SESSION_SECRET);
 
 app.use(securityHeaders);
 app.use(protectInternalFiles);
