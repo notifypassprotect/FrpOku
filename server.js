@@ -11,49 +11,19 @@ const { createRateLimiter } = require('./lib/rate_limiter');
 const { buildOwnedReportRow, canManageReport, canEditReportNote, canReadReport, nextReportVersion, reportId, reportRowToClient, reportRowToSummaryClient, toSupabaseReportRow } = require('./lib/report_access');
 const { createSessionAuth } = require('./lib/session_auth');
 const { createStagingAccessMiddleware } = require('./lib/staging_access');
+const { validateEnvironment } = require('./lib/environment');
+const { createJsonStore } = require('./lib/json_store');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const APP_ENV = process.env.NODE_ENV || 'development';
-const IS_DEPLOYED_ENVIRONMENT = APP_ENV === 'production' || APP_ENV === 'staging';
+const environment = validateEnvironment();
+const APP_ENV = environment.appEnvironment;
+const IS_DEPLOYED_ENVIRONMENT = environment.deployed;
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
 const SUPABASE_SERVER_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || (!IS_DEPLOYED_ENVIRONMENT ? process.env.SUPABASE_KEY : '') || '';
-const BROWSER_SUPABASE_ENABLED = ['1', 'true', 'yes', 'on'].includes(String(process.env.ENABLE_BROWSER_SUPABASE || '').toLowerCase());
-
-function validateEnvironment() {
-  const missing = [];
-  const requireValue = key => {
-    if (!String(process.env[key] || '').trim()) missing.push(key);
-  };
-
-  if (IS_DEPLOYED_ENVIRONMENT) {
-    ['SESSION_SECRET', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'].forEach(requireValue);
-  }
-  if (APP_ENV === 'staging') {
-    ['APP_BASE_URL', 'BOOTSTRAP_ADMIN_USERNAME', 'BOOTSTRAP_ADMIN_PASSWORD', 'BOOTSTRAP_ADMIN_EMAIL'].forEach(requireValue);
-    // STAGING_ACCESS_USER/PASSWORD yalnızca STAGING_ACCESS_ENABLED=true ise zorunludur
-    if (['1', 'true', 'yes', 'on'].includes(String(process.env.STAGING_ACCESS_ENABLED || '').toLowerCase())) {
-      ['STAGING_ACCESS_USER', 'STAGING_ACCESS_PASSWORD'].forEach(requireValue);
-    }
-  }
-  if (BROWSER_SUPABASE_ENABLED) requireValue('SUPABASE_ANON_KEY');
-  if (['1', 'true', 'yes', 'on'].includes(String(process.env.MAIL_ENABLED || '').toLowerCase())) {
-    requireValue('APP_BASE_URL');
-    const mailProvider = String(process.env.MAIL_PROVIDER || '').trim().toLowerCase();
-    if (mailProvider === 'brevo' || (!mailProvider && process.env.BREVO_API_KEY)) {
-      ['BREVO_API_KEY', 'BREVO_FROM_EMAIL'].forEach(requireValue);
-    } else {
-      ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'].forEach(requireValue);
-    }
-  }
-  if (missing.length > 0) {
-    throw new Error(`Eksik zorunlu ortam değişkenleri: ${[...new Set(missing)].join(', ')}`);
-  }
-}
-
-validateEnvironment();
+const BROWSER_SUPABASE_ENABLED = environment.browserSupabaseEnabled;
 
 let supabase = null;
 if (SUPABASE_URL && SUPABASE_SERVER_KEY) {
@@ -64,27 +34,16 @@ const mailer = createMailer();
 
 // ── Kullanıcı Veri Yönetimi & Yerel Yedekleme ─────────────────
 const usersJsonPath = path.join(__dirname, 'data', 'users.json');
+const usersStore = createJsonStore(usersJsonPath, { label: 'Yerel kullanıcı' });
 
 // Yerel kullanıcı dosyasını oku / yaz
 function getLocalUsers() {
-  try {
-    if (fs.existsSync(usersJsonPath)) {
-      return JSON.parse(fs.readFileSync(usersJsonPath, 'utf8')) || [];
-    }
-  } catch (e) {
-    console.warn('Yerel kullanıcı dosyası okunamadı:', e.message);
-  }
-  return [];
+  const users = usersStore.read();
+  return Array.isArray(users) ? users : [];
 }
 
 function saveLocalUsers(users) {
-  try {
-    const dataDir = path.dirname(usersJsonPath);
-    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-    fs.writeFileSync(usersJsonPath, JSON.stringify(users, null, 2), 'utf8');
-  } catch (e) {
-    console.warn('Yerel kullanıcı dosyası yazılamadı:', e.message);
-  }
+  usersStore.write(users);
 }
 
 async function loadUserById(userId) {
@@ -192,34 +151,15 @@ async function ensureAdminUser() {
 
 // ── DENETİM GÜNLÜĞÜ (AUDIT LOGS) DEPOLAMA ────────────────────
 const LOGS_FILE = path.join(__dirname, 'data', 'audit_logs.json');
+const auditLogStore = createJsonStore(LOGS_FILE, { label: 'Denetim günlüğü', limit: 5000 });
 
 function getAuditLogs() {
-  try {
-    if (!fs.existsSync(LOGS_FILE)) {
-      const dataDir = path.join(__dirname, 'data');
-      if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-      fs.writeFileSync(LOGS_FILE, '[]', 'utf8');
-      return [];
-    }
-    const raw = fs.readFileSync(LOGS_FILE, 'utf8');
-    return JSON.parse(raw);
-  } catch (err) {
-    console.error('Audit logs okuma hatası:', err.message);
-    return [];
-  }
+  const logs = auditLogStore.read();
+  return Array.isArray(logs) ? logs : [];
 }
 
 function saveAuditLogs(logs) {
-  try {
-    const dataDir = path.join(__dirname, 'data');
-    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-    const trimmed = Array.isArray(logs) ? logs.slice(0, 5000) : [];
-    const tempFile = LOGS_FILE + '.tmp';
-    fs.writeFileSync(tempFile, JSON.stringify(trimmed, null, 2), 'utf8');
-    fs.renameSync(tempFile, LOGS_FILE);
-  } catch (err) {
-    console.error('Audit logs yazma hatası:', err.message);
-  }
+  auditLogStore.write(Array.isArray(logs) ? logs : []);
 }
 
 async function recordAuditLog({ userId, username, fullName, role, action, target, details, ip }) {
