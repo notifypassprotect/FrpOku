@@ -258,7 +258,10 @@
  const topbarRight = document.querySelector('.topbar-right');
 
  const btnDashboard = document.getElementById('btnDashboardPanel');
- if (btnDashboard) btnDashboard.style.display = isAdmin()? 'inline-flex': 'none';
+ const btnMobileDashboard = document.getElementById('btnMobDashboard');
+ const dashboardDisplay = isAdmin() ? 'inline-flex' : 'none';
+ if (btnDashboard) btnDashboard.style.display = dashboardDisplay;
+ if (btnMobileDashboard) btnMobileDashboard.style.display = dashboardDisplay;
 
  if (user) {
  if (btnProfile) {
