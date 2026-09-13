@@ -7,7 +7,6 @@ const { createClient } = require('@supabase/supabase-js');
 const { isValidEmail, isValidText, isValidUsername, normalizeEmail, normalizePhone, normalizeText, normalizeUsername } = require('./lib/input_validation');
 const { createMailer } = require('./lib/mailer');
 const { PASSWORD_MAX_LENGTH, hashPassword, verifyPassword: verifyPasswordHash } = require('./lib/passwords');
-const { createRateLimiter } = require('./lib/rate_limiter');
 const { buildOwnedReportRow, canManageReport, canEditReportNote, canReadReport, nextReportVersion, reportId, reportRowToClient, reportRowToSummaryClient, toSupabaseReportRow } = require('./lib/report_access');
 const { createSessionAuth } = require('./lib/session_auth');
 const { createStagingAccessMiddleware } = require('./lib/staging_access');
@@ -19,6 +18,7 @@ const { createAuthSecurity } = require('./server/services/auth_security');
 const { boundedSetting, plainObject, safeLogStr } = require('./server/services/value_utils');
 const { createUserService } = require('./server/services/user_service');
 const { createAuditService } = require('./server/services/audit_service');
+const { configureHttpMiddleware } = require('./server/middleware/http');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -74,14 +74,10 @@ const { generateCaptcha, generateEmergencyRecoveryKey, verifyCaptcha } = createA
 app.use(securityHeaders);
 app.use(protectInternalFiles);
 
-const authRateLimiter = createRateLimiter({ windowMs: 60000, max: 25, message: 'Giriş/Kayıt deneme sınırı aşıldı. Lütfen 1 dakika bekleyiniz.' });
-const adminRateLimiter = createRateLimiter({ windowMs: 60000, max: 60, message: 'Yönetim istek sınırı aşıldı.' });
-const apiWriteRateLimiter = createRateLimiter({ windowMs: 60000, max: 120, message: 'Yazma işlemi sınırı aşıldı. Lütfen kısa bir süre bekleyiniz.' });
-
-const requestBodyLimit = process.env.REQUEST_BODY_LIMIT || '15mb';
-app.use(express.json({ limit: requestBodyLimit, strict: true }));
-app.use(express.urlencoded({ extended: true, limit: '1mb', parameterLimit: 1000 }));
-app.use(createStagingAccessMiddleware());
+const { adminRateLimiter, apiWriteRateLimiter, authRateLimiter } = configureHttpMiddleware(app, {
+  requestBodyLimit: process.env.REQUEST_BODY_LIMIT || '15mb',
+  stagingAccess: createStagingAccessMiddleware()
+});
 
 // Yalnızca tarayıcıya gerekli dosyaları yayınla; sunucu, test, migration ve
 // deployment dosyaları statik olarak erişilebilir değildir.
