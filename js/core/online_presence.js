@@ -533,6 +533,8 @@
     const avatar = (liveUser && liveUser.avatar) || currentUser.avatar || '';
     const name = currentUser.fullName || currentUser.full_name || currentUser.username || 'Ben';
     const avatarEl = dockEl.querySelector('#frpSelfAvatar');
+    const nameEl = dockEl.querySelector('#frpSelfName');
+    if (nameEl) nameEl.textContent = (liveUser && (liveUser.fullName || liveUser.username)) || name;
     if (!avatarEl) return;
     avatarEl.style.background = getAvatarGradient(name);
     avatarEl.innerHTML = renderAvatarContent(avatar, getCleanInitials(name, currentUser.username), true);
@@ -2780,6 +2782,12 @@
         updateSelfAvatarUI();
         if (currentTab === 'users') renderUsers();
       }
+      sendHeartbeat();
+    });
+
+    window.addEventListener('frp:session-changed', () => {
+      updateSelfStatusUI();
+      updateSelfAvatarUI();
       sendHeartbeat();
     });
 

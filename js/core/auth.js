@@ -119,6 +119,9 @@
  }
  updateNavbarUserBadge();
  refreshAdminPendingBadge();
+ try {
+ window.dispatchEvent(new CustomEvent('frp:session-changed', { detail: { userId: user?.id || null } }));
+ } catch {}
  }
 
  function applyExternalSession(token, user, remember = true) {
