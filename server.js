@@ -23,6 +23,7 @@ const { registerCatalogRoutes } = require('./server/routes/catalog');
 const { startServer } = require('./server/bootstrap');
 const { createPresenceService } = require('./server/services/presence_service');
 const { createChatMessageService } = require('./server/services/chat_message_service');
+const { createChatRoomService } = require('./server/services/chat_room_service');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -2584,60 +2585,8 @@ app.delete('/api/chat/conversations/:id', requireAuth, async (req, res) => {
 
 // ── DEPARTMAN ODALARI YÖNETİMİ ──────────────────
 const CHAT_ROOMS_STORE_PATH = path.join(__dirname, 'data', 'chat_rooms.json');
-let chatRoomsCache = null;
-
-function getChatRooms() {
-  if (chatRoomsCache !== null) return chatRoomsCache;
-  try {
-    if (fs.existsSync(CHAT_ROOMS_STORE_PATH)) {
-      chatRoomsCache = JSON.parse(fs.readFileSync(CHAT_ROOMS_STORE_PATH, 'utf8'));
-    } else {
-      chatRoomsCache = [
-        { id: 'room_general', name: 'Genel Ekip Duyuruları', icon: '📢', description: 'Tüm birimler ortak iletişim ve duyuru kanalı', isAllUsers: true, memberUserIds: [] },
-        { id: 'room_ops', name: 'Operasyon & Saha', icon: '⚙️', description: 'Raporlama ve saha operasyon koordinasyonu', isAllUsers: true, memberUserIds: [] },
-        { id: 'room_finance', name: 'Muhasebe & Finans', icon: '📊', description: 'Mali tablolar ve mutabakat kanalı', isAllUsers: true, memberUserIds: [] }
-      ];
-      saveChatRooms();
-    }
-  } catch {
-    chatRoomsCache = [];
-  }
-  return chatRoomsCache;
-}
-
-function saveChatRooms() {
-  try {
-    const dir = path.dirname(CHAT_ROOMS_STORE_PATH);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(CHAT_ROOMS_STORE_PATH, JSON.stringify(chatRoomsCache, null, 2), 'utf8');
-  } catch {}
-}
-
-function chatRoomFromRow(room) {
-  const isAllUsers = room.is_all_users !== undefined ? Boolean(room.is_all_users) : Boolean(room.isAllUsers);
-  const memberUserIds = Array.isArray(room.member_user_ids) ? room.member_user_ids.map(String) : (Array.isArray(room.memberUserIds) ? room.memberUserIds.map(String) : []);
-  return {
-    id: String(room.id),
-    name: room.name || 'İsimsiz Oda',
-    icon: room.icon || '💬',
-    description: room.description || '',
-    isAllUsers,
-    is_all_users: isAllUsers,
-    memberUserIds,
-    member_user_ids: memberUserIds,
-    createdBy: room.created_by || room.createdBy || null,
-    createdAt: room.created_at || room.createdAt || null,
-    updatedAt: room.updated_at || room.updatedAt || null
-  };
-}
-
-async function loadChatRooms() {
-  if (!supabase) return getChatRooms();
-  const { data, error } = await supabase.from('chat_rooms').select('*').order('created_at', { ascending: true });
-  if (error) throw error;
-  chatRoomsCache = (data || []).map(chatRoomFromRow);
-  return chatRoomsCache;
-}
+const chatRoomsStore = createJsonStore(CHAT_ROOMS_STORE_PATH, { label: 'Sohbet odası' });
+const { chatRoomFromRow, getChatRooms, loadChatRooms, replaceChatRooms, saveChatRooms } = createChatRoomService({ store: chatRoomsStore, supabase });
 
 app.get('/api/chat/rooms', requireAuth, async (req, res) => {
   try {
@@ -2689,7 +2638,7 @@ app.post('/api/chat/rooms', requireAuth, async (req, res) => {
       }).select('*').limit(1);
       if (error) throw error;
       const savedRoom = data?.[0] ? chatRoomFromRow(data[0]) : newRoom;
-      chatRoomsCache = [...rooms.filter(room => String(room.id) !== String(savedRoom.id)), savedRoom];
+      replaceChatRooms([...rooms.filter(room => String(room.id) !== String(savedRoom.id)), savedRoom]);
       return res.json({ success: true, room: savedRoom });
     }
     rooms.push(newRoom);
@@ -2729,7 +2678,7 @@ app.put('/api/chat/rooms/:id', requireAuth, async (req, res) => {
       }).eq('id', room.id).select('*').limit(1);
       if (error) throw error;
       const savedRoom = data?.[0] ? chatRoomFromRow(data[0]) : room;
-      chatRoomsCache = rooms.map(item => String(item.id) === String(savedRoom.id) ? savedRoom : item);
+      replaceChatRooms(rooms.map(item => String(item.id) === String(savedRoom.id) ? savedRoom : item));
       return res.json({ success: true, room: savedRoom });
     }
     saveChatRooms();
@@ -2753,7 +2702,7 @@ app.delete('/api/chat/rooms/:id', requireAuth, async (req, res) => {
       if (messageDeleteError) throw messageDeleteError;
       const { error: roomDeleteError } = await supabase.from('chat_rooms').delete().eq('id', req.params.id);
       if (roomDeleteError) throw roomDeleteError;
-      chatRoomsCache = rooms.filter(room => String(room.id) !== String(req.params.id));
+      replaceChatRooms(rooms.filter(room => String(room.id) !== String(req.params.id)));
       return res.json({ success: true });
     }
     rooms.splice(idx, 1);
