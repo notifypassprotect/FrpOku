@@ -16,19 +16,6 @@ window.FrpListModals = window.FrpListModals || {};
     const files = FrpStore.getAll ? FrpStore.getAll() : [];
     let usage = FrpStore.getParameterUsage ? FrpStore.getParameterUsage(files) : [];
 
-    // Eğer bazı raporların sorgu veya parametre detayları bellekte eksikse, eksik olanları parti parti yükle:
-    if (files.length > 0 && FrpStore.ensureFullReport) {
-      const filesNeedingLoad = files.filter(f => (!f.queries || f.queries.length === 0) && (!f.paramNames || f.paramNames.length === 0));
-      if (filesNeedingLoad.length > 0) {
-        const batchSize = 25;
-        for (let i = 0; i < filesNeedingLoad.length; i += batchSize) {
-          const chunk = filesNeedingLoad.slice(i, i + batchSize);
-          await Promise.all(chunk.map(f => FrpStore.ensureFullReport(f.id).catch(() => {})));
-        }
-        usage = FrpStore.getParameterUsage ? FrpStore.getParameterUsage(files) : [];
-      }
-    }
-
     if (!usage || usage.length === 0) {
       if (typeof window.showModal === 'function') {
         await window.showModal({
@@ -154,9 +141,9 @@ window.FrpListModals = window.FrpListModals || {};
             const q = (activeReportQuery || '').toLowerCase().trim();
             const filteredReports = item.groupedReports.filter(r => {
               if (!q) return true;
-              return r.reportName.toLowerCase().includes(q) ||
-                     r.fileName.toLowerCase().includes(q) ||
-                     r.queries.some(qn => qn.toLowerCase().includes(q));
+              return String(r.reportName || '').toLowerCase().includes(q) ||
+                     String(r.fileName || '').toLowerCase().includes(q) ||
+                     r.queries.some(qn => String(qn || '').toLowerCase().includes(q));
             });
 
             if (filteredReports.length === 0) {
@@ -232,19 +219,6 @@ window.FrpListModals = window.FrpListModals || {};
   window.FrpListModals.openDependenciesModal = async function() {
     const files = FrpStore.getAll ? FrpStore.getAll() : [];
     let deps = FrpStore.getDependencyMap ? FrpStore.getDependencyMap(files) : [];
-
-    // Raporların tablo/bağımlılık detayları bellekte eksikse otomatik tara:
-    if (files.length > 0 && FrpStore.ensureFullReport) {
-      const filesNeedingLoad = files.filter(f => (!f.queries || f.queries.length === 0) && (!f.tableNames || f.tableNames.length === 0));
-      if (filesNeedingLoad.length > 0) {
-        const batchSize = 25;
-        for (let i = 0; i < filesNeedingLoad.length; i += batchSize) {
-          const chunk = filesNeedingLoad.slice(i, i + batchSize);
-          await Promise.all(chunk.map(f => FrpStore.ensureFullReport(f.id).catch(() => {})));
-        }
-        deps = FrpStore.getDependencyMap ? FrpStore.getDependencyMap(files) : [];
-      }
-    }
 
     if (!deps || deps.length === 0) {
       if (typeof window.showModal === 'function') {
@@ -363,9 +337,9 @@ window.FrpListModals = window.FrpListModals || {};
             const q = (activeReportQuery || '').toLowerCase().trim();
             const filteredReports = item.groupedReports.filter(r => {
               if (!q) return true;
-              return r.reportName.toLowerCase().includes(q) ||
-                     r.fileName.toLowerCase().includes(q) ||
-                     r.queries.some(qn => qn.toLowerCase().includes(q));
+              return String(r.reportName || '').toLowerCase().includes(q) ||
+                     String(r.fileName || '').toLowerCase().includes(q) ||
+                     r.queries.some(qn => String(qn || '').toLowerCase().includes(q));
             });
 
             if (filteredReports.length === 0) {
@@ -434,19 +408,6 @@ window.FrpListModals = window.FrpListModals || {};
   window.FrpListModals.openTableUsageModal = async function() {
     const files = FrpStore.getAll ? FrpStore.getAll() : [];
     let usage = FrpStore.getTableUsage ? FrpStore.getTableUsage(files) : [];
-
-    // Özet modunda bazı raporların tabloları çıkarılmadıysa otomatik tara:
-    if (files.length > 0 && FrpStore.ensureFullReport) {
-      const filesNeedingLoad = files.filter(f => (!f.queries || f.queries.length === 0) && (!f.tableNames || f.tableNames.length === 0) && (!f.datasets || f.datasets.length === 0));
-      if (filesNeedingLoad.length > 0) {
-        const batchSize = 25;
-        for (let i = 0; i < filesNeedingLoad.length; i += batchSize) {
-          const chunk = filesNeedingLoad.slice(i, i + batchSize);
-          await Promise.all(chunk.map(f => FrpStore.ensureFullReport(f.id).catch(() => {})));
-        }
-        usage = FrpStore.getTableUsage ? FrpStore.getTableUsage(files) : [];
-      }
-    }
 
     if (!usage || usage.length === 0) {
       if (typeof window.showModal === 'function') {

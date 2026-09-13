@@ -33,7 +33,7 @@
         tableRx.lastIndex = 0;
         while ((match = tableRx.exec(sql)) !== null) {
           let rawTable = match[1].replace(/[()]/g, '').trim().toUpperCase();
-          rawTable = rawTable.split('.')[0]; 
+          rawTable = rawTable.split('.').pop();
           if (rawTable && !rawTable.startsWith('(') && !SQL_RESERVED.has(rawTable) && rawTable.length > 2 && !/^\d+$/.test(rawTable)) {
             if (!tableMap.has(rawTable)) tableMap.set(rawTable, new Set());
             tableMap.get(rawTable).add(file);
@@ -45,11 +45,9 @@
       if (!foundQueries) {
         const tables = Array.isArray(file.tableNames) && file.tableNames.length > 0
           ? file.tableNames
-          : (Array.isArray(file.tables) && file.tables.length > 0
-            ? file.tables
-            : (Array.isArray(file.datasets) ? file.datasets : []));
+          : (Array.isArray(file.tables) ? file.tables : []);
         tables.forEach(tbl => {
-          let rawTable = String(tbl || '').replace(/[()]/g, '').trim().toUpperCase().split('.')[0];
+          let rawTable = String(tbl || '').replace(/[()]/g, '').trim().toUpperCase().split('.').pop();
           if (rawTable && !rawTable.startsWith('(') && !SQL_RESERVED.has(rawTable) && rawTable.length > 2 && !/^\d+$/.test(rawTable)) {
             if (!tableMap.has(rawTable)) tableMap.set(rawTable, new Set());
             tableMap.get(rawTable).add(file);

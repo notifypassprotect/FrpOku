@@ -47,9 +47,7 @@
       if (!foundQueries) {
         const tblList = (Array.isArray(file.tableNames) && file.tableNames.length > 0)
           ? file.tableNames
-          : (Array.isArray(file.tables) && file.tables.length > 0
-            ? file.tables
-            : (Array.isArray(file.datasets) ? file.datasets : []));
+          : (Array.isArray(file.tables) ? file.tables : []);
         const queryLabel = (Array.isArray(file.queryNames) && file.queryNames.length > 0)
           ? file.queryNames.join(', ')
           : 'SQL Sorgusu';
