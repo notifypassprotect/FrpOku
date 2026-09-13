@@ -2052,28 +2052,18 @@ async function scheduleChatEmailDigest(senderUser, receiverId, messageSnippet) {
 
 // ── GRUP SOHBETLERİ YÖNETİMİ (Kullanıcı Çoklu Grup Sohbeti) ─────
 const CHAT_GROUPS_STORE_PATH = path.join(__dirname, 'data', 'chat_groups.json');
-let chatGroupsCache = null;
+const chatGroupsStore = createJsonStore(CHAT_GROUPS_STORE_PATH, { label: 'Sohbet grubu' });
+let chatGroupsCache;
 
 function getChatGroups() {
-  if (chatGroupsCache !== null) return chatGroupsCache;
-  try {
-    if (fs.existsSync(CHAT_GROUPS_STORE_PATH)) {
-      chatGroupsCache = JSON.parse(fs.readFileSync(CHAT_GROUPS_STORE_PATH, 'utf8'));
-    } else {
-      chatGroupsCache = [];
-    }
-  } catch {
-    chatGroupsCache = [];
-  }
+  if (chatGroupsCache) return chatGroupsCache;
+  const groups = chatGroupsStore.read();
+  chatGroupsCache = Array.isArray(groups) ? groups : [];
   return chatGroupsCache;
 }
 
 function saveChatGroups() {
-  try {
-    const dir = path.dirname(CHAT_GROUPS_STORE_PATH);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(CHAT_GROUPS_STORE_PATH, JSON.stringify(chatGroupsCache, null, 2), 'utf8');
-  } catch {}
+  chatGroupsStore.write(getChatGroups());
 }
 
 app.get('/api/chat/groups', requireAuth, async (req, res) => {
