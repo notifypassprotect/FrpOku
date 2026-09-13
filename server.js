@@ -21,6 +21,7 @@ const { createAuditService } = require('./server/services/audit_service');
 const { configureHttpMiddleware } = require('./server/middleware/http');
 const { registerCatalogRoutes } = require('./server/routes/catalog');
 const { startServer } = require('./server/bootstrap');
+const { createPresenceService } = require('./server/services/presence_service');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1908,112 +1909,9 @@ app.get('/api/reports/:id/attachments/:filename', requireAuth, async (req, res) 
 });
 
 // ── ÇEVRİMİÇİ KULLANICI & VARLIK (PRESENCE) YÖNETİMİ ──────────
-const activePresence = new Map(); // userId -> { userId, customStatus, lastSeen }
-
-function recordUserPresence(user, customStatus = 'online') {
-  if (!user || !user.id) return;
-  const validStatus = ['online', 'busy', 'dnd', 'invisible'].includes(customStatus) ? customStatus : 'online';
-  activePresence.set(String(user.id), {
-    userId: String(user.id),
-    lastSeen: Date.now(),
-    customStatus: validStatus
-  });
-}
-
-function removeUserPresence(userId) {
-  if (!userId) return;
-  activePresence.delete(String(userId));
-}
-
-// ── KULLANICI PROFİL RESİMLERİ & AVATAR DEPOSU (KALICI & YEDEKLİ) ──
 const USER_AVATARS_FILE = path.join(__dirname, 'data', 'user_avatars.json');
-let userAvatarsCache = null;
-
-function getUserAvatars() {
-  if (userAvatarsCache !== null) return userAvatarsCache;
-  try {
-    if (fs.existsSync(USER_AVATARS_FILE)) {
-      userAvatarsCache = JSON.parse(fs.readFileSync(USER_AVATARS_FILE, 'utf8'));
-    } else {
-      userAvatarsCache = {};
-    }
-  } catch {
-    userAvatarsCache = {};
-  }
-  return userAvatarsCache;
-}
-
-function saveUserAvatar(userId, username, avatar) {
-  const avatars = getUserAvatars();
-  if (userId) avatars[String(userId)] = avatar;
-  if (username) avatars[String(username).toLowerCase()] = avatar;
-  userAvatarsCache = avatars;
-  try {
-    const d = path.dirname(USER_AVATARS_FILE);
-    if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
-    fs.writeFileSync(USER_AVATARS_FILE, JSON.stringify(avatars, null, 2), 'utf8');
-  } catch {}
-}
-
-async function getAllUsersWithPresence() {
-  const now = Date.now();
-  const threshold = 45 * 1000;
-  const activeMap = new Map();
-  for (const [id, data] of activePresence.entries()) {
-    if (now - data.lastSeen <= threshold) {
-      activeMap.set(String(id), data);
-    } else {
-      activePresence.delete(id);
-    }
-  }
-
-  const avatarStore = getUserAvatars();
-  let allUsers = [];
-  if (supabase) {
-    try {
-      let { data, error } = await supabase
-        .from('app_users')
-        .select('id, username, full_name, department, role, avatar, is_active, last_seen, last_login')
-        .eq('is_active', true);
-      if (error && String(error.message || '').includes('avatar')) {
-        const retry = await supabase
-          .from('app_users')
-          .select('id, username, full_name, department, role, is_active, last_seen, last_login')
-          .eq('is_active', true);
-        data = retry.data;
-      }
-      if (data && data.length) allUsers = data;
-    } catch {}
-  }
-  if (!allUsers.length) {
-    allUsers = getLocalUsers().filter(u => u.is_active !== false);
-  }
-
-  return allUsers.map(u => {
-    const strId = String(u.id);
-    const active = activeMap.get(strId);
-    const rawStatus = active ? (active.customStatus || 'online') : 'offline';
-    const isOnline = Boolean(active) && rawStatus !== 'invisible';
-    const status = isOnline ? rawStatus : 'offline';
-    const lastSeenTime = active ? new Date(active.lastSeen).toISOString() : (u.last_seen || u.last_login || null);
-    const resolvedAvatar = avatarStore[strId] || avatarStore[(u.username || '').toLowerCase()] || u.avatar || '';
-    return {
-      id: strId,
-      username: u.username || '',
-      fullName: u.full_name || u.fullName || u.username || '',
-      department: u.department || '',
-      role: u.role || 'user',
-      avatar: resolvedAvatar || (u.username ? u.username[0].toUpperCase() : 'U'),
-      isOnline,
-      status,
-      lastSeen: lastSeenTime
-    };
-  }).sort((a, b) => {
-    if (a.isOnline && !b.isOnline) return -1;
-    if (!a.isOnline && b.isOnline) return 1;
-    return (a.fullName || a.username).localeCompare(b.fullName || b.username, 'tr');
-  });
-}
+const avatarStore = createJsonStore(USER_AVATARS_FILE, { fallback: {}, label: 'Kullanıcı avatarı' });
+const { getAllUsersWithPresence, getUserAvatars, recordUserPresence, removeUserPresence, saveUserAvatar } = createPresenceService({ avatarStore, getLocalUsers, supabase });
 
 // ── GERÇEK ZAMANLI SOHBET & MESAJLAŞMA SİSTEMİ ──────────────────
 const CHAT_STORE_PATH = path.join(__dirname, 'data', 'chat_messages.json');
