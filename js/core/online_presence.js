@@ -372,6 +372,7 @@
         if (data && data.success) {
           if (Array.isArray(data.users)) {
             cachedUsers = data.users;
+            updateSelfAvatarUI();
           }
           if (data.unreadCounts) {
             handleUnreadUpdate(data.unreadCounts);
@@ -494,6 +495,19 @@
     if (select) select.value = current;
   }
 
+  function updateSelfAvatarUI() {
+    if (!dockEl) return;
+    const currentUser = window.FrpAuth && window.FrpAuth.getUser ? window.FrpAuth.getUser() : null;
+    if (!currentUser) return;
+    const liveUser = cachedUsers.find(user => String(user.id) === String(currentUser.id));
+    const avatar = (liveUser && liveUser.avatar) || currentUser.avatar || '';
+    const name = currentUser.fullName || currentUser.full_name || currentUser.username || 'Ben';
+    const avatarEl = dockEl.querySelector('#frpSelfAvatar');
+    if (!avatarEl) return;
+    avatarEl.style.background = getAvatarGradient(name);
+    avatarEl.innerHTML = renderAvatarContent(avatar, getCleanInitials(name, currentUser.username), true);
+  }
+
   // ── DOCK VE PANEL DOM OLUŞTURUCU ──
   function createDock() {
     if (document.getElementById('frpPresenceDock')) return;
@@ -531,7 +545,10 @@
         <!-- KULLANICI KENDİ DURUM KARTI -->
         <div class="frp-presence-self-card">
           <div class="frp-presence-self-info">
-            <span id="frpSelfStatusDot" class="frp-presence-self-dot"></span>
+            <div class="frp-presence-self-avatar-wrap">
+              <div id="frpSelfAvatar" class="frp-presence-self-avatar"></div>
+              <span id="frpSelfStatusDot" class="frp-presence-self-dot"></span>
+            </div>
             <div>
               <div id="frpSelfName" class="frp-presence-self-name">${escHtml(currentAuthUser?.fullName || currentAuthUser?.username || 'Ben')}</div>
               <div id="frpSelfStatusLabel" class="frp-presence-self-desc">Çevrimiçi</div>
@@ -757,6 +774,7 @@
     }
 
     updateSelfStatusUI();
+    updateSelfAvatarUI();
   }
 
   function bindChatRowActivation(row, openAction) {
@@ -2715,6 +2733,7 @@
         curAuth.avatar = newAvatar;
         const selfUser = cachedUsers.find(u => String(u.id) === String(curAuth.id));
         if (selfUser) selfUser.avatar = newAvatar;
+        updateSelfAvatarUI();
         if (currentTab === 'users') renderUsers();
       }
       sendHeartbeat();
