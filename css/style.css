@@ -2577,6 +2577,32 @@ tr.pinned-row {
 @media (max-width: 860px) {
 .btn-mobile-menu { display: flex; }
 .mobile-fab-btn { display: inline-flex; }
+
+.modal-overlay {
+ padding: max(0.6rem, env(safe-area-inset-top)) max(0.6rem, env(safe-area-inset-right)) max(0.6rem, env(safe-area-inset-bottom)) max(0.6rem, env(safe-area-inset-left));
+ box-sizing: border-box;
+ }
+.modal {
+ width: 100%!important;
+ max-width: calc(100vw - 1.2rem)!important;
+ max-height: calc(100dvh - 1.2rem)!important;
+ box-sizing: border-box;
+ }
+.modal-body {
+ overscroll-behavior: contain;
+ }
+.modal-actions {
+ flex-wrap: wrap;
+ position: sticky;
+ bottom: 0;
+ background: var(--bg-surface);
+ padding-top: 0.55rem;
+ }
+.modal-actions > .btn {
+ flex: 1 1 120px;
+ justify-content: center;
+ min-height: 42px;
+ }
  
 .topbar {
  padding: 0 0.85rem;
@@ -2597,6 +2623,64 @@ tr.pinned-row {
  margin: auto!important;
  border-radius: 16px!important;
  padding: 1rem!important;
+ }
+.settings-modal-box {
+ grid-template-columns: minmax(0, 1fr)!important;
+ grid-template-rows: auto minmax(0, 1fr)!important;
+ width: 100%!important;
+ height: calc(100dvh - 1.2rem)!important;
+ min-height: 0!important;
+ max-height: calc(100dvh - 1.2rem)!important;
+ padding: 0!important;
+ border-radius: 14px!important;
+ }
+.settings-modal-box > div:first-child {
+ min-width: 0;
+ padding: 0.7rem!important;
+ border-right: 0!important;
+ border-bottom: 1px solid var(--border-light);
+ overflow: hidden;
+ }
+.settings-modal-box > div:first-child > div:first-child {
+ margin: 0 0 0.55rem!important;
+ padding-left: 0.25rem!important;
+ }
+.settings-modal-box > div:first-child > div:last-child {
+ display: flex!important;
+ flex-direction: row!important;
+ gap: 0.35rem!important;
+ overflow-x: auto!important;
+ overflow-y: hidden!important;
+ padding-bottom: 0.2rem;
+ scrollbar-width: thin;
+ }
+.settings-modal-box .settings-tab-btn {
+ width: auto!important;
+ min-width: max-content;
+ min-height: 40px;
+ padding: 0.55rem 0.75rem!important;
+ }
+#settingsTabContentArea {
+ padding: 1rem!important;
+ overscroll-behavior: contain;
+ }
+#settingsTabContentArea + div {
+ flex-wrap: wrap;
+ padding: 0.65rem 0.8rem!important;
+ gap: 0.5rem!important;
+ }
+#btnResetToFactoryPrefs {
+ width: 100%;
+ order: 2;
+ }
+#settingsTabContentArea + div > div {
+ width: 100%;
+ display: grid!important;
+ grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+ }
+#settingsTabContentArea + div .btn {
+ min-height: 42px;
+ justify-content: center;
  }
 
  /* Detay Sayfası Mobil Düzeni */
