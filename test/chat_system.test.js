@@ -268,3 +268,15 @@ test('sohbet penceresi cok satirli taslak, otomatik boyut ve gonderim hatasi ger
   assert.match(css, /\.frp-chat-char-count\.near-limit/);
   assert.match(css, /\.frp-chat-msg\.send-failed/);
 });
+
+test('sohbet API hedef, uyelik, boyut ve mesaj erisim kontrollerini uygular', () => {
+  const serverSource = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+  assert.match(serverSource, /function canAccessChatGroup/);
+  assert.match(serverSource, /function canAccessChatRoom/);
+  assert.match(serverSource, /function canAccessChatMessage/);
+  assert.match(serverSource, /targetCount !== 1/);
+  assert.match(serverSource, /cleanText\.length > 1000/);
+  assert.match(serverSource, /6 \* 1024 \* 1024/);
+  assert.match(serverSource, /id: crypto\.randomUUID\(\)/);
+  assert.match(serverSource, /id: newMsg\.id/);
+});

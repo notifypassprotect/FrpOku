@@ -2391,6 +2391,32 @@ function saveChatMessages() {
   } catch {}
 }
 
+function canAccessChatGroup(user, groupId) {
+  const group = getChatGroups().find(item => String(item.id) === String(groupId));
+  if (!group) return false;
+  const userId = String(user.id);
+  return user.role === 'admin' || (Array.isArray(group.memberUserIds) && group.memberUserIds.map(String).includes(userId));
+}
+
+function canAccessChatRoom(user, roomId) {
+  const room = getChatRooms().find(item => String(item.id) === String(roomId));
+  if (!room) return false;
+  const userId = String(user.id);
+  return user.role === 'admin' || room.isAllUsers === true || (Array.isArray(room.memberUserIds) && room.memberUserIds.map(String).includes(userId));
+}
+
+function canAccessChatMessage(user, message) {
+  const userId = String(user.id);
+  if (message.groupId) return canAccessChatGroup(user, message.groupId);
+  if (message.roomId) return canAccessChatRoom(user, message.roomId);
+  return String(message.senderId) === userId || String(message.receiverId) === userId;
+}
+
+function chatPayloadSize(value) {
+  if (!value) return 0;
+  try { return Buffer.byteLength(JSON.stringify(value), 'utf8'); } catch { return Number.MAX_SAFE_INTEGER; }
+}
+
 function getUnreadCountsForUser(userId) {
   const msgs = getChatMessages();
   const counts = {};
@@ -2616,6 +2642,9 @@ app.get('/api/chat/groups/:id/details', requireAuth, async (req, res) => {
     const groups = getChatGroups();
     const group = groups.find(g => g.id === groupId);
     if (!group) return res.status(404).json({ success: false, reason: 'Grup bulunamadı.' });
+    if (!canAccessChatGroup(req.authUser, groupId)) {
+      return res.status(403).json({ success: false, reason: 'Bu grubun ayrıntılarını görüntüleme yetkiniz yok.' });
+    }
 
     const allUsers = await getAllUsersWithPresence();
     const memberIds = new Set((group.memberUserIds || []).map(String));
@@ -2699,6 +2728,12 @@ app.post('/api/chat/nudge', requireAuth, async (req, res) => {
   try {
     const { receiverId, groupId } = req.body || {};
     const myId = String(req.authUser.id);
+    if ((!receiverId && !groupId) || (receiverId && groupId)) {
+      return res.status(400).json({ success: false, reason: 'Tek bir titreşim hedefi belirtilmelidir.' });
+    }
+    if (groupId && !canAccessChatGroup(req.authUser, groupId)) {
+      return res.status(403).json({ success: false, reason: 'Bu gruba titreşim gönderme yetkiniz yok.' });
+    }
     const targetKey = receiverId ? `${myId}_${receiverId}` : `${myId}_${groupId}`;
 
     const lastNudge = nudgeCooldowns.get(targetKey) || 0;
@@ -2712,7 +2747,7 @@ app.post('/api/chat/nudge', requireAuth, async (req, res) => {
     const messages = getChatMessages();
     const senderName = req.authUser.full_name || req.authUser.username;
     const nudgeMsg = {
-      id: 'nudge_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      id: crypto.randomUUID(),
       senderId: myId,
       senderName,
       senderUsername: req.authUser.username,
@@ -2749,6 +2784,23 @@ app.post('/api/chat/send', requireAuth, async (req, res) => {
     if (!receiverId && !roomId && !groupId) {
       return res.status(400).json({ success: false, reason: 'Alıcı, oda veya grup belirtilmelidir.' });
     }
+    const targetCount = [receiverId, roomId, groupId].filter(Boolean).length;
+    if (targetCount !== 1) {
+      return res.status(400).json({ success: false, reason: 'Her mesaj için yalnızca bir hedef belirtilmelidir.' });
+    }
+    const cleanText = String(text || '').trim();
+    if (cleanText.length > 1000) {
+      return res.status(400).json({ success: false, reason: 'Mesaj 1000 karakterden uzun olamaz.' });
+    }
+    if (chatPayloadSize(attachment) > 6 * 1024 * 1024 || chatPayloadSize(voice) > 6 * 1024 * 1024) {
+      return res.status(413).json({ success: false, reason: 'Sohbet eki 6 MB sınırını aşamaz.' });
+    }
+    if (groupId && !canAccessChatGroup(req.authUser, groupId)) {
+      return res.status(403).json({ success: false, reason: 'Bu gruba mesaj gönderme yetkiniz yok.' });
+    }
+    if (roomId && !canAccessChatRoom(req.authUser, roomId)) {
+      return res.status(403).json({ success: false, reason: 'Bu kanala erişim yetkiniz yok.' });
+    }
 
     // Odalardan / Kanallardan yalnızca yönetici (Admin) paylaşım yapabilir kuralı
     if (roomId && req.authUser.role !== 'admin') {
@@ -2757,7 +2809,7 @@ app.post('/api/chat/send', requireAuth, async (req, res) => {
 
     const messages = getChatMessages();
     const newMsg = {
-      id: 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      id: crypto.randomUUID(),
       senderId: String(req.authUser.id),
       senderName: req.authUser.full_name || req.authUser.username,
       senderUsername: req.authUser.username,
@@ -2765,7 +2817,7 @@ app.post('/api/chat/send', requireAuth, async (req, res) => {
       receiverId: receiverId ? String(receiverId) : null,
       roomId: roomId ? String(roomId) : null,
       groupId: groupId ? String(groupId) : null,
-      text: String(text || '').trim(),
+      text: cleanText,
       attachment: attachment || null,
       voice: voice || null,
       isNudge: Boolean(isNudge),
@@ -2786,9 +2838,11 @@ app.post('/api/chat/send', requireAuth, async (req, res) => {
     // Supabase yedekleme (varsa)
     if (supabase) {
       supabase.from('chat_messages').insert({
+        id: newMsg.id,
         sender_id: req.authUser.id,
         receiver_id: receiverId || null,
         room_id: roomId || null,
+        ...(groupId ? { group_id: groupId } : {}),
         text: newMsg.text,
         attachment: newMsg.attachment,
         voice: newMsg.voice,
@@ -2810,6 +2864,16 @@ app.get('/api/chat/messages', requireAuth, async (req, res) => {
     const groupId = req.query.groupId ? String(req.query.groupId) : null;
     const since = req.query.since ? new Date(req.query.since).getTime() : 0;
     const myId = String(req.authUser.id);
+    const targetCount = [peerId, roomId, groupId].filter(Boolean).length;
+    if (targetCount !== 1) {
+      return res.status(400).json({ success: false, reason: 'Tek bir sohbet hedefi belirtilmelidir.' });
+    }
+    if (groupId && !canAccessChatGroup(req.authUser, groupId)) {
+      return res.status(403).json({ success: false, reason: 'Bu grubun mesajlarını görüntüleme yetkiniz yok.' });
+    }
+    if (roomId && !canAccessChatRoom(req.authUser, roomId)) {
+      return res.status(403).json({ success: false, reason: 'Bu kanalın mesajlarını görüntüleme yetkiniz yok.' });
+    }
 
     const all = getChatMessages();
     let changed = false;
@@ -2881,6 +2945,12 @@ app.post('/api/chat/typing', requireAuth, async (req, res) => {
     const senderId = String(req.authUser.id);
     const senderName = req.authUser.full_name || req.authUser.username;
     const targetId = req.body?.peerId || req.body?.roomId || req.body?.groupId;
+    if (req.body?.groupId && !canAccessChatGroup(req.authUser, req.body.groupId)) {
+      return res.status(403).json({ success: false, reason: 'Bu gruba erişim yetkiniz yok.' });
+    }
+    if (req.body?.roomId && !canAccessChatRoom(req.authUser, req.body.roomId)) {
+      return res.status(403).json({ success: false, reason: 'Bu kanala erişim yetkiniz yok.' });
+    }
     if (targetId) {
       const key = `${senderId}_${targetId}`;
       activeChatTyping.set(key, {
@@ -2951,6 +3021,9 @@ app.post('/api/chat/react', requireAuth, async (req, res) => {
     }
 
     if (!msg) return res.status(404).json({ success: false, reason: 'Mesaj bulunamadı.' });
+    if (!canAccessChatMessage(req.authUser, msg)) {
+      return res.status(403).json({ success: false, reason: 'Bu mesaja erişim yetkiniz yok.' });
+    }
 
     if (!msg.reactions || typeof msg.reactions !== 'object') msg.reactions = {};
     const myId = String(req.authUser.id);
@@ -2985,6 +3058,9 @@ app.delete('/api/chat/messages/:id', requireAuth, async (req, res) => {
     if (idx === -1) return res.status(404).json({ success: false, reason: 'Mesaj bulunamadı.' });
     const msg = all[idx];
     const myId = String(req.authUser.id);
+    if (!canAccessChatMessage(req.authUser, msg)) {
+      return res.status(403).json({ success: false, reason: 'Bu mesaja erişim yetkiniz yok.' });
+    }
     if (String(msg.senderId) !== myId && req.authUser.role !== 'admin') {
       return res.status(403).json({ success: false, reason: 'Yalnızca kendi mesajınızı silebilirsiniz.' });
     }
