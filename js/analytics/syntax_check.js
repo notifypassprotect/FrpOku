@@ -852,17 +852,19 @@
       }
     }
 
-    const emptyClause = /\b(WHERE|HAVING)\s*$/i.exec(trim);
+    const rawWithoutComments = (item.raw || '').replace(/--[^\r\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{[^\r\n]*\}/g, '').trim();
+
+    const emptyClause = /\b(WHERE|HAVING)\s*$/i.exec(rawWithoutComments);
     if (emptyClause && (!nextTrim || clauseStartRx.test(nextTrim))) {
       errors.push(`Satır ${lineNo}: '${emptyClause[1].toUpperCase()}' sonrasında koşul eksik.`);
     }
 
-    const danglingLogical = /\b(AND|OR)\s*$/i.exec(trim);
+    const danglingLogical = /\b(AND|OR)\s*$/i.exec(rawWithoutComments);
     if (danglingLogical && (!nextTrim || /^(?:GROUP\s+BY|ORDER\s+BY|HAVING|UNION|MINUS|INTERSECT|\))\b/i.test(nextTrim))) {
       errors.push(`Satır ${lineNo}: '${danglingLogical[1].toUpperCase()}' sonrasında koşul eksik.`);
     }
 
-    const danglingOperator = /(=|<>|!=|<=|>=|<|>|\bLIKE\b|\bIN\b)\s*$/i.exec(trim);
+    const danglingOperator = /(=|<>|!=|<=|>=|<|>|\bLIKE\b|\bIN\b)\s*$/i.exec(rawWithoutComments);
     if (danglingOperator && (!nextTrim || clauseStartRx.test(nextTrim) || /^(?:AND|OR)\b/i.test(nextTrim))) {
       errors.push(`Satır ${lineNo}: '${danglingOperator[1]}' karşılaştırma operatörünün sağ tarafı eksik.`);
     }

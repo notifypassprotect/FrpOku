@@ -532,103 +532,8 @@ function findSyntaxErrors(code, lang = 'sql') {
     }
   });
 
-  // 4. SQL Kapsamlı Tanımlanmamış / Orphan Tablo ve Alias Taraması
   if (lang === 'sql') {
-    const cleanWholeSql = code
-      .replace(/'(?:''|[^'\r\n])*'/g, "''")
-      .replace(/\/\*[\s\S]*?\*\//g, ' ')
-      .replace(/--[^\r\n]*/g, '')
-      .replace(/<[^>]+>/g, '');
-
-    const definedAliases = new Set();
-    const sqlReservedKeywords = new Set([
-      'ON','WHERE','LEFT','RIGHT','INNER','OUTER','FULL','CROSS','JOIN','GROUP','ORDER','HAVING',
-      'LIMIT','OFFSET','UNION','USING','WITH','SET','VALUES','AND','OR','SELECT','INTO','FROM','AS',
-      'CASE','WHEN','THEN','ELSE','END','DISTINCT','BETWEEN','LIKE','EXISTS','IN','IS','NOT','NULL'
-    ]);
-
-    // 1. CTEs: WITH cte AS (...), cte2 AS (...)
-    const cteRx = /\b(?:WITH|,)\s*([a-zA-Z0-9_#$]+)\s+AS\s*\(/gi;
-    let cm;
-    while ((cm = cteRx.exec(cleanWholeSql)) !== null) {
-      const cteName = cm[1].toUpperCase();
-      if (!sqlReservedKeywords.has(cteName)) definedAliases.add(cteName);
-    }
-
-    // 2. FROM / JOIN tables and aliases (including inside subqueries)
-    const tableRx = /\b(?:FROM|JOIN|INTO|UPDATE)\s+([a-zA-Z0-9_#$.]+)(?:\s+(?:AS\s+)?([a-zA-Z0-9_#$]+))?/gi;
-    let tm;
-    while ((tm = tableRx.exec(cleanWholeSql)) !== null) {
-      const fullTable = tm[1];
-      if (!fullTable.startsWith('(')) {
-        const parts = fullTable.split('.');
-        const tName = parts[parts.length - 1].toUpperCase();
-        if (!sqlReservedKeywords.has(tName)) definedAliases.add(tName);
-      }
-
-      if (tm[2]) {
-        const aName = tm[2].toUpperCase();
-        if (!sqlReservedKeywords.has(aName)) definedAliases.add(aName);
-      }
-    }
-
-    // 3. Subquery aliases: ) [AS] alias (ör. )aa, ) aa, ) AS aa)
-    const subqueryAliasRx = /\)\s*(?:AS\s+)?([a-zA-Z0-9_#$]+)/gi;
-    let sm;
-    while ((sm = subqueryAliasRx.exec(cleanWholeSql)) !== null) {
-      const sa = sm[1].toUpperCase();
-      if (!sqlReservedKeywords.has(sa)) definedAliases.add(sa);
-    }
-
-    // Bilinen sistem tabloları, paketler ve pseudo kolonlar
-    const systemNamespaces = [
-      'DUAL', 'SYS', 'SYSTEM', 'DBO', 'INSERTED', 'DELETED', 'NEW', 'OLD', 'ROWNUM', 'USER',
-      'ALL_TABLES', 'USER_TABLES', 'DBA_TABLES', 'V$SESSION', 'V$SQL', 'DBMS_LOB', 'DBMS_OUTPUT',
-      'UTL_RAW', 'UTL_HTTP', 'SYS_CONTEXT', 'JSON_VALUE', 'XMLTABLE', 'EXTRACTVALUE'
-    ];
-    systemNamespaces.forEach(s => definedAliases.add(s));
-
-    // Eğer sorguda en az 1 tablo/FROM/JOIN tespit edildiyse, bilinmeyen prefix.kolon kullanımlarını yakala
-    if (definedAliases.size > 0) {
-      lines.forEach((lineText, idx) => {
-        const lineNum = idx + 1;
-        const cleanLine = lineText
-          .replace(/'(?:''|[^'\r\n])*'/g, "''")
-          .replace(/\/\/[^\r\n]*/g, '')
-          .replace(/--[^\r\n]*/g, '')
-          .replace(/\{[^\r\n]*\}/g, '');
-
-        // alias.column veya alias.* kalıplarını yakala
-        const aliasColRx = /\b([a-zA-Z_]\w*)\.([a-zA-Z0-9_#$*]+|\*)\b/g;
-        let am;
-        while ((am = aliasColRx.exec(cleanLine)) !== null) {
-          const prefix = am[1];
-          const col = am[2];
-          const prefixUp = prefix.toUpperCase();
-
-          // Sayısal veya floating point kontrolü (örn. 3.14 veya 1.0)
-          if (/^\d+$/.test(prefix) || /^\d+$/.test(col)) continue;
-          if (definedAliases.has(prefixUp)) continue;
-          if (SQL_FN.has(prefixUp) || SQL_KW.has(prefixUp)) continue;
-
-          // Paket / Şema fonksiyon çağrıları: prefix.function(...) (örn. p_util.datediff)
-          const safePref = typeof escapeRegex === 'function' ? escapeRegex(prefix) : prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const safeCol = typeof escapeRegex === 'function' ? escapeRegex(col) : col.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          if (new RegExp('\\b' + safePref + '\\.' + safeCol + '\\s*\\(', 'i').test(cleanLine)) continue;
-
-          // Bu satırda zaten aynı hata var mı?
-          if (!errors.some(e => e.line === lineNum && e.token === am[0])) {
-            errors.push({
-              line: lineNum,
-              col: am.index + 1,
-              token: am[0],
-              suggestion: `FROM veya JOIN içine '${prefix}' tablosunu ekleyin`,
-              message: `Tanımlanmamış Tablo/Alias: '${prefix}' aliası sorgudaki FROM veya JOIN tabloları arasında bulunamadı ('${am[0]}').`
-            });
-          }
-        }
-      });
-    }
+    // (Tanımlanmamış alias kontrolü alt sorgularda ve karmaşık SQL yapılarında sahte hataları önlemek için kaldırıldı)
 
     // Precalculate line start offsets for fast, accurate O(log N) line/col translation
     const lineStartOffsets = [0];
@@ -918,8 +823,10 @@ function findSyntaxErrors(code, lang = 'sql') {
         }
       }
 
+      const rawWithoutComments = (item.raw || '').replace(/--[^\r\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{[^\r\n]*\}/g, '').trim();
+
       // WHERE / HAVING boş koşul denetimi (Çok satırlı güvenli)
-      const emptyClause = /\b(WHERE|HAVING)\s*$/i.exec(trim);
+      const emptyClause = /\b(WHERE|HAVING)\s*$/i.exec(rawWithoutComments);
       if (emptyClause) {
         if (!nextTrim || clauseStartRx.test(nextTrim)) {
           addDiagnostic(lineNo, clean.toUpperCase().lastIndexOf(emptyClause[1].toUpperCase()) + 1, emptyClause[1].toUpperCase(), 'Koşul ifadesini tamamlayın', `'${emptyClause[1].toUpperCase()}' anahtar sözcüğünden sonra koşul eksik.`);
@@ -927,7 +834,7 @@ function findSyntaxErrors(code, lang = 'sql') {
       }
 
       // Satır sonu yarım kalan AND / OR
-      const danglingLogical = /\b(AND|OR)\s*$/i.exec(trim);
+      const danglingLogical = /\b(AND|OR)\s*$/i.exec(rawWithoutComments);
       if (danglingLogical) {
         if (!nextTrim || /^(?:GROUP\s+BY|ORDER\s+BY|HAVING|UNION|MINUS|INTERSECT|\))\b/i.test(nextTrim)) {
           addDiagnostic(lineNo, clean.toUpperCase().lastIndexOf(danglingLogical[1].toUpperCase()) + 1, danglingLogical[1].toUpperCase(), 'Koşul ifadesini tamamlayın', `'${danglingLogical[1].toUpperCase()}' anahtar sözcüğünden sonra koşul eksik.`);
@@ -935,10 +842,10 @@ function findSyntaxErrors(code, lang = 'sql') {
       }
 
       // Karşılaştırma operatörü sağ tarafı eksik
-      const danglingComparison = /(=|<>|!=|<=|>=|<|>|\bLIKE\b|\bIN\b)\s*$/i.exec(trim);
+      const danglingComparison = /(=|<>|!=|<=|>=|<|>|\bLIKE\b|\bIN\b)\s*$/i.exec(rawWithoutComments);
       if (danglingComparison) {
         if (!nextTrim || clauseStartRx.test(nextTrim) || /^(?:AND|OR)\b/i.test(nextTrim)) {
-          addDiagnostic(lineNo, Math.max(1, clean.lastIndexOf(danglingComparison[1]) + 1), danglingComparison[1], 'Operatörün sağına değer, parametre veya kolon yazın', `Karşılaştırma operatörü '${danglingComparison[1]}' sonrasında değer eksik.`);
+          addDiagnostic(lineNo, Math.max(1, rawWithoutComments.lastIndexOf(danglingComparison[1]) + 1), danglingComparison[1], 'Operatörün sağına değer, parametre veya kolon yazın', `Karşılaştırma operatörü '${danglingComparison[1]}' sonrasında değer eksik.`);
         }
       }
 
