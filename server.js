@@ -27,6 +27,7 @@ const { createChatRoomService } = require('./server/services/chat_room_service')
 const { registerPresenceRoutes } = require('./server/routes/presence');
 const { registerChatRoomRoutes } = require('./server/routes/chat_rooms');
 const { registerChatGroupRoutes } = require('./server/routes/chat_groups');
+const { registerChatNudgeRoute } = require('./server/routes/chat_nudge');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -2034,60 +2035,7 @@ function saveChatGroups() {
 
 registerChatGroupRoutes(app, { canAccessChatGroup, getAllUsersWithPresence, getChatGroups, requireAuth, saveChatGroups });
 
-// MSN Nudge (Titreşim / Dürtme)
-const nudgeCooldowns = new Map();
-
-app.post('/api/chat/nudge', requireAuth, async (req, res) => {
-  try {
-    await ensureChatMessagesHydrated();
-    const { receiverId, groupId } = req.body || {};
-    const myId = String(req.authUser.id);
-    if ((!receiverId && !groupId) || (receiverId && groupId)) {
-      return res.status(400).json({ success: false, reason: 'Tek bir titreşim hedefi belirtilmelidir.' });
-    }
-    if (groupId && !canAccessChatGroup(req.authUser, groupId)) {
-      return res.status(403).json({ success: false, reason: 'Bu gruba titreşim gönderme yetkiniz yok.' });
-    }
-    const targetKey = receiverId ? `${myId}_${receiverId}` : `${myId}_${groupId}`;
-
-    const lastNudge = nudgeCooldowns.get(targetKey) || 0;
-    if (Date.now() - lastNudge < 15 * 1000) {
-      const waitSec = Math.ceil((15 * 1000 - (Date.now() - lastNudge)) / 1000);
-      return res.status(429).json({ success: false, reason: `Lütfen tekrar titreşim göndermeden önce ${waitSec} saniye bekleyin.` });
-    }
-
-    nudgeCooldowns.set(targetKey, Date.now());
-
-    const messages = getChatMessages();
-    const senderName = req.authUser.full_name || req.authUser.username;
-    const nudgeMsg = {
-      id: crypto.randomUUID(),
-      senderId: myId,
-      senderName,
-      senderUsername: req.authUser.username,
-      senderAvatar: req.authUser.avatar || (req.authUser.username ? req.authUser.username[0].toUpperCase() : 'U'),
-      receiverId: receiverId ? String(receiverId) : null,
-      groupId: groupId ? String(groupId) : null,
-      roomId: null,
-      text: `📳 ${senderName} bir titreşim gönderdi!`,
-      attachment: null,
-      voice: null,
-      isNudge: true,
-      reactions: {},
-      isRead: false,
-      readAt: null,
-      createdAt: new Date().toISOString()
-    };
-
-    await persistChatMessage(nudgeMsg);
-    messages.push(nudgeMsg);
-    saveChatMessages();
-
-    res.json({ success: true, message: nudgeMsg });
-  } catch {
-    res.status(500).json({ success: false, reason: 'Titreşim gönderilemedi.' });
-  }
-});
+registerChatNudgeRoute(app, { canAccessChatGroup, ensureChatMessagesHydrated, getChatMessages, persistChatMessage, requireAuth, saveChatMessages });
 
 // Chat: Mesaj Gönderme
 app.post('/api/chat/send', requireAuth, async (req, res) => {
