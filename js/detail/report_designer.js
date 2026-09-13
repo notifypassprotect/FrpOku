@@ -2086,7 +2086,6 @@ function esc(str) {
  };
 
  window.addEventListener('mousemove', onMouseMove);
- window.addEventListener('mousemove', onMouseMove);
  window.addEventListener('mouseup', onMouseUp);
  });
  });
@@ -2292,30 +2291,33 @@ function esc(str) {
  let startX = 0;
  let startW = 0;
 
+ const onInspectorMove = e => {
+ if (!isResizing) return;
+ const dx = startX - e.clientX;
+ const newW = Math.max(220, Math.min(650, startW + dx));
+ inspectorWidth = newW;
+ insp.style.width = newW + 'px';
+ };
+
+ const stopInspectorResize = () => {
+ if (!isResizing) return;
+ isResizing = false;
+ document.body.style.cursor = '';
+ document.body.style.userSelect = '';
+ localStorage.setItem('frp_inspector_width', inspectorWidth);
+ window.removeEventListener('mousemove', onInspectorMove);
+ window.removeEventListener('mouseup', stopInspectorResize);
+ };
+
  resizer.addEventListener('mousedown', e => {
  isResizing = true;
  startX = e.clientX;
  startW = insp.offsetWidth;
  document.body.style.cursor = 'ew-resize';
  document.body.style.userSelect = 'none';
+ window.addEventListener('mousemove', onInspectorMove);
+ window.addEventListener('mouseup', stopInspectorResize);
  e.preventDefault();
- });
-
- window.addEventListener('mousemove', e => {
- if (!isResizing) return;
- const dx = startX - e.clientX;
- const newW = Math.max(220, Math.min(650, startW + dx));
- inspectorWidth = newW;
- insp.style.width = newW + 'px';
- });
-
- window.addEventListener('mouseup', () => {
- if (isResizing) {
- isResizing = false;
- document.body.style.cursor = '';
- document.body.style.userSelect = '';
- localStorage.setItem('frp_inspector_width', inspectorWidth);
- }
  });
  }
 
