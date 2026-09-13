@@ -9,6 +9,29 @@
   --ui-shadow-lift: 0 14px 34px rgba(15, 23, 42, 0.12);
 }
 
+/* Görünüm ayarları gerçek bir ölçek sistemi olarak çalışır. Rem tabanlı
+   bileşenler kök boyutla, sabit kontroller ise ortak değişkenlerle küçülür. */
+html[data-ui-scale="micro"] {
+  font-size: 12px;
+  --font-size-base: 11px !important;
+  --ui-control-h: 27px;
+  --ui-radius-sm: 6px;
+  --ui-radius-md: 9px;
+  --ui-radius-lg: 13px;
+}
+
+html[data-ui-scale="compact"] {
+  font-size: 13.6px;
+  --font-size-base: 12.5px !important;
+  --ui-control-h: 32px;
+}
+
+html[data-ui-scale="normal"] { font-size: 16px; --font-size-base: 14px !important; }
+html[data-ui-scale="spacious"] { font-size: 18.4px; --font-size-base: 16px !important; --ui-control-h: 42px; }
+html[data-ui-scale="large"] { font-size: 20.8px; --font-size-base: 18px !important; --ui-control-h: 46px; }
+
+body { font-size: var(--font-size-base, 14px) !important; }
+
 * { scrollbar-color: color-mix(in srgb, var(--text-muted) 42%, transparent) transparent; }
 
 body {
@@ -60,7 +83,7 @@ textarea:focus-visible {
 .mobile-drawer-item {
   min-height: var(--ui-control-h);
   border-radius: var(--ui-radius-sm) !important;
-  font-weight: 700;
+  font-weight: var(--bold-weight, 700);
   line-height: 1.15;
   transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease !important;
 }
@@ -160,6 +183,37 @@ select:focus {
 
 .report-table { border-radius: var(--ui-radius-md); }
 
+html[data-font-weight="light"] :is(
+  .btn, .dash-action-btn, .cmp-slot-btn, .cmp-tab-scroll-btn,
+  .workspace-tab-btn, .filter-chip, .view-btn, .theme-switch-pill,
+  .mobile-drawer-item, .report-name-title, .card-title,
+  .modal-title, .dash-title, .dash-table-header
+) { font-weight: var(--bold-weight, 500) !important; }
+
+html[data-font-weight="light"] :is(.report-table, .dash-tbl) :is(th, td) {
+  font-weight: var(--base-weight, 300) !important;
+}
+
+html[data-ui-scale="micro"] :is(
+  .topbar, .workspace-bar, .toolbar, .cmp-topbar, .cmp-selector-bar
+) { padding-block: 0.22rem !important; }
+
+html[data-ui-scale="micro"] :is(.btn, .filter-chip, .view-btn, .workspace-tab-btn) {
+  padding: 0.24rem 0.48rem !important;
+  gap: 0.28rem !important;
+}
+
+html[data-ui-scale="micro"][data-density="minimal"] :is(.report-table, table) :is(th, td) {
+  height: 18px !important;
+  padding: 1px 4px !important;
+  line-height: 1.05 !important;
+}
+
+html[data-ui-scale="micro"][data-density="minimal"] :is(.badge, .tag-pill, .pool-count-badge) {
+  padding: 0 3px !important;
+  line-height: 1.15 !important;
+}
+
 .report-table thead th,
 .dash-tbl th {
   letter-spacing: 0.045em;
@@ -246,7 +300,7 @@ select:focus {
 }
 
 @media (max-width: 860px) {
-  :root { --ui-control-h: 42px; }
+  :root:not([data-ui-scale="micro"]):not([data-ui-scale="compact"]) { --ui-control-h: 42px; }
 
   .topbar,
   .cmp-topbar {
@@ -260,9 +314,9 @@ select:focus {
   .workspace-bar,
   .cmp-selector-bar { padding-inline: 0.75rem !important; }
 
-  .btn,
-  .dash-action-btn,
-  .filter-chip { min-height: 42px; }
+  :root:not([data-ui-scale="micro"]):not([data-ui-scale="compact"]) :is(
+    .btn, .dash-action-btn, .filter-chip
+  ) { min-height: 42px; }
 
   .dash-header { align-items: stretch !important; }
   .dash-header > * { width: 100%; }

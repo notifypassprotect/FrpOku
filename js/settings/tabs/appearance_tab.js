@@ -230,6 +230,7 @@ window.FrpSettingsTabs.appearance = {
           'extrabold': { base: '600', bold: '800', heading: '900' }
         };
         const fwConfig = weightMap[e.target.value] || weightMap['normal'];
+        document.documentElement.setAttribute('data-font-weight', e.target.value);
         document.documentElement.style.setProperty('--base-weight', fwConfig.base);
         document.documentElement.style.setProperty('--bold-weight', fwConfig.bold);
         document.documentElement.style.setProperty('--heading-weight', fwConfig.heading);
@@ -245,7 +246,7 @@ window.FrpSettingsTabs.appearance = {
     overlay.querySelectorAll('input[name="stagedFontSize"]').forEach(radio => {
       radio.addEventListener('change', (e) => {
         stagedPrefs.fontSize = e.target.value;
-        const fontSizeMap = { micro: '13px', compact: '14px', normal: '15px', spacious: '16px', large: '17px' };
+        const fontSizeMap = { micro: '11px', compact: '12.5px', normal: '14px', spacious: '16px', large: '18px' };
         document.documentElement.setAttribute('data-ui-scale', e.target.value);
         if (fontSizeMap[e.target.value]) document.documentElement.style.setProperty('--font-size-base', fontSizeMap[e.target.value]);
         overlay.querySelectorAll('input[name="stagedFontSize"]').forEach(r => {

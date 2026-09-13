@@ -1862,6 +1862,7 @@
       'extrabold': { base: '600', bold: '800', heading: '900' }
     };
     const fwConfig = weightMap[prefs.fontWeight] || weightMap['normal'];
+    root.setAttribute('data-font-weight', prefs.fontWeight || 'normal');
     root.style.setProperty('--base-weight', fwConfig.base);
     root.style.setProperty('--bold-weight', fwConfig.bold);
     root.style.setProperty('--heading-weight', fwConfig.heading);
@@ -1885,11 +1886,11 @@
 
     // 4. Arayüz & Yazı Boyutu (UI Scale)
     const fontSizeMap = {
-      'micro': '13px',
-      'compact': '14px',
-      'normal': '15px',
+      'micro': '11px',
+      'compact': '12.5px',
+      'normal': '14px',
       'spacious': '16px',
-      'large': '17px'
+      'large': '18px'
     };
     if (prefs.fontSize) {
       root.setAttribute('data-ui-scale', prefs.fontSize);
