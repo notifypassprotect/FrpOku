@@ -802,62 +802,6 @@ app.post('/api/admin/approve-user', adminRateLimiter, requireAdmin, async (req, 
   }
 });
 
-app.get('/api/admin/mail/status', adminRateLimiter, requireAdmin, async (req, res) => {
-  try {
-    const envPath = path.join(__dirname, '.env');
-    if (fs.existsSync(envPath)) {
-      const envConfig = dotenv.parse(fs.readFileSync(envPath));
-      for (const k in envConfig) {
-        process.env[k] = envConfig[k];
-      }
-    }
-  } catch (e) {}
-  const status = mailer.getStatus();
-  const verification = status.ready ? await mailer.verify() : { ok: false, status: status.enabled ? 'not_configured' : 'disabled' };
-  const stats = mailer.getMailStats ? mailer.getMailStats() : null;
-  res.json({
-    success: true,
-    mail: {
-      ...status,
-      verified: verification.ok,
-      verifyStatus: verification.status,
-      error: verification.error || null
-    },
-    stats
-  });
-});
-
-app.get('/api/admin/mail/stats', adminRateLimiter, requireAdmin, (req, res) => {
-  res.json({
-    success: true,
-    stats: mailer.getMailStats ? mailer.getMailStats() : null
-  });
-});
-
-app.post('/api/admin/mail/test', adminRateLimiter, requireAdmin, async (req, res) => {
-  const email = String(req.body?.email || '').trim().toLowerCase();
-  if (!isValidEmail(email)) {
-    return res.status(400).json({ success: false, reason: 'Geçerli bir test e-posta adresi gereklidir.' });
-  }
-
-  const result = await mailer.sendTestEmail({ to: email });
-  await recordAuditLog({
-    userId: req.adminUser.id,
-    username: req.adminUser.username,
-    role: req.adminUser.role,
-    action: result.sent ? 'MAIL_TEST_SENT' : 'MAIL_TEST_FAILED',
-    target: email,
-    details: `E-posta testi durumu: ${result.status}`,
-    ip: req.ip
-  });
-
-  res.status(result.sent ? 200 : 503).json({
-    success: result.sent,
-    mail: { sent: result.sent, status: result.status },
-    reason: result.sent ? undefined : (result.error || result.reason || 'Test e-postası gönderilemedi. Mail yapılandırmasını kontrol edin.')
-  });
-});
-
 // ── 6. ADMİN: KULLANICIYI REDDET VEYA SİL ────────────────────
 app.post('/api/admin/reject-user', adminRateLimiter, requireAdmin, async (req, res) => {
   const { userId, deletePermanently = true } = req.body;
