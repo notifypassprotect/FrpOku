@@ -712,12 +712,12 @@
 .frp-chat-window {
   position: fixed;
   bottom: 0;
-  width: 350px;
-  height: 560px;
-  max-height: 86vh;
+  width: 390px;
+  height: 640px;
+  max-height: 90vh;
   background: var(--bg-surface, #ffffff);
-  border-top-left-radius: 16px;
-  border-top-right-radius: 16px;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
   border: 1px solid var(--border, #cbd5e1);
   border-bottom: none;
   box-shadow: 0 -10px 35px rgba(0, 0, 0, 0.18), 0 0 1px 1px rgba(0, 0, 0, 0.05);
@@ -943,7 +943,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.65rem 0.85rem;
+  padding: 0.78rem 0.9rem;
   background: var(--bg-surface, #ffffff);
   border-bottom: 1px solid var(--border-light, #e2e8f0);
   cursor: pointer;
@@ -1095,7 +1095,10 @@
 /* ── CHAT BODY ── */
 .frp-chat-body {
   flex: 1;
-  background: var(--bg-card, #f8fafc);
+  background:
+    radial-gradient(circle at 10% 10%, rgba(37, 99, 235, 0.055), transparent 34%),
+    radial-gradient(circle at 90% 90%, rgba(124, 58, 237, 0.045), transparent 32%),
+    var(--bg-card, #f8fafc);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -1470,15 +1473,21 @@
 
 /* ── CHAT FOOTER & INPUT ── */
 .frp-chat-footer {
-  padding: 0.55rem 0.65rem;
+  padding: 0.6rem 0.7rem 0.7rem;
   background: var(--bg-surface, #ffffff);
   border-top: 1px solid var(--border-light, #e2e8f0);
 }
 
 .frp-chat-input-row {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 0.35rem;
+}
+
+.frp-chat-composer-field {
+  flex: 1;
+  min-width: 0;
+  position: relative;
 }
 
 .frp-chat-btn-action {
@@ -1497,19 +1506,42 @@
 }
 
 .frp-chat-input {
-  flex: 1;
-  padding: 0.45rem 0.75rem;
+  display: block;
+  width: 100%;
+  min-height: 38px;
+  max-height: 112px;
+  padding: 0.58rem 3rem 0.58rem 0.78rem;
   font-size: 0.8rem;
-  border-radius: 20px;
+  line-height: 1.35;
+  border-radius: 18px;
   border: 1px solid var(--border, #cbd5e1);
   background: var(--bg-card, #f8fafc);
   color: var(--text-primary, #0f172a);
   outline: none;
+  resize: none;
+  overflow-y: auto;
+  box-sizing: border-box;
+  font-family: inherit;
 }
 
 .frp-chat-input:focus {
   border-color: var(--accent, #2563eb);
   background: var(--bg-surface, #ffffff);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.frp-chat-char-count {
+  position: absolute;
+  right: 0.65rem;
+  bottom: 0.68rem;
+  color: var(--text-muted, #94a3b8);
+  font-size: 0.58rem;
+  pointer-events: none;
+}
+
+.frp-chat-char-count.near-limit {
+  color: #dc2626;
+  font-weight: 800;
 }
 
 .frp-chat-send-btn {
@@ -1530,6 +1562,24 @@
 .frp-chat-send-btn:hover {
   background: #1d4ed8;
   transform: scale(1.05);
+}
+
+.frp-chat-send-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+  transform: none;
+}
+
+.frp-chat-msg.send-failed .frp-chat-bubble {
+  outline: 1px solid rgba(220, 38, 38, 0.65);
+  filter: saturate(0.65);
+}
+
+.frp-chat-send-error {
+  margin: 3px 5px 0;
+  color: #dc2626;
+  font-size: 0.62rem;
+  font-weight: 750;
 }
 
 /* ── INSTAGRAM DM MESAJ BUBBLE & TİKLER ── */

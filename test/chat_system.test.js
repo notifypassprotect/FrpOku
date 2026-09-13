@@ -256,3 +256,15 @@ test('sohbet kisi listesi kalici arama, canli filtreler ve klavye erisimi sunar'
   assert.match(css, /\.frp-presence-list-wrap\s*\{[^}]*flex:\s*1/s);
 });
 
+test('sohbet penceresi cok satirli taslak, otomatik boyut ve gonderim hatasi geri bildirimi sunar', () => {
+  const presence = fs.readFileSync(path.join(root, 'js', 'core', 'online_presence.js'), 'utf8');
+  const css = fs.readFileSync(path.join(root, 'css', 'online_presence.css'), 'utf8');
+  assert.match(presence, /<textarea class="frp-chat-input"/);
+  assert.match(presence, /frp_chat_draft_/);
+  assert.match(presence, /function updateComposerState/);
+  assert.match(presence, /classList\.add\('send-failed'\)/);
+  assert.match(presence, /function getChatBaseOffset/);
+  assert.match(css, /\.frp-chat-composer-field/);
+  assert.match(css, /\.frp-chat-char-count\.near-limit/);
+  assert.match(css, /\.frp-chat-msg\.send-failed/);
+});

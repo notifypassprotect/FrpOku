@@ -1146,14 +1146,20 @@
     return Boolean(panelEl && panelEl.classList.contains('open'));
   }
 
+  function getChatBaseOffset() {
+    if (!isPresencePanelOpen()) return 24;
+    const panelEl = dockEl.querySelector('#frpPresencePanel');
+    const panelWidth = panelEl ? panelEl.getBoundingClientRect().width : 380;
+    return Math.ceil(panelWidth) + 36;
+  }
+
   // ── DİNAMİK PENCERE HİZALAMA (BOŞLUKSUZ & TAŞMAYI ÖNLEYEN YERLEŞİM) ──
   function realignChatWindows() {
-    const isDockOpen = isPresencePanelOpen();
-    const baseOffset = isDockOpen ? 355 : 24;
+    const baseOffset = getChatBaseOffset();
     const vpWidth = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 1920;
 
     // Ekrana sığabilecek maksimum açık (genişletilmiş) pencere sayısı
-    const maxExpanded = Math.max(1, Math.min(3, Math.floor((vpWidth - baseOffset - 60) / 365)));
+    const maxExpanded = Math.max(1, Math.min(3, Math.floor((vpWidth - baseOffset - 60) / 405)));
 
     const windowsArr = Array.from(activeChatWindows.values());
     const expandedWins = windowsArr.filter(w => !w.el.classList.contains('minimized'));
@@ -1169,7 +1175,7 @@
     let currentRight = baseOffset;
     windowsArr.forEach((winObj) => {
       const isMin = winObj.el.classList.contains('minimized');
-      const winWidth = isMin ? 220 : 350;
+      const winWidth = isMin ? 220 : 390;
 
       // Sol kenardan taşmayı önle
       if (currentRight + winWidth > vpWidth - 16) {
@@ -1181,7 +1187,7 @@
       winObj.el.style.right = `${currentRight}px`;
       winObj.el.style.transition = 'right 0.25s cubic-bezier(0.16, 1, 0.3, 1), height 0.2s ease, width 0.2s ease';
 
-      const step = winObj.el.classList.contains('minimized') ? 228 : 358;
+      const step = winObj.el.classList.contains('minimized') ? 228 : 398;
       currentRight += step;
     });
   }
@@ -1207,9 +1213,8 @@
       return;
     }
 
-    const isDockOpen = isPresencePanelOpen();
-    const baseOffset = isDockOpen ? 355 : 24;
-    const rightOffset = baseOffset + (activeChatWindows.size * 358);
+    const baseOffset = getChatBaseOffset();
+    const rightOffset = baseOffset + (activeChatWindows.size * 398);
 
     const chatEl = document.createElement('div');
     chatEl.className = 'frp-chat-window';
@@ -1367,7 +1372,10 @@
             <button type="button" class="frp-chat-btn-action btn-attach" title="Dosya veya Görsel Ekle">📎</button>
             <button type="button" class="frp-chat-btn-action btn-audio-fallback" title="Ses Dosyası Yükle (.mp3, .wav, .m4a)">🎵</button>
             <button type="button" class="frp-chat-btn-action btn-emoji-toggle" title="Emoji Ekle">😀</button>
-            <input type="text" class="frp-chat-input" placeholder="Bir mesaj yazın..." maxlength="1000" />
+            <div class="frp-chat-composer-field">
+              <textarea class="frp-chat-input" placeholder="Bir mesaj yazın..." maxlength="1000" rows="1" aria-label="Mesaj"></textarea>
+              <span class="frp-chat-char-count" aria-live="polite">0/1000</span>
+            </div>
             <button type="button" class="frp-chat-btn-action btn-mic" title="Gerçek Ses Kaydı (Bas Konuş)">🎙️</button>
             ${!isRoom ? '<button type="button" class="frp-chat-btn-action btn-nudge-action" title="Titreşim Gönder (📳 MSN Titret)">📳</button>' : ''}
             <button type="button" class="frp-chat-send-btn" title="Gönder">
@@ -1388,6 +1396,7 @@
       chip.addEventListener('click', () => {
         if (input) {
           input.value = chip.dataset.quick || chip.textContent;
+          input.dispatchEvent(new Event('input', { bubbles: true }));
           input.focus();
         }
       });
@@ -1413,6 +1422,7 @@
     const btnMediaClose = chatEl.querySelector('.btn-media-close');
 
     const input = chatEl.querySelector('.frp-chat-input');
+    const charCount = chatEl.querySelector('.frp-chat-char-count');
     const btnSend = chatEl.querySelector('.frp-chat-send-btn');
     const btnEmojiToggle = chatEl.querySelector('.btn-emoji-toggle');
     const emojiPicker = chatEl.querySelector('.frp-chat-emoji-picker');
@@ -1435,6 +1445,23 @@
     let recordingTimer = null;
     let seenMsgIds = new Set();
     let isInitialStream = true;
+    const draftKey = `frp_chat_draft_${myId}_${isGroup ? 'group' : (isRoom ? 'room' : 'user')}_${chatId}`;
+
+    function updateComposerState() {
+      if (!input) return;
+      input.style.height = 'auto';
+      input.style.height = `${Math.min(input.scrollHeight, 112)}px`;
+      if (charCount) {
+        const length = input.value.length;
+        charCount.textContent = `${length}/1000`;
+        charCount.classList.toggle('near-limit', length >= 900);
+      }
+    }
+
+    if (input) {
+      try { input.value = localStorage.getItem(draftKey) || ''; } catch {}
+      updateComposerState();
+    }
 
     // ── MSN TITRET / NUDGE GÖNDERME ──
     let nudgeCooldownTimer = null;
@@ -1915,6 +1942,7 @@
         btn.addEventListener('click', () => {
           if (input) {
             input.value += emoji;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
             input.focus();
           }
         });
@@ -2062,7 +2090,7 @@
     // Mesaj Gönderme Mantığı (İyimser UI & Anlık Sıralama Bumps)
     async function sendMessage(payload) {
       const currentAuth = window.FrpAuth && window.FrpAuth.getUser ? window.FrpAuth.getUser() : null;
-      if (!currentAuth) return;
+      if (!currentAuth) return false;
 
       const bodyData = {
         receiverId: (!isRoom && !isGroup) ? chatId : null,
@@ -2105,18 +2133,26 @@
           headers: window.FrpAuth.getAuthHeaders ? window.FrpAuth.getAuthHeaders() : { 'Content-Type': 'application/json' },
           body: JSON.stringify(bodyData)
         });
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.success && data.message) {
-            localLastInteractions[chatId] = Date.now();
-            currentMessages = currentMessages.filter(m => m.id !== tempId);
-            currentMessages.push(data.message);
-            renderMessageStream(currentMessages);
-            if (currentTab === 'users') renderUsers();
-          }
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success || !data.message) {
+          throw new Error(data.reason || 'Mesaj sunucuya iletilemedi.');
         }
+        localLastInteractions[chatId] = Date.now();
+        currentMessages = currentMessages.filter(m => m.id !== tempId);
+        currentMessages.push(data.message);
+        renderMessageStream(currentMessages);
+        if (currentTab === 'users') renderUsers();
+        return true;
       } catch (err) {
         console.warn('Mesaj gönderilemedi:', err);
+        optimisticDiv.classList.remove('optimistic-pending');
+        optimisticDiv.classList.add('send-failed');
+        const errorLabel = document.createElement('div');
+        errorLabel.className = 'frp-chat-send-error';
+        errorLabel.textContent = 'Gönderilemedi';
+        optimisticDiv.appendChild(errorLabel);
+        if (typeof window.toast === 'function') window.toast(err.message || 'Mesaj gönderilemedi.', 'error');
+        return false;
       }
     }
 
@@ -2140,24 +2176,39 @@
       } catch {}
     }
 
-    function handleSend() {
+    async function handleSend() {
       if (!input) return;
       const text = (input.value || '').trim();
       if (!text) return;
       input.value = '';
+      updateComposerState();
+      try { localStorage.removeItem(draftKey); } catch {}
       if (emojiPicker) emojiPicker.style.display = 'none';
       if (btnSend) {
+        btnSend.disabled = true;
         btnSend.classList.add('sent-ripple');
         setTimeout(() => btnSend.classList.remove('sent-ripple'), 300);
       }
       playMessageSentSound();
-      sendMessage({ text });
+      const sent = await sendMessage({ text });
+      if (btnSend) btnSend.disabled = false;
+      if (!sent) {
+        input.value = text;
+        updateComposerState();
+        try { localStorage.setItem(draftKey, text); } catch {}
+        input.focus();
+      }
     }
 
     if (btnSend) btnSend.addEventListener('click', handleSend);
     let lastTypingSent = 0;
     if (input) {
       input.addEventListener('input', () => {
+        updateComposerState();
+        try {
+          if (input.value) localStorage.setItem(draftKey, input.value);
+          else localStorage.removeItem(draftKey);
+        } catch {}
         const now = Date.now();
         if (now - lastTypingSent > 2000 && (input.value || '').trim()) {
           lastTypingSent = now;
