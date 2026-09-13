@@ -6,6 +6,13 @@
 (function () {
  'use strict';
 
+ const clickFirstAvailable = (...ids) => {
+   const element = ids.map(id => document.getElementById(id)).find(Boolean);
+   if (!element) return false;
+   element.click();
+   return true;
+ };
+
  // ── Komut Tanımları ─────────────────────────────────────────
  const COMMANDS = [
  // Navigasyon
@@ -14,9 +21,9 @@
  { id: 'nav_compare', label: 'Karşılaştırma Ekranı', desc: 'İki raporu yan yana diff', action: () => { window.location.href = 'compare.html'; } },
 
  // Dosya İşlemleri
- { id: 'file_add', label: 'Rapor Ekle (.frp)', desc: 'Tek dosya yükle', action: () => { document.getElementById('fileInputSingle')?.click() || document.getElementById('fileInputMulti')?.click(); } },
+ { id: 'file_add', label: 'Rapor Ekle (.frp)', desc: 'Tek dosya yükle', action: () => { clickFirstAvailable('fileInputSingle', 'fileInputMulti'); } },
  { id: 'file_export_backup', label: 'Yedek Al (JSON)', desc: 'Tüm verileri yedekle', action: () => { document.getElementById('btnExportBackup')?.click(); } },
- { id: 'file_import_backup', label: 'Yedek Yükle (JSON)', desc: 'Yedeği geri yükle', action: () => { document.getElementById('btnImportBackup')?.click() || document.getElementById('fileInputBackup')?.click(); } },
+ { id: 'file_import_backup', label: 'Yedek Yükle (JSON)', desc: 'Yedeği geri yükle', action: () => { clickFirstAvailable('btnImportBackup', 'fileInputBackup'); } },
  { id: 'file_export_sqls', label: 'Tüm SQL\'leri İndir', desc: 'Toplu SQL export', action: () => { document.getElementById('btnExportAllSqls')?.click(); } },
  { id: 'file_export_csv', label: 'CSV Dışa Aktar', desc: 'Sorguları CSV olarak indir', action: () => {
  if (!window.FrpStore) return;
@@ -36,8 +43,8 @@
  { id: 'view_theme', label: 'Tema Değiştir', desc: 'Koyu/Aydınlık tema', action: () => { document.getElementById('btnThemeToggle')?.click(); } },
 
  // Araçlar
- { id: 'tool_params', label: 'SQL Parametre Paneli', desc: 'Tüm parametreleri görüntüle', action: () => { document.getElementById('btnParams')?.click() || window.openParamsModal?.(); } },
- { id: 'tool_deps', label: 'Bağımlılık Haritası', desc: 'Tablo bağımlılıkları', action: () => { document.getElementById('btnDependencies')?.click() || window.openDependenciesModal?.(); } },
+ { id: 'tool_params', label: 'SQL Parametre Paneli', desc: 'Tüm parametreleri görüntüle', action: () => { if (!clickFirstAvailable('btnParams')) window.openParamsModal?.(); } },
+ { id: 'tool_deps', label: 'Bağımlılık Haritası', desc: 'Tablo bağımlılıkları', action: () => { if (!clickFirstAvailable('btnDependencies')) window.openDependenciesModal?.(); } },
  { id: 'tool_snippets', label: 'Sorgu Kütüphanesi', desc: 'Kayıtlı SQL şablonları', action: () => { if (window.renderSnippetsModal) { window.renderSnippetsModal(); } else { document.getElementById('btnSnippets')?.click(); } } },
  { id: 'tool_dupes', label: 'Duplicate Sorgular', desc: 'Tekrarlayan SQL tespiti', action: () => { document.getElementById('btnFindDuplicates')?.click(); } },
  { id: 'tool_shortcuts',label: 'Klavye Kısayolları', desc: 'Kısayol tablosunu aç', action: () => { window.openSettingsModal?.('shortcuts'); } },

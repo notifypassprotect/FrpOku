@@ -533,6 +533,14 @@ function renderCurrentView() {
 }
 window.renderCurrentView = renderCurrentView;
 
+function setViewMode(mode) {
+  if (!['table', 'cards', 'timeline'].includes(mode)) return false;
+  currentViewMode = mode;
+  renderCurrentView();
+  return true;
+}
+window.setViewMode = setViewMode;
+
 // ── Tablo Görünümü Render ───────────────────────────────────
 function renderTable() {
   const sorted = sortFiles(allFiles);
