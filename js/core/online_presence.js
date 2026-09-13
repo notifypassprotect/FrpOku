@@ -420,6 +420,13 @@
       if (newCounts.bySender && typeof newCounts.bySender === 'object') {
         bySender = { ...newCounts.bySender };
         total = Number(newCounts.total) || 0;
+        Object.entries(bySender).forEach(([senderId, count]) => {
+          const currentCount = Number(count) || 0;
+          const previousCount = Number(unreadData.bySender?.[senderId]) || 0;
+          if (currentCount > previousCount) {
+            newSenders.push({ senderId, count: currentCount, diff: currentCount - previousCount });
+          }
+        });
         if (newCounts.lastInteraction && typeof newCounts.lastInteraction === 'object') {
           unreadData.lastInteraction = { ...unreadData.lastInteraction, ...newCounts.lastInteraction };
         }
