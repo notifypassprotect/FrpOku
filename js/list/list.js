@@ -20,7 +20,7 @@ let onlyNotes        = false;
 let isRegexMode      = false;
 let isStoreLoaded    = false;
 let currentPage      = 1;
-let currentViewMode  = 'table';
+let currentViewMode  = window.matchMedia?.('(max-width: 768px)').matches ? 'cards' : 'table';
 let _lastSelectedRowId = null;
 
 const tableBody          = document.getElementById('tableBody');
@@ -1103,16 +1103,31 @@ function setupMobileDrawer() {
   function openDrawer() {
     drawer?.classList.add('open');
     overlay?.classList.add('open');
+    document.body.classList.add('mobile-drawer-open');
+    btnToggle?.setAttribute('aria-expanded', 'true');
+    drawer?.setAttribute('aria-hidden', 'false');
+    overlay?.setAttribute('aria-hidden', 'false');
+    window.setTimeout(() => btnClose?.focus(), 50);
   }
 
   function closeDrawer() {
     drawer?.classList.remove('open');
     overlay?.classList.remove('open');
+    document.body.classList.remove('mobile-drawer-open');
+    btnToggle?.setAttribute('aria-expanded', 'false');
+    drawer?.setAttribute('aria-hidden', 'true');
+    overlay?.setAttribute('aria-hidden', 'true');
   }
 
   btnToggle?.addEventListener('click', openDrawer);
   btnClose?.addEventListener('click', closeDrawer);
   overlay?.addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && drawer?.classList.contains('open')) {
+      closeDrawer();
+      btnToggle?.focus();
+    }
+  });
 
   const bindDrawerItem = (id, fn) => {
     document.getElementById(id)?.addEventListener('click', () => {
