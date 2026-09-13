@@ -1079,9 +1079,14 @@
     });
   }
 
+  function isPresencePanelOpen() {
+    const panelEl = dockEl ? dockEl.querySelector('#frpPresencePanel') : null;
+    return Boolean(panelEl && panelEl.classList.contains('open'));
+  }
+
   // ── DİNAMİK PENCERE HİZALAMA (BOŞLUKSUZ & TAŞMAYI ÖNLEYEN YERLEŞİM) ──
   function realignChatWindows() {
-    const isDockOpen = panel && panel.classList.contains('open');
+    const isDockOpen = isPresencePanelOpen();
     const baseOffset = isDockOpen ? 355 : 24;
     const vpWidth = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 1920;
 
@@ -1140,7 +1145,7 @@
       return;
     }
 
-    const isDockOpen = panel && panel.classList.contains('open');
+    const isDockOpen = isPresencePanelOpen();
     const baseOffset = isDockOpen ? 355 : 24;
     const rightOffset = baseOffset + (activeChatWindows.size * 358);
 

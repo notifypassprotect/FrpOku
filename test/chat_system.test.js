@@ -63,6 +63,8 @@ test('server.js içinde oda yönetimi, mesaj silme ve medya filtresi bulunur', (
 test('online_presence.js içinde pencere hizalama, ses kaydı, DM stili ve medya galerisi bulunur', () => {
   const presence = fs.readFileSync(path.join(root, 'js', 'core', 'online_presence.js'), 'utf8');
   assert.match(presence, /realignChatWindows/);
+  assert.match(presence, /function isPresencePanelOpen\(\)/);
+  assert.doesNotMatch(presence, /const isDockOpen = panel && panel\.classList\.contains\('open'\)/);
   assert.match(presence, /MediaRecorder/);
   assert.match(presence, /btnMediaGallery/);
   assert.match(presence, /frp-chat-media-drawer/);
@@ -241,6 +243,5 @@ test('online_presence.js ve online_presence.css gorsel lightbox, kalici reaksiyo
   assert.match(server, /saveUserAvatar/);
   assert.match(server, /supabase\.from\('chat_messages'\)\.update\(\{ reactions: msg\.reactions \}\)/);
 });
-
 
 
