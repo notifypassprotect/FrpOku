@@ -25,6 +25,7 @@ const { createPresenceService } = require('./server/services/presence_service');
 const { createChatMessageService } = require('./server/services/chat_message_service');
 const { createChatRoomService } = require('./server/services/chat_room_service');
 const { registerPresenceRoutes } = require('./server/routes/presence');
+const { registerChatRoomRoutes } = require('./server/routes/chat_rooms');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -2551,130 +2552,7 @@ const CHAT_ROOMS_STORE_PATH = path.join(__dirname, 'data', 'chat_rooms.json');
 const chatRoomsStore = createJsonStore(CHAT_ROOMS_STORE_PATH, { label: 'Sohbet odası' });
 const { chatRoomFromRow, getChatRooms, loadChatRooms, replaceChatRooms, saveChatRooms } = createChatRoomService({ store: chatRoomsStore, supabase });
 
-app.get('/api/chat/rooms', requireAuth, async (req, res) => {
-  try {
-    const rooms = await loadChatRooms();
-    const myId = String(req.authUser.id);
-    const isAdmin = req.authUser.role === 'admin';
-    const filtered = rooms.filter(r => {
-      if (isAdmin || r.isAllUsers) return true;
-      return Array.isArray(r.memberUserIds) && r.memberUserIds.map(String).includes(myId);
-    });
-    res.json({ success: true, rooms: filtered.map(chatRoomFromRow) });
-  } catch {
-    res.status(500).json({ success: false, reason: 'Odalar alınamadı.' });
-  }
-});
-
-app.post('/api/chat/rooms', requireAuth, async (req, res) => {
-  try {
-    if (req.authUser.role !== 'admin') {
-      return res.status(403).json({ success: false, reason: 'Yalnızca yöneticiler oda oluşturabilir.' });
-    }
-    const { name, icon, description } = req.body || {};
-    const isAllUsers = req.body?.isAllUsers ?? req.body?.is_all_users ?? true;
-    const memberUserIds = req.body?.memberUserIds ?? req.body?.member_user_ids ?? [];
-    if (!name || !name.trim()) {
-      return res.status(400).json({ success: false, reason: 'Oda adı zorunludur.' });
-    }
-    const rooms = await loadChatRooms();
-    const id = 'room_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
-    const newRoom = {
-      id,
-      name: name.trim(),
-      icon: (icon || '📢').trim(),
-      description: (description || '').trim(),
-      isAllUsers: Boolean(isAllUsers),
-      memberUserIds: Array.isArray(memberUserIds) ? memberUserIds.map(String) : [],
-      createdBy: String(req.authUser.id),
-      createdAt: new Date().toISOString()
-    };
-    if (supabase) {
-      const { data, error } = await supabase.from('chat_rooms').insert({
-        id: newRoom.id,
-        name: newRoom.name,
-        icon: newRoom.icon,
-        description: newRoom.description,
-        is_all_users: newRoom.isAllUsers,
-        member_user_ids: newRoom.memberUserIds,
-        created_by: req.authUser.id
-      }).select('*').limit(1);
-      if (error) throw error;
-      const savedRoom = data?.[0] ? chatRoomFromRow(data[0]) : newRoom;
-      replaceChatRooms([...rooms.filter(room => String(room.id) !== String(savedRoom.id)), savedRoom]);
-      return res.json({ success: true, room: savedRoom });
-    }
-    rooms.push(newRoom);
-    saveChatRooms();
-    res.json({ success: true, room: chatRoomFromRow(newRoom) });
-  } catch {
-    res.status(500).json({ success: false, reason: 'Oda oluşturulamadı.' });
-  }
-});
-
-app.put('/api/chat/rooms/:id', requireAuth, async (req, res) => {
-  try {
-    if (req.authUser.role !== 'admin') {
-      return res.status(403).json({ success: false, reason: 'Yalnızca yöneticiler odayı düzenleyebilir.' });
-    }
-    const rooms = await loadChatRooms();
-    const room = rooms.find(r => r.id === req.params.id);
-    if (!room) return res.status(404).json({ success: false, reason: 'Oda bulunamadı.' });
-
-    const { name, icon, description } = req.body || {};
-    const isAllUsers = req.body?.isAllUsers ?? req.body?.is_all_users;
-    const memberUserIds = req.body?.memberUserIds ?? req.body?.member_user_ids;
-    if (name) room.name = name.trim();
-    if (icon) room.icon = icon.trim();
-    if (description !== undefined) room.description = String(description).trim();
-    if (isAllUsers !== undefined) room.isAllUsers = Boolean(isAllUsers);
-    if (Array.isArray(memberUserIds)) room.memberUserIds = memberUserIds.map(String);
-
-    if (supabase) {
-      const { data, error } = await supabase.from('chat_rooms').update({
-        name: room.name,
-        icon: room.icon,
-        description: room.description,
-        is_all_users: room.isAllUsers,
-        member_user_ids: room.memberUserIds,
-        updated_at: new Date().toISOString()
-      }).eq('id', room.id).select('*').limit(1);
-      if (error) throw error;
-      const savedRoom = data?.[0] ? chatRoomFromRow(data[0]) : room;
-      replaceChatRooms(rooms.map(item => String(item.id) === String(savedRoom.id) ? savedRoom : item));
-      return res.json({ success: true, room: savedRoom });
-    }
-    saveChatRooms();
-    res.json({ success: true, room: chatRoomFromRow(room) });
-  } catch {
-    res.status(500).json({ success: false, reason: 'Oda güncellenemedi.' });
-  }
-});
-
-app.delete('/api/chat/rooms/:id', requireAuth, async (req, res) => {
-  try {
-    if (req.authUser.role !== 'admin') {
-      return res.status(403).json({ success: false, reason: 'Yalnızca yöneticiler odayı silebilir.' });
-    }
-    const rooms = await loadChatRooms();
-    const idx = rooms.findIndex(r => r.id === req.params.id);
-    if (idx === -1) return res.status(404).json({ success: false, reason: 'Oda bulunamadı.' });
-
-    if (supabase) {
-      const { error: messageDeleteError } = await supabase.from('chat_messages').delete().eq('room_id', req.params.id);
-      if (messageDeleteError) throw messageDeleteError;
-      const { error: roomDeleteError } = await supabase.from('chat_rooms').delete().eq('id', req.params.id);
-      if (roomDeleteError) throw roomDeleteError;
-      replaceChatRooms(rooms.filter(room => String(room.id) !== String(req.params.id)));
-      return res.json({ success: true });
-    }
-    rooms.splice(idx, 1);
-    saveChatRooms();
-    res.json({ success: true });
-  } catch {
-    res.status(500).json({ success: false, reason: 'Oda silinemedi.' });
-  }
-});
+registerChatRoomRoutes(app, { chatRoomFromRow, loadChatRooms, replaceChatRooms, requireAuth, saveChatRooms, supabase });
 
 registerCatalogRoutes(app, { apiWriteRateLimiter, dataRoot: path.join(__dirname, 'data'), requireAuth, supabase });
 
