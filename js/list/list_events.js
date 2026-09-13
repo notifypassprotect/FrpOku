@@ -5,8 +5,7 @@
   const analysisActions = {
     dependencies: () => window.openDependenciesModal?.(),
     params: () => window.openParamsModal?.(),
-    snippets: () => window.renderSnippetsModal?.(),
-    'table-analysis': () => window.openTableUsageModal?.()
+    snippets: () => window.renderSnippetsModal?.()
   };
 
   async function runAnalysis(action) {
@@ -26,8 +25,7 @@
       if (result === undefined && !(
         (action === 'dependencies' && window.openDependenciesModal) ||
         (action === 'params' && window.openParamsModal) ||
-        (action === 'snippets' && window.renderSnippetsModal) ||
-        (action === 'table-analysis' && window.openTableUsageModal)
+        (action === 'snippets' && window.renderSnippetsModal)
       )) throw new Error('Analiz modülü yüklenemedi.');
       await Promise.resolve(result);
     } catch (error) {

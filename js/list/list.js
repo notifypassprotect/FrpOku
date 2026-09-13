@@ -1151,7 +1151,6 @@ function setupMobileDrawer() {
   bindDrawerItem('btnMobDependencies', () => window.openDependenciesModal?.());
   bindDrawerItem('btnMobParams', () => window.openParamsModal?.());
   bindDrawerItem('btnMobSnippets', () => window.renderSnippetsModal?.());
-  bindDrawerItem('btnMobTableAnalysis', () => window.openTableUsageModal?.());
   bindDrawerItem('btnMobRecent', () => window.openRecentModal?.());
   bindDrawerItem('btnMobDashboard', () => { window.location.href = 'dashboard.html'; });
   bindDrawerItem('btnMobSettings', () => window.openSettingsModal?.('appearance'));

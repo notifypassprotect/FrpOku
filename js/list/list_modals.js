@@ -11,6 +11,48 @@ window.FrpListModals = window.FrpListModals || {};
   const escHtml = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const encodeInlineArg = window.encodeInlineArg || (s => encodeURIComponent(String(s || '')));
 
+  async function hydrateReportsForTableAnalysis(files) {
+    if (!FrpStore.ensureFullReport) return files;
+    const missing = files.filter(file => {
+      const sqlCount = Number(file.stats?.sqlCount ?? file.sqlCount ?? 0);
+      const hasTables = Array.isArray(file.tableNames) && file.tableNames.length > 0;
+      const hasQueries = Array.isArray(file.queries) && file.queries.length > 0;
+      return sqlCount > 0 && !hasTables && !hasQueries;
+    });
+    if (missing.length === 0) return files;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.zIndex = '210000';
+    overlay.innerHTML = `
+      <div class="modal" style="max-width:460px;text-align:center;">
+        <div class="modal-title">Raporlar Analiz Ediliyor</div>
+        <div class="modal-body" style="display:grid;gap:.75rem;">
+          <div style="font-size:.82rem;color:var(--text-secondary);">Eksik analiz indeksleri rapor içeriklerinden tamamlanıyor.</div>
+          <div style="height:8px;border-radius:999px;background:var(--bg-raised);overflow:hidden;"><div id="analysisHydrateBar" style="height:100%;width:0;background:linear-gradient(90deg,var(--accent),#7c3aed);transition:width .18s;"></div></div>
+          <strong id="analysisHydrateText" style="font-size:.78rem;color:var(--text-muted);">0 / ${missing.length}</strong>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    let completed = 0;
+    const queue = missing.slice();
+    const bar = overlay.querySelector('#analysisHydrateBar');
+    const label = overlay.querySelector('#analysisHydrateText');
+    const worker = async () => {
+      while (queue.length) {
+        const file = queue.shift();
+        await FrpStore.ensureFullReport(file.id).catch(() => null);
+        completed += 1;
+        if (bar) bar.style.width = `${Math.round(completed * 100 / missing.length)}%`;
+        if (label) label.textContent = `${completed} / ${missing.length}`;
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(10, missing.length) }, worker));
+    overlay.remove();
+    return FrpStore.getAll ? FrpStore.getAll() : files;
+  }
+
   // 1. Parametre Yönetim Paneli
   window.FrpListModals.openParamsModal = async function() {
     const files = FrpStore.getAll ? FrpStore.getAll() : [];
@@ -217,13 +259,16 @@ window.FrpListModals = window.FrpListModals || {};
 
   // 2. Bağımlılık Haritası Modalı
   window.FrpListModals.openDependenciesModal = async function() {
-    const files = FrpStore.getAll ? FrpStore.getAll() : [];
+    let files = FrpStore.getAll ? FrpStore.getAll() : [];
+    files = await hydrateReportsForTableAnalysis(files);
     let deps = FrpStore.getDependencyMap ? FrpStore.getDependencyMap(files) : [];
+    const coveredReportIds = new Set(deps.flatMap(item => (item.deps || []).map(dep => String(dep.fileId))));
+    const totalReportCount = files.length;
 
     if (!deps || deps.length === 0) {
       if (typeof window.showModal === 'function') {
         await window.showModal({
-          title: 'Tablo Bağımlılık Haritası',
+          title: `Tablo Etki ve Bağımlılık Analizi · ${totalReportCount} Rapor Tarandı`,
           body: `
             <div style="padding:2rem;text-align:center;color:var(--text-muted);font-size:.88rem;line-height:1.5;">
               Bağımlılık analizi için henüz veritabanı tablosu içeren bir rapor bulunamadı.<br>
@@ -260,7 +305,7 @@ window.FrpListModals = window.FrpListModals || {};
           <div class="master-search-wrap">
             <input type="text" id="tableMasterSearch" class="master-search-input" placeholder="Tablo ara... (BIRIM, HASTA)" autocomplete="off" />
             <div style="font-size:.72rem;color:var(--text-muted);display:flex;justify-content:space-between;">
-              <span>Toplam: <strong>${deps.length}</strong> veritabanı tablosu</span>
+              <span><strong>${totalReportCount}</strong> rapor tarandı · <strong>${coveredReportIds.size}</strong> raporda tablo bulundu · <strong>${deps.length}</strong> benzersiz tablo</span>
               <span id="tableFilterCount"></span>
             </div>
           </div>
@@ -293,7 +338,7 @@ window.FrpListModals = window.FrpListModals || {};
 
     if (typeof window.showModal === 'function') {
       await window.showModal({
-        title: `Veritabanı Tablo Bağımlılık Haritası (${deps.length} Tablo)`,
+        title: `Tablo Etki ve Bağımlılık Analizi (${deps.length} Tablo · ${totalReportCount} Rapor Tarandı)`,
         body: bodyHtml,
         confirmText: 'Kapat',
         cancelText: '',
