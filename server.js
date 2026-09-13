@@ -29,6 +29,7 @@ const { registerChatRoomRoutes } = require('./server/routes/chat_rooms');
 const { registerChatGroupRoutes } = require('./server/routes/chat_groups');
 const { registerChatNudgeRoute } = require('./server/routes/chat_nudge');
 const { registerChatSendRoute } = require('./server/routes/chat_send');
+const { registerChatMessageListRoute } = require('./server/routes/chat_messages');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -2042,74 +2043,10 @@ registerChatNudgeRoute(app, { canAccessChatGroup, ensureChatMessagesHydrated, ge
 registerChatSendRoute(app, { canAccessChatGroup, canAccessChatRoom, chatPayloadSize, ensureChatMessagesHydrated, getChatMessages, persistChatMessage, requireAuth, saveChatMessages, scheduleChatEmailDigest });
 
 // Chat: Mesajları Listeleme
-app.get('/api/chat/messages', requireAuth, async (req, res) => {
-  try {
-    await ensureChatMessagesHydrated();
-    const peerId = req.query.peerId ? String(req.query.peerId) : null;
-    const roomId = req.query.roomId ? String(req.query.roomId) : null;
-    const groupId = req.query.groupId ? String(req.query.groupId) : null;
-    const since = req.query.since ? new Date(req.query.since).getTime() : 0;
-    const myId = String(req.authUser.id);
-    const targetCount = [peerId, roomId, groupId].filter(Boolean).length;
-    if (targetCount !== 1) {
-      return res.status(400).json({ success: false, reason: 'Tek bir sohbet hedefi belirtilmelidir.' });
-    }
-    if (groupId && !canAccessChatGroup(req.authUser, groupId)) {
-      return res.status(403).json({ success: false, reason: 'Bu grubun mesajlarını görüntüleme yetkiniz yok.' });
-    }
-    if (roomId && !canAccessChatRoom(req.authUser, roomId)) {
-      return res.status(403).json({ success: false, reason: 'Bu kanalın mesajlarını görüntüleme yetkiniz yok.' });
-    }
-
-    const all = getChatMessages();
-
-    let matched = all.filter(m => {
-      if (roomId) {
-        return m.roomId === roomId;
-      }
-      if (groupId) {
-        return m.groupId === groupId;
-      }
-      if (peerId) {
-        const isMeToPeer = (String(m.senderId) === myId && String(m.receiverId) === peerId);
-        const isPeerToMe = (String(m.senderId) === peerId && String(m.receiverId) === myId);
-        return isMeToPeer || isPeerToMe;
-      }
-      return false;
-    });
-
-    if (since > 0) {
-      matched = matched.filter(m => new Date(m.createdAt).getTime() > since);
-    }
-
-    const mediaOnly = req.query.mediaOnly === 'true';
-    if (mediaOnly) {
-      matched = matched.filter(m => !!m.attachment);
-    }
-
-    // Aktif yazıyor (typing) kullanıcıları topla
-    const now = Date.now();
-    const typingUsers = [];
-    for (const [key, item] of activeChatTyping.entries()) {
-      if (now > item.expiresAt) {
-        activeChatTyping.delete(key);
-      } else if (item.senderId !== myId) {
-        if (peerId && item.senderId === peerId && item.targetId === myId) {
-          typingUsers.push(item.senderName);
-        } else if ((roomId && item.targetId === roomId) || (groupId && item.targetId === groupId)) {
-          typingUsers.push(item.senderName);
-        }
-      }
-    }
-
-    res.json({ success: true, messages: matched.slice(-100), typingUsers });
-  } catch (err) {
-    res.status(500).json({ success: false, reason: 'Mesajlar alınamadı.' });
-  }
-});
+const activeChatTyping = new Map();
+registerChatMessageListRoute(app, { activeChatTyping, canAccessChatGroup, canAccessChatRoom, ensureChatMessagesHydrated, getChatMessages, requireAuth });
 
 // Chat: Canlı Yazıyor (Typing) Bildirimi
-const activeChatTyping = new Map();
 app.post('/api/chat/typing', requireAuth, async (req, res) => {
   try {
     const senderId = String(req.authUser.id);
