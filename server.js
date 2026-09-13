@@ -17,6 +17,7 @@ const { protectInternalFiles, securityHeaders } = require('./server/middleware/s
 const { registerSystemRoutes } = require('./server/routes/system');
 const { createAuthSecurity } = require('./server/services/auth_security');
 const { boundedSetting, plainObject, safeLogStr } = require('./server/services/value_utils');
+const { createUserService } = require('./server/services/user_service');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -39,118 +40,13 @@ const mailer = createMailer();
 // ── Kullanıcı Veri Yönetimi & Yerel Yedekleme ─────────────────
 const usersJsonPath = path.join(__dirname, 'data', 'users.json');
 const usersStore = createJsonStore(usersJsonPath, { label: 'Yerel kullanıcı' });
-
-// Yerel kullanıcı dosyasını oku / yaz
-function getLocalUsers() {
-  const users = usersStore.read();
-  return Array.isArray(users) ? users : [];
-}
-
-function saveLocalUsers(users) {
-  usersStore.write(users);
-}
-
-async function loadUserById(userId) {
-  if (!userId) return null;
-  if (supabase) {
-    const { data, error } = await supabase
-      .from('app_users')
-      .select('*')
-      .eq('id', String(userId))
-      .limit(1);
-    if (error) throw error;
-    return data && data[0] ? data[0] : null;
-  }
-  return getLocalUsers().find(user => String(user.id) === String(userId)) || null;
-}
-
-async function updateUserById(userId, updates) {
-  if (supabase) {
-    const pendingUpdates = { ...updates };
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const { data, error } = await supabase
-        .from('app_users')
-        .update(pendingUpdates)
-        .eq('id', String(userId))
-        .select('id, username, email, full_name, phone, department, role, is_active, avatar, created_at, last_login')
-        .limit(1);
-      if (!error) return data && data[0] ? data[0] : null;
-
-      const optionalColumn = ['is_frozen', 'password_changed_at'].find(column =>
-        Object.prototype.hasOwnProperty.call(pendingUpdates, column) && String(error.message || '').includes(column)
-      );
-      if (optionalColumn) {
-        delete pendingUpdates[optionalColumn];
-        continue;
-      }
-      throw error;
-    }
-    throw new Error('Kullanıcı güncellemesi desteklenmeyen veritabanı şeması nedeniyle tamamlanamadı.');
-  }
-
-  const users = getLocalUsers();
-  const index = users.findIndex(user => String(user.id) === String(userId));
-  if (index === -1) return null;
-  users[index] = { ...users[index], ...updates };
-  saveLocalUsers(users);
-  const safeUser = { ...users[index] };
-  delete safeUser.password_hash;
-  return safeUser;
-}
-
-// Staging/ilk kurulum admini yalnızca ortam değişkenlerinden oluşturulur.
-async function ensureAdminUser() {
-  const bootstrapUsername = (process.env.BOOTSTRAP_ADMIN_USERNAME || '').trim().toLowerCase();
-  const bootstrapPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD || '';
-  const bootstrapEmail = (process.env.BOOTSTRAP_ADMIN_EMAIL || '').trim().toLowerCase();
-
-  if (!bootstrapUsername || !bootstrapPassword) return false;
-  if (bootstrapPassword.length < 12) {
-    throw new Error('BOOTSTRAP_ADMIN_PASSWORD en az 12 karakter olmalıdır.');
-  }
-
-  const bootstrapAdmin = {
-    id: 'usr_admin_root',
-    username: bootstrapUsername,
-    password_hash: await hashPassword(bootstrapPassword),
-    email: bootstrapEmail,
-    full_name: 'Sistem Yöneticisi (Admin)',
-    phone: '',
-    department: 'Bilgi İşlem ve Yönetim',
-    role: 'admin',
-    is_active: true,
-    avatar: 'A',
-    created_at: new Date().toISOString(),
-    last_login: null
-  };
-
-  if (supabase) {
-    try {
-      const { data: admins, error: adminQueryError } = await supabase
-        .from('app_users')
-        .select('id, role')
-        .eq('role', 'admin')
-        .limit(1);
-      if (adminQueryError) throw adminQueryError;
-
-      if (!admins || admins.length === 0) {
-        console.log('Admin kullanıcısı bulunamadı, ortam değişkenlerinden bootstrap admin oluşturuluyor...');
-        const { error } = await supabase.from('app_users').upsert([bootstrapAdmin], { onConflict: 'username' });
-        if (error) throw error;
-      }
-      return true;
-    } catch (err) {
-      console.warn('Supabase admin doğrulama uyarısı:', safeLogStr(err.message));
-    }
-  }
-
-  const localUsers = getLocalUsers();
-  if (!localUsers.some(u => u.role === 'admin' || u.username === bootstrapUsername)) {
-    localUsers.unshift(bootstrapAdmin);
-    saveLocalUsers(localUsers);
-  }
-  return true;
-}
+const { ensureAdminUser, getLocalUsers, loadUserById, saveLocalUsers, updateUserById } = createUserService({
+  env: process.env,
+  hashPassword,
+  safeLogStr,
+  supabase,
+  usersStore
+});
 
 
 // ── DENETİM GÜNLÜĞÜ (AUDIT LOGS) DEPOLAMA ────────────────────
