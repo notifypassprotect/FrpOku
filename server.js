@@ -20,6 +20,7 @@ const { createUserService } = require('./server/services/user_service');
 const { createAuditService } = require('./server/services/audit_service');
 const { configureHttpMiddleware } = require('./server/middleware/http');
 const { registerCatalogRoutes } = require('./server/routes/catalog');
+const { startServer } = require('./server/bootstrap');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -3040,44 +3041,7 @@ app.delete('/api/chat/rooms/:id', requireAuth, async (req, res) => {
 
 registerCatalogRoutes(app, { apiWriteRateLimiter, dataRoot: path.join(__dirname, 'data'), requireAuth, supabase });
 
-async function startServer() {
-  try {
-    await ensureAdminUser();
-  } catch (err) {
-    console.warn('Bootstrap admin başlatma uyarısı:', safeLogStr(err.message));
-  }
-
-  const server = app.listen(PORT, () => {
-    const url = `http://localhost:${PORT}`;
-    console.log(`\n======================================================`);
-    console.log(` FrpOku Sunucusu Başarıyla Başlatıldı!`);
-    console.log(` Web Adresi: ${url}`);
-    console.log(`======================================================\n`);
-
-    // Geliştirme ortamında tarayıcıyı otomatik aç
-    if (process.env.AUTO_OPEN_BROWSER !== 'false') {
-      const { exec } = require('child_process');
-      const startCmd = process.platform === 'win32'
-        ? `start "" "${url}"`
-        : process.platform === 'darwin'
-        ? `open "${url}"`
-        : `xdg-open "${url}"`;
-      exec(startCmd, () => {});
-    }
-  });
-
-  server.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      console.error(`\n[HATA] ${PORT} portu zaten başka bir FrpOku penceresi veya uygulama tarafından kullanılıyor!`);
-      console.error(`Lütfen açık olan diğer Node.js / FrpOku pencerelerini kapatıp tekrar deneyin.\n`);
-    } else {
-      console.error('Sunucu başlatılamadı:', safeLogStr(err.message));
-    }
-    process.exit(1);
-  });
-}
-
-startServer().catch(error => {
+startServer(app, { ensureAdminUser, port: PORT, safeLogStr }).catch(error => {
   console.error('Sunucu başlatılamadı:', safeLogStr(error.message));
   process.exit(1);
 });
