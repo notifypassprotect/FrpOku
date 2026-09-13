@@ -18,6 +18,7 @@ const { registerSystemRoutes } = require('./server/routes/system');
 const { createAuthSecurity } = require('./server/services/auth_security');
 const { boundedSetting, plainObject, safeLogStr } = require('./server/services/value_utils');
 const { createUserService } = require('./server/services/user_service');
+const { createAuditService } = require('./server/services/audit_service');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -52,56 +53,7 @@ const { ensureAdminUser, getLocalUsers, loadUserById, saveLocalUsers, updateUser
 // ── DENETİM GÜNLÜĞÜ (AUDIT LOGS) DEPOLAMA ────────────────────
 const LOGS_FILE = path.join(__dirname, 'data', 'audit_logs.json');
 const auditLogStore = createJsonStore(LOGS_FILE, { label: 'Denetim günlüğü', limit: 5000 });
-
-function getAuditLogs() {
-  const logs = auditLogStore.read();
-  return Array.isArray(logs) ? logs : [];
-}
-
-function saveAuditLogs(logs) {
-  auditLogStore.write(Array.isArray(logs) ? logs : []);
-}
-
-async function recordAuditLog({ userId, username, fullName, role, action, target, details, ip }) {
-  try {
-    const logEntry = {
-      id: 'log_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
-      timestamp: new Date().toISOString(),
-      userId: userId || 'system',
-      username: username || 'misafir',
-      fullName: fullName || '',
-      role: role || 'user',
-      action: action || 'INFO',
-      target: target || '',
-      details: details || '',
-      ip: (ip || '127.0.0.1').replace(/^::ffff:/, '')
-    };
-    if (supabase) {
-      const { error } = await supabase.from('audit_logs').insert({
-        id: logEntry.id,
-        occurred_at: logEntry.timestamp,
-        user_id: logEntry.userId,
-        username: logEntry.username,
-        full_name: logEntry.fullName,
-        role: logEntry.role,
-        action: logEntry.action,
-        target: logEntry.target,
-        details: logEntry.details,
-        ip: logEntry.ip
-      });
-      if (error) throw error;
-    } else {
-      const logs = getAuditLogs();
-      logs.unshift(logEntry);
-      saveAuditLogs(logs);
-    }
-
-    return logEntry;
-  } catch (e) {
-    console.warn('Audit log yazılamadı:', safeLogStr(e.message));
-    return null;
-  }
-}
+const { getAuditLogs, recordAuditLog, saveAuditLogs } = createAuditService({ safeLogStr, store: auditLogStore, supabase });
 
 app.disable('x-powered-by');
 app.set('trust proxy', IS_DEPLOYED_ENVIRONMENT ? 1 : false);
