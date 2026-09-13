@@ -1353,11 +1353,11 @@
       <!-- HIZLI YANIT ÇİPLERİ (QUICK REPLIES) -->
       ${!isReadOnlyRoom ? `
         <div class="frp-chat-quick-replies">
-          <button type="button" class="frp-chat-quick-chip" data-quick="👍 İnceliyorum">👍 İnceliyorum</button>
-          <button type="button" class="frp-chat-quick-chip" data-quick="✅ Onaylandı">✅ Onaylandı</button>
-          <button type="button" class="frp-chat-quick-chip" data-quick="📋 Rapor hazır">📋 Rapor hazır</button>
-          <button type="button" class="frp-chat-quick-chip" data-quick="📞 Arıyorum">📞 Arıyorum</button>
-          <button type="button" class="frp-chat-quick-chip" data-quick="⏳ Birazdan döneceğim">⏳ Birazdan döneceğim</button>
+          <button type="button" class="frp-chat-quick-chip" data-quick="👍 İnceliyorum" title="İnceliyorum">👍 İnceliyorum</button>
+          <button type="button" class="frp-chat-quick-chip" data-quick="✅ Onaylandı" title="Onaylandı">✅ Onaylandı</button>
+          <button type="button" class="frp-chat-quick-chip" data-quick="📋 Rapor hazır" title="Rapor hazır">📋 Rapor hazır</button>
+          <button type="button" class="frp-chat-quick-chip" data-quick="📞 Arıyorum" title="Arıyorum">📞 Arıyorum</button>
+          <button type="button" class="frp-chat-quick-chip" data-quick="⏳ Birazdan döneceğim" title="Birazdan döneceğim">⏳ Birazdan döneceğim</button>
         </div>
       ` : ''}
 

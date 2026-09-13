@@ -1814,11 +1814,11 @@
 
 /* ── HIZLI YANIT ÇİPLERİ (QUICK REPLIES) ── */
 .frp-chat-quick-replies {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  overflow-x: auto;
-  padding: 0.35rem 0.65rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.32rem;
+  overflow: visible;
+  padding: 0.45rem 0.65rem;
   background: var(--bg-surface, #ffffff);
   border-top: 1px solid var(--border-light, #e2e8f0);
   scrollbar-width: none;
@@ -1836,9 +1836,12 @@
   font-size: 0.7rem;
   font-weight: 600;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
   transition: all 0.15s ease;
-  flex-shrink: 0;
+  min-width: 0;
+  width: 100%;
 }
 
 .frp-chat-quick-chip:hover {
