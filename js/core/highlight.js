@@ -509,26 +509,7 @@ function findSyntaxErrors(code, lang = 'sql') {
         });
       }
 
-      // 3. JOIN without ON check
-      if (/\bJOIN\b/i.test(cleanLineText) && !/\bON\b|\bUSING\b/i.test(cleanLineText) && !/CROSS\s+JOIN/i.test(cleanLineText)) {
-        const restOfCode = lines.slice(lineIdx).join('\n')
-          .replace(/'(?:''|[^'\r\n])*'/g, "''")
-          .replace(/--[^\r\n]*/g, '')
-          .replace(/\/\/[^\r\n]*/g, '');
-        const joinMatch = /\bJOIN\b\s+([a-zA-Z0-9_$.]+)/i.exec(restOfCode);
-        if (joinMatch) {
-          const afterJoin = restOfCode.slice(joinMatch.index + joinMatch[0].length, joinMatch.index + joinMatch[0].length + 120);
-          if (!/\bON\b|\bUSING\b/i.test(afterJoin)) {
-            errors.push({
-              line: lineNum,
-              col: lineText.indexOf(joinMatch[0]) + 1,
-              token: joinMatch[0],
-              suggestion: 'ON tablo1.id = tablo2.id',
-              message: `Eksik JOIN Bağlantısı: '${joinMatch[0]}' sonrasında 'ON' veya 'USING' koşulu bulunamadı.`
-            });
-          }
-        }
-      }
+
     }
 
     if (lang === 'pascal') {
@@ -649,74 +630,395 @@ function findSyntaxErrors(code, lang = 'sql') {
       });
     }
 
-    // Oracle SQL yapısal tanıları: editörde yarım bırakılan ifadeleri anında gösterir.
-    const clauseStartRx = /^(?:WHERE|GROUP\s+BY|ORDER\s+BY|HAVING|UNION|MINUS|INTERSECT|CONNECT\s+BY|START\s+WITH|JOIN|LEFT\s+JOIN|RIGHT\s+JOIN|INNER\s+JOIN|FULL\s+JOIN|LEFT\s+OUTER\s+JOIN|RIGHT\s+OUTER\s+JOIN)\b/i;
-    const significant = lines.map((line, index) => ({ index, text: cleanCodeLine(line, true).trim() })).filter(item => item.text);
-    const nextSignificant = new Map();
-    significant.forEach((item, pos) => nextSignificant.set(item.index, significant[pos + 1]?.text || ''));
+    // Precalculate line start offsets for fast, accurate O(log N) line/col translation
+    const lineStartOffsets = [0];
+    for (let i = 0; i < code.length; i++) {
+      if (code[i] === '\n') lineStartOffsets.push(i + 1);
+    }
+    function getPosLineAndCol(index) {
+      let low = 0, high = lineStartOffsets.length - 1, lineIdx = 0;
+      while (low <= high) {
+        const mid = (low + high) >> 1;
+        if (lineStartOffsets[mid] <= index) {
+          lineIdx = mid;
+          low = mid + 1;
+        } else {
+          high = mid - 1;
+        }
+      }
+      return { line: lineIdx + 1, col: index - lineStartOffsets[lineIdx] + 1 };
+    }
 
-    lines.forEach((rawLine, index) => {
-      const clean = cleanCodeLine(rawLine, true);
+    // Mask strings and comments while strictly preserving character offsets and newlines
+    let maskedSql = '';
+    let inSingleQuote = false;
+    let inSlashStar = false;
+    let inDashDash = false;
+    let quoteStartPos = -1;
+
+    for (let i = 0; i < code.length; i++) {
+      const ch = code[i];
+      const next = code[i + 1] || '';
+
+      if (inSingleQuote) {
+        if (ch === "'") {
+          if (next === "'") {
+            maskedSql += '  ';
+            i++;
+          } else {
+            inSingleQuote = false;
+            maskedSql += ' ';
+          }
+        } else if (ch === '\n') {
+          maskedSql += '\n';
+        } else {
+          maskedSql += ' ';
+        }
+        continue;
+      }
+
+      if (inSlashStar) {
+        if (ch === '*' && next === '/') {
+          inSlashStar = false;
+          maskedSql += '  ';
+          i++;
+        } else if (ch === '\n') {
+          maskedSql += '\n';
+        } else {
+          maskedSql += ' ';
+        }
+        continue;
+      }
+
+      if (inDashDash) {
+        if (ch === '\n') {
+          inDashDash = false;
+          maskedSql += '\n';
+        } else {
+          maskedSql += ' ';
+        }
+        continue;
+      }
+
+      if (ch === '-' && next === '-') {
+        inDashDash = true;
+        maskedSql += '  ';
+        i++;
+        continue;
+      }
+
+      if (ch === '/' && next === '*') {
+        inSlashStar = true;
+        maskedSql += '  ';
+        i++;
+        continue;
+      }
+
+      if (ch === "'") {
+        inSingleQuote = true;
+        quoteStartPos = i;
+        maskedSql += ' ';
+        continue;
+      }
+
+      maskedSql += ch;
+    }
+
+    if (inSingleQuote && quoteStartPos >= 0) {
+      const qPos = getPosLineAndCol(quoteStartPos);
+      addDiagnostic(qPos.line, qPos.col, "'", "Metin değerini ' ile kapatın", "SQL metin değeri tek tırnak (') ile kapatılmamış.");
+    }
+
+    // ── 1. CASE ... WHEN ... THEN ... ELSE ... END Bütünlüğü Denetimi ──
+    const caseStack = [];
+    const caseTokenRx = /\b(CASE|WHEN|THEN|ELSE|END)\b/gi;
+    let caseMatch;
+    while ((caseMatch = caseTokenRx.exec(maskedSql)) !== null) {
+      const token = caseMatch[1].toUpperCase();
+      const pos = caseMatch.index;
+      const { line, col } = getPosLineAndCol(pos);
+
+      if (token === 'CASE') {
+        caseStack.push({ line, col, pos, hasWhen: false, state: 'CASE' });
+      } else if (token === 'WHEN') {
+        if (caseStack.length === 0) {
+          addDiagnostic(line, col, 'WHEN', "CASE ifadesi ile başlayın", "Eşleşmeyen 'WHEN' ifadesi — Başlangıç 'CASE' bulunamadı.");
+        } else {
+          const top = caseStack[caseStack.length - 1];
+          if (top.state === 'WHEN') {
+            addDiagnostic(top.lastWhenLine || line, top.lastWhenCol || col, 'WHEN', "'THEN' ekleyin", "CASE ifadesinde 'WHEN' koşulundan sonra 'THEN' eksik.");
+          } else if (top.state === 'ELSE') {
+            addDiagnostic(line, col, 'WHEN', "'WHEN', 'ELSE'ten önce yazılmalıdır", "CASE ifadesinde 'WHEN', 'ELSE' bloğundan sonra gelemez.");
+          }
+          top.hasWhen = true;
+          top.state = 'WHEN';
+          top.lastWhenLine = line;
+          top.lastWhenCol = col;
+        }
+      } else if (token === 'THEN') {
+        if (caseStack.length === 0) {
+          addDiagnostic(line, col, 'THEN', '', "Eşleşmeyen 'THEN' ifadesi — Başlangıç 'CASE ... WHEN' bulunamadı.");
+        } else {
+          const top = caseStack[caseStack.length - 1];
+          if (top.state !== 'WHEN') {
+            addDiagnostic(line, col, 'THEN', "'WHEN <koşul> THEN' kullanın", "'THEN' öncesinde 'WHEN' koşulu bulunamadı.");
+          }
+          top.state = 'THEN';
+        }
+      } else if (token === 'ELSE') {
+        if (caseStack.length === 0) {
+          addDiagnostic(line, col, 'ELSE', '', "Eşleşmeyen 'ELSE' ifadesi — Başlangıç 'CASE' bulunamadı.");
+        } else {
+          const top = caseStack[caseStack.length - 1];
+          if (top.state === 'WHEN') {
+            addDiagnostic(top.lastWhenLine || line, top.lastWhenCol || col, 'WHEN', "'THEN' ekleyin", "CASE ifadesinde 'WHEN' koşulundan sonra 'THEN' eksik.");
+          }
+          top.state = 'ELSE';
+        }
+      } else if (token === 'END') {
+        if (caseStack.length === 0) {
+          addDiagnostic(line, col, 'END', "Fazladan 'END' ifadesini kaldırın", "Eşleşmeyen 'END' ifadesi — Başlangıç 'CASE' bulunamadı.");
+        } else {
+          const top = caseStack.pop();
+          if (!top.hasWhen) {
+            addDiagnostic(top.line, top.col, 'CASE', "WHEN ... THEN koşulu ekleyin", "CASE bloğunda en az bir 'WHEN ... THEN' ifadesi bulunmalıdır.");
+          } else if (top.state === 'WHEN') {
+            addDiagnostic(top.lastWhenLine || line, top.lastWhenCol || col, 'WHEN', "'THEN' ekleyin", "CASE bloğunda son 'WHEN' koşulundan sonra 'THEN' ifadesi eksik.");
+          }
+        }
+      }
+    }
+
+    while (caseStack.length > 0) {
+      const top = caseStack.pop();
+      addDiagnostic(
+        top.line,
+        top.col,
+        'CASE',
+        "CASE bloğunu 'END' ile kapatın (Örn: CASE ... END)",
+        `Satır ${top.line}: Açılan 'CASE' ifadesi 'END' ile kapatılmamış.`
+      );
+    }
+
+    // ── 2. JOIN Bağlantıları ve CROSS JOIN / NATURAL Muafiyeti Denetimi ──
+    const joinRx = /\b((?:CROSS\s+|NATURAL(?:\s+(?:LEFT|RIGHT|FULL)\s+(?:OUTER\s+)?|\s+INNER\s+)?|(?:LEFT|RIGHT|FULL)(?:\s+OUTER)?\s+|INNER\s+)?JOIN)\b/gi;
+    let jm;
+    while ((jm = joinRx.exec(maskedSql)) !== null) {
+      const fullJoinKw = jm[1].trim();
+      const upperJoinKw = fullJoinKw.toUpperCase();
+      const joinPos = jm.index;
+      const { line, col } = getPosLineAndCol(joinPos);
+
+      const isCross = upperJoinKw.startsWith('CROSS');
+      const isNatural = upperJoinKw.startsWith('NATURAL');
+
+      const afterJoinStart = joinPos + jm[0].length;
+      const afterJoinSub = maskedSql.slice(afterJoinStart);
+
+      // Tablo veya alt sorgu eşleşmesi
+      const tableMatch = /^\s*(?:\(([\s\S]*?)\)\s*(?:AS\s+)?([a-zA-Z0-9_#$]+)|([a-zA-Z0-9_$.]+)(?:\s+(?:AS\s+)?([a-zA-Z0-9_#$]+))?)/i.exec(afterJoinSub);
+
+      // Bu JOIN ifadesinin bitebileceği sınır noktası (Sonraki JOIN, WHERE, GROUP BY vb.)
+      const boundaryRx = /\b(?:(?:CROSS\s+|NATURAL(?:\s+\w+)*\s+|(?:LEFT|RIGHT|FULL)(?:\s+OUTER)?\s+|INNER\s+)?JOIN|WHERE|GROUP\s+BY|ORDER\s+BY|HAVING|UNION|MINUS|INTERSECT|CONNECT\s+BY|START\s+WITH)\b|\)/gi;
+      boundaryRx.lastIndex = afterJoinStart + 1;
+      const boundaryMatch = boundaryRx.exec(maskedSql);
+      const boundaryPos = boundaryMatch ? boundaryMatch.index : maskedSql.length;
+
+      if (!tableMatch || !tableMatch[0].trim() || (afterJoinStart + tableMatch.index >= boundaryPos)) {
+        addDiagnostic(line, col, 'JOIN', 'JOIN sonrasına tablo adı ekleyin', 'JOIN ifadesinde tablo adı eksik.');
+        continue;
+      }
+
+      // CROSS JOIN ve NATURAL JOIN koşul (ON veya USING) GEREKTİRMEZ
+      if (isCross || isNatural) {
+        continue;
+      }
+
+      const tableEndPos = afterJoinStart + tableMatch[0].length;
+      const conditionSegment = maskedSql.slice(tableEndPos, boundaryPos).trim();
+
+      const hasOn = /\bON\b/i.test(conditionSegment);
+      const hasUsing = /\bUSING\b/i.test(conditionSegment);
+
+      if (hasOn) {
+        const onPart = conditionSegment.slice(conditionSegment.toUpperCase().indexOf('ON') + 2).trim();
+        if (!onPart) {
+          addDiagnostic(line, col, 'ON', 'ON sonrasına koşul yazın (Örn: ON a.id = b.id)', "'ON' anahtar sözcüğünden sonra bağlantı koşulu eksik.");
+        }
+      } else if (hasUsing) {
+        const usingPart = conditionSegment.slice(conditionSegment.toUpperCase().indexOf('USING') + 5).trim();
+        if (!/^\([^)]+\)/.test(usingPart)) {
+          addDiagnostic(line, col, 'USING', 'USING (kolon_adi) biçiminde yazın', "'USING' sonrasında parantez içinde kolon adı eksik.");
+        }
+      } else {
+        if (conditionSegment.length > 0) {
+          const previewCond = conditionSegment.replace(/\s+/g, ' ').slice(0, 35);
+          addDiagnostic(
+            line,
+            col,
+            'ON',
+            `ON ${previewCond}`,
+            `JOIN bağlantısında 'ON' anahtar sözcüğü eksik. (Örn: ON ${previewCond})`
+          );
+        } else {
+          addDiagnostic(
+            line,
+            col,
+            'JOIN',
+            'JOIN tablosundan sonra ON veya USING koşulu ekleyin',
+            'JOIN bağlantısı ON veya USING koşulu olmadan tamamlanmış.'
+          );
+        }
+      }
+    }
+
+    // ── 3. Çok Satırlı SQL Bölümleri (SELECT, FROM, WHERE, GROUP/ORDER BY) ──
+    const cleanLines = lines.map((l, idx) => ({
+      idx,
+      lineNo: idx + 1,
+      raw: l,
+      clean: cleanCodeLine(l, true)
+    }));
+    const nonEmptyLines = cleanLines.filter(item => item.clean.trim().length > 0);
+    const nextNonEmptyMap = new Map();
+    nonEmptyLines.forEach((item, pos) => {
+      nextNonEmptyMap.set(item.idx, nonEmptyLines[pos + 1] || null);
+    });
+
+    const clauseStartRx = /^(?:WHERE|GROUP\s+BY|ORDER\s+BY|HAVING|UNION|MINUS|INTERSECT|CONNECT\s+BY|START\s+WITH|(?:CROSS\s+|NATURAL(?:\s+\w+)*\s+|(?:LEFT|RIGHT|FULL)(?:\s+OUTER)?\s+|INNER\s+)?JOIN|\))\b/i;
+
+    cleanLines.forEach(item => {
+      const { lineNo, idx, clean } = item;
       const trim = clean.trim();
       if (!trim) return;
-      const lineNo = index + 1;
-      const next = nextSignificant.get(index) || '';
+      const nextItem = nextNonEmptyMap.get(idx);
+      const nextTrim = nextItem ? nextItem.clean.trim() : '';
 
-      const emptyClause = /\b(WHERE|HAVING|ON|AND|OR)\s*$/i.exec(trim);
-      if (emptyClause && (!next || clauseStartRx.test(next) || /^\)/.test(next))) {
-        addDiagnostic(lineNo, clean.toUpperCase().lastIndexOf(emptyClause[1].toUpperCase()) + 1, emptyClause[1], 'Koşul ifadesini tamamlayın', `'${emptyClause[1].toUpperCase()}' anahtar sözcüğünden sonra koşul eksik.`);
+      // SELECT boş liste denetimi (Çok satırlı güvenli)
+      if (/^\s*SELECT(?:\s+(?:DISTINCT|ALL))?\s*$/i.test(trim)) {
+        if (!nextTrim || /^(?:FROM|WHERE|GROUP\s+BY|ORDER\s+BY|HAVING|UNION|MINUS|INTERSECT|\))\b/i.test(nextTrim)) {
+          addDiagnostic(lineNo, clean.toUpperCase().indexOf('SELECT') + 1, 'SELECT', 'SELECT sonrasına kolon veya ifade yazın', 'SELECT listesi boş bırakılamaz.');
+        }
+      } else if (/\bSELECT\s+(?:DISTINCT\s+|ALL\s+)?(?:FROM\b|\))/i.test(trim)) {
+        addDiagnostic(lineNo, clean.toUpperCase().indexOf('SELECT') + 1, 'SELECT', 'SELECT sonrasına kolon veya ifade yazın', 'SELECT listesi boş bırakılamaz.');
       }
 
+      // FROM / INTO / UPDATE tablo eksikliği denetimi (Çok satırlı güvenli)
+      const missingSourceMatch = /^(?:FROM|INTO|UPDATE)\s*$/i.exec(trim);
+      if (missingSourceMatch) {
+        if (!nextTrim || clauseStartRx.test(nextTrim)) {
+          const kw = missingSourceMatch[0].trim().toUpperCase();
+          addDiagnostic(lineNo, clean.toUpperCase().indexOf(kw) + 1, kw, `${kw} sonrasına tablo adı yazın`, `'${kw}' ifadesinde tablo adı eksik.`);
+        }
+      } else {
+        const inlineMissingSource = /\b(FROM|INTO|UPDATE)\s*(?:WHERE|SET|GROUP\s+BY|ORDER\s+BY|HAVING|\)|$)/i.exec(trim);
+        if (inlineMissingSource && !/\b(?:FROM|INTO|UPDATE)\s+[a-zA-Z0-9_$.]+/i.test(trim)) {
+          const kw = inlineMissingSource[1].toUpperCase();
+          addDiagnostic(lineNo, clean.toUpperCase().indexOf(kw) + 1, kw, `${kw} sonrasına tablo adı yazın`, `'${kw}' ifadesinde tablo adı eksik.`);
+        }
+      }
+
+      // WHERE / HAVING boş koşul denetimi (Çok satırlı güvenli)
+      const emptyClause = /\b(WHERE|HAVING)\s*$/i.exec(trim);
+      if (emptyClause) {
+        if (!nextTrim || clauseStartRx.test(nextTrim)) {
+          addDiagnostic(lineNo, clean.toUpperCase().lastIndexOf(emptyClause[1].toUpperCase()) + 1, emptyClause[1].toUpperCase(), 'Koşul ifadesini tamamlayın', `'${emptyClause[1].toUpperCase()}' anahtar sözcüğünden sonra koşul eksik.`);
+        }
+      }
+
+      // Satır sonu yarım kalan AND / OR
+      const danglingLogical = /\b(AND|OR)\s*$/i.exec(trim);
+      if (danglingLogical) {
+        if (!nextTrim || /^(?:GROUP\s+BY|ORDER\s+BY|HAVING|UNION|MINUS|INTERSECT|\))\b/i.test(nextTrim)) {
+          addDiagnostic(lineNo, clean.toUpperCase().lastIndexOf(danglingLogical[1].toUpperCase()) + 1, danglingLogical[1].toUpperCase(), 'Koşul ifadesini tamamlayın', `'${danglingLogical[1].toUpperCase()}' anahtar sözcüğünden sonra koşul eksik.`);
+        }
+      }
+
+      // Karşılaştırma operatörü sağ tarafı eksik
       const danglingComparison = /(=|<>|!=|<=|>=|<|>|\bLIKE\b|\bIN\b)\s*$/i.exec(trim);
-      if (danglingComparison && (!next || clauseStartRx.test(next) || /^\)/.test(next))) {
-        addDiagnostic(lineNo, Math.max(1, clean.lastIndexOf(danglingComparison[1]) + 1), danglingComparison[1], 'Operatörün sağına değer, parametre veya kolon yazın', `Karşılaştırma operatörü '${danglingComparison[1]}' sonrasında değer eksik.`);
+      if (danglingComparison) {
+        if (!nextTrim || clauseStartRx.test(nextTrim) || /^(?:AND|OR)\b/i.test(nextTrim)) {
+          addDiagnostic(lineNo, Math.max(1, clean.lastIndexOf(danglingComparison[1]) + 1), danglingComparison[1], 'Operatörün sağına değer, parametre veya kolon yazın', `Karşılaştırma operatörü '${danglingComparison[1]}' sonrasında değer eksik.`);
+        }
       }
 
-      const operatorBeforeClause = /(=|<>|!=|<=|>=|<|>|\bLIKE\b|\bIN\b)\s+(WHERE|GROUP\s+BY|ORDER\s+BY|HAVING|JOIN|LEFT|RIGHT|INNER|FULL|UNION|MINUS|INTERSECT)\b/i.exec(trim);
-      if (operatorBeforeClause) {
-        addDiagnostic(lineNo, clean.toUpperCase().indexOf(operatorBeforeClause[0].toUpperCase()) + 1, operatorBeforeClause[1], 'Operatör ile sonraki SQL bölümü arasına değer yazın', `Karşılaştırma operatörü '${operatorBeforeClause[1]}' tamamlanmadan '${operatorBeforeClause[2].toUpperCase()}' bölümüne geçilmiş.`);
-      }
-
-      const missingJoinTable = /\b(?:LEFT\s+(?:OUTER\s+)?|RIGHT\s+(?:OUTER\s+)?|FULL\s+(?:OUTER\s+)?|INNER\s+|CROSS\s+)?JOIN\s*$/i.exec(trim);
-      if (missingJoinTable) addDiagnostic(lineNo, clean.toUpperCase().lastIndexOf('JOIN') + 1, 'JOIN', 'JOIN sonrasına tablo adı ve bağlantı koşulu yazın', 'JOIN ifadesinde tablo adı eksik.');
-
-      const missingSource = /\b(FROM|INTO|UPDATE)\s*(?:WHERE|SET|GROUP\s+BY|ORDER\s+BY|HAVING|$)/i.exec(trim);
-      if (missingSource) addDiagnostic(lineNo, clean.toUpperCase().indexOf(missingSource[1].toUpperCase()) + 1, missingSource[1], `${missingSource[1].toUpperCase()} sonrasına tablo adı yazın`, `'${missingSource[1].toUpperCase()}' ifadesinde tablo adı eksik.`);
-
-      const emptySelect = /\bSELECT\s*(?:FROM\b|$)/i.exec(trim);
-      if (emptySelect) addDiagnostic(lineNo, clean.toUpperCase().indexOf('SELECT') + 1, 'SELECT', 'SELECT sonrasına kolon veya ifade yazın', 'SELECT listesi boş bırakılamaz.');
-
+      // Bölüm öncesi fazladan virgül
       const trailingComma = /,\s*$/i.exec(trim);
-      if (trailingComma && next && clauseStartRx.test(next)) addDiagnostic(lineNo, clean.lastIndexOf(',') + 1, ',', 'Son virgülü kaldırın veya sonraki alanı yazın', 'SQL bölümü değişmeden önce virgülden sonra kolon ya da tablo eksik.');
+      if (trailingComma && nextTrim && clauseStartRx.test(nextTrim)) {
+        addDiagnostic(lineNo, clean.lastIndexOf(',') + 1, ',', 'Son virgülü kaldırın', 'SQL bölümü değişmeden önce virgülden sonra kolon ya da tablo eksik.');
+      }
 
+      // GROUP BY / ORDER BY eksik 'BY'
       const missingBy = /\b(GROUP|ORDER)\s+(?!BY\b)([a-zA-Z_][\w$#.]*)/i.exec(trim);
-      if (missingBy) addDiagnostic(lineNo, clean.toUpperCase().indexOf(missingBy[1].toUpperCase()) + 1, missingBy[1], `${missingBy[1].toUpperCase()} BY kullanın`, `'${missingBy[1].toUpperCase()}' sonrasında 'BY' anahtar sözcüğü eksik.`);
+      if (missingBy) {
+        addDiagnostic(lineNo, clean.toUpperCase().indexOf(missingBy[1].toUpperCase()) + 1, missingBy[1].toUpperCase(), `${missingBy[1].toUpperCase()} BY kullanın`, `'${missingBy[1].toUpperCase()}' sonrasında 'BY' anahtar sözcüğü eksik.`);
+      }
 
+      // BETWEEN ... AND eksikliği
       if (/\bBETWEEN\b/i.test(trim)) {
         const afterBetween = trim.slice(trim.toUpperCase().lastIndexOf('BETWEEN') + 7);
-        if (afterBetween && !/\bAND\b/i.test(afterBetween) && (!next || clauseStartRx.test(next))) {
+        if (afterBetween && !/\bAND\b/i.test(afterBetween) && (!nextTrim || clauseStartRx.test(nextTrim))) {
           addDiagnostic(lineNo, clean.toUpperCase().lastIndexOf('BETWEEN') + 1, 'BETWEEN', 'BETWEEN alt_değer AND üst_değer biçimini kullanın', 'BETWEEN ifadesinin AND ve üst sınır bölümü eksik.');
         }
       }
     });
 
-    const structuralSql = cleanWholeSql.trim();
-    const incompleteJoinRx = /\b(?:LEFT\s+(?:OUTER\s+)?|RIGHT\s+(?:OUTER\s+)?|FULL\s+(?:OUTER\s+)?|INNER\s+)?JOIN\s+[\w$#.]+(?:\s+[\w$#]+)?\s*(?=(?:WHERE|GROUP\s+BY|ORDER\s+BY|HAVING|UNION|MINUS|INTERSECT|$))/gi;
-    let incompleteJoin;
-    while ((incompleteJoin = incompleteJoinRx.exec(structuralSql)) !== null) {
-      const before = structuralSql.slice(0, incompleteJoin.index);
-      const lineNo = (before.match(/\n/g) || []).length + 1;
-      addDiagnostic(lineNo, 1, 'JOIN', 'JOIN tablosundan sonra ON veya USING koşulu ekleyin', 'JOIN bağlantısı ON/USING koşulu olmadan tamamlanmış.');
-    }
+    // ── 4. SELECT Kolon Listesinde Eksik Virgül (,) Tespiti ──
+    const selectMatch = /\bSELECT\b/i.exec(maskedSql);
+    if (selectMatch) {
+      const selectIdx = selectMatch.index;
+      let fromIdx = -1;
+      let pDepth = 0;
+      for (let i = selectIdx + 6; i < maskedSql.length; i++) {
+        if (maskedSql[i] === '(') pDepth++;
+        else if (maskedSql[i] === ')') pDepth = Math.max(0, pDepth - 1);
+        else if (pDepth === 0 && /\bFROM\b/i.test(maskedSql.slice(i, i + 5))) {
+          fromIdx = i;
+          break;
+        }
+      }
 
-    const sqlQuoteSource = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--[^\r\n]*/g, '');
-    let sqlQuoteOpen = false;
-    for (let i = 0; i < sqlQuoteSource.length; i++) {
-      if (sqlQuoteSource[i] !== "'") continue;
-      if (sqlQuoteOpen && sqlQuoteSource[i + 1] === "'") { i += 1; continue; }
-      sqlQuoteOpen = !sqlQuoteOpen;
+      if (fromIdx > selectIdx) {
+        const startLineObj = getPosLineAndCol(selectIdx);
+        const endLineObj = getPosLineAndCol(fromIdx);
+
+        for (let l = startLineObj.line; l <= endLineObj.line; l++) {
+          const curLineText = cleanLines[l - 1]?.clean || '';
+          const curTrim = curLineText.trim();
+          if (!curTrim) continue;
+
+          let body = curTrim;
+          if (l === startLineObj.line) {
+            body = body.replace(/^\s*SELECT(?:\s+(?:DISTINCT|ALL))?\b/i, '').trim();
+          }
+          if (!body) continue;
+
+          const nextItem = nextNonEmptyMap.get(l - 1);
+          if (nextItem && nextItem.lineNo <= endLineObj.line) {
+            const nextTrimClean = nextItem.clean.trim();
+            const endsWithComma = /,\s*$/.test(curTrim);
+            const endsWithOp = /(=|<>|!=|<=|>=|<|>|\+|-|\*|\/|\|\||\bAS|\bAND|\bOR|\bCASE|\bWHEN|\bTHEN|\bELSE)\s*$/i.test(curTrim);
+            const startsWithComma = /^\s*,/.test(nextTrimClean);
+            const startsWithFrom = /^\s*FROM\b/i.test(nextTrimClean);
+
+            if (!endsWithComma && !endsWithOp && !startsWithComma && !startsWithFrom) {
+              const nextStartsNewExpr = /^(?:[a-zA-Z_]\w*\s*\(|CASE\b|\(|\d+|'|[a-zA-Z_]\w*\.[a-zA-Z0-9_#$*]+)/i.test(nextTrimClean);
+              const curHasExpr = body.length > 0;
+
+              if (nextStartsNewExpr && curHasExpr) {
+                addDiagnostic(
+                  l,
+                  curLineText.length,
+                  ',',
+                  `Satır sonuna virgül (,) ekleyin (Örn: '${curTrim},')`,
+                  'Kolon veya ifadeler arasında virgül (,) eksik.'
+                );
+              }
+            }
+          }
+        }
+      }
     }
-    if (sqlQuoteOpen) addDiagnostic(lines.length, Math.max(1, lines[lines.length - 1].lastIndexOf("'") + 1), "'", "Metin değerini ' ile kapatın", 'SQL metin değeri kapatılmamış.');
   } else if (lang === 'pascal') {
     lines.forEach((rawLine, index) => {
       const clean = cleanCodeLine(rawLine, false);
@@ -876,13 +1178,7 @@ function findSyntaxErrors(code, lang = 'sql') {
         if (openStack.length > 0) {
           openStack.pop();
         } else {
-          errors.push({
-            line: lineNum,
-            col: c + 1,
-            token: ')',
-            suggestion: 'Fazladan kapama parantezi',
-            message: `Satır ${lineNum}: Eşleşmeyen kapama parantezi ')' bulundu.`
-          });
+          addDiagnostic(lineNum, c + 1, ')', 'Fazladan kapama parantezi', `Satır ${lineNum}: Eşleşmeyen kapama parantezi ')' bulundu.`);
         }
       }
     }
@@ -890,13 +1186,7 @@ function findSyntaxErrors(code, lang = 'sql') {
 
   if (openStack.length > 0) {
     const lastOpen = openStack[openStack.length - 1];
-    errors.push({
-      line: lastOpen.line,
-      col: lastOpen.col,
-      token: '(',
-      suggestion: 'Açılan \'(\' parantezini kapatın',
-      message: `Satır ${lastOpen.line}: Açılan parantez '(' kapatılmamış.`
-    });
+    addDiagnostic(lastOpen.line, lastOpen.col, '(', "Açılan '(' parantezini kapatın", `Satır ${lastOpen.line}: Açılan parantez '(' kapatılmamış.`);
   }
 
   // 5. PascalScript için Noktalı Virgül (;) ve Blok Bütünlüğü Doğrulaması

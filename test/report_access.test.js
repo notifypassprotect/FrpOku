@@ -69,7 +69,7 @@ test('rapor istemci çıktısına authoritative sürüm eklenir', () => {
   assert.equal(reportRowToClient({ id: 'rep_1', user_id: owner.id, version: 7 }).version, 7);
 });
 
-test('toSupabaseReportRow eski şemada olmayan version kolonunu filtreler, data içeriğini korur', () => {
+test('toSupabaseReportRow şemadaki version ve görünürlük kolonlarını korur, data içeriğini saklar', () => {
   const { toSupabaseReportRow } = require('../lib/report_access');
   const fullRow = {
     id: 'rep_123',
@@ -85,9 +85,9 @@ test('toSupabaseReportRow eski şemada olmayan version kolonunu filtreler, data 
   const sanitized = toSupabaseReportRow(fullRow);
   assert.equal(sanitized.id, 'rep_123');
   assert.equal(sanitized.user_id, owner.id);
-  assert.equal(sanitized.is_public, undefined);
-  assert.equal(sanitized.owner_name, undefined);
-  assert.equal(sanitized.version, undefined);
+  assert.equal(sanitized.is_public, true);
+  assert.equal(sanitized.owner_name, 'Owner Name');
+  assert.equal(sanitized.version, 3);
   assert.equal(sanitized.data.is_public, true);
   assert.equal(sanitized.data.version, 3);
 });

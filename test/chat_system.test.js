@@ -184,7 +184,7 @@ test('online_presence.js modern onay modali, anlasilir bildirim butonu, ses cali
 
   // Ses dosyası ve ses kaydı desteği
   assert.match(presence, /bindAudioPlayer/);
-  assert.match(presence, /audioSrc/);
+  assert.match(presence, /audioSource|audioSrc/);
 
   // Grup WhatsApp detay & ayrılma/yönetici özellikleri
   assert.match(presence, /frp-group-info-drawer/);

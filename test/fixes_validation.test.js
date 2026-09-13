@@ -221,4 +221,66 @@ test('yetim dosyalar ve aaa.txt kök dizinden temizlenmiştir', () => {
   assert.equal(fs.existsSync(path.join(rootDir, 'docs', 'security-audit-notes.md')), true, 'docs/security-audit-notes.md mevcut olmalı');
 });
 
+test('findSyntaxErrors ve checkSqlStaticSyntax SQL sözdizimi hata doğrulamalarını eksiksiz uygular', () => {
+  const vm = require('vm');
+  const highlightCode = fs.readFileSync(path.join(__dirname, '..', 'js', 'core', 'highlight.js'), 'utf8');
+  const syntaxCode = fs.readFileSync(path.join(__dirname, '..', 'js', 'analytics', 'syntax_check.js'), 'utf8');
+
+  const ctx = { window: {}, document: { getElementById: () => null } };
+  ctx.window = ctx;
+  vm.runInNewContext(syntaxCode, ctx);
+  vm.runInNewContext(highlightCode, ctx);
+
+  // 1. Çok satırlı geçerli SELECT (Kullanıcı ekran görüntüsü 1): sıfır hata olmalı
+  const sqlClean = `select
+  to_date(c.tarihi, 'DD-MM-YYYY') cari_tarihi, SUBSTR (H.TC_KIMLIK_NO, 1, 2) || '*******' || SUBSTR (H.TC_KIMLIK_NO, 10, 2) TC_KIMLIK_NO, m.numarasi, m.hasta_id, h.adi, h.soyadi, h.dogum_tarihi, h.cinsiyeti,
+  to_char(c.onay_kts, 'DD.MM.YYYY') onay_kts, c.yapan_doktor_id, p.adi_soyadi doktor_adi, lo.*, lk.*,
+  case when h.cinsiyeti='E' then 'Erkek' else 'Kadın' end cinsiyet
+from cari c
+left outer join muracaat m on m.id=c.muracaat_id
+left outer join hasta h on h.id=m.hasta_id
+left outer join personel p on p.id=c.yapan_doktor_id
+where c.id=:cariid and c.lab_durum=150`;
+
+  const errsClean = ctx.findSyntaxErrors(sqlClean, 'sql');
+  assert.equal(errsClean.length, 0, 'Çok satırlı SELECT hatasız olmalıdır');
+  assert.equal(ctx.FrpSyntaxCheck.checkSqlStaticSyntax(sqlClean).errors.length, 0);
+
+  // 2. Eksik virgül denetimi (select k \\n to_date(...)): satır 1'de virgül uyarısı
+  const sqlComma = `select k
+  to_date(c.tarihi, 'DD-MM-YYYY') cari_tarihi
+from cari c`;
+  const errsComma = ctx.findSyntaxErrors(sqlComma, 'sql');
+  assert.equal(errsComma.some(e => e.line === 1 && e.token === ','), true, 'Eksik virgül yakalanmalı');
+  assert.equal(ctx.FrpSyntaxCheck.checkSqlStaticSyntax(sqlComma).errors.some(e => e.includes('virgül')), true);
+
+  // 3. CASE bloğunda eksik END denetimi (Kullanıcı ekran görüntüsü 3)
+  const sqlCase = `select
+  case when h.cinsiyeti='E' then 'Erkek' else 'Kadın' cinsiyet
+from cari c`;
+  const errsCase = ctx.findSyntaxErrors(sqlCase, 'sql');
+  assert.equal(errsCase.some(e => e.token === 'CASE' && e.message.includes("'END' ile kapatılmamış")), true, 'Eksik END yakalanmalı');
+  assert.equal(ctx.FrpSyntaxCheck.checkSqlStaticSyntax(sqlCase).errors.some(e => e.includes("'END' ile kapatılmamış")), true);
+
+  // 4. JOIN'de eksik ON denetimi (Kullanıcı ekran görüntüsü 4): left outer join hasta h h.id=m.hasta_id
+  const sqlJoin = `select c.id
+from cari c
+left outer join muracaat m on m.id=c.muracaat_id
+left outer join hasta h h.id=m.hasta_id
+left outer join personel p on p.id=c.yapan_doktor_id`;
+  const errsJoin = ctx.findSyntaxErrors(sqlJoin, 'sql');
+  assert.equal(errsJoin.some(e => e.token === 'ON' && e.message.includes("'ON' anahtar sözcüğü eksik")), true, 'Eksik ON yakalanmalı');
+  assert.equal(ctx.FrpSyntaxCheck.checkSqlStaticSyntax(sqlJoin).errors.some(e => e.includes("'ON' anahtar sözcüğü eksik")), true);
+
+  // 5. CROSS JOIN muafiyeti (Kullanıcı ekran görüntüsü 5): ON gerektirmez
+  const sqlCross = `select c.id
+from cari c
+cross join aa
+where c.id=:cariid and c.lab_durum=150`;
+  const errsCross = ctx.findSyntaxErrors(sqlCross, 'sql');
+  assert.equal(errsCross.length, 0, 'CROSS JOIN için ON hatası verilmemeli');
+  assert.equal(ctx.FrpSyntaxCheck.checkSqlStaticSyntax(sqlCross).errors.length, 0);
+});
+
+
 
