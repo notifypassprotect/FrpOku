@@ -31,7 +31,7 @@ async function readFileAsText(file) {
 }
 
 // ── YÜKLEME VE İLERLEME PENCERESİ (PROGRESS MODAL) ────────
-function showProgressModal(title, sub, icon = '') {
+function showProgressModal(title, sub) {
   const pm = document.getElementById('progressModal');
   if (!pm) return;
   const pTitle = document.getElementById('progressTitle');
@@ -43,7 +43,11 @@ function showProgressModal(title, sub, icon = '') {
 
   if (pTitle) pTitle.textContent = title || 'İşlem Yapılıyor...';
   if (pSub)   pSub.textContent   = sub || 'Lütfen bekleyin';
-  if (pIcon)  pIcon.textContent  = icon || '';
+  if (pIcon) {
+    pIcon.style.animation = 'none';
+    void pIcon.getBoundingClientRect();
+    pIcon.style.animation = 'spin 1.8s linear infinite';
+  }
   if (pFill)  pFill.style.width  = '0%';
   if (pCount) pCount.textContent = '0 / 0 dosya';
   if (pPct)   pPct.textContent   = '0%';
