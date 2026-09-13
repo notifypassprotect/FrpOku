@@ -85,16 +85,6 @@ window.openCategoryManagerModal = openCategoryManagerModal;
 window.openCategoryModalFor = openCategoryModalFor;
 
 document.getElementById('btnManageCategories')?.addEventListener('click', () => openCategoryManagerModal());
-document.getElementById('btnBulkCategory')?.addEventListener('click', () => {
-  const currentSelected = window.selectedIds || (typeof selectedIds !== 'undefined' ? selectedIds : new Set());
-  const ids = [...currentSelected];
-  if (ids.length === 0) {
-    if (typeof toast === 'function') toast('Lütfen kategori atanacak raporları seçin.', 'warning');
-    else if (window.toast) window.toast('Lütfen kategori atanacak raporları seçin.', 'warning');
-    return;
-  }
-  openCategoryManagerModal(ids);
-});
 
 function bindInlineNameEdit() {
   // Inline name editing replaced by Right-Click -> "Adını Düzenle" modal per user request
