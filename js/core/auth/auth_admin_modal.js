@@ -843,6 +843,9 @@
           Şifre Sıfırla
         </button>
         ${!isSelf ? `
+          <button type="button" class="btn btn-sm btn-toggle-admin" data-id="${u.id}" data-name="${escHtml(u.full_name || u.username)}" data-admin="${isUsrAdmin ? '1' : '0'}" title="${isUsrAdmin ? 'Yönetici yetkisini kaldır' : 'Yönetici yetkisi ver'}" style="font-size:.78rem;padding:.38rem .75rem;${isUsrAdmin ? 'background:rgba(245,158,11,0.12);color:#b45309;border:1px solid rgba(245,158,11,0.35);' : 'background:rgba(124,58,237,0.11);color:#7c3aed;border:1px solid rgba(124,58,237,0.3);'}">
+            ${isUsrAdmin ? 'Yetkiyi Kaldır' : 'Yönetici Yap'}
+          </button>
           <button type="button" class="btn btn-sm btn-freeze-user" data-id="${u.id}" data-name="${escHtml(u.full_name || u.username)}" data-frozen="${isFrozen ? '1' : '0'}" title="${isFrozen ? 'Hesabı Aç' : 'Hesabı Dondur'}" style="font-size:.78rem;padding:.38rem .75rem;${isFrozen ? 'background:rgba(16,185,129,0.1);color:#10b981;border:1px solid rgba(16,185,129,0.3);' : 'background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.3);'}">
             ${isFrozen ? 'Hesabı Aç' : 'Hesabı Dondur'}
           </button>
@@ -934,6 +937,40 @@
             }
           } catch (e) {
             if (typeof window.toast === 'function') window.toast('Hata: ' + e.message, 'error');
+          }
+        }
+      });
+    };
+  });
+
+  // Yönetici rolü ver / kaldır
+  body.querySelectorAll('.btn-toggle-admin').forEach(btn => {
+    btn.onclick = () => {
+      const uId = btn.getAttribute('data-id');
+      const uName = btn.getAttribute('data-name');
+      const isAdmin = btn.getAttribute('data-admin') === '1';
+      showAdminCustomConfirm({
+        title: isAdmin ? 'Yönetici Yetkisini Kaldır' : 'Yönetici Yetkisi Ver',
+        message: `"${uName}" kullanıcısını ${isAdmin ? 'standart kullanıcı rolüne geçirmek' : 'yönetici yapmak'} istediğinizden emin misiniz?`,
+        details: isAdmin ? 'Kullanıcı yönetim ekranlarına ve yönetici işlemlerine artık erişemeyecek.' : 'Bu kullanıcı; kullanıcı yönetimi, sistem ayarları ve yönetici işlemlerine erişebilecek.',
+        confirmText: isAdmin ? 'Yetkiyi Kaldır' : 'Yönetici Yap',
+        cancelText: 'Vazgeç',
+        isDanger: isAdmin,
+        onConfirm: async () => {
+          btn.disabled = true;
+          try {
+            const res = await fetch('/api/admin/toggle-admin', {
+              method: 'POST',
+              headers: (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') ? window.FrpAuth.getAuthHeaders() : {},
+              body: JSON.stringify({ userId: uId, makeAdmin: !isAdmin })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) throw new Error(data.reason || 'Kullanıcı rolü güncellenemedi.');
+            if (typeof window.toast === 'function') window.toast(`"${uName}" kullanıcısının rolü ${data.role === 'admin' ? 'Yönetici' : 'Kullanıcı'} olarak güncellendi.`, 'success');
+            renderAllUsersTab();
+          } catch (e) {
+            btn.disabled = false;
+            if (typeof window.toast === 'function') window.toast(e.message || 'Kullanıcı rolü güncellenemedi.', 'error');
           }
         }
       });

@@ -1283,8 +1283,7 @@ app.post('/api/admin/toggle-admin', adminRateLimiter, requireAdmin, async (req, 
 
   try {
     const newRole = makeAdmin ? 'admin' : 'user';
-    const newAvatar = makeAdmin ? 'A' : 'U';
-    const updatedUser = await updateUserById(userId, { role: newRole, avatar: newAvatar });
+    const updatedUser = await updateUserById(userId, { role: newRole });
     if (!updatedUser) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
     await recordAuditLog({ userId: req.adminUser.id, username: req.adminUser.username, role: 'admin', action: 'USER_ROLE_CHANGE', target: updatedUser.username, details: `Yeni rol: ${newRole}`, ip: req.ip });
     res.json({ success: true, role: newRole });
