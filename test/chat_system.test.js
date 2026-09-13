@@ -278,5 +278,17 @@ test('sohbet API hedef, uyelik, boyut ve mesaj erisim kontrollerini uygular', ()
   assert.match(serverSource, /cleanText\.length > 1000/);
   assert.match(serverSource, /6 \* 1024 \* 1024/);
   assert.match(serverSource, /id: crypto\.randomUUID\(\)/);
-  assert.match(serverSource, /id: newMsg\.id/);
+  assert.match(serverSource, /await persistChatMessage\(newMsg\)/);
+});
+
+test('sohbet gecmisi Supabase ile hydrate edilir ve genisletilmis sema migrationi vardir', () => {
+  const serverSource = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+  const sql = fs.readFileSync(path.join(root, 'supabase', 'migrations', '010_chat_persistence.sql'), 'utf8');
+  assert.match(serverSource, /async function ensureChatMessagesHydrated/);
+  assert.match(serverSource, /async function persistChatMessage/);
+  assert.match(serverSource, /chatRowToMessage/);
+  assert.match(serverSource, /await persistChatMessage\(newMsg\)/);
+  assert.match(sql, /add column if not exists group_id text/i);
+  assert.match(sql, /idx_chat_messages_group/i);
+  assert.match(sql, /sender_username text/i);
 });

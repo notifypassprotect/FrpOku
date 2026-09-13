@@ -2365,6 +2365,7 @@ async function getAllUsersWithPresence() {
 // ── GERÇEK ZAMANLI SOHBET & MESAJLAŞMA SİSTEMİ ──────────────────
 const CHAT_STORE_PATH = path.join(__dirname, 'data', 'chat_messages.json');
 let chatMessagesCache = null;
+let chatMessagesHydrationPromise = null;
 
 function getChatMessages() {
   if (chatMessagesCache !== null) return chatMessagesCache;
@@ -2389,6 +2390,97 @@ function saveChatMessages() {
     }
     fs.writeFileSync(CHAT_STORE_PATH, JSON.stringify(chatMessagesCache, null, 2), 'utf8');
   } catch {}
+}
+
+function chatRowToMessage(row) {
+  const legacyGroupId = typeof row.room_id === 'string' && row.room_id.startsWith('group:')
+    ? row.room_id.slice(6)
+    : null;
+  return {
+    id: String(row.id),
+    senderId: row.sender_id == null ? null : String(row.sender_id),
+    senderName: row.sender_name || row.sender_username || 'Kullanıcı',
+    senderUsername: row.sender_username || '',
+    senderAvatar: row.sender_avatar || '',
+    receiverId: row.receiver_id == null ? null : String(row.receiver_id),
+    roomId: legacyGroupId ? null : (row.room_id == null ? null : String(row.room_id)),
+    groupId: row.group_id == null ? legacyGroupId : String(row.group_id),
+    text: row.text || '',
+    attachment: row.attachment || null,
+    voice: row.voice || null,
+    isNudge: Boolean(row.is_nudge),
+    reactions: row.reactions || {},
+    isRead: Boolean(row.is_read),
+    readAt: row.read_at || null,
+    createdAt: row.created_at || new Date().toISOString()
+  };
+}
+
+async function ensureChatMessagesHydrated() {
+  if (!supabase) return getChatMessages();
+  if (chatMessagesHydrationPromise) return chatMessagesHydrationPromise;
+  chatMessagesHydrationPromise = (async () => {
+    const localMessages = getChatMessages();
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .order('created_at', { ascending: true })
+      .limit(3000);
+    if (error) throw error;
+    const merged = new Map();
+    localMessages.forEach(message => merged.set(String(message.id), message));
+    (Array.isArray(data) ? data : []).forEach(row => merged.set(String(row.id), chatRowToMessage(row)));
+    chatMessagesCache = Array.from(merged.values())
+      .sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0))
+      .slice(-3000);
+    saveChatMessages();
+    return chatMessagesCache;
+  })().catch(error => {
+    console.warn('Sohbet geçmişi Supabase üzerinden yüklenemedi:', safeLogStr(error.message));
+    return getChatMessages();
+  });
+  return chatMessagesHydrationPromise;
+}
+
+async function persistChatMessage(message) {
+  if (!supabase) return;
+  const row = {
+    id: message.id,
+    sender_id: message.senderId,
+    receiver_id: message.receiverId,
+    room_id: message.roomId,
+    group_id: message.groupId,
+    sender_name: message.senderName,
+    sender_username: message.senderUsername,
+    sender_avatar: message.senderAvatar,
+    text: message.text,
+    attachment: message.attachment,
+    voice: message.voice,
+    is_nudge: Boolean(message.isNudge),
+    reactions: message.reactions || {},
+    is_read: Boolean(message.isRead),
+    read_at: message.readAt,
+    created_at: message.createdAt
+  };
+  let { error } = await supabase.from('chat_messages').upsert(row, { onConflict: 'id' });
+  if (error && message.groupId && /group_id|sender_name|sender_username|sender_avatar|is_nudge/i.test(String(error.message || ''))) {
+    const legacyRow = { ...row, room_id: `group:${message.groupId}` };
+    delete legacyRow.group_id;
+    delete legacyRow.sender_name;
+    delete legacyRow.sender_username;
+    delete legacyRow.sender_avatar;
+    delete legacyRow.is_nudge;
+    ({ error } = await supabase.from('chat_messages').upsert(legacyRow, { onConflict: 'id' }));
+  } else if (error && /group_id|sender_name|sender_username|sender_avatar|is_nudge/i.test(String(error.message || ''))) {
+    const legacyRow = { ...row };
+    delete legacyRow.group_id;
+    delete legacyRow.sender_name;
+    delete legacyRow.sender_username;
+    delete legacyRow.sender_avatar;
+    delete legacyRow.is_nudge;
+    ({ error } = await supabase.from('chat_messages').upsert(legacyRow, { onConflict: 'id' }));
+  }
+  if (error) throw error;
 }
 
 function canAccessChatGroup(user, groupId) {
@@ -2464,6 +2556,7 @@ app.post('/api/presence/heartbeat', requireAuth, async (req, res) => {
     if (supabase) {
       supabase.from('app_users').update({ last_seen: new Date().toISOString(), is_online: customStatus !== 'invisible' }).eq('id', req.authUser.id).then(() => {}).catch(() => {});
     }
+    await ensureChatMessagesHydrated();
     const users = await getAllUsersWithPresence();
     const unread = getUnreadCountsForUser(req.authUser.id);
     res.json({ success: true, users, unreadCounts: unread });
@@ -2474,6 +2567,7 @@ app.post('/api/presence/heartbeat', requireAuth, async (req, res) => {
 
 app.get('/api/presence/users', requireAuth, async (req, res) => {
   try {
+    await ensureChatMessagesHydrated();
     const users = await getAllUsersWithPresence();
     const unread = getUnreadCountsForUser(req.authUser.id);
     res.json({ success: true, users, unreadCounts: unread });
@@ -2533,6 +2627,7 @@ async function scheduleChatEmailDigest(senderUser, receiverId, messageSnippet) {
     const timer = setTimeout(async () => {
       chatEmailTimers.delete(timerKey);
       try {
+        await ensureChatMessagesHydrated();
         const all = getChatMessages();
         const unreads = all.filter(m => String(m.senderId) === strSender && String(m.receiverId) === strReceiver && !m.isRead);
         if (unreads.length === 0) return;
@@ -2726,6 +2821,7 @@ const nudgeCooldowns = new Map();
 
 app.post('/api/chat/nudge', requireAuth, async (req, res) => {
   try {
+    await ensureChatMessagesHydrated();
     const { receiverId, groupId } = req.body || {};
     const myId = String(req.authUser.id);
     if ((!receiverId && !groupId) || (receiverId && groupId)) {
@@ -2765,6 +2861,7 @@ app.post('/api/chat/nudge', requireAuth, async (req, res) => {
       createdAt: new Date().toISOString()
     };
 
+    await persistChatMessage(nudgeMsg);
     messages.push(nudgeMsg);
     saveChatMessages();
 
@@ -2777,6 +2874,7 @@ app.post('/api/chat/nudge', requireAuth, async (req, res) => {
 // Chat: Mesaj Gönderme
 app.post('/api/chat/send', requireAuth, async (req, res) => {
   try {
+    await ensureChatMessagesHydrated();
     const { receiverId, roomId, groupId, text, attachment, voice, isNudge } = req.body || {};
     if (!text && !attachment && !voice && !isNudge) {
       return res.status(400).json({ success: false, reason: 'Mesaj içeriği boş olamaz.' });
@@ -2827,27 +2925,13 @@ app.post('/api/chat/send', requireAuth, async (req, res) => {
       createdAt: new Date().toISOString()
     };
 
+    await persistChatMessage(newMsg);
     messages.push(newMsg);
     saveChatMessages();
 
     // 1-e-1 sohbette okunmayan mesajlar için gecikmeli e-posta bildirimini planla
     if (receiverId && !roomId && !groupId) {
       scheduleChatEmailDigest(req.authUser, receiverId, newMsg.text).catch(() => {});
-    }
-
-    // Supabase yedekleme (varsa)
-    if (supabase) {
-      supabase.from('chat_messages').insert({
-        id: newMsg.id,
-        sender_id: req.authUser.id,
-        receiver_id: receiverId || null,
-        room_id: roomId || null,
-        ...(groupId ? { group_id: groupId } : {}),
-        text: newMsg.text,
-        attachment: newMsg.attachment,
-        voice: newMsg.voice,
-        reactions: newMsg.reactions
-      }).then(() => {}).catch(() => {});
     }
 
     res.json({ success: true, message: newMsg });
@@ -2859,6 +2943,7 @@ app.post('/api/chat/send', requireAuth, async (req, res) => {
 // Chat: Mesajları Listeleme
 app.get('/api/chat/messages', requireAuth, async (req, res) => {
   try {
+    await ensureChatMessagesHydrated();
     const peerId = req.query.peerId ? String(req.query.peerId) : null;
     const roomId = req.query.roomId ? String(req.query.roomId) : null;
     const groupId = req.query.groupId ? String(req.query.groupId) : null;
@@ -2969,6 +3054,7 @@ app.post('/api/chat/typing', requireAuth, async (req, res) => {
 // Chat: Mesajları Okundu İşaretleme
 app.post('/api/chat/mark-read', requireAuth, async (req, res) => {
   try {
+    await ensureChatMessagesHydrated();
     const peerId = req.body?.peerId ? String(req.body.peerId) : null;
     const myId = String(req.authUser.id);
     if (!peerId) return res.json({ success: true });
@@ -2995,6 +3081,7 @@ app.post('/api/chat/mark-read', requireAuth, async (req, res) => {
 // Chat: Reaksiyon Ekleme / Kaldırma
 app.post('/api/chat/react', requireAuth, async (req, res) => {
   try {
+    await ensureChatMessagesHydrated();
     const { messageId, emoji } = req.body || {};
     if (!messageId || !emoji) return res.status(400).json({ success: false, reason: 'Eksik parametre' });
 
@@ -3053,6 +3140,7 @@ app.post('/api/chat/react', requireAuth, async (req, res) => {
 // Chat: Mesaj Silme (Geri Çekme)
 app.delete('/api/chat/messages/:id', requireAuth, async (req, res) => {
   try {
+    await ensureChatMessagesHydrated();
     const all = getChatMessages();
     const idx = all.findIndex(m => m.id === req.params.id);
     if (idx === -1) return res.status(404).json({ success: false, reason: 'Mesaj bulunamadı.' });
@@ -3078,6 +3166,7 @@ app.delete('/api/chat/messages/:id', requireAuth, async (req, res) => {
 // Chat: Tüm Sohbeti Temizle / Sil (Conversation Delete)
 app.delete('/api/chat/conversations/:id', requireAuth, async (req, res) => {
   try {
+    await ensureChatMessagesHydrated();
     const targetId = String(req.params.id || '');
     const type = req.query.type || 'peer'; // 'peer', 'room', 'group'
     const myId = String(req.authUser.id);
