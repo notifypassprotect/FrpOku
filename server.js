@@ -24,6 +24,7 @@ const { startServer } = require('./server/bootstrap');
 const { createPresenceService } = require('./server/services/presence_service');
 const { createChatMessageService } = require('./server/services/chat_message_service');
 const { createChatRoomService } = require('./server/services/chat_room_service');
+const { registerPresenceRoutes } = require('./server/routes/presence');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1941,45 +1942,7 @@ function canAccessChatMessage(user, message) {
   return String(message.senderId) === userId || String(message.receiverId) === userId;
 }
 
-app.post('/api/presence/heartbeat', requireAuth, async (req, res) => {
-  try {
-    const customStatus = req.body?.customStatus || 'online';
-    recordUserPresence(req.authUser, customStatus);
-    if (supabase) {
-      supabase.from('app_users').update({ last_seen: new Date().toISOString(), is_online: customStatus !== 'invisible' }).eq('id', req.authUser.id).then(() => {}).catch(() => {});
-    }
-    await ensureChatMessagesHydrated();
-    const users = await getAllUsersWithPresence();
-    const unread = getUnreadCountsForUser(req.authUser.id);
-    res.json({ success: true, users, unreadCounts: unread });
-  } catch (err) {
-    res.status(500).json({ success: false, reason: 'Presence güncellenemedi.' });
-  }
-});
-
-app.get('/api/presence/users', requireAuth, async (req, res) => {
-  try {
-    await ensureChatMessagesHydrated();
-    const users = await getAllUsersWithPresence();
-    const unread = getUnreadCountsForUser(req.authUser.id);
-    res.json({ success: true, users, unreadCounts: unread });
-  } catch (err) {
-    res.status(500).json({ success: false, reason: 'Kullanıcılar alınamadı.' });
-  }
-});
-
-app.post('/api/presence/offline', requireAuth, async (req, res) => {
-  try {
-    const userId = String(req.authUser.id);
-    removeUserPresence(userId);
-    if (supabase) {
-      supabase.from('app_users').update({ is_online: false, last_seen: new Date().toISOString() }).eq('id', userId).then(() => {}).catch(() => {});
-    }
-    res.json({ success: true });
-  } catch {
-    res.json({ success: true });
-  }
-});
+registerPresenceRoutes(app, { ensureChatMessagesHydrated, getAllUsersWithPresence, getUnreadCountsForUser, recordUserPresence, removeUserPresence, requireAuth, supabase });
 
 // ── OKUNMAMIŞ SOHBET MESAJLARI İÇİN E-POSTA BİLDİRİM YÖNETİCİSİ (DEBOUNCED & ANTI-SPAM) ──
 const chatEmailTimers = new Map(); // `${senderId}_${receiverId}` -> { timer }
