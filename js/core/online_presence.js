@@ -8,7 +8,7 @@
   let pollInterval = null;
   let isPanelOpen = false;
   let dockEl = null;
-  let activeChatWindows = new Map(); // peerId/roomId/groupId -> { el, timer, lastMsgCount }
+  let activeChatWindows = new Map(); // namespaced chat key -> { el, timer, lastMsgCount }
   let currentTab = 'users'; // 'users' | 'groups' | 'rooms'
   let unreadData = { bySender: {}, total: 0, lastInteraction: {} };
   let lastTotalUnread = 0;
@@ -808,6 +808,7 @@
   function bindChatRowActivation(row, openAction) {
     row.tabIndex = 0;
     row.setAttribute('role', 'button');
+    row.style.touchAction = 'manipulation';
     row.addEventListener('click', openAction);
     row.addEventListener('keydown', event => {
       if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -1276,6 +1277,7 @@
     const isRoom = Boolean(room);
     const isGroup = Boolean(group);
     const chatId = isGroup ? group.id : (isRoom ? room.id : String(targetUser.id));
+    const chatKey = `${isGroup ? 'group' : (isRoom ? 'room' : 'peer')}:${String(chatId)}`;
     const chatTitle = isGroup ? group.name : (isRoom ? room.name : (targetUser.fullName || targetUser.username));
 
     const currentAuthUser = window.FrpAuth && window.FrpAuth.getUser ? window.FrpAuth.getUser() : null;
@@ -1283,13 +1285,23 @@
     const myId = currentAuthUser ? String(currentAuthUser.id) : '';
 
     // Zaten açıksa öne al
-    if (activeChatWindows.has(chatId)) {
-      const activeObj = activeChatWindows.get(chatId);
+    if (activeChatWindows.has(chatKey)) {
+      const activeObj = activeChatWindows.get(chatKey);
       activeObj.el.classList.remove('minimized');
       realignChatWindows();
       const inp = activeObj.el.querySelector('.frp-chat-input');
       if (inp) inp.focus();
       return;
+    }
+
+    // Telefonda üst üste görünmeyen pencereler bırakma: yalnızca seçilen sohbet açık kalır.
+    if (window.matchMedia('(max-width: 640px)').matches) {
+      activeChatWindows.forEach((windowObj, key) => {
+        if (key === chatKey) return;
+        clearInterval(windowObj.timer);
+        windowObj.el.remove();
+        activeChatWindows.delete(key);
+      });
     }
 
     const baseOffset = getChatBaseOffset();
@@ -1469,6 +1481,7 @@
     `;
 
     document.body.appendChild(chatEl);
+    document.body.classList.add('frp-mobile-chat-open');
 
     // Hızlı yanıt çipleri dinleyicileri
     chatEl.querySelectorAll('.frp-chat-quick-chip').forEach(chip => {
@@ -1748,7 +1761,8 @@
               if (typeof window.toast === 'function') window.toast(`"${chatTitle}" grubundan ayrıldınız.`, 'success');
               clearInterval(pollTimer);
               chatEl.remove();
-              activeChatWindows.delete(chatId);
+              activeChatWindows.delete(chatKey);
+              if (activeChatWindows.size === 0) document.body.classList.remove('frp-mobile-chat-open');
               realignChatWindows();
               fetchChatGroups();
             } else {
@@ -1776,6 +1790,38 @@
 
     // Pencere Takibi ve Otomatik Polling (Her 2.5 saniyede bir yeni mesajları sorgula)
     let currentMessages = [];
+    let readMarkPending = false;
+
+    async function markVisibleMessagesRead() {
+      if (isRoom || isGroup || targetUser?.isSelfNote || chatId === myId || readMarkPending) return;
+      if (!chatEl.isConnected || chatEl.classList.contains('minimized') || document.visibilityState !== 'visible') return;
+      const hasUnreadIncoming = currentMessages.some(message =>
+        String(message.senderId) === String(chatId) &&
+        String(message.receiverId) === myId &&
+        !message.isRead
+      );
+      if (!hasUnreadIncoming) return;
+
+      readMarkPending = true;
+      try {
+        const response = await fetch('/api/chat/mark-read', {
+          method: 'POST',
+          headers: window.FrpAuth.getAuthHeaders ? window.FrpAuth.getAuthHeaders() : { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ peerId: String(chatId) })
+        });
+        if (!response.ok) return;
+        currentMessages.forEach(message => {
+          if (String(message.senderId) === String(chatId) && String(message.receiverId) === myId) {
+            message.isRead = true;
+          }
+        });
+        if (unreadData.bySender) delete unreadData.bySender[String(chatId)];
+        renderUsers();
+      } catch {} finally {
+        readMarkPending = false;
+      }
+    }
+
     async function loadMessages() {
       if (!window.FrpAuth || !window.FrpAuth.isLoggedIn()) return;
       try {
@@ -1798,6 +1844,7 @@
               }
             }
             renderMessageStream(currentMessages);
+            markVisibleMessagesRead();
           }
 
           if (typingIndicator) {
@@ -1814,22 +1861,10 @@
       } catch {}
     }
 
-    // Okundu işaretleme
-    if (!isRoom && !isGroup) {
-      fetch('/api/chat/mark-read', {
-        method: 'POST',
-        headers: window.FrpAuth.getAuthHeaders ? window.FrpAuth.getAuthHeaders() : { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ peerId: chatId })
-      }).then(() => {
-        if (unreadData.bySender) delete unreadData.bySender[chatId];
-        renderUsers();
-      }).catch(() => {});
-    }
-
     loadMessages();
     const pollTimer = setInterval(loadMessages, 2500);
 
-    activeChatWindows.set(chatId, {
+    activeChatWindows.set(chatKey, {
       el: chatEl,
       timer: pollTimer,
       lastCount: 0
@@ -1844,13 +1879,15 @@
       if (nudgeCooldownTimer) clearInterval(nudgeCooldownTimer);
       if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
       chatEl.remove();
-      activeChatWindows.delete(chatId);
+      activeChatWindows.delete(chatKey);
+      if (activeChatWindows.size === 0) document.body.classList.remove('frp-mobile-chat-open');
       realignChatWindows();
     });
 
     btnMinimize.addEventListener('click', (e) => {
       e.stopPropagation();
       chatEl.classList.toggle('minimized');
+      if (!chatEl.classList.contains('minimized')) markVisibleMessagesRead();
     });
 
     btnMaximize.addEventListener('click', (e) => {
@@ -1901,6 +1938,7 @@
     chatHeader.addEventListener('click', () => {
       if (chatEl.classList.contains('minimized')) {
         chatEl.classList.remove('minimized');
+        markVisibleMessagesRead();
         if (input) input.focus();
       }
     });

@@ -2964,7 +2964,6 @@ app.get('/api/chat/messages', requireAuth, async (req, res) => {
     }
 
     const all = getChatMessages();
-    let changed = false;
 
     let matched = all.filter(m => {
       if (roomId) {
@@ -2988,21 +2987,6 @@ app.get('/api/chat/messages', requireAuth, async (req, res) => {
     const mediaOnly = req.query.mediaOnly === 'true';
     if (mediaOnly) {
       matched = matched.filter(m => !!m.attachment);
-    }
-
-    // Okundu işaretleme (Bana gelen okunmamış mesajları okundu yap)
-    if (peerId) {
-      clearChatEmailTimer(peerId, myId);
-      matched.forEach(m => {
-        if (String(m.senderId) === peerId && String(m.receiverId) === myId && !m.isRead) {
-          m.isRead = true;
-          m.readAt = new Date().toISOString();
-          changed = true;
-        }
-      });
-      if (changed) {
-        saveChatMessages();
-      }
     }
 
     // Aktif yazıyor (typing) kullanıcıları topla
@@ -3060,24 +3044,36 @@ app.post('/api/chat/mark-read', requireAuth, async (req, res) => {
     await ensureChatMessagesHydrated();
     const peerId = req.body?.peerId ? String(req.body.peerId) : null;
     const myId = String(req.authUser.id);
-    if (!peerId) return res.json({ success: true });
+    if (!peerId || peerId === myId) return res.json({ success: true, updated: 0 });
 
     clearChatEmailTimer(peerId, myId);
 
     const all = getChatMessages();
-    let changed = false;
-    all.forEach(m => {
-      if (String(m.senderId) === peerId && String(m.receiverId) === myId && !m.isRead) {
-        m.isRead = true;
-        m.readAt = new Date().toISOString();
-        changed = true;
-      }
-    });
+    const readAt = new Date().toISOString();
+    const unreadMessages = all.filter(m =>
+      String(m.senderId) === peerId &&
+      String(m.receiverId) === myId &&
+      !m.isRead
+    );
 
-    if (changed) saveChatMessages();
-    res.json({ success: true });
-  } catch {
-    res.json({ success: true });
+    if (unreadMessages.length && supabase) {
+      const { error } = await supabase
+        .from('chat_messages')
+        .update({ is_read: true, read_at: readAt })
+        .eq('sender_id', peerId)
+        .eq('receiver_id', myId)
+        .eq('is_read', false);
+      if (error) throw error;
+    }
+    unreadMessages.forEach(message => {
+      message.isRead = true;
+      message.readAt = readAt;
+    });
+    if (unreadMessages.length) saveChatMessages();
+    res.json({ success: true, updated: unreadMessages.length });
+  } catch (err) {
+    console.warn('Mesaj okundu bilgisi kaydedilemedi:', safeLogStr(err.message));
+    res.status(500).json({ success: false, reason: 'Okundu bilgisi kaydedilemedi.' });
   }
 });
 
