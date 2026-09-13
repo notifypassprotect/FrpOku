@@ -15,6 +15,8 @@
 
  let currentUser = null;
  let adminPollingInterval = null;
+ let logoutInProgress = false;
+ let storageSyncTimer = null;
 
  async function register({ fullName, username, email, phone, department, password }) {
  const cleanUser = (username || '').trim().toLowerCase();
@@ -125,7 +127,15 @@
  delete safeUser.password_hash;
  delete safeUser.previous_password_hashes;
  delete safeUser.recovery_keys;
- try { localStorage.setItem('frpoku_auth_token', token); } catch {}
+ try {
+ if (remember) {
+ localStorage.setItem('frpoku_auth_token', token);
+ sessionStorage.removeItem('frpoku_auth_token');
+ } else {
+ sessionStorage.setItem('frpoku_auth_token', token);
+ localStorage.removeItem('frpoku_auth_token');
+ }
+ } catch {}
  setSession(safeUser, remember);
  return safeUser;
  }
@@ -158,24 +168,35 @@
   }
 
   function logout() {
+    if (logoutInProgress) return;
+    logoutInProgress = true;
     try {
       if (window.FrpPresence && typeof window.FrpPresence.leave === 'function') {
         window.FrpPresence.leave();
       }
     } catch {}
 
-    const doClear = () => {
-      currentUser = null;
+    currentUser = null;
+    if (adminPollingInterval) {
+      clearInterval(adminPollingInterval);
+      adminPollingInterval = null;
+    }
+    try {
       localStorage.removeItem(AUTH_STORAGE_KEY);
       localStorage.removeItem(REMEMBER_KEY);
       localStorage.removeItem('frpoku_auth_token');
       sessionStorage.removeItem(AUTH_STORAGE_KEY);
-      try { sessionStorage.removeItem('frp_session_column_order'); } catch {}
+      sessionStorage.removeItem('frpoku_auth_token');
+      sessionStorage.removeItem('frp_session_column_order');
+    } catch {}
+
+    const doClear = async () => {
       if (window.FrpStore && typeof window.FrpStore.clearSessionCache === 'function') {
-        window.FrpStore.clearSessionCache();
+        await window.FrpStore.clearSessionCache();
       }
       updateNavbarUserBadge();
       document.getElementById('btnAdminPendingRegistrations')?.remove();
+      logoutInProgress = false;
       if (typeof window.showAuthFullScreenPortal === 'function') {
         window.showAuthFullScreenPortal('login');
       } else {
@@ -217,7 +238,7 @@
  const headers = { 'Content-Type': 'application/json',...extra };
  if (user) {
  try {
- const token = user.token || localStorage.getItem('frpoku_auth_token');
+ const token = user.token || sessionStorage.getItem('frpoku_auth_token') || localStorage.getItem('frpoku_auth_token');
  if (token) {
  headers['Authorization'] = `Bearer ${token}`;
  headers['X-Admin-Auth'] = token;
@@ -271,6 +292,7 @@
  document.getElementById('btnAdminPendingRegistrations')?.remove();
  return;
  }
+ const requestUserId = String(getSession()?.id || '');
  const topbarRight = document.querySelector('.topbar-right');
  if (!topbarRight) return;
 
@@ -280,6 +302,8 @@
  const data = await res.json();
  if (data && data.success && Array.isArray(data.users)) pendingCount = data.users.length;
  } catch {}
+
+ if (!isAdmin() || String(getSession()?.id || '') !== requestUserId) return;
 
  let adminBtn = document.getElementById('btnAdminPendingRegistrations');
  if (!adminBtn) {
@@ -345,13 +369,30 @@
     initAuthUI();
   }
 
-  window.addEventListener('frp:auth-expired', () => {
+ window.addEventListener('frp:auth-expired', () => {
     if (isLoggedIn()) {
       if (typeof window.toast === 'function') {
         window.toast('Oturum süreniz doldu, lütfen tekrar giriş yapın.', 'warning');
       }
       logout();
     }
+  });
+
+  window.addEventListener('storage', (event) => {
+    if (![AUTH_STORAGE_KEY, REMEMBER_KEY, 'frpoku_auth_token'].includes(event.key)) return;
+    clearTimeout(storageSyncTimer);
+    storageSyncTimer = setTimeout(async () => {
+      const previousUserId = String(currentUser?.id || '');
+      currentUser = null;
+      const nextUser = getSession();
+      const nextUserId = String(nextUser?.id || '');
+      if (previousUserId === nextUserId) return;
+      if (window.FrpStore && typeof window.FrpStore.clearSessionCache === 'function') {
+        await window.FrpStore.clearSessionCache();
+      }
+      if (nextUser) window.location.reload();
+      else if (typeof window.showAuthFullScreenPortal === 'function') window.showAuthFullScreenPortal('login');
+    }, 50);
   });
 
  async function updatePassword({ oldPassword, newPassword }) {
@@ -366,8 +407,14 @@
  const data = await res.json();
  if (data && data.success && data.token) {
  currentUser.token = data.token;
- localStorage.setItem('frpoku_auth_token', data.token);
  const isRemembered = localStorage.getItem(REMEMBER_KEY) === '1';
+ if (isRemembered) {
+ localStorage.setItem('frpoku_auth_token', data.token);
+ sessionStorage.removeItem('frpoku_auth_token');
+ } else {
+ sessionStorage.setItem('frpoku_auth_token', data.token);
+ localStorage.removeItem('frpoku_auth_token');
+ }
  setSession(currentUser, isRemembered);
  }
  return data;

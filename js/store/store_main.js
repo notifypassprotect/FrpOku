@@ -48,10 +48,15 @@
     try {
       const db = await initDB();
       if (!db) return;
-      const tx = db.transaction(DB_STORE, 'readwrite');
-      const store = tx.objectStore(DB_STORE);
-      store.clear();
-      files.forEach(f => store.put(f));
+      await new Promise(resolve => {
+        const tx = db.transaction(DB_STORE, 'readwrite');
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+        tx.onabort = () => resolve();
+        const store = tx.objectStore(DB_STORE);
+        store.clear();
+        files.forEach(f => store.put(f));
+      });
     } catch (e) {
       console.warn('IndexedDB sync hatası:', e);
     }
@@ -61,10 +66,15 @@
     try {
       const db = await initDB();
       if (!db || !db.objectStoreNames.contains(DB_TRASH_STORE)) return;
-      const tx = db.transaction(DB_TRASH_STORE, 'readwrite');
-      const store = tx.objectStore(DB_TRASH_STORE);
-      store.clear();
-      trashItems.forEach(item => store.put(item));
+      await new Promise(resolve => {
+        const tx = db.transaction(DB_TRASH_STORE, 'readwrite');
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+        tx.onabort = () => resolve();
+        const store = tx.objectStore(DB_TRASH_STORE);
+        store.clear();
+        trashItems.forEach(item => store.put(item));
+      });
     } catch (e) {
       console.warn('IndexedDB trash sync hatası:', e);
     }
@@ -152,6 +162,11 @@
   function _scopedStorageKey(baseKey) {
     const user = window.FrpAuth && typeof window.FrpAuth.getUser === 'function' ? window.FrpAuth.getUser() : null;
     return `${baseKey}:${encodeURIComponent(String(user?.id || 'anonymous'))}`;
+  }
+
+  function _sessionIdentity() {
+    const user = window.FrpAuth && typeof window.FrpAuth.getUser === 'function' ? window.FrpAuth.getUser() : null;
+    return user ? `${String(user.id)}:${String(user.token || '')}` : 'anonymous';
   }
   function _getUserNotesMap() {
     try {
@@ -308,14 +323,16 @@
   }
 
   // ── 3. Başlangıç & Bulut Senkronizasyonu ───────────────────────
+  let _refreshSequence = 0;
   const bootstrapReady = (async () => {
     const splashStartTime = Date.now();
+    const bootstrapSessionIdentity = _sessionIdentity();
     try {
       let isCloudLoaded = false;
       let loadedFiles = [];
 
       // Bulut verilerini (Aktif raporlar, çöp kutusu, kategoriler, snippets, ayarlar) paralel çek:
-      if (window.FrpCloud) {
+      if (window.FrpCloud && bootstrapSessionIdentity !== 'anonymous') {
         try {
           const [activeSettled, trashSettled, catSettled, snipSettled, settingsSettled] = await Promise.allSettled([
             typeof window.FrpCloud.loadActiveReports === 'function' ? window.FrpCloud.loadActiveReports() : Promise.resolve(null),
@@ -417,6 +434,8 @@
           console.warn('Bulut senkronizasyonu hatası:', cloudErr);
         }
       }
+
+      if (_sessionIdentity() !== bootstrapSessionIdentity) return;
 
       // 4. Çevrimdışı / Yerel Yedek
       if (!isCloudLoaded) {
@@ -759,7 +778,8 @@
     _audit('DATA_RESET', 'Tüm Veritabanı', 'Kullanıcı onayı ile tüm raporlar, çöp kutusu ve ayarlar sıfırlandı.');
   }
 
-  function clearSessionCache() {
+  async function clearSessionCache() {
+    _refreshSequence++;
     _memoryStore = [];
     _trashStore = [];
     _persistedReportHashes.clear();
@@ -768,9 +788,14 @@
       localStorage.removeItem(STORE_KEY);
       localStorage.removeItem(TRASH_KEY);
       localStorage.removeItem(PENDING_SYNC_KEY);
+      localStorage.removeItem(CATEGORIES_KEY);
+      localStorage.removeItem(CUSTOM_TAGS_KEY);
+      localStorage.removeItem(SNIPPET_KEY);
+      localStorage.removeItem(RECENT_KEY);
+      localStorage.removeItem(PREFS_KEY);
+      localStorage.removeItem(PROFILE_KEY);
     } catch (e) {}
-    syncToIndexedDB([]);
-    syncTrashToIndexedDB([]);
+    await Promise.all([syncToIndexedDB([]), syncTrashToIndexedDB([])]);
   }
 
   // ── 5. Çöp Kutusu (Soft Delete) Metotları ─────────────────────
@@ -2157,18 +2182,42 @@
     bumpVersionFilename: (name, count) => window.FrpTags ? window.FrpTags.bumpVersionFilename(name, count) : name,
 
     refreshFromCloud: async function() {
-      if (window.FrpCloud && typeof window.FrpCloud.loadActiveReports === 'function') {
-        const cloudFiles = await window.FrpCloud.loadActiveReports();
-        if (Array.isArray(cloudFiles)) {
-          const visible = _reportsVisibleToSession(cloudFiles);
-          _persistLocal(visible);
-          _rememberPersisted(visible);
-          if (typeof window.refreshAll === 'function') window.refreshAll();
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('frp:cloud-synced', { detail: { count: visible.length } }));
-          }
-          return visible;
+      const refreshSequence = ++_refreshSequence;
+      const sessionIdentity = _sessionIdentity();
+      if (sessionIdentity === 'anonymous') return [];
+      if (!window.FrpCloud || typeof window.FrpCloud.loadActiveReports !== 'function') return getAll();
+
+      const [activeSettled, trashSettled, categorySettled, snippetSettled, settingsSettled] = await Promise.allSettled([
+        window.FrpCloud.loadActiveReports(),
+        typeof window.FrpCloud.loadTrashReports === 'function' ? window.FrpCloud.loadTrashReports() : Promise.resolve(null),
+        typeof window.FrpCloud.loadCategories === 'function' ? window.FrpCloud.loadCategories() : Promise.resolve(null),
+        typeof window.FrpCloud.loadSnippets === 'function' ? window.FrpCloud.loadSnippets() : Promise.resolve(null),
+        typeof window.FrpCloud.loadSettings === 'function' ? window.FrpCloud.loadSettings() : Promise.resolve(null)
+      ]);
+      if (refreshSequence !== _refreshSequence || sessionIdentity !== _sessionIdentity()) return getAll();
+
+      if (trashSettled.status === 'fulfilled' && Array.isArray(trashSettled.value)) _writeTrash(trashSettled.value);
+      if (categorySettled.status === 'fulfilled' && Array.isArray(categorySettled.value)) localStorage.setItem(CATEGORIES_KEY, JSON.stringify(categorySettled.value));
+      if (snippetSettled.status === 'fulfilled' && Array.isArray(snippetSettled.value)) localStorage.setItem(SNIPPET_KEY, JSON.stringify(snippetSettled.value));
+      if (settingsSettled.status === 'fulfilled' && settingsSettled.value) {
+        const settings = settingsSettled.value;
+        if (settings.preferences && typeof settings.preferences === 'object') setPreferences(settings.preferences);
+        if (settings.theme) setTheme(settings.theme);
+        const customTags = settings.custom_tags ?? settings.customTags;
+        if (Array.isArray(customTags)) {
+          localStorage.setItem(_scopedStorageKey(CUSTOM_TAGS_KEY), JSON.stringify(customTags));
+          localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(customTags));
         }
+        applyPreferences();
+      }
+
+      if (activeSettled.status === 'fulfilled' && Array.isArray(activeSettled.value)) {
+        const visible = _reportsVisibleToSession(activeSettled.value);
+        _persistLocal(visible);
+        _rememberPersisted(visible);
+        if (typeof window.refreshAll === 'function') window.refreshAll();
+        window.dispatchEvent(new CustomEvent('frp:cloud-synced', { detail: { count: visible.length } }));
+        return visible;
       }
       return getAll();
     }
@@ -2178,6 +2227,7 @@
   function startBackgroundSync() {
     setInterval(async () => {
       if (typeof document !== 'undefined' && document.hidden) return;
+      if (!window.FrpAuth || !window.FrpAuth.isLoggedIn()) return;
       if (Date.now() - _lastBackgroundSyncTime < 30000) return;
       _lastBackgroundSyncTime = Date.now();
       try {
@@ -2187,6 +2237,7 @@
 
     if (typeof window !== 'undefined') {
       window.addEventListener('focus', async () => {
+        if (!window.FrpAuth || !window.FrpAuth.isLoggedIn()) return;
         if (Date.now() - _lastBackgroundSyncTime < 15000) return;
         _lastBackgroundSyncTime = Date.now();
         try {
@@ -2196,6 +2247,7 @@
 
       if (typeof document !== 'undefined') {
         document.addEventListener('visibilitychange', async () => {
+          if (!window.FrpAuth || !window.FrpAuth.isLoggedIn()) return;
           if (!document.hidden && Date.now() - _lastBackgroundSyncTime >= 15000) {
             _lastBackgroundSyncTime = Date.now();
             try {

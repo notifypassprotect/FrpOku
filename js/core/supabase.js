@@ -42,15 +42,18 @@
   async function serverRequest(path, options = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), options.timeout || 30000);
+    const requestHeaders = serverAuthHeaders(options.headers || {});
+    const requestedAuthorization = requestHeaders.Authorization || '';
     try {
       const response = await fetch(path, {
         ...options,
         signal: controller.signal,
-        headers: serverAuthHeaders(options.headers || {})
+        headers: requestHeaders
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) {
-        if (response.status === 401 && typeof window !== 'undefined') {
+        const currentAuthorization = serverAuthHeaders().Authorization || '';
+        if (response.status === 401 && requestedAuthorization && requestedAuthorization === currentAuthorization && typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('frp:auth-expired', { detail: { path, status: 401 } }));
         }
         const error = new Error(data?.reason || `Sunucu isteği başarısız (${response.status}).`);
