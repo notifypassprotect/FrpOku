@@ -439,6 +439,20 @@ function findSyntaxErrors(code, lang = 'sql') {
   const errors = [];
   const lines = code.split('\n');
 
+  function addDiagnostic(line, col, token, suggestion, message) {
+    const safeLine = Math.max(1, Number(line) || 1);
+    const safeCol = Math.max(1, Number(col) || 1);
+    const safeToken = String(token || '').trim() || 'ifade';
+    if (errors.some(item => item.line === safeLine && item.col === safeCol && item.message === message)) return;
+    errors.push({ line: safeLine, col: safeCol, token: safeToken, suggestion, message });
+  }
+
+  function cleanCodeLine(value, sqlMode) {
+    let result = String(value || '').replace(/'(?:''|[^'\r\n])*'/g, match => ' '.repeat(match.length));
+    result = result.replace(sqlMode ? /--[^\r\n]*/g : /\/\/[^\r\n]*/g, match => ' '.repeat(match.length));
+    return result.replace(/\{[^\r\n]*\}/g, match => ' '.repeat(match.length));
+  }
+
   lines.forEach((lineText, lineIdx) => {
     const lineNum = lineIdx + 1;
 
@@ -634,6 +648,97 @@ function findSyntaxErrors(code, lang = 'sql') {
         }
       });
     }
+
+    // Oracle SQL yapısal tanıları: editörde yarım bırakılan ifadeleri anında gösterir.
+    const clauseStartRx = /^(?:WHERE|GROUP\s+BY|ORDER\s+BY|HAVING|UNION|MINUS|INTERSECT|CONNECT\s+BY|START\s+WITH|JOIN|LEFT\s+JOIN|RIGHT\s+JOIN|INNER\s+JOIN|FULL\s+JOIN|LEFT\s+OUTER\s+JOIN|RIGHT\s+OUTER\s+JOIN)\b/i;
+    const significant = lines.map((line, index) => ({ index, text: cleanCodeLine(line, true).trim() })).filter(item => item.text);
+    const nextSignificant = new Map();
+    significant.forEach((item, pos) => nextSignificant.set(item.index, significant[pos + 1]?.text || ''));
+
+    lines.forEach((rawLine, index) => {
+      const clean = cleanCodeLine(rawLine, true);
+      const trim = clean.trim();
+      if (!trim) return;
+      const lineNo = index + 1;
+      const next = nextSignificant.get(index) || '';
+
+      const emptyClause = /\b(WHERE|HAVING|ON|AND|OR)\s*$/i.exec(trim);
+      if (emptyClause && (!next || clauseStartRx.test(next) || /^\)/.test(next))) {
+        addDiagnostic(lineNo, clean.toUpperCase().lastIndexOf(emptyClause[1].toUpperCase()) + 1, emptyClause[1], 'Koşul ifadesini tamamlayın', `'${emptyClause[1].toUpperCase()}' anahtar sözcüğünden sonra koşul eksik.`);
+      }
+
+      const danglingComparison = /(=|<>|!=|<=|>=|<|>|\bLIKE\b|\bIN\b)\s*$/i.exec(trim);
+      if (danglingComparison && (!next || clauseStartRx.test(next) || /^\)/.test(next))) {
+        addDiagnostic(lineNo, Math.max(1, clean.lastIndexOf(danglingComparison[1]) + 1), danglingComparison[1], 'Operatörün sağına değer, parametre veya kolon yazın', `Karşılaştırma operatörü '${danglingComparison[1]}' sonrasında değer eksik.`);
+      }
+
+      const operatorBeforeClause = /(=|<>|!=|<=|>=|<|>|\bLIKE\b|\bIN\b)\s+(WHERE|GROUP\s+BY|ORDER\s+BY|HAVING|JOIN|LEFT|RIGHT|INNER|FULL|UNION|MINUS|INTERSECT)\b/i.exec(trim);
+      if (operatorBeforeClause) {
+        addDiagnostic(lineNo, clean.toUpperCase().indexOf(operatorBeforeClause[0].toUpperCase()) + 1, operatorBeforeClause[1], 'Operatör ile sonraki SQL bölümü arasına değer yazın', `Karşılaştırma operatörü '${operatorBeforeClause[1]}' tamamlanmadan '${operatorBeforeClause[2].toUpperCase()}' bölümüne geçilmiş.`);
+      }
+
+      const missingJoinTable = /\b(?:LEFT\s+(?:OUTER\s+)?|RIGHT\s+(?:OUTER\s+)?|FULL\s+(?:OUTER\s+)?|INNER\s+|CROSS\s+)?JOIN\s*$/i.exec(trim);
+      if (missingJoinTable) addDiagnostic(lineNo, clean.toUpperCase().lastIndexOf('JOIN') + 1, 'JOIN', 'JOIN sonrasına tablo adı ve bağlantı koşulu yazın', 'JOIN ifadesinde tablo adı eksik.');
+
+      const missingSource = /\b(FROM|INTO|UPDATE)\s*(?:WHERE|SET|GROUP\s+BY|ORDER\s+BY|HAVING|$)/i.exec(trim);
+      if (missingSource) addDiagnostic(lineNo, clean.toUpperCase().indexOf(missingSource[1].toUpperCase()) + 1, missingSource[1], `${missingSource[1].toUpperCase()} sonrasına tablo adı yazın`, `'${missingSource[1].toUpperCase()}' ifadesinde tablo adı eksik.`);
+
+      const emptySelect = /\bSELECT\s*(?:FROM\b|$)/i.exec(trim);
+      if (emptySelect) addDiagnostic(lineNo, clean.toUpperCase().indexOf('SELECT') + 1, 'SELECT', 'SELECT sonrasına kolon veya ifade yazın', 'SELECT listesi boş bırakılamaz.');
+
+      const trailingComma = /,\s*$/i.exec(trim);
+      if (trailingComma && next && clauseStartRx.test(next)) addDiagnostic(lineNo, clean.lastIndexOf(',') + 1, ',', 'Son virgülü kaldırın veya sonraki alanı yazın', 'SQL bölümü değişmeden önce virgülden sonra kolon ya da tablo eksik.');
+
+      const missingBy = /\b(GROUP|ORDER)\s+(?!BY\b)([a-zA-Z_][\w$#.]*)/i.exec(trim);
+      if (missingBy) addDiagnostic(lineNo, clean.toUpperCase().indexOf(missingBy[1].toUpperCase()) + 1, missingBy[1], `${missingBy[1].toUpperCase()} BY kullanın`, `'${missingBy[1].toUpperCase()}' sonrasında 'BY' anahtar sözcüğü eksik.`);
+
+      if (/\bBETWEEN\b/i.test(trim)) {
+        const afterBetween = trim.slice(trim.toUpperCase().lastIndexOf('BETWEEN') + 7);
+        if (afterBetween && !/\bAND\b/i.test(afterBetween) && (!next || clauseStartRx.test(next))) {
+          addDiagnostic(lineNo, clean.toUpperCase().lastIndexOf('BETWEEN') + 1, 'BETWEEN', 'BETWEEN alt_değer AND üst_değer biçimini kullanın', 'BETWEEN ifadesinin AND ve üst sınır bölümü eksik.');
+        }
+      }
+    });
+
+    const structuralSql = cleanWholeSql.trim();
+    const incompleteJoinRx = /\b(?:LEFT\s+(?:OUTER\s+)?|RIGHT\s+(?:OUTER\s+)?|FULL\s+(?:OUTER\s+)?|INNER\s+)?JOIN\s+[\w$#.]+(?:\s+[\w$#]+)?\s*(?=(?:WHERE|GROUP\s+BY|ORDER\s+BY|HAVING|UNION|MINUS|INTERSECT|$))/gi;
+    let incompleteJoin;
+    while ((incompleteJoin = incompleteJoinRx.exec(structuralSql)) !== null) {
+      const before = structuralSql.slice(0, incompleteJoin.index);
+      const lineNo = (before.match(/\n/g) || []).length + 1;
+      addDiagnostic(lineNo, 1, 'JOIN', 'JOIN tablosundan sonra ON veya USING koşulu ekleyin', 'JOIN bağlantısı ON/USING koşulu olmadan tamamlanmış.');
+    }
+
+    const sqlQuoteSource = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--[^\r\n]*/g, '');
+    let sqlQuoteOpen = false;
+    for (let i = 0; i < sqlQuoteSource.length; i++) {
+      if (sqlQuoteSource[i] !== "'") continue;
+      if (sqlQuoteOpen && sqlQuoteSource[i + 1] === "'") { i += 1; continue; }
+      sqlQuoteOpen = !sqlQuoteOpen;
+    }
+    if (sqlQuoteOpen) addDiagnostic(lines.length, Math.max(1, lines[lines.length - 1].lastIndexOf("'") + 1), "'", "Metin değerini ' ile kapatın", 'SQL metin değeri kapatılmamış.');
+  } else if (lang === 'pascal') {
+    lines.forEach((rawLine, index) => {
+      const clean = cleanCodeLine(rawLine, false);
+      const trim = clean.trim();
+      if (!trim) return;
+      const lineNo = index + 1;
+      const emptyAssignment = /:=\s*;?\s*$/i.exec(trim);
+      if (emptyAssignment) addDiagnostic(lineNo, clean.lastIndexOf(':=') + 1, ':=', 'Atamanın sağına değer veya ifade yazın', "Pascal atama operatörü ':=' sonrasında değer eksik.");
+      if (/^\s*IF\b/i.test(trim) && !/\bTHEN\b/i.test(trim)) addDiagnostic(lineNo, clean.toUpperCase().indexOf('IF') + 1, 'if', 'Koşulu THEN ile tamamlayın', "IF koşulunda 'then' eksik.");
+      if (/^\s*(?:WHILE|FOR)\b/i.test(trim) && !/\bDO\b/i.test(trim)) addDiagnostic(lineNo, 1, trim.split(/\s+/)[0], 'Döngü koşulunu DO ile tamamlayın', "Pascal döngüsünde 'do' eksik.");
+      if (/^\s*(?:ELSE|THEN)\s*;\s*$/i.test(trim)) addDiagnostic(lineNo, 1, trim.replace(';', ''), 'Anahtar sözcükten sonra çalıştırılacak ifadeyi yazın', 'Kontrol bloğu boş bırakılmış.');
+      if (/STRINGREPLACE\s*\([^\n]*\[\s*RFREPLACEALL\s*\]/i.test(trim)) addDiagnostic(lineNo, clean.toUpperCase().indexOf('STRINGREPLACE') + 1, 'StringReplace', 'StringReplace(source, old, new) biçimini kullanın', 'Bu FastReport ortamında [rfReplaceAll] parametresi desteklenmiyor.');
+
+      const quoteLine = rawLine.replace(/\/\/.*$/, '').replace(/\{[^}]*\}/g, '');
+      let quoteOpen = false;
+      for (let i = 0; i < quoteLine.length; i++) {
+        if (quoteLine[i] !== "'") continue;
+        if (quoteOpen && quoteLine[i + 1] === "'") { i += 1; continue; }
+        quoteOpen = !quoteOpen;
+      }
+      if (quoteOpen) addDiagnostic(lineNo, Math.max(1, rawLine.lastIndexOf("'") + 1), "'", "Metni ' ile kapatın", 'Pascal metin değeri satır sonunda kapatılmamış.');
+    });
   }
 
   // Document-wide Parenthesis & Bracket Balance Check (Comments, Strings, and FastReport Macros stripped safely)
@@ -800,7 +905,7 @@ function findSyntaxErrors(code, lang = 'sql') {
     if (pasRes && Array.isArray(pasRes.errors)) {
       pasRes.errors.forEach(pe => {
         const lineN = pe.line || 1;
-        if (!errors.some(e => e.line === lineN && (e.message === pe.text || e.token === ';'))) {
+        if (!errors.some(e => e.line === lineN && (e.message === pe.text || e.token === ';' || (pe.token && e.token === pe.token)))) {
           errors.push({
             line: lineN,
             col: 1,
@@ -820,7 +925,4 @@ window.highlightSQL = highlightSQL;
 window.highlightPascal = highlightPascal;
 window.findSyntaxErrors = findSyntaxErrors;
 window.findFuzzyTypoMatch = findFuzzyTypoMatch;
-
-
-
 

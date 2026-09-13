@@ -426,6 +426,25 @@
  }
  }
 
+ // Yarım bırakılmış FastReport Pascal ifadeleri
+ rawLines.forEach((rawLine, index) => {
+ const lineNo = index + 1;
+ const codeLine = rawLine.replace(/\/\/.*$/, '').replace(/\{[^}]*\}/g, '').trim();
+ if (!codeLine) return;
+ if (/:=\s*;?\s*$/i.test(codeLine)) errors.push({ text: `Satır ${lineNo}: ':=' sonrasında atanacak değer eksik`, line: lineNo, token: ':=', suggestion: 'Atamanın sağına değer veya ifade yazın.' });
+ if (/^IF\b/i.test(codeLine) && !/\bTHEN\b/i.test(codeLine)) errors.push({ text: `Satır ${lineNo}: IF koşulunda 'then' eksik`, line: lineNo, token: 'if', suggestion: "Koşulu 'then' ile tamamlayın." });
+ if (/^(WHILE|FOR)\b/i.test(codeLine) && !/\bDO\b/i.test(codeLine)) errors.push({ text: `Satır ${lineNo}: Döngü ifadesinde 'do' eksik`, line: lineNo, token: codeLine.split(/\s+/)[0], suggestion: "Döngü koşulunu 'do' ile tamamlayın." });
+ if (/STRINGREPLACE\s*\([^\n]*\[\s*RFREPLACEALL\s*\]/i.test(codeLine)) errors.push({ text: `Satır ${lineNo}: Bu FastReport ortamında [rfReplaceAll] desteklenmiyor`, line: lineNo, token: 'StringReplace', suggestion: 'StringReplace(source, old, new) biçimini kullanın.' });
+ const quoteLine = rawLine.replace(/\/\/.*$/, '').replace(/\{[^}]*\}/g, '');
+ let quoteOpen = false;
+ for (let i = 0; i < quoteLine.length; i++) {
+ if (quoteLine[i]!== "'") continue;
+ if (quoteOpen && quoteLine[i + 1] === "'") { i++; continue; }
+ quoteOpen = !quoteOpen;
+ }
+ if (quoteOpen) errors.push({ text: `Satır ${lineNo}: Pascal metin değeri kapatılmamış`, line: lineNo, token: "'", suggestion: "Metin değerini ' ile kapatın." });
+ });
+
  return { errors, warnings };
  }
 
@@ -568,6 +587,44 @@
  if (hasSelect &&!/\bFROM\b/i.test(upper)) {
  errors.push("SELECT ifadesi bulundu fakat FROM anahtar sözcüğü eksik.");
  }
+
+ // 4.1. Yarım bırakılmış SQL bölümleri ve operatörler
+ const sqlLines = sql.split('\n');
+ const cleanedLines = sqlLines.map(line => line
+ .replace(/'(?:''|[^'\r\n])*'/g, "''")
+ .replace(/--[^\r\n]*/g, '')
+ .trim());
+ const nextCodeLine = index => {
+ for (let i = index + 1; i < cleanedLines.length; i++) if (cleanedLines[i]) return cleanedLines[i];
+ return '';
+ };
+ const nextClauseRx = /^(?:WHERE|GROUP\s+BY|ORDER\s+BY|HAVING|UNION|MINUS|INTERSECT|JOIN|LEFT|RIGHT|INNER|FULL|\))/i;
+ cleanedLines.forEach((line, index) => {
+ if (!line) return;
+ const lineNo = index + 1;
+ const next = nextCodeLine(index);
+ const emptyClause = /\b(WHERE|HAVING|ON|AND|OR)\s*$/i.exec(line);
+ if (emptyClause && (!next || nextClauseRx.test(next))) errors.push(`Satır ${lineNo}: '${emptyClause[1].toUpperCase()}' sonrasında koşul eksik.`);
+ const danglingOperator = /(=|<>|!=|<=|>=|<|>|\bLIKE\b|\bIN\b)\s*$/i.exec(line);
+ if (danglingOperator && (!next || nextClauseRx.test(next))) errors.push(`Satır ${lineNo}: '${danglingOperator[1]}' karşılaştırma operatörünün sağ tarafı eksik.`);
+ if (/\b(?:LEFT\s+(?:OUTER\s+)?|RIGHT\s+(?:OUTER\s+)?|FULL\s+(?:OUTER\s+)?|INNER\s+|CROSS\s+)?JOIN\s*$/i.test(line)) errors.push(`Satır ${lineNo}: JOIN sonrasında tablo adı eksik.`);
+ if (/\b(?:FROM|INTO|UPDATE)\s*(?:WHERE|SET|GROUP\s+BY|ORDER\s+BY|HAVING|$)/i.test(line)) errors.push(`Satır ${lineNo}: FROM/INTO/UPDATE sonrasında tablo adı eksik.`);
+ if (/\bSELECT\s*(?:FROM\b|$)/i.test(line)) errors.push(`Satır ${lineNo}: SELECT listesi boş.`);
+ if (/\b(?:GROUP|ORDER)\s+(?!BY\b)[a-zA-Z_][\w$#.]*/i.test(line)) errors.push(`Satır ${lineNo}: GROUP/ORDER sonrasında BY eksik.`);
+ if (/\bBETWEEN\b/i.test(line) && !/\bBETWEEN\b[\s\S]*\bAND\b/i.test(line) && (!next || nextClauseRx.test(next))) errors.push(`Satır ${lineNo}: BETWEEN ifadesinin AND ve üst sınırı eksik.`);
+ });
+
+ const joinSegments = upper.match(/\b(?:LEFT\s+(?:OUTER\s+)?|RIGHT\s+(?:OUTER\s+)?|FULL\s+(?:OUTER\s+)?|INNER\s+)?JOIN\s+[\w$#.]+(?:\s+[\w$#]+)?\s*(?=(?:WHERE|GROUP\s+BY|ORDER\s+BY|HAVING|UNION|MINUS|INTERSECT|$))/gi) || [];
+ joinSegments.forEach(segment => errors.push(`JOIN bağlantısı ON/USING koşulu olmadan tamamlanmış: ${segment.trim()}`));
+
+ const quoteSource = sql.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--[^\r\n]*/g, '');
+ let quoteOpen = false;
+ for (let i = 0; i < quoteSource.length; i++) {
+ if (quoteSource[i]!== "'") continue;
+ if (quoteOpen && quoteSource[i + 1] === "'") { i++; continue; }
+ quoteOpen = !quoteOpen;
+ }
+ if (quoteOpen) errors.push("SQL metin değeri tek tırnak (') ile kapatılmamış.");
 
  // 5. Parantez Bütünlüğü Kontrolü
  let openCount = 0;
