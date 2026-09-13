@@ -28,6 +28,7 @@ const { registerPresenceRoutes } = require('./server/routes/presence');
 const { registerChatRoomRoutes } = require('./server/routes/chat_rooms');
 const { registerChatGroupRoutes } = require('./server/routes/chat_groups');
 const { registerChatNudgeRoute } = require('./server/routes/chat_nudge');
+const { registerChatSendRoute } = require('./server/routes/chat_send');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -2038,73 +2039,7 @@ registerChatGroupRoutes(app, { canAccessChatGroup, getAllUsersWithPresence, getC
 registerChatNudgeRoute(app, { canAccessChatGroup, ensureChatMessagesHydrated, getChatMessages, persistChatMessage, requireAuth, saveChatMessages });
 
 // Chat: Mesaj Gönderme
-app.post('/api/chat/send', requireAuth, async (req, res) => {
-  try {
-    await ensureChatMessagesHydrated();
-    const { receiverId, roomId, groupId, text, attachment, voice, isNudge } = req.body || {};
-    if (!text && !attachment && !voice && !isNudge) {
-      return res.status(400).json({ success: false, reason: 'Mesaj içeriği boş olamaz.' });
-    }
-    if (!receiverId && !roomId && !groupId) {
-      return res.status(400).json({ success: false, reason: 'Alıcı, oda veya grup belirtilmelidir.' });
-    }
-    const targetCount = [receiverId, roomId, groupId].filter(Boolean).length;
-    if (targetCount !== 1) {
-      return res.status(400).json({ success: false, reason: 'Her mesaj için yalnızca bir hedef belirtilmelidir.' });
-    }
-    const cleanText = String(text || '').trim();
-    if (cleanText.length > 1000) {
-      return res.status(400).json({ success: false, reason: 'Mesaj 1000 karakterden uzun olamaz.' });
-    }
-    if (chatPayloadSize(attachment) > 6 * 1024 * 1024 || chatPayloadSize(voice) > 6 * 1024 * 1024) {
-      return res.status(413).json({ success: false, reason: 'Sohbet eki 6 MB sınırını aşamaz.' });
-    }
-    if (groupId && !canAccessChatGroup(req.authUser, groupId)) {
-      return res.status(403).json({ success: false, reason: 'Bu gruba mesaj gönderme yetkiniz yok.' });
-    }
-    if (roomId && !canAccessChatRoom(req.authUser, roomId)) {
-      return res.status(403).json({ success: false, reason: 'Bu kanala erişim yetkiniz yok.' });
-    }
-
-    // Odalardan / Kanallardan yalnızca yönetici (Admin) paylaşım yapabilir kuralı
-    if (roomId && req.authUser.role !== 'admin') {
-      return res.status(403).json({ success: false, reason: 'Bu kurumsal kanala yalnızca sistem yöneticileri (Admin) duyuru ve mesaj gönderebilir.' });
-    }
-
-    const messages = getChatMessages();
-    const newMsg = {
-      id: crypto.randomUUID(),
-      senderId: String(req.authUser.id),
-      senderName: req.authUser.full_name || req.authUser.username,
-      senderUsername: req.authUser.username,
-      senderAvatar: req.authUser.avatar || (req.authUser.username ? req.authUser.username[0].toUpperCase() : 'U'),
-      receiverId: receiverId ? String(receiverId) : null,
-      roomId: roomId ? String(roomId) : null,
-      groupId: groupId ? String(groupId) : null,
-      text: cleanText,
-      attachment: attachment || null,
-      voice: voice || null,
-      isNudge: Boolean(isNudge),
-      reactions: {},
-      isRead: false,
-      readAt: null,
-      createdAt: new Date().toISOString()
-    };
-
-    await persistChatMessage(newMsg);
-    messages.push(newMsg);
-    saveChatMessages();
-
-    // 1-e-1 sohbette okunmayan mesajlar için gecikmeli e-posta bildirimini planla
-    if (receiverId && !roomId && !groupId) {
-      scheduleChatEmailDigest(req.authUser, receiverId, newMsg.text).catch(() => {});
-    }
-
-    res.json({ success: true, message: newMsg });
-  } catch (err) {
-    res.status(500).json({ success: false, reason: 'Mesaj gönderilemedi.' });
-  }
-});
+registerChatSendRoute(app, { canAccessChatGroup, canAccessChatRoom, chatPayloadSize, ensureChatMessagesHydrated, getChatMessages, persistChatMessage, requireAuth, saveChatMessages, scheduleChatEmailDigest });
 
 // Chat: Mesajları Listeleme
 app.get('/api/chat/messages', requireAuth, async (req, res) => {
