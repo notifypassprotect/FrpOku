@@ -298,8 +298,21 @@
     }
   }
 
+  function notificationPreferenceKey() {
+    const user = window.FrpAuth && window.FrpAuth.getUser ? window.FrpAuth.getUser() : null;
+    return `frp_chat_notifications_${user ? String(user.id) : 'guest'}`;
+  }
+
+  function areChatNotificationsEnabled() {
+    try { return localStorage.getItem(notificationPreferenceKey()) !== 'off'; } catch { return true; }
+  }
+
+  function setChatNotificationsEnabled(enabled) {
+    try { localStorage.setItem(notificationPreferenceKey(), enabled ? 'on' : 'off'); } catch {}
+  }
+
   function showDesktopNotification(title, body) {
-    if ('Notification' in window && Notification.permission === 'granted') {
+    if (areChatNotificationsEnabled() && 'Notification' in window && Notification.permission === 'granted') {
       try {
         new Notification(title, { body, icon: '/favicon.ico' });
       } catch {}
@@ -403,7 +416,7 @@
 
     unreadData = { bySender, total, lastInteraction: unreadData.lastInteraction || {} };
 
-    if (newSenders.length > 0 && total > lastTotalUnread) {
+    if (newSenders.length > 0 && total > lastTotalUnread && areChatNotificationsEnabled()) {
       playNotificationChime();
       newSenders.forEach(({ senderId, count }) => {
         const senderUser = cachedUsers.find(u => String(u.id) === String(senderId));
@@ -422,6 +435,7 @@
             }
           }
         });
+        showDesktopNotification(senderName, count > 1 ? `${count} yeni mesajınız var.` : 'Size yeni bir mesaj gönderdi.');
       });
     }
     lastTotalUnread = total;
@@ -587,6 +601,14 @@
       if (!btnNotif) return;
       const dot = btnNotif.querySelector('#frpNotifStatusDot');
       const text = btnNotif.querySelector('#frpNotifStatusText');
+      const appEnabled = areChatNotificationsEnabled();
+      btnNotif.setAttribute('aria-pressed', appEnabled ? 'true' : 'false');
+      if (!appEnabled) {
+        if (dot) dot.className = 'frp-notif-status-dot disabled';
+        if (text) text.textContent = 'Bildirim: Kapalı';
+        btnNotif.title = 'Sohbet bildirimlerini aç';
+        return;
+      }
       if (!('Notification' in window)) {
         if (dot) dot.className = 'frp-notif-status-dot';
         if (text) text.textContent = 'Desteklenmiyor';
@@ -595,6 +617,7 @@
       if (Notification.permission === 'granted') {
         if (dot) dot.className = 'frp-notif-status-dot granted';
         if (text) text.textContent = '🔔 Bildirim: Açık';
+        btnNotif.title = 'Sohbet bildirimlerini kapat';
       } else if (Notification.permission === 'denied') {
         if (dot) dot.className = 'frp-notif-status-dot denied';
         if (text) text.textContent = '🔕 Bildirim: Engellendi';
@@ -683,11 +706,19 @@
     });
 
     btnNotif.addEventListener('click', async () => {
+      if (areChatNotificationsEnabled()) {
+        setChatNotificationsEnabled(false);
+        updateNotifBtnUI();
+        if (typeof window.toast === 'function') window.toast('Sohbet bildirimleri kapatıldı.', 'info');
+        return;
+      }
       if (!('Notification' in window)) {
         if (typeof window.toast === 'function') window.toast('Bu tarayıcı masaüstü bildirimlerini desteklemiyor.', 'warning');
         return;
       }
       if (Notification.permission === 'granted') {
+        setChatNotificationsEnabled(true);
+        updateNotifBtnUI();
         if (typeof window.toast === 'function') {
           window.toast('✓ Masaüstü bildirimleri aktif! Yeni mesaj veya titreşim geldiğinde anlık bildirim alırsınız.', 'success');
         }
@@ -708,6 +739,8 @@
           const perm = await Notification.requestPermission();
           updateNotifBtnUI();
           if (perm === 'granted') {
+            setChatNotificationsEnabled(true);
+            updateNotifBtnUI();
             if (typeof window.toast === 'function') window.toast('Masaüstü bildirimleri başarıyla etkinleştirildi! 🎉', 'success');
           } else {
             if (typeof window.toast === 'function') window.toast('Bildirim izni onaylanmadı.', 'info');

@@ -602,6 +602,16 @@
   background: #ef4444;
 }
 
+.frp-notif-status-dot.disabled {
+  background: #94a3b8;
+  box-shadow: none;
+}
+
+.frp-presence-notif-btn[aria-pressed="false"] {
+  color: var(--text-muted, #64748b);
+  background: var(--bg-raised, #f1f5f9);
+}
+
 /* ── GRUP BİLGİSİ VE ÜYE YÖNETİMİ ÇEKMECESİ ── */
 .frp-group-info-drawer {
   display: none;
