@@ -337,6 +337,7 @@ app.use((req, res, next) => {
     "font-src 'self' https://fonts.gstatic.com data:; " +
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co; " +
     "img-src 'self' data: blob: https:; " +
+    "media-src 'self' data: blob:; " +
     "frame-src 'self' blob: data: https:; " +
     "object-src 'self' blob: data:; " +
     "base-uri 'self'; " +
@@ -402,6 +403,7 @@ function sendScriptSafePage(res, page) {
     "font-src 'self' https://fonts.gstatic.com data:; " +
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co; " +
     "img-src 'self' data: blob: https:; " +
+    "media-src 'self' data: blob:; " +
     "frame-src 'self' blob: data: https:; " +
     "object-src 'self' blob: data:; " +
     "worker-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self';"
@@ -422,6 +424,7 @@ function sendNoncePage(res, page) {
       "font-src 'self' https://fonts.gstatic.com data:; " +
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co; " +
       "img-src 'self' data: blob: https:; " +
+      "media-src 'self' data: blob:; " +
       "frame-src 'self' blob: data: https:; " +
       "object-src 'self' blob: data:; " +
       "base-uri 'self'; form-action 'self'; frame-ancestors 'self';"
