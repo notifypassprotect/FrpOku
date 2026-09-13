@@ -13,6 +13,7 @@
   let unreadData = { bySender: {}, total: 0, lastInteraction: {} };
   let lastTotalUnread = 0;
   let cachedGroups = [];
+  let userListFilter = 'all';
   const localLastInteractions = {};
 
   // MSN Nudge Buzzer Sesi (Web Audio API ile otantik çift ton titreşim sesi)
@@ -531,8 +532,10 @@
         </div>
 
         <!-- ARAMA BARI -->
-        <div id="frpPresenceSearchBar" class="frp-presence-search-bar" style="display: none;">
-          <input type="text" id="frpPresenceSearchInput" class="frp-presence-search-input" placeholder="İsim, departman veya grup ara..." />
+        <div id="frpPresenceSearchBar" class="frp-presence-search-bar">
+          <span class="frp-presence-search-icon" aria-hidden="true">⌕</span>
+          <input type="text" id="frpPresenceSearchInput" class="frp-presence-search-input" placeholder="Kişi, departman veya grup ara" autocomplete="off" />
+          <button type="button" id="btnPresenceSearchClear" class="frp-presence-search-clear" title="Aramayı temizle" aria-label="Aramayı temizle">×</button>
         </div>
 
         <!-- TABLAR (KİŞİLER / GRUPLARIM / ODALAR) -->
@@ -540,6 +543,12 @@
           <button type="button" class="frp-presence-tab active" data-tab="users">👥 Kişiler</button>
           <button type="button" class="frp-presence-tab" data-tab="groups">💬 Gruplarım</button>
           ${isAdmin ? '<button type="button" class="frp-presence-tab" data-tab="rooms">📢 Odalar</button>' : ''}
+        </div>
+
+        <div id="frpPresenceFilters" class="frp-presence-filters" aria-label="Kişi listesi filtreleri">
+          <button type="button" class="frp-presence-filter active" data-filter="all">Tümü <span id="frpFilterAllCount">0</span></button>
+          <button type="button" class="frp-presence-filter" data-filter="online">Çevrimiçi <span id="frpFilterOnlineCount">0</span></button>
+          <button type="button" class="frp-presence-filter" data-filter="unread">Okunmamış <span id="frpFilterUnreadCount">0</span></button>
         </div>
 
         <!-- LİSTE -->
@@ -568,6 +577,8 @@
     const searchToggle = dockEl.querySelector('#btnPresenceSearchToggle');
     const searchBar = dockEl.querySelector('#frpPresenceSearchBar');
     const searchInput = dockEl.querySelector('#frpPresenceSearchInput');
+    const searchClear = dockEl.querySelector('#btnPresenceSearchClear');
+    const userFilters = dockEl.querySelector('#frpPresenceFilters');
     const statusSelect = dockEl.querySelector('#frpSelfStatusSelect');
     const tabs = dockEl.querySelectorAll('.frp-presence-tab');
     const btnNotif = dockEl.querySelector('#btnDesktopNotifOpt');
@@ -613,9 +624,30 @@
     });
 
     searchToggle.addEventListener('click', () => {
-      const isVisible = searchBar.style.display === 'block';
-      searchBar.style.display = isVisible ? 'none' : 'block';
-      if (!isVisible) searchInput.focus();
+      searchBar.classList.add('focused');
+      searchInput.focus();
+      searchInput.select();
+    });
+
+    searchInput.addEventListener('focus', () => searchBar.classList.add('focused'));
+    searchInput.addEventListener('blur', () => searchBar.classList.remove('focused'));
+
+    searchClear.addEventListener('click', () => {
+      searchInput.value = '';
+      searchInput.focus();
+      if (currentTab === 'users') renderUsers();
+      else if (currentTab === 'groups') renderGroups();
+      else renderRooms();
+    });
+
+    userFilters.querySelectorAll('.frp-presence-filter').forEach(button => {
+      button.addEventListener('click', () => {
+        userListFilter = button.dataset.filter || 'all';
+        userFilters.querySelectorAll('.frp-presence-filter').forEach(item => {
+          item.classList.toggle('active', item === button);
+        });
+        renderUsers(searchInput.value.trim());
+      });
     });
 
     searchInput.addEventListener('input', () => {
@@ -638,6 +670,7 @@
         tabs.forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
         currentTab = tab.dataset.tab;
+        userFilters.hidden = currentTab !== 'users';
         const q = searchInput.value.trim();
         if (currentTab === 'users') {
           renderUsers(q);
@@ -693,6 +726,17 @@
     updateSelfStatusUI();
   }
 
+  function bindChatRowActivation(row, openAction) {
+    row.tabIndex = 0;
+    row.setAttribute('role', 'button');
+    row.addEventListener('click', openAction);
+    row.addEventListener('keydown', event => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      openAction();
+    });
+  }
+
   function renderUsers(query = '') {
     if (!dockEl || currentTab !== 'users') return;
     const listEl = dockEl.querySelector('#frpPresenceList');
@@ -707,9 +751,21 @@
     const q = (query || '').toLowerCase().trim();
     const currentAuthUser = window.FrpAuth && window.FrpAuth.getUser ? window.FrpAuth.getUser() : null;
     const myId = currentAuthUser ? String(currentAuthUser.id) : '';
+    const unreadUserCount = cachedUsers.filter(u => ((unreadData.bySender && unreadData.bySender[String(u.id)]) || 0) > 0).length;
+    const allCountEl = dockEl.querySelector('#frpFilterAllCount');
+    const onlineCountEl = dockEl.querySelector('#frpFilterOnlineCount');
+    const unreadCountEl = dockEl.querySelector('#frpFilterUnreadCount');
+    if (allCountEl) allCountEl.textContent = cachedUsers.filter(u => String(u.id) !== myId).length;
+    if (onlineCountEl) onlineCountEl.textContent = onlineUsers.filter(u => String(u.id) !== myId).length;
+    if (unreadCountEl) unreadCountEl.textContent = unreadUserCount;
 
     const filtered = cachedUsers.filter(u => {
       if (!q && String(u.id) === myId) return false; // Kendisi aşağıda ayrı listelenmesin, yukarıda sabit not kartı olacak
+      if (String(u.id) === myId) return false;
+      const isOnline = u.isOnline || u.status === 'online' || u.status === 'busy';
+      const hasUnread = ((unreadData.bySender && unreadData.bySender[String(u.id)]) || 0) > 0;
+      if (userListFilter === 'online' && !isOnline) return false;
+      if (userListFilter === 'unread' && !hasUnread) return false;
       if (!q) return true;
       const fn = (u.fullName || '').toLowerCase();
       const un = (u.username || '').toLowerCase();
@@ -752,7 +808,8 @@
     listEl.innerHTML = '';
 
     // WHATSAPP TARZI KENDİNE NOTLAR KARTI (EN ÜSTTE SABİT)
-    if (!q && currentAuthUser) {
+    const showSelfNote = !q && currentAuthUser && userListFilter === 'all';
+    if (showSelfNote) {
       const selfLi = document.createElement('li');
       selfLi.className = 'frp-presence-item';
       selfLi.style.background = 'linear-gradient(135deg, rgba(37,99,235,0.08), rgba(99,102,241,0.06))';
@@ -772,7 +829,7 @@
           </div>
         </div>
       `;
-      selfLi.addEventListener('click', () => {
+      bindChatRowActivation(selfLi, () => {
         openChatWindow({
           targetUser: {
             id: currentAuthUser.id,
@@ -786,8 +843,13 @@
       listEl.appendChild(selfLi);
     }
 
-    if (filtered.length === 0 && !currentAuthUser) {
-      listEl.innerHTML = `<li class="frp-presence-empty">${q ? 'Aramaya uygun kullanıcı bulunamadı.' : 'Henüz kayıtlı kullanıcı bulunmuyor.'}</li>`;
+    if (filtered.length === 0 && !showSelfNote) {
+      const emptyLabel = q
+        ? 'Aramaya uygun kullanıcı bulunamadı.'
+        : (userListFilter === 'online'
+            ? 'Şu anda başka çevrimiçi kullanıcı yok.'
+            : (userListFilter === 'unread' ? 'Okunmamış mesajınız yok.' : 'Henüz kayıtlı kullanıcı bulunmuyor.'));
+      listEl.innerHTML = `<li class="frp-presence-empty">${emptyLabel}</li>`;
       return;
     }
 
@@ -840,7 +902,7 @@
         </div>
       `;
 
-      li.addEventListener('click', () => {
+      bindChatRowActivation(li, () => {
         openChatWindow({ targetUser: u });
       });
 

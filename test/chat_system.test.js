@@ -244,4 +244,15 @@ test('online_presence.js ve online_presence.css gorsel lightbox, kalici reaksiyo
   assert.match(server, /supabase\.from\('chat_messages'\)\.update\(\{ reactions: msg\.reactions \}\)/);
 });
 
+test('sohbet kisi listesi kalici arama, canli filtreler ve klavye erisimi sunar', () => {
+  const presence = fs.readFileSync(path.join(root, 'js', 'core', 'online_presence.js'), 'utf8');
+  const css = fs.readFileSync(path.join(root, 'css', 'online_presence.css'), 'utf8');
+  assert.match(presence, /id="frpPresenceFilters"/);
+  assert.match(presence, /data-filter="online"/);
+  assert.match(presence, /data-filter="unread"/);
+  assert.match(presence, /function bindChatRowActivation/);
+  assert.match(presence, /event\.key !== 'Enter'/);
+  assert.match(css, /height:\s*820px/);
+  assert.match(css, /\.frp-presence-list-wrap\s*\{[^}]*flex:\s*1/s);
+});
 
