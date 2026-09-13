@@ -15,7 +15,29 @@ const SQL_TYPO_MAP = new Map([
   ['OUTE', 'OUTER'], ['INNE', 'INNER'], ['INNRE', 'INNER'],
   ['VALUS', 'VALUES'], ['VALUE', 'VALUES'], ['VALUSE', 'VALUES'],
   ['COALESE', 'COALESCE'], ['COALESSE', 'COALESCE'], ['COALES', 'COALESCE'],
-  ['UNON', 'UNION'], ['UNIONN', 'UNION']
+  ['UNON', 'UNION'], ['UNIONN', 'UNION'],
+  ['LEF', 'LEFT'], ['LFT', 'LEFT'], ['LFE', 'LEFT'], ['LEFTT', 'LEFT'], ['LEFFT', 'LEFT'],
+  ['RIGH', 'RIGHT'], ['RGHT', 'RIGHT'], ['RIGTH', 'RIGHT'], ['RIGHTT', 'RIGHT'],
+  ['INER', 'INNER'], ['INNR', 'INNER'], ['INNE', 'INNER'], ['INNERN', 'INNER'],
+  ['OUTE', 'OUTER'], ['OUTR', 'OUTER'], ['OUTERR', 'OUTER'],
+  ['FUL', 'FULL'], ['FULLL', 'FULL'],
+  ['CROS', 'CROSS'], ['CROOS', 'CROSS'], ['CRSS', 'CROSS'],
+  ['NATURL', 'NATURAL'], ['NATURALL', 'NATURAL'],
+  ['EXTRAC', 'EXTRACT'], ['EXTRAKT', 'EXTRACT'], ['EXRACT', 'EXTRACT'], ['EXTRCT', 'EXTRACT'], ['EXTRAT', 'EXTRACT'],
+  ['LIK', 'LIKE'], ['LİKE', 'LIKE'], ['LIKEE', 'LIKE'],
+  ['BETW', 'BETWEEN'], ['BTWEEN', 'BETWEEN'], ['BETWEN', 'BETWEEN'], ['BETYEEN', 'BETWEEN'],
+  ['SUBTR', 'SUBSTR'], ['SUBST', 'SUBSTR'], ['SUSTR', 'SUBSTR'], ['SUBSTRINGG', 'SUBSTR'],
+  ['TOCHAR', 'TO_CHAR'], ['TO_CHR', 'TO_CHAR'],
+  ['TODATE', 'TO_DATE'], ['TO_DTE', 'TO_DATE'],
+  ['TONUMBER', 'TO_NUMBER'], ['TO_NUM', 'TO_NUMBER'],
+  ['REPLCE', 'REPLACE'], ['REPLAS', 'REPLACE'],
+  ['LENGHT', 'LENGTH'], ['LENGTHH', 'LENGTH'],
+  ['TRUNCC', 'TRUNC'], ['TRUNCAT', 'TRUNC'],
+  ['ROUN', 'ROUND'], ['ROND', 'ROUND'],
+  ['UPPR', 'UPPER'],
+  ['LOWR', 'LOWER'],
+  ['NVLL', 'NVL'], ['NVAL', 'NVL'],
+  ['DECOD', 'DECODE']
 ]);
 
 const PAS_TYPO_MAP = new Map([
@@ -749,6 +771,15 @@ function findSyntaxErrors(code, lang = 'sql') {
         const onPart = conditionSegment.slice(conditionSegment.toUpperCase().indexOf('ON') + 2).trim();
         if (!onPart) {
           addDiagnostic(line, col, 'ON', 'ON sonrasına koşul yazın (Örn: ON a.id = b.id)', "'ON' anahtar sözcüğünden sonra bağlantı koşulu eksik.");
+        } else {
+          const hasComparison = /(=|<>|!=|<=|>=|<|>|\bLIKE\b|\bIN\b|\bIS\s+(?:NOT\s+)?NULL\b|\bBETWEEN\b)/i.test(onPart);
+          if (!hasComparison) {
+            const rawSub = maskedSql.slice(tableEndPos, boundaryPos);
+            const onOffset = rawSub.toUpperCase().indexOf('ON');
+            const onPos = tableEndPos + (onOffset >= 0 ? onOffset : 0);
+            const onLineCol = getPosLineAndCol(onPos);
+            addDiagnostic(onLineCol.line, onLineCol.col, 'ON', 'ON a.id = b.id', "JOIN bağlantı koşulunda '=' veya karşılaştırma operatörü eksik (Örn: ON a.id = b.id).");
+          }
         }
       } else if (hasUsing) {
         const usingPart = conditionSegment.slice(conditionSegment.toUpperCase().indexOf('USING') + 5).trim();
@@ -861,12 +892,50 @@ function findSyntaxErrors(code, lang = 'sql') {
         addDiagnostic(lineNo, clean.toUpperCase().indexOf(missingBy[1].toUpperCase()) + 1, missingBy[1].toUpperCase(), `${missingBy[1].toUpperCase()} BY kullanın`, `'${missingBy[1].toUpperCase()}' sonrasında 'BY' anahtar sözcüğü eksik.`);
       }
 
-      // BETWEEN ... AND eksikliği
+      // BETWEEN ... AND denetimleri
       if (/\bBETWEEN\b/i.test(trim)) {
-        const afterBetween = trim.slice(trim.toUpperCase().lastIndexOf('BETWEEN') + 7);
-        if (afterBetween && !/\bAND\b/i.test(afterBetween) && (!nextTrim || clauseStartRx.test(nextTrim))) {
-          addDiagnostic(lineNo, clean.toUpperCase().lastIndexOf('BETWEEN') + 1, 'BETWEEN', 'BETWEEN alt_değer AND üst_değer biçimini kullanın', 'BETWEEN ifadesinin AND ve üst sınır bölümü eksik.');
+        if (/\bBETWEEN\s+AND\b/i.test(trim)) {
+          addDiagnostic(lineNo, clean.toUpperCase().indexOf('BETWEEN') + 1, 'BETWEEN', 'BETWEEN :t1 AND :t2', 'BETWEEN sonrasında alt sınır değeri eksik (Örn: BETWEEN :t1 AND :t2).');
+        } else {
+          const afterBetween = trim.slice(trim.toUpperCase().lastIndexOf('BETWEEN') + 7);
+          if (afterBetween && !/\bAND\b/i.test(afterBetween) && (!nextTrim || clauseStartRx.test(nextTrim))) {
+            addDiagnostic(lineNo, clean.toUpperCase().lastIndexOf('BETWEEN') + 1, 'BETWEEN', 'BETWEEN alt_değer AND üst_değer biçimini kullanın', 'BETWEEN ifadesinin AND ve üst sınır bölümü eksik.');
+          }
         }
+      }
+
+      // Eksik EXTRACT fonksiyonu: (YEAR|MONTH|... FROM ...)
+      const missingExtractMatch = /(?<!\bEXTRACT\s*)\(\s*(YEAR|MONTH|DAY|HOUR|MINUTE|SECOND)\s+FROM\b/gi;
+      let mem;
+      while ((mem = missingExtractMatch.exec(clean)) !== null) {
+        const field = mem[1];
+        addDiagnostic(lineNo, mem.index + 1, `(${field} FROM`, `EXTRACT(${field} FROM ...)`, `Eksik Fonksiyon Adı: '(${field} FROM ...)' ifadesinin başına 'EXTRACT' yazılmalıdır (Örn: EXTRACT(${field} FROM ...)).`);
+      }
+
+      // Inline dangling operatörler (Örn: col = AND ...)
+      const inlineDanglingComparison = /(=|<>|!=|<=|>=|<|>|\bLIKE\b)\s+(?:AND|OR|WHERE|GROUP\s+BY|ORDER\s+BY|HAVING|\))/i.exec(rawWithoutComments);
+      if (inlineDanglingComparison) {
+        addDiagnostic(lineNo, rawWithoutComments.indexOf(inlineDanglingComparison[1]) + 1, inlineDanglingComparison[1], 'Operatörün sağına değer yazın', `Karşılaştırma operatörü '${inlineDanglingComparison[1]}' sonrasında değer eksik.`);
+      }
+
+      // Ardışık iki karşılaştırma operatörü (Örn: = =, <> <>)
+      const doubleOpMatch = /(=|<>|!=|<=|>=|<|>)\s+(=|<>|!=|<=|>=|<|>)/.exec(rawWithoutComments);
+      if (doubleOpMatch) {
+        addDiagnostic(lineNo, rawWithoutComments.indexOf(doubleOpMatch[0]) + 1, doubleOpMatch[0], doubleOpMatch[1], `Hatalı Operatör: '${doubleOpMatch[0]}' ardışık iki karşılaştırma operatörü kullanılamaz.`);
+      }
+
+      // Boş IN () kontrolü
+      const emptyInMatch = /\bIN\s*\(\s*\)/i.exec(clean);
+      if (emptyInMatch) {
+        addDiagnostic(lineNo, emptyInMatch.index + 1, 'IN ()', 'IN (değer1, değer2)', "'IN ()' parantez içi boş bırakılamaz.");
+      }
+
+      // Zorunlu parametreli fonksiyonların boş parantezle çağrılması
+      const emptyFuncMatch = /\b(COUNT|SUM|AVG|MIN|MAX|ROUND|TRUNC|COALESCE|NVL|NVL2|UPPER|LOWER|LENGTH|SUBSTR|REPLACE|TO_CHAR|TO_DATE|TO_NUMBER)\s*\(\s*\)/gi;
+      let efm;
+      while ((efm = emptyFuncMatch.exec(clean)) !== null) {
+        const fnName = efm[1].toUpperCase();
+        addDiagnostic(lineNo, efm.index + 1, `${fnName}()`, `${fnName}(parametre)`, `'${fnName}' fonksiyonu parametresiz kullanılamaz.`);
       }
     });
 

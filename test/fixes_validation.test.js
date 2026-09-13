@@ -280,6 +280,37 @@ where c.id=:cariid and c.lab_durum=150`;
   const errsCross = ctx.findSyntaxErrors(sqlCross, 'sql');
   assert.equal(errsCross.length, 0, 'CROSS JOIN için ON hatası verilmemeli');
   assert.equal(ctx.FrpSyntaxCheck.checkSqlStaticSyntax(sqlCross).errors.length, 0);
+
+  // 6. JOIN anahtar kelime yazım hatası (lef outer join -> LEFT)
+  const sqlLefJoin = `from birim_kayit bk
+    lef outer join birim b on bk.birim_id = b.id`;
+  const errsLef = ctx.findSyntaxErrors(sqlLefJoin, 'sql');
+  assert.equal(errsLef.some(e => e.token === 'lef' && e.suggestion === 'LEFT'), true, 'lef yerine LEFT önerilmeli');
+
+  // 7. JOIN ON bağlantısında karşılaştırma operatörü eksikliği (on bk.birim_id  b.id)
+  const sqlOnMissingOp = `from birim_kayit bk
+    left outer join birim b on bk.birim_id  b.id`;
+  const errsOnOp = ctx.findSyntaxErrors(sqlOnMissingOp, 'sql');
+  assert.equal(errsOnOp.some(e => e.token === 'ON' && e.message.includes("karşılaştırma operatörü eksik")), true, 'ON koşulunda eksik operatör yakalanmalı');
+  assert.equal(ctx.FrpSyntaxCheck.checkSqlStaticSyntax(sqlOnMissingOp).errors.some(e => e.includes("karşılaştırma operatörü eksik")), true);
+
+  // 8. BETWEEN sonrasında alt sınır eksikliği (between and :t2)
+  const sqlBetweenAnd = `select id from t where t.tarih between and :t2`;
+  const errsBetween = ctx.findSyntaxErrors(sqlBetweenAnd, 'sql');
+  assert.equal(errsBetween.some(e => e.token === 'BETWEEN' && e.message.includes('alt sınır')), true, 'BETWEEN alt sınır eksikliği yakalanmalı');
+  assert.equal(ctx.FrpSyntaxCheck.checkSqlStaticSyntax(sqlBetweenAnd).errors.some(e => e.includes('alt sınır')), true);
+
+  // 9. (YEAR FROM ...) başında eksik EXTRACT fonksiyonu
+  const sqlExtract = `select id from t order by (year from t.tarih) desc`;
+  const errsExtract = ctx.findSyntaxErrors(sqlExtract, 'sql');
+  assert.equal(errsExtract.some(e => e.message.includes('EXTRACT')), true, 'Eksik EXTRACT yakalanmalı');
+  assert.equal(ctx.FrpSyntaxCheck.checkSqlStaticSyntax(sqlExtract).errors.some(e => e.includes('EXTRACT')), true);
+
+  // 10. Parametresiz fonksiyon çağrısı (COALESCE()) ve boş IN ()
+  const sqlFuncEmpty = `select coalesce() from t where id in ()`;
+  const errsFuncEmpty = ctx.findSyntaxErrors(sqlFuncEmpty, 'sql');
+  assert.equal(errsFuncEmpty.some(e => e.message.includes('parametresiz')), true, 'Parametresiz fonksiyon yakalanmalı');
+  assert.equal(errsFuncEmpty.some(e => e.message.includes('IN ()')), true, 'Boş IN listesi yakalanmalı');
 });
 
 

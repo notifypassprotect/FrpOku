@@ -790,6 +790,11 @@
       const onPart = conditionSegment.slice(conditionSegment.toUpperCase().indexOf('ON') + 2).trim();
       if (!onPart) {
         errors.push(`Satır ${line}: 'ON' anahtar sözcüğünden sonra bağlantı koşulu eksik.`);
+      } else {
+        const hasComparison = /(=|<>|!=|<=|>=|<|>|\bLIKE\b|\bIN\b|\bIS\s+(?:NOT\s+)?NULL\b|\bBETWEEN\b)/i.test(onPart);
+        if (!hasComparison) {
+          errors.push(`Satır ${line}: JOIN 'ON' bağlantı koşulunda '=' veya karşılaştırma operatörü eksik (Örn: ON a.id = b.id).`);
+        }
       }
     } else if (hasUsing) {
       const usingPart = conditionSegment.slice(conditionSegment.toUpperCase().indexOf('USING') + 5).trim();
@@ -875,10 +880,40 @@
     }
 
     if (/\bBETWEEN\b/i.test(trim)) {
-      const afterBetween = trim.slice(trim.toUpperCase().lastIndexOf('BETWEEN') + 7);
-      if (afterBetween && !/\bAND\b/i.test(afterBetween) && (!nextTrim || clauseStartRx.test(nextTrim))) {
-        errors.push(`Satır ${lineNo}: BETWEEN ifadesinin AND ve üst sınırı eksik.`);
+      if (/\bBETWEEN\s+AND\b/i.test(trim)) {
+        errors.push(`Satır ${lineNo}: BETWEEN sonrasında alt sınır değeri eksik (Örn: BETWEEN :t1 AND :t2).`);
+      } else {
+        const afterBetween = trim.slice(trim.toUpperCase().lastIndexOf('BETWEEN') + 7);
+        if (afterBetween && !/\bAND\b/i.test(afterBetween) && (!nextTrim || clauseStartRx.test(nextTrim))) {
+          errors.push(`Satır ${lineNo}: BETWEEN ifadesinin AND ve üst sınırı eksik.`);
+        }
       }
+    }
+
+    const missingExtractMatch = /(?<!\bEXTRACT\s*)\(\s*(YEAR|MONTH|DAY|HOUR|MINUTE|SECOND)\s+FROM\b/gi;
+    let mem;
+    while ((mem = missingExtractMatch.exec(clean)) !== null) {
+      errors.push(`Satır ${lineNo}: Eksik Fonksiyon: '(${mem[1]} FROM ...)' ifadesinin başına 'EXTRACT' eklenmelidir (Örn: EXTRACT(${mem[1]} FROM ...)).`);
+    }
+
+    const inlineDanglingComparison = /(=|<>|!=|<=|>=|<|>|\bLIKE\b)\s+(?:AND|OR|WHERE|GROUP\s+BY|ORDER\s+BY|HAVING|\))/i.exec(rawWithoutComments);
+    if (inlineDanglingComparison) {
+      errors.push(`Satır ${lineNo}: '${inlineDanglingComparison[1]}' karşılaştırma operatörünün sağ tarafı eksik.`);
+    }
+
+    const doubleOpMatch = /(=|<>|!=|<=|>=|<|>)\s+(=|<>|!=|<=|>=|<|>)/.exec(rawWithoutComments);
+    if (doubleOpMatch) {
+      errors.push(`Satır ${lineNo}: Hatalı Operatör: '${doubleOpMatch[0]}' ardışık iki karşılaştırma operatörü kullanılamaz.`);
+    }
+
+    if (/\bIN\s*\(\s*\)/i.test(clean)) {
+      errors.push(`Satır ${lineNo}: 'IN ()' listesi boş bırakılamaz.`);
+    }
+
+    const emptyFuncMatch = /\b(COUNT|SUM|AVG|MIN|MAX|ROUND|TRUNC|COALESCE|NVL|NVL2|UPPER|LOWER|LENGTH|SUBSTR|REPLACE|TO_CHAR|TO_DATE|TO_NUMBER)\s*\(\s*\)/gi;
+    let efm;
+    while ((efm = emptyFuncMatch.exec(clean)) !== null) {
+      errors.push(`Satır ${lineNo}: '${efm[1].toUpperCase()}' fonksiyonu parametresiz kullanılamaz.`);
     }
   });
 
