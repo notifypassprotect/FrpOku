@@ -22,6 +22,7 @@ const { configureHttpMiddleware } = require('./server/middleware/http');
 const { registerCatalogRoutes } = require('./server/routes/catalog');
 const { startServer } = require('./server/bootstrap');
 const { createPresenceService } = require('./server/services/presence_service');
+const { createChatMessageService } = require('./server/services/chat_message_service');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1915,126 +1916,8 @@ const { getAllUsersWithPresence, getUserAvatars, recordUserPresence, removeUserP
 
 // ── GERÇEK ZAMANLI SOHBET & MESAJLAŞMA SİSTEMİ ──────────────────
 const CHAT_STORE_PATH = path.join(__dirname, 'data', 'chat_messages.json');
-let chatMessagesCache = null;
-let chatMessagesHydrationPromise = null;
-
-function getChatMessages() {
-  if (chatMessagesCache !== null) return chatMessagesCache;
-  try {
-    if (fs.existsSync(CHAT_STORE_PATH)) {
-      chatMessagesCache = JSON.parse(fs.readFileSync(CHAT_STORE_PATH, 'utf8'));
-    } else {
-      chatMessagesCache = [];
-    }
-  } catch {
-    chatMessagesCache = [];
-  }
-  return chatMessagesCache;
-}
-
-function saveChatMessages() {
-  try {
-    const dir = path.dirname(CHAT_STORE_PATH);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    if (chatMessagesCache.length > 3000) {
-      chatMessagesCache = chatMessagesCache.slice(-3000);
-    }
-    const tempFile = CHAT_STORE_PATH + '.tmp';
-    fs.writeFileSync(tempFile, JSON.stringify(chatMessagesCache, null, 2), 'utf8');
-    fs.renameSync(tempFile, CHAT_STORE_PATH);
-  } catch {}
-}
-
-function chatRowToMessage(row) {
-  const legacyGroupId = typeof row.room_id === 'string' && row.room_id.startsWith('group:')
-    ? row.room_id.slice(6)
-    : null;
-  return {
-    id: String(row.id),
-    senderId: row.sender_id == null ? null : String(row.sender_id),
-    senderName: row.sender_name || row.sender_username || 'Kullanıcı',
-    senderUsername: row.sender_username || '',
-    senderAvatar: row.sender_avatar || '',
-    receiverId: row.receiver_id == null ? null : String(row.receiver_id),
-    roomId: legacyGroupId ? null : (row.room_id == null ? null : String(row.room_id)),
-    groupId: row.group_id == null ? legacyGroupId : String(row.group_id),
-    text: row.text || '',
-    attachment: row.attachment || null,
-    voice: row.voice || null,
-    isNudge: Boolean(row.is_nudge),
-    reactions: row.reactions || {},
-    isRead: Boolean(row.is_read),
-    readAt: row.read_at || null,
-    createdAt: row.created_at || new Date().toISOString()
-  };
-}
-
-async function ensureChatMessagesHydrated() {
-  if (!supabase) return getChatMessages();
-  if (chatMessagesHydrationPromise) return chatMessagesHydrationPromise;
-  chatMessagesHydrationPromise = (async () => {
-    const localMessages = getChatMessages();
-    const { data, error } = await supabase
-      .from('chat_messages')
-      .select('*')
-      .order('created_at', { ascending: true })
-      .limit(3000);
-    if (error) throw error;
-    const merged = new Map();
-    localMessages.forEach(message => merged.set(String(message.id), message));
-    (Array.isArray(data) ? data : []).forEach(row => merged.set(String(row.id), chatRowToMessage(row)));
-    chatMessagesCache = Array.from(merged.values())
-      .sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0))
-      .slice(-3000);
-    saveChatMessages();
-    return chatMessagesCache;
-  })().catch(error => {
-    console.warn('Sohbet geçmişi Supabase üzerinden yüklenemedi:', safeLogStr(error.message));
-    return getChatMessages();
-  });
-  return chatMessagesHydrationPromise;
-}
-
-async function persistChatMessage(message) {
-  if (!supabase) return;
-  const row = {
-    id: message.id,
-    sender_id: message.senderId,
-    receiver_id: message.receiverId,
-    room_id: message.roomId,
-    group_id: message.groupId,
-    sender_name: message.senderName,
-    sender_username: message.senderUsername,
-    sender_avatar: message.senderAvatar,
-    text: message.text,
-    attachment: message.attachment,
-    voice: message.voice,
-    is_nudge: Boolean(message.isNudge),
-    reactions: message.reactions || {},
-    is_read: Boolean(message.isRead),
-    read_at: message.readAt,
-    created_at: message.createdAt
-  };
-  let { error } = await supabase.from('chat_messages').upsert(row, { onConflict: 'id' });
-  if (error && message.groupId && /group_id|sender_name|sender_username|sender_avatar|is_nudge/i.test(String(error.message || ''))) {
-    const legacyRow = { ...row, room_id: `group:${message.groupId}` };
-    delete legacyRow.group_id;
-    delete legacyRow.sender_name;
-    delete legacyRow.sender_username;
-    delete legacyRow.sender_avatar;
-    delete legacyRow.is_nudge;
-    ({ error } = await supabase.from('chat_messages').upsert(legacyRow, { onConflict: 'id' }));
-  } else if (error && /group_id|sender_name|sender_username|sender_avatar|is_nudge/i.test(String(error.message || ''))) {
-    const legacyRow = { ...row };
-    delete legacyRow.group_id;
-    delete legacyRow.sender_name;
-    delete legacyRow.sender_username;
-    delete legacyRow.sender_avatar;
-    delete legacyRow.is_nudge;
-    ({ error } = await supabase.from('chat_messages').upsert(legacyRow, { onConflict: 'id' }));
-  }
-  if (error) throw error;
-}
+const chatStore = createJsonStore(CHAT_STORE_PATH, { label: 'Sohbet mesajı', limit: 3000 });
+const { chatPayloadSize, ensureChatMessagesHydrated, getChatMessages, getUnreadCountsForUser, persistChatMessage, replaceChatMessages, saveChatMessages } = createChatMessageService({ safeLogStr, store: chatStore, supabase });
 
 function canAccessChatGroup(user, groupId) {
   const group = getChatGroups().find(item => String(item.id) === String(groupId));
@@ -2055,51 +1938,6 @@ function canAccessChatMessage(user, message) {
   if (message.groupId) return canAccessChatGroup(user, message.groupId);
   if (message.roomId) return canAccessChatRoom(user, message.roomId);
   return String(message.senderId) === userId || String(message.receiverId) === userId;
-}
-
-function chatPayloadSize(value) {
-  if (!value) return 0;
-  try { return Buffer.byteLength(JSON.stringify(value), 'utf8'); } catch { return Number.MAX_SAFE_INTEGER; }
-}
-
-function getUnreadCountsForUser(userId) {
-  const msgs = getChatMessages();
-  const counts = {};
-  const lastInteraction = {};
-  let total = 0;
-  const strUser = String(userId);
-  for (const m of msgs) {
-    const isIncoming = String(m.receiverId) === strUser;
-    const isOutgoing = String(m.senderId) === strUser;
-    const time = new Date(m.createdAt || 0).getTime();
-
-    if (isIncoming && !m.isRead) {
-      const senderKey = String(m.senderId);
-      counts[senderKey] = (counts[senderKey] || 0) + 1;
-      total++;
-    }
-    if (isIncoming || isOutgoing) {
-      const peerId = isIncoming ? String(m.senderId) : String(m.receiverId);
-      if (peerId) {
-        if (!lastInteraction[peerId] || time > lastInteraction[peerId]) {
-          lastInteraction[peerId] = time;
-        }
-      }
-    }
-    if (m.roomId) {
-      const rId = String(m.roomId);
-      if (!lastInteraction[rId] || time > lastInteraction[rId]) {
-        lastInteraction[rId] = time;
-      }
-    }
-    if (m.groupId) {
-      const gId = String(m.groupId);
-      if (!lastInteraction[gId] || time > lastInteraction[gId]) {
-        lastInteraction[gId] = time;
-      }
-    }
-  }
-  return { bySender: counts, total, lastInteraction };
 }
 
 app.post('/api/presence/heartbeat', requireAuth, async (req, res) => {
@@ -2742,8 +2580,7 @@ app.delete('/api/chat/conversations/:id', requireAuth, async (req, res) => {
 
     if (toDeleteIds.length > 0) {
       const deleteSet = new Set(toDeleteIds);
-      chatMessagesCache = all.filter(m => !deleteSet.has(m.id));
-      saveChatMessages();
+      replaceChatMessages(all.filter(m => !deleteSet.has(m.id)));
       if (supabase) {
         supabase.from('chat_messages').delete().in('id', toDeleteIds).then(() => {}).catch(() => {});
       }
