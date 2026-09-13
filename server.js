@@ -32,6 +32,7 @@ const { registerChatSendRoute } = require('./server/routes/chat_send');
 const { registerChatMessageListRoute } = require('./server/routes/chat_messages');
 const { registerChatStateRoutes } = require('./server/routes/chat_state');
 const { registerChatMutationRoutes } = require('./server/routes/chat_mutations');
+const { createChatEmailService } = require('./server/services/chat_email_service');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1952,74 +1953,14 @@ function canAccessChatMessage(user, message) {
 registerPresenceRoutes(app, { ensureChatMessagesHydrated, getAllUsersWithPresence, getUnreadCountsForUser, recordUserPresence, removeUserPresence, requireAuth, supabase });
 
 // ── OKUNMAMIŞ SOHBET MESAJLARI İÇİN E-POSTA BİLDİRİM YÖNETİCİSİ (DEBOUNCED & ANTI-SPAM) ──
-const chatEmailTimers = new Map(); // `${senderId}_${receiverId}` -> { timer }
-const chatEmailCooldowns = new Map(); // `${receiverId}` -> timestamp
-
-function clearChatEmailTimer(senderId, receiverId) {
-  const timerKey = `${senderId}_${receiverId}`;
-  const existing = chatEmailTimers.get(timerKey);
-  if (existing) {
-    if (existing.timer) clearTimeout(existing.timer);
-    chatEmailTimers.delete(timerKey);
-  }
-}
-
-async function scheduleChatEmailDigest(senderUser, receiverId, messageSnippet) {
-  if (!senderUser || !receiverId) return;
-  const strReceiver = String(receiverId);
-  const strSender = String(senderUser.id);
-  if (strReceiver === strSender) return;
-
-  try {
-    const recipient = await loadUserById(strReceiver);
-    if (!recipient || !recipient.email) return;
-    if (recipient.email_chat_digest === false || recipient.emailChatDigest === false) return;
-
-    // 15 dakikalık anti-spam soğuma kontrolü
-    const lastSent = chatEmailCooldowns.get(strReceiver) || 0;
-    if (Date.now() - lastSent < 15 * 60 * 1000) return;
-
-    const timerKey = `${strSender}_${strReceiver}`;
-    if (chatEmailTimers.has(timerKey)) return;
-
-    const delayMs = process.env.CHAT_EMAIL_DELAY_MS ? parseInt(process.env.CHAT_EMAIL_DELAY_MS, 10) : 3 * 60 * 1000;
-
-    const timer = setTimeout(async () => {
-      chatEmailTimers.delete(timerKey);
-      try {
-        await ensureChatMessagesHydrated();
-        const all = getChatMessages();
-        const unreads = all.filter(m => String(m.senderId) === strSender && String(m.receiverId) === strReceiver && !m.isRead);
-        if (unreads.length === 0) return;
-
-        const currentLastSent = chatEmailCooldowns.get(strReceiver) || 0;
-        if (Date.now() - currentLastSent < 15 * 60 * 1000) return;
-
-        chatEmailCooldowns.set(strReceiver, Date.now());
-
-        const recName = recipient.full_name || recipient.username || 'Kullanıcı';
-        const sndName = senderUser.full_name || senderUser.username || 'Ekip Arkadaşınız';
-        const lastMsg = unreads[unreads.length - 1];
-        const snippet = lastMsg.text || (lastMsg.attachment ? '📎 Görsel / Belge eki' : (lastMsg.voice ? '🎤 Sesli mesaj' : messageSnippet || 'Yeni ileti'));
-
-        await mailer.sendUnreadMessageDigest({
-          to: recipient.email,
-          recipientName: recName,
-          senderName: sndName,
-          unreadCount: unreads.length,
-          lastMessageSnippet: snippet
-        });
-      } catch (err) {
-        console.warn('Okunmamış mesaj bildirim e-postası gönderilemedi:', err.message);
-      }
-    }, delayMs);
-
-    if (timer.unref) timer.unref();
-    chatEmailTimers.set(timerKey, { timer });
-  } catch (err) {
-    console.warn('E-posta bildirim planlaması yapılamadı:', err.message);
-  }
-}
+const chatEmailDelay = Number.parseInt(process.env.CHAT_EMAIL_DELAY_MS || '', 10);
+const { clearChatEmailTimer, scheduleChatEmailDigest } = createChatEmailService({
+  delayMs: Number.isFinite(chatEmailDelay) ? chatEmailDelay : 180000,
+  ensureChatMessagesHydrated,
+  getChatMessages,
+  loadUserById,
+  mailer
+});
 
 // ── GRUP SOHBETLERİ YÖNETİMİ (Kullanıcı Çoklu Grup Sohbeti) ─────
 const CHAT_GROUPS_STORE_PATH = path.join(__dirname, 'data', 'chat_groups.json');
