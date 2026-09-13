@@ -26,6 +26,7 @@ const { createChatMessageService } = require('./server/services/chat_message_ser
 const { createChatRoomService } = require('./server/services/chat_room_service');
 const { registerPresenceRoutes } = require('./server/routes/presence');
 const { registerChatRoomRoutes } = require('./server/routes/chat_rooms');
+const { registerChatGroupRoutes } = require('./server/routes/chat_groups');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -2031,134 +2032,7 @@ function saveChatGroups() {
   chatGroupsStore.write(getChatGroups());
 }
 
-app.get('/api/chat/groups', requireAuth, async (req, res) => {
-  try {
-    const myId = String(req.authUser.id);
-    const groups = getChatGroups();
-    const myGroups = groups.filter(g => Array.isArray(g.memberUserIds) && g.memberUserIds.map(String).includes(myId));
-    res.json({ success: true, groups: myGroups });
-  } catch {
-    res.status(500).json({ success: false, reason: 'Gruplar alınamadı.' });
-  }
-});
-
-app.post('/api/chat/groups', requireAuth, async (req, res) => {
-  try {
-    const { name, icon, memberUserIds } = req.body || {};
-    const cleanName = String(name || '').trim();
-    if (!cleanName) return res.status(400).json({ success: false, reason: 'Grup adı belirtilmelidir.' });
-
-    const myId = String(req.authUser.id);
-    const membersSet = new Set((Array.isArray(memberUserIds) ? memberUserIds : []).map(String));
-    membersSet.add(myId);
-
-    if (membersSet.size < 2) {
-      return res.status(400).json({ success: false, reason: 'Grup oluşturmak için en az bir kişi daha seçmelisiniz.' });
-    }
-
-    const groups = getChatGroups();
-    const newGroup = {
-      id: 'group_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
-      name: cleanName,
-      icon: String(icon || '👥').trim() || '👥',
-      memberUserIds: Array.from(membersSet),
-      createdBy: myId,
-      createdByName: req.authUser.full_name || req.authUser.username,
-      createdAt: new Date().toISOString()
-    };
-
-    groups.unshift(newGroup);
-    saveChatGroups();
-    res.json({ success: true, group: newGroup });
-  } catch {
-    res.status(500).json({ success: false, reason: 'Grup oluşturulamadı.' });
-  }
-});
-
-app.get('/api/chat/groups/:id/details', requireAuth, async (req, res) => {
-  try {
-    const groupId = req.params.id;
-    const groups = getChatGroups();
-    const group = groups.find(g => g.id === groupId);
-    if (!group) return res.status(404).json({ success: false, reason: 'Grup bulunamadı.' });
-    if (!canAccessChatGroup(req.authUser, groupId)) {
-      return res.status(403).json({ success: false, reason: 'Bu grubun ayrıntılarını görüntüleme yetkiniz yok.' });
-    }
-
-    const allUsers = await getAllUsersWithPresence();
-    const memberIds = new Set((group.memberUserIds || []).map(String));
-    const members = allUsers.filter(u => memberIds.has(String(u.id))).map(u => ({
-      ...u,
-      isCreator: String(u.id) === String(group.createdBy),
-      isAdmin: String(u.id) === String(group.createdBy) || (Array.isArray(group.admins) && group.admins.map(String).includes(String(u.id)))
-    }));
-
-    res.json({
-      success: true,
-      group: {
-        ...group,
-        members
-      }
-    });
-  } catch {
-    res.status(500).json({ success: false, reason: 'Grup detayları alınamadı.' });
-  }
-});
-
-app.post('/api/chat/groups/:id/leave', requireAuth, async (req, res) => {
-  try {
-    const groupId = req.params.id;
-    const myId = String(req.authUser.id);
-    const groups = getChatGroups();
-    const group = groups.find(g => g.id === groupId);
-    if (!group) return res.status(404).json({ success: false, reason: 'Grup bulunamadı.' });
-
-    group.memberUserIds = (group.memberUserIds || []).map(String).filter(id => id !== myId);
-    if (group.memberUserIds.length === 0) {
-      const idx = groups.findIndex(g => g.id === groupId);
-      if (idx !== -1) groups.splice(idx, 1);
-    } else if (String(group.createdBy) === myId) {
-      group.createdBy = group.memberUserIds[0];
-      const remainingUser = (await getAllUsersWithPresence()).find(u => String(u.id) === group.createdBy);
-      if (remainingUser) {
-        group.createdByName = remainingUser.fullName || remainingUser.username;
-      }
-    }
-
-    saveChatGroups();
-    res.json({ success: true });
-  } catch {
-    res.status(500).json({ success: false, reason: 'Gruptan ayrılamadı.' });
-  }
-});
-
-app.delete('/api/chat/groups/:id/members/:userId', requireAuth, async (req, res) => {
-  try {
-    const groupId = req.params.id;
-    const targetUserId = String(req.params.userId);
-    const myId = String(req.authUser.id);
-    const groups = getChatGroups();
-    const group = groups.find(g => g.id === groupId);
-    if (!group) return res.status(404).json({ success: false, reason: 'Grup bulunamadı.' });
-
-    const isGroupAdmin = String(group.createdBy) === myId || (Array.isArray(group.admins) && group.admins.map(String).includes(myId));
-    const isSysAdmin = req.authUser.role === 'admin';
-
-    if (!isGroupAdmin && !isSysAdmin) {
-      return res.status(403).json({ success: false, reason: 'Yalnızca grup yöneticisi üyeleri gruptan çıkarabilir.' });
-    }
-
-    if (String(group.createdBy) === targetUserId && !isSysAdmin) {
-      return res.status(400).json({ success: false, reason: 'Grup kurucusu gruptan çıkarılamaz.' });
-    }
-
-    group.memberUserIds = (group.memberUserIds || []).map(String).filter(id => id !== targetUserId);
-    saveChatGroups();
-    res.json({ success: true });
-  } catch {
-    res.status(500).json({ success: false, reason: 'Üye gruptan çıkarılamadı.' });
-  }
-});
+registerChatGroupRoutes(app, { canAccessChatGroup, getAllUsersWithPresence, getChatGroups, requireAuth, saveChatGroups });
 
 // MSN Nudge (Titreşim / Dürtme)
 const nudgeCooldowns = new Map();
