@@ -2313,10 +2313,26 @@
       const timeSpan = audioPlayer.querySelector('.frp-audio-time');
       const track = audioPlayer.querySelector('.frp-audio-track');
       const fallbackDuration = (m.voice && m.voice.duration > 0) ? m.voice.duration : 10;
+      const audioSource = (m.voice && m.voice.dataUrl) || (m.attachment && m.attachment.dataUrl) || '';
+      if (!audioSource) {
+        btnPlay.disabled = true;
+        btnPlay.title = 'Ses kaynağı bulunamadı';
+        return;
+      }
+      audioEl.src = audioSource;
+      audioEl.load();
 
       function setPlayIcon(isPlaying) {
         btnPlay.innerHTML = chatIcon(isPlaying ? 'pause' : 'play');
         btnPlay.setAttribute('aria-label', isPlaying ? 'Duraklat' : 'Oynat');
+      }
+
+      function showPlaybackError() {
+        setPlayIcon(false);
+        audioPlayer.classList.remove('playing');
+        audioPlayer.classList.add('playback-error');
+        btnPlay.title = 'Ses kaydı oynatılamadı';
+        timeSpan.textContent = 'Oynatılamadı';
       }
 
       function getEffectiveDuration() {
@@ -2368,23 +2384,16 @@
                   standaloneAudio.play().then(() => {
                     setPlayIcon(true);
                     audioPlayer.classList.add('playing');
-                  }).catch(() => {
-                    setPlayIcon(false);
-                    audioPlayer.classList.remove('playing');
-                  });
+                  }).catch(showPlaybackError);
                 } catch {
-                  setPlayIcon(false);
-                  audioPlayer.classList.remove('playing');
+                  showPlaybackError();
                 }
               });
             } else {
               setPlayIcon(true);
               audioPlayer.classList.add('playing');
             }
-          } catch {
-            setPlayIcon(false);
-            audioPlayer.classList.remove('playing');
-          }
+          } catch { showPlaybackError(); }
         } else {
           audioEl.pause();
           setPlayIcon(false);
@@ -2438,6 +2447,7 @@
         setPlayIcon(false);
         audioPlayer.classList.remove('playing');
       });
+      audioEl.addEventListener('error', showPlaybackError);
     }
 
     // Tekil Mesaj DOM Elemanı Üretici
@@ -2494,7 +2504,6 @@
 
       const hasVoiceOrAudio = (m.voice && m.voice.dataUrl) || (isAudioAttachment && m.attachment.dataUrl);
       if (hasVoiceOrAudio) {
-        const audioSrc = (m.voice && m.voice.dataUrl) ? m.voice.dataUrl : m.attachment.dataUrl;
         const duration = (m.voice && m.voice.duration && m.voice.duration > 0) ? m.voice.duration : 10;
         const durMin = Math.floor(duration / 60);
         const durSec = String(duration % 60).padStart(2, '0');
@@ -2514,7 +2523,7 @@
             <div class="frp-audio-wave-bars">
               <span></span><span></span><span></span><span></span><span></span>
             </div>
-            <audio src="${audioSrc}" preload="metadata" style="display:none;"></audio>
+            <audio preload="metadata" playsinline style="display:none;"></audio>
           </div>
         `;
       }

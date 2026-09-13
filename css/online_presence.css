@@ -1696,6 +1696,15 @@
   font-size: 0.75rem;
   transition: transform 0.12s;
   flex-shrink: 0;
+  position: relative;
+  z-index: 3;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+.frp-chat-audio-player.playback-error .frp-audio-play-btn {
+  background: rgba(239, 68, 68, 0.16);
+  color: #ef4444;
 }
 
 .frp-chat-msg.incoming .frp-audio-play-btn {
