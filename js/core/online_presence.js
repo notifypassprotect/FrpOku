@@ -176,12 +176,19 @@
     return text.slice(0, 2).toLocaleUpperCase('tr-TR');
   }
 
+  function isSafeImageUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    const trimmed = url.trim();
+    return /^data:image\/(png|jpeg|jpg|webp|gif);base64,[a-zA-Z0-9+/=]+$/i.test(trimmed) ||
+           /^https?:\/\/[^\s"'<>]+$/i.test(trimmed);
+  }
+
   function renderAvatarContent(avatar, initials, isSmall = false) {
-    if (avatar && (avatar.startsWith('data:image/') || avatar.startsWith('http'))) {
-      return `<img src="${avatar}" alt="Avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
+    if (avatar && isSafeImageUrl(avatar)) {
+      return `<img src="${escHtml(avatar)}" alt="Avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
     }
     if (avatar && avatar.length <= 14 && !/^[a-zA-Z0-9_]{1,3}$/.test(avatar.trim())) {
-      return `<span style="font-size:${isSmall ? '0.92rem' : '1.18rem'};display:flex;align-items:center;justify-content:center;width:100%;height:100%;">${avatar}</span>`;
+      return `<span style="font-size:${isSmall ? '0.92rem' : '1.18rem'};display:flex;align-items:center;justify-content:center;width:100%;height:100%;">${escHtml(avatar)}</span>`;
     }
     return `<span style="font-size:${isSmall ? '0.72rem' : '0.85rem'};font-weight:800;color:#ffffff;">${escHtml(initials)}</span>`;
   }
@@ -194,6 +201,7 @@
     const fileName = name || 'gorsel.png';
     let currentZoom = 1;
 
+    const safeSrc = (src && (src.startsWith('data:image/') || /^https?:\/\//i.test(src))) ? escHtml(src) : '';
     const modal = document.createElement('div');
     modal.className = 'frp-lightbox-modal';
     modal.innerHTML = `
@@ -213,7 +221,7 @@
         </div>
       </div>
       <div class="frp-lightbox-body">
-        <img src="${src}" alt="${escHtml(fileName)}" class="frp-lightbox-img" draggable="false" />
+        <img src="${safeSrc}" alt="${escHtml(fileName)}" class="frp-lightbox-img" draggable="false" />
       </div>
     `;
 
@@ -1969,7 +1977,8 @@
             if (m.attachment) {
               const isImg = (m.attachment.type || '').startsWith('image/');
               if (isImg) {
-                item.innerHTML = `<img src="${m.attachment.dataUrl}" alt="${escHtml(m.attachment.name)}" />`;
+                const safeImgUrl = (m.attachment.dataUrl && (m.attachment.dataUrl.startsWith('data:image/') || /^https?:\/\//i.test(m.attachment.dataUrl))) ? escHtml(m.attachment.dataUrl) : '';
+                item.innerHTML = `<img src="${safeImgUrl}" alt="${escHtml(m.attachment.name)}" />`;
                 item.addEventListener('click', () => {
                   openImageLightbox({ src: m.attachment.dataUrl, name: m.attachment.name });
                 });

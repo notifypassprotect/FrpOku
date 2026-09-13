@@ -180,7 +180,7 @@ function transferLine(fromPane, lineIdx) {
 
     const targetFile = fromPane === 'A' ? fileB : fileA;
     const targetQIdx = fromPane === 'A' ? qIdxB : qIdxA;
-    const targetSql  = targetQIdx >= 0 ? (targetFile.queries[targetQIdx]?.sql || '') : '';
+    const targetSql  = (targetQIdx >= 0 && targetFile?.queries) ? (targetFile.queries[targetQIdx]?.sql || '') : '';
 
     compareUndoStack.push({
       type: 'sql',
@@ -189,8 +189,8 @@ function transferLine(fromPane, lineIdx) {
       oldCode: targetSql
     });
 
-    const sqlA = qIdxA >= 0 ? fileA.queries[qIdxA].sql : '';
-    const sqlB = qIdxB >= 0 ? fileB.queries[qIdxB].sql : '';
+    const sqlA = (qIdxA >= 0 && fileA?.queries) ? (fileA.queries[qIdxA]?.sql || '') : '';
+    const sqlB = (qIdxB >= 0 && fileB?.queries) ? (fileB.queries[qIdxB]?.sql || '') : '';
 
     const alignedDiff = DiffEngine.computeLineDiff(sqlA, sqlB);
     const transferred = DiffEngine.applyLineTransfer(alignedDiff, fromPane, lineIdx, sqlA, sqlB);
@@ -768,9 +768,9 @@ async function renderDiff() {
     textC = fileC ? (fileC.pascalScript || '') : '';
   } else if (activeTab.startsWith('sql_')) {
     const qName = activeTab.replace('sql_', '');
-    const qA = fileA ? fileA.queries.find(q => q.name === qName) : null;
-    const qB = fileB ? fileB.queries.find(q => q.name === qName) : null;
-    const qC = fileC ? fileC.queries.find(q => q.name === qName) : null;
+    const qA = (fileA?.queries || []).find(q => q.name === qName) || null;
+    const qB = (fileB?.queries || []).find(q => q.name === qName) || null;
+    const qC = (fileC?.queries || []).find(q => q.name === qName) || null;
     textA = qA ? qA.sql : '';
     textB = qB ? qB.sql : '';
     textC = qC ? qC.sql : '';

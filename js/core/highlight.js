@@ -1002,7 +1002,11 @@ function findSyntaxErrors(code, lang = 'sql') {
             const startsWithFrom = /^\s*FROM\b/i.test(nextTrimClean);
 
             if (!endsWithComma && !endsWithOp && !startsWithComma && !startsWithFrom) {
-              const nextStartsNewExpr = /^(?:[a-zA-Z_]\w*\s*\(|CASE\b|\(|\d+|'|[a-zA-Z_]\w*\.[a-zA-Z0-9_#$*]+)/i.test(nextTrimClean);
+              const nextStartsWithOp = /^(=|<>|!=|<=|>=|<|>|\+|-|\*|\/|\|\|)/.test(nextTrimClean);
+              const nextStartsNewExpr = !nextStartsWithOp && (
+                /^(?:[a-zA-Z_]\w*\s*\(|CASE\b|\(|\d+|'|[a-zA-Z_]\w*\.[a-zA-Z0-9_#$*]+)/i.test(nextTrimClean) ||
+                /^[a-zA-Z_][\w$#]*/i.test(nextTrimClean)
+              );
               const curHasExpr = body.length > 0;
 
               if (nextStartsNewExpr && curHasExpr) {

@@ -293,6 +293,11 @@
               }
             }).catch(() => {});
           }
+        } else if (error?.status === 400 || error?.status === 401 || error?.status === 403 || error?.status === 404) {
+          // Kalıcı istemci / yetki hatası: Raporu sonsuz döngüye sokmamak için kuyruktan temizle
+          _pendingSyncIds.delete(key);
+          _savePendingSyncIds();
+          _notifySyncIssue(error.message || 'Rapor kaydedilemedi (Yetki veya doğrulama hatası).');
         } else {
           // Ağ hatası veya geçici kesinti durumunda kuyrukta koru
           _pendingSyncIds.add(key);

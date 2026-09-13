@@ -387,16 +387,21 @@ window.FrpSettingsTabs.profile = {
       return u.slice(0, 2).toLocaleUpperCase('tr-TR');
     };
 
+    const escSafe = (val) => {
+      if (typeof window.escHtml === 'function') return window.escHtml(val);
+      return String(val || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    };
+
     const updateAvatarUI = (avatarVal) => {
       if (!avatarPreviewWrap) return;
-      if (avatarVal && (avatarVal.startsWith('data:image/') || avatarVal.startsWith('http'))) {
-        avatarPreviewWrap.innerHTML = `<img src="${avatarVal}" alt="Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
+      if (avatarVal && (avatarVal.startsWith('data:image/') || /^https?:\/\//i.test(avatarVal))) {
+        avatarPreviewWrap.innerHTML = `<img src="${escSafe(avatarVal)}" alt="Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`;
         if (avatarStatusLabel) avatarStatusLabel.textContent = 'Özel Fotoğraf Yüklendi';
       } else if (avatarVal && avatarVal.trim()) {
-        avatarPreviewWrap.innerHTML = `<span style="font-size:2.3rem;line-height:1;">${avatarVal}</span>`;
-        if (avatarStatusLabel) avatarStatusLabel.textContent = `Yönetici Avatarı (${avatarVal})`;
+        avatarPreviewWrap.innerHTML = `<span style="font-size:2.3rem;line-height:1;">${escSafe(avatarVal)}</span>`;
+        if (avatarStatusLabel) avatarStatusLabel.textContent = `Yönetici Avatarı (${escSafe(avatarVal)})`;
       } else {
-        avatarPreviewWrap.innerHTML = `<span>${getInitials()}</span>`;
+        avatarPreviewWrap.innerHTML = `<span>${escSafe(getInitials())}</span>`;
         if (avatarStatusLabel) avatarStatusLabel.textContent = 'Varsayılan Baş Harfler';
       }
     };

@@ -214,7 +214,9 @@ function saveAuditLogs(logs) {
     const dataDir = path.join(__dirname, 'data');
     if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
     const trimmed = Array.isArray(logs) ? logs.slice(0, 5000) : [];
-    fs.writeFileSync(LOGS_FILE, JSON.stringify(trimmed, null, 2), 'utf8');
+    const tempFile = LOGS_FILE + '.tmp';
+    fs.writeFileSync(tempFile, JSON.stringify(trimmed, null, 2), 'utf8');
+    fs.renameSync(tempFile, LOGS_FILE);
   } catch (err) {
     console.error('Audit logs yazma hatası:', err.message);
   }
@@ -791,9 +793,18 @@ app.post('/api/auth/recover-with-key', authRateLimiter, async (req, res) => {
   try {
     let user = null;
     if (supabase) {
-      const { data, error } = await supabase.from('app_users').select('*').or(`username.eq.${ident},email.eq.${ident}`).limit(1);
-      if (error) throw error;
-      if (data && data.length) user = data[0];
+      const isEmail = ident.includes('@');
+      const cleanEmail = normalizeEmail(ident);
+      const cleanUser = normalizeUsername(ident);
+      if (isEmail && isValidEmail(cleanEmail)) {
+        const { data, error } = await supabase.from('app_users').select('*').eq('email', cleanEmail).limit(1);
+        if (error) throw error;
+        if (data && data.length) user = data[0];
+      } else if (isValidUsername(cleanUser)) {
+        const { data, error } = await supabase.from('app_users').select('*').eq('username', cleanUser).limit(1);
+        if (error) throw error;
+        if (data && data.length) user = data[0];
+      }
     } else {
       const localUsers = getLocalUsers();
       user = localUsers.find(u => (u.username || '').toLowerCase() === ident || (u.email || '').toLowerCase() === ident);
@@ -886,9 +897,18 @@ app.post('/api/auth/forgot-password-code', authRateLimiter, async (req, res) => 
   try {
     let user = null;
     if (supabase) {
-      const { data, error } = await supabase.from('app_users').select('*').or(`username.eq.${ident},email.eq.${ident}`).limit(1);
-      if (error) throw error;
-      if (data && data.length) user = data[0];
+      const isEmail = ident.includes('@');
+      const cleanEmail = normalizeEmail(ident);
+      const cleanUser = normalizeUsername(ident);
+      if (isEmail && isValidEmail(cleanEmail)) {
+        const { data, error } = await supabase.from('app_users').select('*').eq('email', cleanEmail).limit(1);
+        if (error) throw error;
+        if (data && data.length) user = data[0];
+      } else if (isValidUsername(cleanUser)) {
+        const { data, error } = await supabase.from('app_users').select('*').eq('username', cleanUser).limit(1);
+        if (error) throw error;
+        if (data && data.length) user = data[0];
+      }
     } else {
       const localUsers = getLocalUsers();
       user = localUsers.find(u => (u.username || '').toLowerCase() === ident || (u.email || '').toLowerCase() === ident);
@@ -1778,7 +1798,7 @@ app.put('/api/reports/:id', apiWriteRateLimiter, requireAuth, async (req, res) =
       return res.status(403).json({ success: false, reason: 'Başka bir kullanıcıya ait rapor güncellenemez.' });
     }
 
-    const currentVersion = existing ? Math.max(1, Number(existing.version) || 1) : 0;
+    const currentVersion = existing ? Math.max(1, Number(existing.version != null ? existing.version : existing.data?.version) || 1) : 0;
     let nextVersion;
     try {
       nextVersion = nextReportVersion(existing, req.body.version);
@@ -1849,7 +1869,9 @@ function saveUserSettingsFileMap(map) {
   try {
     const dir = path.dirname(USER_SETTINGS_PATH);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(map, null, 2), 'utf8');
+    const tempFile = USER_SETTINGS_PATH + '.tmp';
+    fs.writeFileSync(tempFile, JSON.stringify(map, null, 2), 'utf8');
+    fs.renameSync(tempFile, USER_SETTINGS_PATH);
   } catch {}
 }
 
@@ -1998,9 +2020,10 @@ app.patch('/api/reports/:id/trash', apiWriteRateLimiter, requireAuth, async (req
     const isDeleted = req.body?.deleted !== false;
     const deletedAt = isDeleted ? new Date().toISOString() : null;
     let nextVersion;
+    const currentVersion = Math.max(1, Number(report.version != null ? report.version : report.data?.version) || 1);
     try {
       // Sürüm belirtilmemişse veya 0 ise mevcut sürümü baz al
-      const requestedVer = req.body?.version ? Number(req.body.version) : (report.version || 1);
+      const requestedVer = req.body?.version ? Number(req.body.version) : currentVersion;
       nextVersion = nextReportVersion(report, requestedVer);
     } catch (versionError) {
       return res.status(409).json({ success: false, code: versionError.code, reason: 'Rapor başka bir oturumda güncellendi.', currentVersion: versionError.currentVersion });
@@ -2011,7 +2034,7 @@ app.patch('/api/reports/:id/trash', apiWriteRateLimiter, requireAuth, async (req
       const data = { ...current, isDeleted, is_deleted: isDeleted, deletedAt, deleted_at: deletedAt, version: nextVersion };
       let updateQuery = supabase.from('reports')
         .update({ is_deleted: isDeleted, deleted_at: deletedAt, version: nextVersion, data, updated_at: new Date().toISOString() })
-        .eq('id', String(req.params.id)).eq('version', Number(report.version) || 1);
+        .eq('id', String(req.params.id)).eq('version', currentVersion);
       const result = await updateQuery.select('*').limit(1);
       if (result.error) throw result.error;
       if (!result.data?.length) return res.status(409).json({ success: false, code: 'REPORT_CONFLICT', reason: 'Rapor aynı anda başka bir oturumda güncellendi.' });
@@ -2245,11 +2268,16 @@ app.get('/api/reports/:id/attachments/:filename', requireAuth, async (req, res) 
     }
 
     const targetDir = path.resolve(ATTACHMENTS_DIR, reportIdParam);
+    if (!targetDir.startsWith(ATTACHMENTS_DIR)) {
+      return res.status(400).send('Geçersiz dosya konumu.');
+    }
     const filePath = path.resolve(targetDir, filename);
     if (!filePath.startsWith(targetDir) || !fs.existsSync(filePath)) {
       return res.status(404).send('Ek dosya bulunamadı.');
     }
 
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.sendFile(filePath);
   } catch (err) {
     res.status(500).send('Dosya getirilemedi.');
@@ -2390,7 +2418,9 @@ function saveChatMessages() {
     if (chatMessagesCache.length > 3000) {
       chatMessagesCache = chatMessagesCache.slice(-3000);
     }
-    fs.writeFileSync(CHAT_STORE_PATH, JSON.stringify(chatMessagesCache, null, 2), 'utf8');
+    const tempFile = CHAT_STORE_PATH + '.tmp';
+    fs.writeFileSync(tempFile, JSON.stringify(chatMessagesCache, null, 2), 'utf8');
+    fs.renameSync(tempFile, CHAT_STORE_PATH);
   } catch {}
 }
 
@@ -2578,14 +2608,12 @@ app.get('/api/presence/users', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/presence/offline', async (req, res) => {
+app.post('/api/presence/offline', requireAuth, async (req, res) => {
   try {
-    const userId = req.body?.userId;
-    if (userId) {
-      removeUserPresence(userId);
-      if (supabase) {
-        supabase.from('app_users').update({ is_online: false, last_seen: new Date().toISOString() }).eq('id', String(userId)).then(() => {}).catch(() => {});
-      }
+    const userId = String(req.authUser.id);
+    removeUserPresence(userId);
+    if (supabase) {
+      supabase.from('app_users').update({ is_online: false, last_seen: new Date().toISOString() }).eq('id', userId).then(() => {}).catch(() => {});
     }
     res.json({ success: true });
   } catch {
