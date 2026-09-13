@@ -1190,33 +1190,6 @@ function initListPage() {
     });
   }
 
-  // Topbar Dropdown Menü Tıklama Desteği (Mobil & Masaüstü)
-  document.querySelectorAll('.topbar-dropdown').forEach(dd => {
-    const toggle = dd.querySelector('.topbar-dropdown-toggle');
-    if (toggle && !toggle._boundClick) {
-      toggle._boundClick = true;
-      toggle.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const isOpen = dd.classList.contains('open');
-        document.querySelectorAll('.topbar-dropdown.open').forEach(d => d.classList.remove('open'));
-        if (!isOpen) dd.classList.add('open');
-      });
-    }
-
-    // Menü elemanına tıklandığında dropdown'ı otomatik kapat
-    dd.querySelectorAll('.topbar-dropdown-item').forEach(item => {
-      if (!item._boundCloseClick) {
-        item._boundCloseClick = true;
-        item.addEventListener('click', () => {
-          dd.classList.remove('open');
-        });
-      }
-    });
-  });
-  document.addEventListener('click', () => {
-    document.querySelectorAll('.topbar-dropdown.open').forEach(d => d.classList.remove('open'));
-  });
-
   // Çalışma Alanı Değiştirici
   document.getElementById('tabWsPersonal')?.addEventListener('click', () => {
     document.getElementById('tabWsPersonal')?.classList.add('active');
