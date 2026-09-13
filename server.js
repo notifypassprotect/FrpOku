@@ -34,6 +34,7 @@ const { registerChatStateRoutes } = require('./server/routes/chat_state');
 const { registerChatMutationRoutes } = require('./server/routes/chat_mutations');
 const { createChatEmailService } = require('./server/services/chat_email_service');
 const { registerAdminHealthRoute } = require('./server/routes/admin_health');
+const { registerAdminMailRoutes } = require('./server/routes/admin_mail');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -2259,57 +2260,4 @@ app.post('/api/admin/freeze-user', adminRateLimiter, requireAdmin, async (req, r
 registerAdminHealthRoute(app, { adminRateLimiter, getLocalUsers, mailer, requireAdmin, rootDirectory: __dirname, supabase });
 
 // ── ADMİN: SİSTEM & HAVUZ DURUM ÖZETİ E-POSTASI GÖNDERME ──────────────────
-app.post('/api/admin/mail/send-digest', adminRateLimiter, requireAdmin, async (req, res) => {
-  const requestedEmail = String(req.body?.email || '').trim().toLowerCase();
-  const adminEmail = (requestedEmail && isValidEmail(requestedEmail))
-    ? requestedEmail
-    : (req.adminUser?.email || process.env.BOOTSTRAP_ADMIN_EMAIL || process.env.SMTP_USER);
-
-  if (!adminEmail) return res.status(400).json({ success: false, reason: 'Yönetici e-posta adresi bulunamadı.' });
-
-  try {
-    let users = [];
-    let reports = [];
-    if (supabase) {
-      const uRes = await supabase.from('app_users').select('id, is_active, role');
-      users = uRes.data || [];
-      const rRes = await supabase.from('reports').select('id, is_public');
-      reports = rRes.data || [];
-    } else {
-      users = getLocalUsers();
-      reports = readLocalReports();
-    }
-
-    const stats = {
-      totalUsers: users.length,
-      pendingUsers: users.filter(u => u.is_active === false && !u.is_frozen).length,
-      frozenUsers: users.filter(u => u.is_frozen === true).length,
-      totalReports: reports.length,
-      poolReports: reports.filter(r => r.is_public || r.in_pool || r.data?.isPublic).length
-    };
-
-    const mailResult = await mailer.sendSystemDigest({
-      to: adminEmail,
-      stats
-    });
-
-    await recordAuditLog({
-      userId: req.adminUser.id,
-      username: req.adminUser.username,
-      role: 'admin',
-      action: mailResult.sent ? 'MAIL_DIGEST_SENT' : 'MAIL_DIGEST_FAILED',
-      target: adminEmail,
-      details: `Sistem durum özeti: ${mailResult.status}${mailResult.error ? ' (' + mailResult.error + ')' : ''}`,
-      ip: req.ip
-    });
-
-    res.status(mailResult.sent ? 200 : 503).json({
-      success: mailResult.sent,
-      status: mailResult.status,
-      message: mailResult.sent ? 'Sistem özeti e-posta adresinize gönderildi.' : (mailResult.error || mailResult.reason || 'E-posta gönderilemedi (SMTP kapalı veya hatalı).'),
-      reason: mailResult.sent ? undefined : (mailResult.error || mailResult.reason || 'E-posta gönderilemedi (SMTP kapalı veya hatalı).')
-    });
-  } catch (err) {
-    res.status(503).json({ success: false, reason: err.message });
-  }
-});
+registerAdminMailRoutes(app, { adminRateLimiter, getLocalUsers, isValidEmail, mailer, readLocalReports, recordAuditLog, requireAdmin, supabase });
