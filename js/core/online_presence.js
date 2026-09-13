@@ -42,11 +42,7 @@
     } catch {}
   }
 
-  let ROOMS = [
-    { id: 'room_general', name: 'Genel Ekip Duyuruları', icon: '📢', desc: 'Tüm birimler ortak iletişim kanalı' },
-    { id: 'room_ops', name: 'Operasyon & Saha', icon: '⚙️', desc: 'Raporlama ve operasyon koordinasyonu' },
-    { id: 'room_finance', name: 'Muhasebe & Finans', icon: '📊', desc: 'Mali tablolar ve mutabakat' }
-  ];
+  let ROOMS = [];
 
   async function fetchDepartmentRooms() {
     try {
@@ -2804,7 +2800,9 @@
   window.FrpPresence = {
     heartbeat: sendHeartbeat,
     leave: sendOffline,
-    refresh: sendHeartbeat,
+    refresh: async () => {
+      await Promise.allSettled([fetchDepartmentRooms(), fetchChatGroups(), sendHeartbeat()]);
+    },
     setStatus: setMyCustomStatus,
     openChat: openChatWindow,
     openDock: () => {
