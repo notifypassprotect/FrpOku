@@ -1902,14 +1902,18 @@
 
 /* ── HIZLI YANIT ÇİPLERİ (QUICK REPLIES) ── */
 .frp-chat-quick-replies {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.32rem;
-  overflow: visible;
-  padding: 0.45rem 0.65rem;
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.48rem 0.65rem 0.55rem;
   background: var(--bg-surface, #ffffff);
   border-top: 1px solid var(--border-light, #e2e8f0);
   scrollbar-width: none;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
 }
 .frp-chat-quick-replies::-webkit-scrollbar {
   display: none;
@@ -1924,12 +1928,13 @@
   font-size: 0.7rem;
   font-weight: 600;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
   cursor: pointer;
   transition: all 0.15s ease;
-  min-width: 0;
-  width: 100%;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: max-content;
+  scroll-snap-align: start;
 }
 
 .frp-chat-quick-chip:hover {
