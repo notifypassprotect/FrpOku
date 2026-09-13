@@ -13,6 +13,8 @@ const { createSessionAuth } = require('./lib/session_auth');
 const { createStagingAccessMiddleware } = require('./lib/staging_access');
 const { validateEnvironment } = require('./lib/environment');
 const { createJsonStore } = require('./lib/json_store');
+const { protectInternalFiles, securityHeaders } = require('./server/middleware/security');
+const { registerSystemRoutes } = require('./server/routes/system');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -262,60 +264,8 @@ function plainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-// ── PENTESTING & GÜVENLİK HEADERLARI (Security Hardening & Mozilla Observatory A+) ─────
-app.use((req, res, next) => {
-  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-  res.setHeader('X-XSS-Protection', '1; mode=block');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=(self)');
-  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
-  res.setHeader(
-    'Content-Security-Policy',
-    "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-    "font-src 'self' https://fonts.gstatic.com data:; " +
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co; " +
-    "img-src 'self' data: blob: https:; " +
-    "media-src 'self' data: blob:; " +
-    "frame-src 'self' blob: data: https:; " +
-    "object-src 'self' blob: data:; " +
-    "base-uri 'self'; " +
-    "form-action 'self'; " +
-    "frame-ancestors 'self';"
-  );
-  next();
-});
-
-// ── HASSAS DOSYA VE DİZİN KORUMASI (Information Disclosure Protection) ─
-app.use((req, res, next) => {
-  try {
-    const normalizedPath = decodeURIComponent(req.path).replace(/\\/g, '/').toLowerCase();
-    const blockedPatterns = [
-      /^\/\.env/i,
-      /^\/data(\/|$)/i,
-      /^\/\.git(\/|$)/i,
-      /^\/\.vscode(\/|$)/i,
-      /^\/package(-lock)?\.json$/i,
-      /^\/server\.js$/i,
-      /\.bak$/i,
-      /\.tmp$/i,
-      /\.log$/i
-    ];
-
-    if (blockedPatterns.some(pattern => pattern.test(normalizedPath))) {
-      return res.status(403).json({
-        success: false,
-        reason: '403 Forbidden: Bu dosya veya dizine doğrudan erişim güvenlik politikası gereği engellenmiştir.'
-      });
-    }
-  } catch (err) {
-    return res.status(400).json({ success: false, reason: 'Geçersiz istek URL yolu.' });
-  }
-  next();
-});
+app.use(securityHeaders);
+app.use(protectInternalFiles);
 
 const authRateLimiter = createRateLimiter({ windowMs: 60000, max: 25, message: 'Giriş/Kayıt deneme sınırı aşıldı. Lütfen 1 dakika bekleyiniz.' });
 const adminRateLimiter = createRateLimiter({ windowMs: 60000, max: 60, message: 'Yönetim istek sınırı aşıldı.' });
@@ -330,84 +280,12 @@ app.use(createStagingAccessMiddleware());
 // deployment dosyaları statik olarak erişilebilir değildir.
 app.use('/css', express.static(path.join(__dirname, 'css')));
 app.use('/js', express.static(path.join(__dirname, 'js')));
-function setNoStoreHeaders(res) {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-}
-function sendScriptSafePage(res, page) {
-  setNoStoreHeaders(res);
-  res.setHeader(
-    'Content-Security-Policy',
-    "default-src 'self'; " +
-    "script-src 'self' https://cdn.jsdelivr.net; " +
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-    "font-src 'self' https://fonts.gstatic.com data:; " +
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co; " +
-    "img-src 'self' data: blob: https:; " +
-    "media-src 'self' data: blob:; " +
-    "frame-src 'self' blob: data: https:; " +
-    "object-src 'self' blob: data:; " +
-    "worker-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self';"
-  );
-  res.sendFile(path.join(__dirname, page));
-}
-function sendNoncePage(res, page) {
-  const nonce = crypto.randomBytes(18).toString('base64');
-  const filePath = path.join(__dirname, page);
-  fs.readFile(filePath, 'utf8', (error, source) => {
-    if (error) return res.status(500).send('Sayfa yüklenemedi.');
-    setNoStoreHeaders(res);
-    res.setHeader(
-      'Content-Security-Policy',
-      "default-src 'self'; " +
-      `script-src 'self' 'nonce-${nonce}' https://cdn.jsdelivr.net; ` +
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-      "font-src 'self' https://fonts.gstatic.com data:; " +
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co; " +
-      "img-src 'self' data: blob: https:; " +
-      "media-src 'self' data: blob:; " +
-      "frame-src 'self' blob: data: https:; " +
-      "object-src 'self' blob: data:; " +
-      "base-uri 'self'; form-action 'self'; frame-ancestors 'self';"
-    );
-    const html = source.replace(/<script(?![^>]*\bsrc=)([^>]*)>/gi, `<script nonce="${nonce}"$1>`);
-    res.type('html').send(html);
-  });
-}
-app.get('/', (req, res) => sendScriptSafePage(res, 'index.html'));
-app.get('/index.html', (req, res) => sendScriptSafePage(res, 'index.html'));
-app.get('/compare.html', (req, res) => sendScriptSafePage(res, 'compare.html'));
-app.get('/detail.html', (req, res) => sendScriptSafePage(res, 'detail.html'));
-app.get('/dashboard.html', (req, res) => sendNoncePage(res, 'dashboard.html'));
-
-app.get('/api/health', (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  res.json({
-    status: 'ok',
-    service: 'frpoku',
-    environment: APP_ENV,
-    timestamp: new Date().toISOString()
-  });
-});
-
-app.get('/runtime-config.js', (req, res) => {
-  res.type('application/javascript');
-  res.setHeader('Cache-Control', 'no-store');
-  const publicConfig = {
-    supabaseUrl: SUPABASE_URL || '',
-    supabaseAnonKey: BROWSER_SUPABASE_ENABLED ? SUPABASE_ANON_KEY : '',
-    environment: APP_ENV
-  };
-  res.send(`window.FRP_RUNTIME_CONFIG = ${JSON.stringify(publicConfig)};`);
-});
-
-// Config endpoint for client-side Supabase connection
-app.get('/api/config', (req, res) => {
-  res.json({
-    supabaseUrl: SUPABASE_URL || '',
-    supabaseAnonKey: BROWSER_SUPABASE_ENABLED ? SUPABASE_ANON_KEY : ''
-  });
+registerSystemRoutes(app, {
+  appEnvironment: APP_ENV,
+  browserSupabaseEnabled: BROWSER_SUPABASE_ENABLED,
+  publicRoot: __dirname,
+  supabaseAnonKey: SUPABASE_ANON_KEY,
+  supabaseUrl: SUPABASE_URL
 });
 
 // ── 1. YENİ KULLANICI KAYDI (Admin Onayına Gönderme) ─────────
