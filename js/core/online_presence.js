@@ -98,6 +98,29 @@
     hearts: ['❤️', '💙', '💚', '💛', '💜', '🖤', '✅', '❌', '⚠️', 'ℹ️', '🕒', '☕']
   };
 
+  const CHAT_ICONS = {
+    search: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>',
+    close: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>',
+    users: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"></path></svg>',
+    chat: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"></path></svg>',
+    megaphone: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 11 15-5v12L3 13zM11.6 16l1.4 5H7l-1.5-6"></path><path d="M21 10v4"></path></svg>',
+    nudge: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5a7 7 0 0 0 0 14M16 5a7 7 0 0 1 0 14M5 8a4 4 0 0 0 0 8M19 8a4 4 0 0 1 0 8"></path><rect x="9" y="4" width="6" height="16" rx="2"></rect></svg>',
+    folder: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>',
+    trash: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15M10 10v7M14 10v7"></path></svg>',
+    maximize: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"></path></svg>',
+    minimize: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path></svg>',
+    paperclip: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.4 11.6-8.9 8.9a6 6 0 0 1-8.5-8.5l9.6-9.6a4 4 0 0 1 5.7 5.7l-9.6 9.6a2 2 0 1 1-2.8-2.8l8.9-8.9"></path></svg>',
+    music: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l11-2v13M9 9l11-2"></path><circle cx="6" cy="18" r="3"></circle><circle cx="17" cy="16" r="3"></circle></svg>',
+    smile: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"></path></svg>',
+    mic: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"></rect><path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8"></path></svg>',
+    play: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7z"></path></svg>',
+    pause: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14"></path></svg>'
+  };
+
+  function chatIcon(name) {
+    return CHAT_ICONS[name] || '';
+  }
+
   // ── SES BİLDİRİMİ (WEB AUDIO API) ──
   function playNotificationChime() {
     try {
@@ -537,8 +560,8 @@
             <span id="frpPresenceHeaderCount" class="frp-presence-count-badge">0 Çevrimiçi</span>
           </div>
           <div class="frp-presence-header-actions">
-            <button type="button" id="btnPresenceSearchToggle" class="frp-presence-btn-icon" title="Kullanıcı, Grup veya Oda Ara">🔍</button>
-            <button type="button" id="btnPresenceClose" class="frp-presence-btn-icon" title="Kapat">✕</button>
+            <button type="button" id="btnPresenceSearchToggle" class="frp-presence-btn-icon" title="Kullanıcı, Grup veya Oda Ara" aria-label="Ara">${chatIcon('search')}</button>
+            <button type="button" id="btnPresenceClose" class="frp-presence-btn-icon" title="Kapat" aria-label="Kapat">${chatIcon('close')}</button>
           </div>
         </div>
 
@@ -571,9 +594,9 @@
 
         <!-- TABLAR (KİŞİLER / GRUPLARIM / ODALAR) -->
         <div class="frp-presence-tabs">
-          <button type="button" class="frp-presence-tab active" data-tab="users">👥 Kişiler</button>
-          <button type="button" class="frp-presence-tab" data-tab="groups">💬 Gruplarım</button>
-          ${isAdmin ? '<button type="button" class="frp-presence-tab" data-tab="rooms">📢 Odalar</button>' : ''}
+          <button type="button" class="frp-presence-tab active" data-tab="users">${chatIcon('users')} Kişiler</button>
+          <button type="button" class="frp-presence-tab" data-tab="groups">${chatIcon('chat')} Gruplarım</button>
+          ${isAdmin ? `<button type="button" class="frp-presence-tab" data-tab="rooms">${chatIcon('megaphone')} Odalar</button>` : ''}
         </div>
 
         <div id="frpPresenceFilters" class="frp-presence-filters" aria-label="Kişi listesi filtreleri">
@@ -1321,14 +1344,14 @@
           </div>
         </div>
         <div class="frp-chat-header-controls">
-          ${isGroup ? `<button type="button" class="frp-chat-btn-ctrl btn-group-info" title="Grup Bilgisi & Katılımcılar">👥</button>` : ''}
-          ${!isRoom ? `<button type="button" class="frp-chat-btn-ctrl btn-nudge" title="Titreşim Gönder (📳 MSN Titret)">📳</button>` : ''}
-          <button type="button" class="frp-chat-btn-ctrl btn-media-gallery" title="Paylaşılan Medya & Belgeler (İnovasyon)">📁</button>
-          <button type="button" class="frp-chat-btn-ctrl btn-search" title="Sohbette Ara">🔍</button>
-          ${(!isRoom && !isGroup) || isAdmin ? `<button type="button" class="frp-chat-btn-ctrl btn-clear-chat" title="Sohbeti Sil / Temizle" style="color:#ef4444;">🗑️</button>` : ''}
-          <button type="button" class="frp-chat-btn-ctrl btn-maximize" title="Ekranı Büyüt / Eski Boyut">⛶</button>
-          <button type="button" class="frp-chat-btn-ctrl btn-minimize" title="Simge Durumuna Küçült">─</button>
-          <button type="button" class="frp-chat-btn-ctrl btn-close" title="Kapat">✕</button>
+          ${isGroup ? `<button type="button" class="frp-chat-btn-ctrl btn-group-info" title="Grup Bilgisi & Katılımcılar" aria-label="Grup bilgisi">${chatIcon('users')}</button>` : ''}
+          ${!isRoom ? `<button type="button" class="frp-chat-btn-ctrl btn-nudge" title="Titreşim Gönder" aria-label="Titreşim gönder">${chatIcon('nudge')}</button>` : ''}
+          <button type="button" class="frp-chat-btn-ctrl btn-media-gallery" title="Paylaşılan Medya ve Belgeler" aria-label="Paylaşılan medya">${chatIcon('folder')}</button>
+          <button type="button" class="frp-chat-btn-ctrl btn-search" title="Sohbette Ara" aria-label="Sohbette ara">${chatIcon('search')}</button>
+          ${(!isRoom && !isGroup) || isAdmin ? `<button type="button" class="frp-chat-btn-ctrl btn-clear-chat" title="Sohbeti Sil / Temizle" aria-label="Sohbeti temizle" style="color:#ef4444;">${chatIcon('trash')}</button>` : ''}
+          <button type="button" class="frp-chat-btn-ctrl btn-maximize" title="Ekranı Büyüt / Eski Boyut" aria-label="Büyüt">${chatIcon('maximize')}</button>
+          <button type="button" class="frp-chat-btn-ctrl btn-minimize" title="Simge Durumuna Küçült" aria-label="Küçült">${chatIcon('minimize')}</button>
+          <button type="button" class="frp-chat-btn-ctrl btn-close" title="Kapat" aria-label="Kapat">${chatIcon('close')}</button>
         </div>
       </div>
 
@@ -1337,7 +1360,7 @@
         <div class="frp-group-info-drawer" id="frpGroupInfoDrawer">
           <div class="frp-group-info-header">
             <span class="frp-group-info-title">👥 Grup Detayı & Üyeler</span>
-            <button type="button" class="frp-chat-btn-ctrl btn-group-info-close">✕</button>
+            <button type="button" class="frp-chat-btn-ctrl btn-group-info-close" aria-label="Grup bilgisini kapat">${chatIcon('close')}</button>
           </div>
           <div style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:0.65rem;">
             <div style="background:var(--bg-card, #f8fafc); border:1px solid var(--border-light, #e2e8f0); border-radius:10px; padding:0.65rem; font-size:0.75rem;">
@@ -1359,7 +1382,7 @@
       <div class="frp-chat-media-drawer" style="display: none;">
         <div class="frp-chat-media-drawer-header">
           <span>📁 Paylaşılan Medya & Ekler</span>
-          <button type="button" class="frp-chat-btn-ctrl btn-media-close">✕</button>
+          <button type="button" class="frp-chat-btn-ctrl btn-media-close" aria-label="Medya bölümünü kapat">${chatIcon('close')}</button>
         </div>
         <div class="frp-chat-media-grid">
           <div style="grid-column: 1/-1; text-align:center; padding: 2rem; color: var(--text-muted); font-size: 0.78rem;">Yükleniyor...</div>
@@ -1369,7 +1392,7 @@
       <!-- SOHBET İÇİ ARAMA ÇUBUĞU -->
       <div class="frp-chat-search-bar" style="display: none;">
         <input type="text" class="frp-chat-search-input" placeholder="Bu sohbette ara..." />
-        <button type="button" class="frp-chat-search-close">✕</button>
+        <button type="button" class="frp-chat-search-close" aria-label="Aramayı kapat">${chatIcon('close')}</button>
       </div>
 
       <!-- MESAJ AKIŞI -->
@@ -1420,15 +1443,15 @@
           <div class="frp-chat-input-row">
             <input type="file" class="frp-chat-file-input" accept="image/*,application/pdf" style="display: none;" />
             <input type="file" class="frp-chat-audio-fallback" accept="audio/*" style="display: none;" />
-            <button type="button" class="frp-chat-btn-action btn-attach" title="Dosya veya Görsel Ekle">📎</button>
-            <button type="button" class="frp-chat-btn-action btn-audio-fallback" title="Ses Dosyası Yükle (.mp3, .wav, .m4a)">🎵</button>
-            <button type="button" class="frp-chat-btn-action btn-emoji-toggle" title="Emoji Ekle">😀</button>
+            <button type="button" class="frp-chat-btn-action btn-attach" title="Dosya veya Görsel Ekle" aria-label="Dosya ekle">${chatIcon('paperclip')}</button>
+            <button type="button" class="frp-chat-btn-action btn-audio-fallback" title="Ses Dosyası Yükle (.mp3, .wav, .m4a)" aria-label="Ses dosyası yükle">${chatIcon('music')}</button>
+            <button type="button" class="frp-chat-btn-action btn-emoji-toggle" title="Emoji Ekle" aria-label="Emoji ekle">${chatIcon('smile')}</button>
             <div class="frp-chat-composer-field">
               <textarea class="frp-chat-input" placeholder="Bir mesaj yazın..." maxlength="1000" rows="1" aria-label="Mesaj"></textarea>
               <span class="frp-chat-char-count" aria-live="polite">0/1000</span>
             </div>
-            <button type="button" class="frp-chat-btn-action btn-mic" title="Gerçek Ses Kaydı (Bas Konuş)">🎙️</button>
-            ${!isRoom ? '<button type="button" class="frp-chat-btn-action btn-nudge-action" title="Titreşim Gönder (📳 MSN Titret)">📳</button>' : ''}
+            <button type="button" class="frp-chat-btn-action btn-mic" title="Gerçek Ses Kaydı (Bas Konuş)" aria-label="Ses kaydet">${chatIcon('mic')}</button>
+            ${!isRoom ? `<button type="button" class="frp-chat-btn-action btn-nudge-action" title="Titreşim Gönder" aria-label="Titreşim gönder">${chatIcon('nudge')}</button>` : ''}
             <button type="button" class="frp-chat-send-btn" title="Gönder">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -2291,6 +2314,11 @@
       const track = audioPlayer.querySelector('.frp-audio-track');
       const fallbackDuration = (m.voice && m.voice.duration > 0) ? m.voice.duration : 10;
 
+      function setPlayIcon(isPlaying) {
+        btnPlay.innerHTML = chatIcon(isPlaying ? 'pause' : 'play');
+        btnPlay.setAttribute('aria-label', isPlaying ? 'Duraklat' : 'Oynat');
+      }
+
       function getEffectiveDuration() {
         return (isFinite(audioEl.duration) && audioEl.duration > 0) ? audioEl.duration : fallbackDuration;
       }
@@ -2300,7 +2328,7 @@
       const togglePlay = () => {
         if (standaloneAudio && !standaloneAudio.paused) {
           standaloneAudio.pause();
-          btnPlay.textContent = '▶️';
+          setPlayIcon(false);
           audioPlayer.classList.remove('playing');
           return;
         }
@@ -2311,7 +2339,7 @@
             const p = audioEl.play();
             if (p && typeof p.then === 'function') {
               p.then(() => {
-                btnPlay.textContent = '⏸️';
+                setPlayIcon(true);
                 audioPlayer.classList.add('playing');
               }).catch(err => {
                 console.warn('Audio play() hatası, doğrudan Audio nesnesi ile deneniyor:', err);
@@ -2332,34 +2360,34 @@
                       }
                     };
                     standaloneAudio.onended = () => {
-                      btnPlay.textContent = '▶️';
+                      setPlayIcon(false);
                       audioPlayer.classList.remove('playing');
                       progBar.style.width = '0%';
                     };
                   }
                   standaloneAudio.play().then(() => {
-                    btnPlay.textContent = '⏸️';
+                    setPlayIcon(true);
                     audioPlayer.classList.add('playing');
                   }).catch(() => {
-                    btnPlay.textContent = '▶️';
+                    setPlayIcon(false);
                     audioPlayer.classList.remove('playing');
                   });
                 } catch {
-                  btnPlay.textContent = '▶️';
+                  setPlayIcon(false);
                   audioPlayer.classList.remove('playing');
                 }
               });
             } else {
-              btnPlay.textContent = '⏸️';
+              setPlayIcon(true);
               audioPlayer.classList.add('playing');
             }
           } catch {
-            btnPlay.textContent = '▶️';
+            setPlayIcon(false);
             audioPlayer.classList.remove('playing');
           }
         } else {
           audioEl.pause();
-          btnPlay.textContent = '▶️';
+          setPlayIcon(false);
           audioPlayer.classList.remove('playing');
         }
       };
@@ -2397,7 +2425,7 @@
       });
 
       audioEl.addEventListener('ended', () => {
-        btnPlay.textContent = '▶️';
+        setPlayIcon(false);
         audioPlayer.classList.remove('playing');
         progBar.style.width = '0%';
         const dur = getEffectiveDuration();
@@ -2407,7 +2435,7 @@
       });
 
       audioEl.addEventListener('pause', () => {
-        btnPlay.textContent = '▶️';
+        setPlayIcon(false);
         audioPlayer.classList.remove('playing');
       });
     }
@@ -2473,7 +2501,7 @@
         const audioTitle = (m.voice ? '🎙️ Ses Kaydı' : `🎵 ${escHtml(m.attachment.name || 'Ses Dosyası')}`);
         contentHtml = `
           <div class="frp-chat-audio-player">
-            <button type="button" class="frp-audio-play-btn" title="Oynat / Durdur">▶️</button>
+            <button type="button" class="frp-audio-play-btn" title="Oynat / Durdur" aria-label="Oynat">${chatIcon('play')}</button>
             <div class="frp-audio-track" title="İleri / Geri Sar">
               <div class="frp-audio-progress-wrap">
                 <div class="frp-audio-progress-bar"></div>
@@ -2512,7 +2540,7 @@
           <button type="button" class="btn-react" data-emoji="😂">😂</button>
           <button type="button" class="btn-react" data-emoji="😮">😮</button>
           <button type="button" class="btn-react" data-emoji="🔥">🔥</button>
-          ${canDelete ? `<button type="button" class="btn-delete-msg" title="Mesajı Sil / Geri Al">🗑️</button>` : ''}
+          ${canDelete ? `<button type="button" class="btn-delete-msg" title="Mesajı Sil / Geri Al" aria-label="Mesajı sil">${chatIcon('trash')}</button>` : ''}
         </div>
       `;
 

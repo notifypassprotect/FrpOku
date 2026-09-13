@@ -185,6 +185,18 @@
   color: var(--text-primary, #0f172a);
 }
 
+.frp-ui-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
 /* ── KULLANICI KENDİ DURUM KARTI ── */
 .frp-presence-self-card {
   display: flex;
@@ -313,6 +325,11 @@
   color: #2563eb;
   background: var(--bg-surface, #ffffff);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.frp-presence-tab .frp-ui-icon {
+  width: 14px;
+  height: 14px;
 }
 
 /* ── SEARCH BAR ── */
@@ -1105,6 +1122,11 @@
   color: var(--text-primary, #0f172a);
 }
 
+.frp-chat-btn-ctrl .frp-ui-icon {
+  width: 16px;
+  height: 16px;
+}
+
 /* ── SOHBET İÇİ ARAMA ÇUBUĞU ── */
 .frp-chat-search-bar {
   display: flex;
@@ -1536,13 +1558,25 @@
   cursor: pointer;
   font-size: 1rem;
   color: var(--text-muted, #64748b);
-  padding: 0 3px;
+  width: 28px;
+  height: 34px;
+  padding: 0;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: transform 0.15s, color 0.15s;
 }
 
 .frp-chat-btn-action:hover {
+  background: color-mix(in srgb, var(--accent, #2563eb) 10%, transparent);
   color: var(--accent, #2563eb);
   transform: scale(1.15);
+}
+
+.frp-chat-btn-action .frp-ui-icon {
+  width: 18px;
+  height: 18px;
 }
 
 .frp-chat-input {
@@ -1671,6 +1705,11 @@
 
 .frp-audio-play-btn:hover {
   transform: scale(1.1);
+}
+
+.frp-audio-play-btn .frp-ui-icon {
+  width: 15px;
+  height: 15px;
 }
 
 .frp-audio-track {
