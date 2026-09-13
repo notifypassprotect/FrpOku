@@ -619,7 +619,61 @@ window.FrpListModals = window.FrpListModals || {};
     }
   };
 
-  // 5. Son İncelenen Raporlar Modalı
+  // 5. Mükerrer SQL Sorguları
+  window.FrpListModals.openDuplicateQueriesModal = async function() {
+    const files = FrpStore.getAll ? FrpStore.getAll() : [];
+    if (files.length > 0 && FrpStore.ensureFullReport) {
+      const missing = files.filter(file => !Array.isArray(file.queries) || file.queries.length === 0);
+      const batchSize = 25;
+      for (let i = 0; i < missing.length; i += batchSize) {
+        await Promise.all(missing.slice(i, i + batchSize).map(file => FrpStore.ensureFullReport(file.id).catch(() => null)));
+      }
+    }
+
+    const refreshedFiles = FrpStore.getAll ? FrpStore.getAll() : files;
+    const duplicates = window.FrpTableUsage?.findDuplicateQueries
+      ? window.FrpTableUsage.findDuplicateQueries(refreshedFiles)
+      : [];
+
+    if (duplicates.length === 0) {
+      window.toast?.('Farklı raporlar arasında birebir aynı SQL sorgusu bulunamadı.', 'info');
+      return;
+    }
+
+    const body = `
+      <div style="display:flex;flex-direction:column;gap:.65rem;max-height:68vh;overflow:auto;padding-right:.25rem;">
+        <div style="padding:.75rem .9rem;border:1px solid var(--border-light);border-radius:10px;background:var(--bg-raised);font-size:.8rem;color:var(--text-secondary);">
+          <strong>${duplicates.length}</strong> mükerrer sorgu eşleşmesi bulundu. Eşleşmeler yalnız farklı raporlar arasında gösterilir.
+        </div>
+        ${duplicates.map((pair, index) => `
+          <section style="border:1px solid var(--border-light);border-radius:12px;background:var(--bg-surface);padding:.85rem;display:grid;gap:.65rem;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;">
+              <strong style="font-size:.82rem;">Eşleşme ${index + 1}</strong>
+              <span class="badge badge-purple">Aynı SQL</span>
+            </div>
+            ${[pair.query1, pair.query2].map(query => `
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.65rem .75rem;border-radius:9px;background:var(--bg-raised);">
+                <div style="min-width:0;">
+                  <div style="font-weight:750;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(query.fileName)}</div>
+                  <div style="font-size:.72rem;color:var(--text-muted);font-family:var(--mono);">${escHtml(query.queryName || 'Adsız sorgu')}</div>
+                </div>
+                <button type="button" class="btn btn-sm btn-primary" data-list-action="open-detail" data-id="${encodeInlineArg(query.fileId)}">Detay</button>
+              </div>
+            `).join('')}
+          </section>
+        `).join('')}
+      </div>`;
+
+    await window.showModal?.({
+      title: `Mükerrer SQL Sorguları (${duplicates.length})`,
+      body,
+      confirmText: 'Kapat',
+      cancelText: '',
+      maxWidth: '780px'
+    });
+  };
+
+  // 6. Son İncelenen Raporlar Modalı
   window.FrpListModals.openRecentModal = async function() {
     const recent = FrpStore.getRecent ? FrpStore.getRecent() : [];
     if (!recent || recent.length === 0) {
@@ -807,6 +861,7 @@ window.FrpListModals = window.FrpListModals || {};
   window.openDependenciesModal = window.FrpListModals.openDependenciesModal;
   window.openComplexityCenter = window.FrpListModals.openComplexityCenter;
   window.openTableUsageModal = window.FrpListModals.openTableUsageModal;
+  window.openDuplicateQueriesModal = window.FrpListModals.openDuplicateQueriesModal;
   window.openRecentModal = window.FrpListModals.openRecentModal;
   window.openDownloadHistoryModal = window.FrpListModals.openDownloadHistoryModal;
   window.openReportNoteModal = window.FrpListModals.openReportNoteModal;

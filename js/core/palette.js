@@ -21,10 +21,10 @@
  { id: 'nav_compare', label: 'Karşılaştırma Ekranı', desc: 'İki raporu yan yana diff', action: () => { window.location.href = 'compare.html'; } },
 
  // Dosya İşlemleri
- { id: 'file_add', label: 'Rapor Ekle (.frp)', desc: 'Tek dosya yükle', action: () => { clickFirstAvailable('fileInputSingle', 'fileInputMulti'); } },
- { id: 'file_export_backup', label: 'Yedek Al (JSON)', desc: 'Tüm verileri yedekle', action: () => { document.getElementById('btnExportBackup')?.click(); } },
- { id: 'file_import_backup', label: 'Yedek Yükle (JSON)', desc: 'Yedeği geri yükle', action: () => { clickFirstAvailable('btnImportBackup', 'fileInputBackup'); } },
- { id: 'file_export_sqls', label: 'Tüm SQL\'leri İndir', desc: 'Toplu SQL export', action: () => { document.getElementById('btnExportAllSqls')?.click(); } },
+ { id: 'file_add', label: 'Rapor Ekle (.frp)', desc: 'Tek dosya yükle', available: () => Boolean(document.getElementById('fileInputSingle') || document.getElementById('fileInputMulti')), action: () => { clickFirstAvailable('fileInputSingle', 'fileInputMulti'); } },
+ { id: 'file_export_backup', label: 'Yedek Al (JSON)', desc: 'Tüm verileri yedekle', available: () => Boolean(document.getElementById('btnExportBackup')), action: () => { document.getElementById('btnExportBackup')?.click(); } },
+ { id: 'file_import_backup', label: 'Yedek Yükle (JSON)', desc: 'Yedeği geri yükle', available: () => Boolean(document.getElementById('btnImportBackup') || document.getElementById('fileInputBackup')), action: () => { clickFirstAvailable('btnImportBackup', 'fileInputBackup'); } },
+ { id: 'file_export_sqls', label: 'Tüm SQL\'leri İndir', desc: 'Toplu SQL export', available: () => Boolean(document.getElementById('btnExportAllSqls')), action: () => { document.getElementById('btnExportAllSqls')?.click(); } },
  { id: 'file_export_csv', label: 'CSV Dışa Aktar', desc: 'Sorguları CSV olarak indir', action: () => {
  if (!window.FrpStore) return;
  const csv = FrpStore.exportAllSqlsCsv();
@@ -37,22 +37,22 @@
  }},
 
  // Görünüm
- { id: 'view_table', label: 'Tablo Görünümü', desc: 'Liste görünüme geç', action: () => { window.setViewMode?.('table'); } },
- { id: 'view_cards', label: 'Kart Görünümü', desc: 'Kart/grid görünüme geç', action: () => { window.setViewMode?.('cards'); } },
- { id: 'view_timeline', label: 'Zaman Çizelgesi', desc: 'Timeline görünüme geç', action: () => { window.setViewMode?.('timeline'); } },
+ { id: 'view_table', label: 'Tablo Görünümü', desc: 'Liste görünüme geç', available: () => typeof window.setViewMode === 'function', action: () => { window.setViewMode?.('table'); } },
+ { id: 'view_cards', label: 'Kart Görünümü', desc: 'Kart/grid görünüme geç', available: () => typeof window.setViewMode === 'function', action: () => { window.setViewMode?.('cards'); } },
+ { id: 'view_timeline', label: 'Zaman Çizelgesi', desc: 'Timeline görünüme geç', available: () => typeof window.setViewMode === 'function', action: () => { window.setViewMode?.('timeline'); } },
  { id: 'view_theme', label: 'Tema Değiştir', desc: 'Koyu/Aydınlık tema', action: () => { document.getElementById('btnThemeToggle')?.click(); } },
 
  // Araçlar
- { id: 'tool_params', label: 'SQL Parametre Paneli', desc: 'Tüm parametreleri görüntüle', action: () => { if (!clickFirstAvailable('btnParams')) window.openParamsModal?.(); } },
- { id: 'tool_deps', label: 'Bağımlılık Haritası', desc: 'Tablo bağımlılıkları', action: () => { if (!clickFirstAvailable('btnDependencies')) window.openDependenciesModal?.(); } },
- { id: 'tool_snippets', label: 'Sorgu Kütüphanesi', desc: 'Kayıtlı SQL şablonları', action: () => { if (window.renderSnippetsModal) { window.renderSnippetsModal(); } else { document.getElementById('btnSnippets')?.click(); } } },
- { id: 'tool_dupes', label: 'Duplicate Sorgular', desc: 'Tekrarlayan SQL tespiti', action: () => { document.getElementById('btnFindDuplicates')?.click(); } },
- { id: 'tool_shortcuts',label: 'Klavye Kısayolları', desc: 'Kısayol tablosunu aç', action: () => { window.openSettingsModal?.('shortcuts'); } },
+ { id: 'tool_params', label: 'SQL Parametre Paneli', desc: 'Tüm parametreleri görüntüle', available: () => Boolean(document.getElementById('btnParams') || window.openParamsModal), action: () => { if (!clickFirstAvailable('btnParams')) window.openParamsModal?.(); } },
+ { id: 'tool_deps', label: 'Bağımlılık Haritası', desc: 'Tablo bağımlılıkları', available: () => Boolean(document.getElementById('btnDependencies') || window.openDependenciesModal), action: () => { if (!clickFirstAvailable('btnDependencies')) window.openDependenciesModal?.(); } },
+ { id: 'tool_snippets', label: 'Sorgu Kütüphanesi', desc: 'Kayıtlı SQL şablonları', available: () => Boolean(window.renderSnippetsModal || document.getElementById('btnSnippets')), action: () => { if (window.renderSnippetsModal) { window.renderSnippetsModal(); } else { document.getElementById('btnSnippets')?.click(); } } },
+ { id: 'tool_dupes', label: 'Mükerrer Sorgular', desc: 'Tekrarlayan SQL tespiti', available: () => typeof window.openDuplicateQueriesModal === 'function', action: () => { window.openDuplicateQueriesModal?.(); } },
+ { id: 'tool_shortcuts',label: 'Klavye Kısayolları', desc: 'Kısayol tablosunu aç', available: () => typeof window.openSettingsModal === 'function', action: () => { window.openSettingsModal?.('shortcuts'); } },
 
  // Filtreler
- { id: 'filter_favs', label: 'Sadece Favoriler', desc: 'Favori filtresi aç/kapat', action: () => { document.getElementById('btnFavOnly')?.click(); } },
- { id: 'filter_pinned', label: 'Sadece Sabitlenmiş', desc: 'Pin filtresi aç/kapat', action: () => { document.getElementById('btnPinnedOnly')?.click(); } },
- { id: 'filter_clear', label: 'Filtreyi Temizle', desc: 'Aramayı sıfırla', action: () => {
+ { id: 'filter_favs', label: 'Sadece Favoriler', desc: 'Favori filtresi aç/kapat', available: () => Boolean(document.getElementById('btnFavOnly')), action: () => { document.getElementById('btnFavOnly')?.click(); } },
+ { id: 'filter_pinned', label: 'Sadece Sabitlenmiş', desc: 'Pin filtresi aç/kapat', available: () => Boolean(document.getElementById('btnPinnedOnly')), action: () => { document.getElementById('btnPinnedOnly')?.click(); } },
+ { id: 'filter_clear', label: 'Filtreyi Temizle', desc: 'Aramayı sıfırla', available: () => Boolean(document.getElementById('searchInput')), action: () => {
  const si = document.getElementById('searchInput');
  if (si) { si.value = ''; si.dispatchEvent(new Event('input')); si.focus(); }
  }},
@@ -144,7 +144,7 @@
 
  function getAvailableCommands() {
  const isAdmin = window.FrpAuth? window.FrpAuth.isAdmin(): false;
- return COMMANDS.filter(cmd =>!cmd.adminOnly || isAdmin);
+ return COMMANDS.filter(cmd => (!cmd.adminOnly || isAdmin) && (!cmd.available || cmd.available()));
  }
 
  function renderList() {
