@@ -255,8 +255,10 @@
   function _queueReportSync(id) {
     if (!window.FrpCloud || typeof window.FrpCloud.saveReport !== 'function') return;
     const key = String(id);
+    const syncSessionIdentity = _sessionIdentity();
     const previous = _reportSyncChains.get(key) || Promise.resolve();
     const next = previous.catch(() => {}).then(async () => {
+      if (syncSessionIdentity !== _sessionIdentity()) return;
       const latest = _memoryStore.find(report => String(report.id) === key);
       if (!latest) {
         _pendingSyncIds.delete(key);
@@ -265,6 +267,7 @@
       }
       try {
         const saved = await window.FrpCloud.saveReport(latest);
+        if (syncSessionIdentity !== _sessionIdentity()) return;
         if (!saved) throw new Error('Bulut kaydı doğrulanamadı.');
         _applySavedVersion(key, saved.version);
         _pendingSyncIds.delete(key);
@@ -311,6 +314,8 @@
       .filter(report => _persistedReportHashes.get(String(report.id)) !== _reportHash(report))
       .map(report => String(report.id)) : [];
     _persistLocal(files);
+    changedIds.forEach(id => _pendingSyncIds.add(id));
+    if (changedIds.length > 0) _savePendingSyncIds();
     changedIds.forEach(_queueReportSync);
     return true;
   }
@@ -356,7 +361,7 @@
                 let item = cf;
 
                 if (_pendingSyncIds.has(cfId) && local) {
-                  if ((Number(local?.version) || 0) > (Number(cf?.version) || 0)) {
+                  if ((Number(local?.version) || 0) >= (Number(cf?.version) || 0)) {
                     item = local;
                   } else {
                     _pendingSyncIds.delete(cfId);
@@ -2212,9 +2217,35 @@
       }
 
       if (activeSettled.status === 'fulfilled' && Array.isArray(activeSettled.value)) {
-        const visible = _reportsVisibleToSession(activeSettled.value);
+        const localMap = new Map((_read() || []).map(report => [String(report.id), report]));
+        const userNotes = _getUserNotesMap();
+        const pinOverrides = _getUserPinOverrides();
+        const merged = activeSettled.value.map(cloudReport => {
+          const id = String(cloudReport.id);
+          const local = localMap.get(id);
+          let report = cloudReport;
+          if (_pendingSyncIds.has(id) && local) {
+            if ((Number(local.version) || 0) >= (Number(cloudReport.version) || 0)) report = local;
+            else {
+              _pendingSyncIds.delete(id);
+              _savePendingSyncIds();
+            }
+          }
+          if (userNotes[id]?.note && !String(report.userNote || '').trim()) {
+            report = { ...report, userNote: userNotes[id].note, user_note: userNotes[id].note };
+          }
+          if (pinOverrides[id] !== undefined) {
+            report = { ...report, isPinned: Boolean(pinOverrides[id]), is_pinned: Boolean(pinOverrides[id]) };
+          }
+          return report;
+        });
+        localMap.forEach((local, id) => {
+          if (_pendingSyncIds.has(id) && !merged.some(report => String(report.id) === id)) merged.push(local);
+        });
+        const visible = _reportsVisibleToSession(merged);
         _persistLocal(visible);
         _rememberPersisted(visible);
+        setTimeout(_flushPendingSync, 250);
         if (typeof window.refreshAll === 'function') window.refreshAll();
         window.dispatchEvent(new CustomEvent('frp:cloud-synced', { detail: { count: visible.length } }));
         return visible;

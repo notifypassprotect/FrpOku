@@ -1697,7 +1697,7 @@ async function getReportRecord(id) {
   }) || null;
 }
 
-const SUMMARY_SELECT_COLUMNS = 'id, name, file_size, category, tags, is_favorite, is_pinned, sql_count, memo_count, dataset_count, page_count, has_script, created_at, updated_at, user_note, is_deleted, deleted_at, user_id, meta:data->meta, data->isPublic, data->is_public, data->inPool, data->in_pool, data->ownerName, data->ownerUsername, data->ownerDepartment, data->sharedAt, data->version, data->noteHtml, data->attachments, tableNames:data->tableNames, queryNames:data->queryNames, paramNames:data->paramNames, datasets:data->datasets';
+const SUMMARY_SELECT_COLUMNS = 'id, name, file_size, category, tags, is_favorite, is_pinned, sql_count, memo_count, dataset_count, page_count, has_script, created_at, updated_at, user_note, note_html, note_attachments, is_deleted, deleted_at, user_id, is_public, owner_name, owner_username, owner_department, shared_at, version, meta:data->meta, tableNames:data->tableNames, queryNames:data->queryNames, paramNames:data->paramNames, datasets:data->datasets';
 
 async function loadVisibleReports(user, isDeleted, { summaryOnly = true } = {}) {
   if (supabase) {
@@ -1711,7 +1711,7 @@ async function loadVisibleReports(user, isDeleted, { summaryOnly = true } = {}) 
       if (user.role !== 'admin') {
         query = isDeleted
           ? query.eq('user_id', user.id)
-          : query.or(`user_id.eq.${user.id},data->>is_public.eq.true,data->>isPublic.eq.true,data->>in_pool.eq.true,data->>inPool.eq.true`);
+          : query.or(`user_id.eq.${user.id},is_public.eq.true`);
       }
       const { data, error } = await query.order('updated_at', { ascending: false }).range(from, from + step - 1);
       if (error) throw error;
@@ -1809,7 +1809,7 @@ app.put('/api/reports/:id', apiWriteRateLimiter, requireAuth, async (req, res) =
         saved = result.data?.[0];
       } else {
         let updateQuery = supabase.from('reports').update(dbRow).eq('id', id);
-        if (existing?.hasVersionColumn) updateQuery = updateQuery.eq('version', currentVersion);
+        updateQuery = updateQuery.eq('version', currentVersion);
         const result = await updateQuery.select('*').limit(1);
         if (result.error) throw result.error;
         if (!result.data?.length) {
@@ -2011,8 +2011,8 @@ app.patch('/api/reports/:id/trash', apiWriteRateLimiter, requireAuth, async (req
       const current = reportRowToClient(report);
       const data = { ...current, isDeleted, is_deleted: isDeleted, deletedAt, deleted_at: deletedAt, version: nextVersion };
       let updateQuery = supabase.from('reports')
-        .update({ is_deleted: isDeleted, deleted_at: deletedAt, data, updated_at: new Date().toISOString() })
-        .eq('id', String(req.params.id));
+        .update({ is_deleted: isDeleted, deleted_at: deletedAt, version: nextVersion, data, updated_at: new Date().toISOString() })
+        .eq('id', String(req.params.id)).eq('version', Number(report.version) || 1);
       const result = await updateQuery.select('*').limit(1);
       if (result.error) throw result.error;
       if (!result.data?.length) return res.status(409).json({ success: false, code: 'REPORT_CONFLICT', reason: 'Rapor aynı anda başka bir oturumda güncellendi.' });
@@ -2047,7 +2047,7 @@ app.post('/api/reports/toggle-pool', apiWriteRateLimiter, requireAuth, async (re
     if (supabase) {
       const current = reportRowToClient(report);
       const data = { ...current, isPublic, is_public: isPublic, inPool: isPublic, in_pool: isPublic, sharedAt, shared_at: sharedAt };
-      const { error } = await supabase.from('reports').update({ data, updated_at: new Date().toISOString() }).eq('id', reportIdValue);
+      const { error } = await supabase.from('reports').update({ is_public: isPublic, shared_at: sharedAt, data, updated_at: new Date().toISOString() }).eq('id', reportIdValue);
       if (error) throw error;
     } else {
       const reports = readLocalReports();
@@ -2085,7 +2085,7 @@ app.post('/api/reports/bulk-toggle-pool', apiWriteRateLimiter, requireAuth, asyn
       for (const report of reports) {
         const current = reportRowToClient(report);
         const data = { ...current, isPublic, is_public: isPublic, inPool: isPublic, in_pool: isPublic, sharedAt, shared_at: sharedAt };
-        const { error } = await supabase.from('reports').update({ data, updated_at: new Date().toISOString() }).eq('id', String(report.id));
+        const { error } = await supabase.from('reports').update({ is_public: isPublic, shared_at: sharedAt, data, updated_at: new Date().toISOString() }).eq('id', String(report.id));
         if (error) throw error;
       }
     } else {
