@@ -37,7 +37,7 @@ function registerAccountRecoveryRoutes(app, deps) {
       }
   
       if (!user) {
-        return res.status(404).json({ success: false, reason: 'Kullanıcı hesabı bulunamadı.' });
+        return res.status(400).json({ success: false, reason: 'Kurtarma bilgileri doğrulanamadı.' });
       }
   
       const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex');
@@ -45,7 +45,7 @@ function registerAccountRecoveryRoutes(app, deps) {
       const matchIdx = keysList.findIndex(k => k.keyHash === keyHash && !k.used);
   
       if (matchIdx === -1) {
-        return res.status(400).json({ success: false, reason: 'Geçersiz veya daha önce kullanılmış acil erişim anahtarı!' });
+        return res.status(400).json({ success: false, reason: 'Kurtarma bilgileri doğrulanamadı.' });
       }
   
       // Anahtarı kullanıldı olarak işaretle
@@ -140,12 +140,12 @@ function registerAccountRecoveryRoutes(app, deps) {
         user = localUsers.find(u => (u.username || '').toLowerCase() === ident || (u.email || '').toLowerCase() === ident);
       }
   
-      if (!user || !user.email) {
-        return res.status(400).json({
-          success: false,
-          reason: 'Bu hesap için tanımlı bir e-posta adresi bulunamadı. Lütfen sistem yöneticinizden şifrenizi sıfırlamasını talep ediniz veya acil kurtarma anahtarınızı kullanınız.'
-        });
-      }
+      const genericResetResponse = {
+        success: true,
+        message: 'Bilgiler kayıtlı bir hesapla eşleşiyorsa şifre sıfırlama kodu e-posta adresine gönderildi.',
+        expiresInMinutes: 15
+      };
+      if (!user || !user.email) return res.json(genericResetResponse);
   
       // 6 haneli rastgele kod oluştur (100000 - 999999)
       const code = crypto.randomInt(100000, 1000000).toString();
@@ -176,15 +176,14 @@ function registerAccountRecoveryRoutes(app, deps) {
         expiresIn: '15'
       });
   
-      res.json({
-        success: true,
-        message: `6 haneli şifre sıfırlama kodu ${maskEmailAddress(user.email)} adresine gönderildi.`,
-        maskedEmail: maskEmailAddress(user.email),
-        expiresInMinutes: 15
-      });
+      res.json(genericResetResponse);
     } catch (err) {
       console.error('Şifre sıfırlama kodu hatası:', safeLogStr(err.message));
-      res.status(500).json({ success: false, reason: 'Doğrulama kodu gönderilemedi. Lütfen daha sonra tekrar deneyiniz.' });
+      res.json({
+        success: true,
+        message: 'Bilgiler kayıtlı bir hesapla eşleşiyorsa şifre sıfırlama kodu e-posta adresine gönderildi.',
+        expiresInMinutes: 15
+      });
     }
   });
   
