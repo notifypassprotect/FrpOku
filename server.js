@@ -155,14 +155,6 @@ registerReportWriteRoute(app, { apiWriteRateLimiter, buildOwnedReportRow, canMan
 
 registerSettingsRoutes(app, { apiWriteRateLimiter, boundedSetting, plainObject, requireAuth, safeLogStr, settingsPath: path.join(__dirname, 'data', 'user_settings.json'), supabase });
 
-app.post('/api/store/save', apiWriteRateLimiter, requireAuth, async (req, res) => {
-  res.status(410).json({
-    success: false,
-    code: 'SNAPSHOT_SYNC_REMOVED',
-    reason: 'Toplu arşiv yazımı kaldırıldı. Raporları tekil endpoint üzerinden kaydedin.'
-  });
-});
-
 registerReportNoteRoutes(app, { apiWriteRateLimiter, attachmentsDir: path.join(__dirname, 'data', 'attachments'), canEditReportNote, canReadReport, getReportRecord, readLocalReports, recordAuditLog, reportId, reportRowToClient, requireAuth, safeLogStr, supabase, writeLocalReports });
 
 // ── ÇEVRİMİÇİ KULLANICI & VARLIK (PRESENCE) YÖNETİMİ ──────────
