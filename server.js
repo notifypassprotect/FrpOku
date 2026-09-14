@@ -39,6 +39,7 @@ const { registerAdminUserRoutes } = require('./server/routes/admin_users');
 const { registerAdminAccountRoutes } = require('./server/routes/admin_accounts');
 const { registerAccountPasswordRoute } = require('./server/routes/account_password');
 const { registerAccountProfileRoute } = require('./server/routes/account_profile');
+const { registerAccountEmailRoutes } = require('./server/routes/account_email');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1602,173 +1603,13 @@ registerChatRoomRoutes(app, { chatRoomFromRow, loadChatRooms, replaceChatRooms, 
 
 registerCatalogRoutes(app, { apiWriteRateLimiter, dataRoot: path.join(__dirname, 'data'), requireAuth, supabase });
 
+registerAccountEmailRoutes(app, { authRateLimiter, crypto, getLocalUsers, isValidEmail, loadUserById, mailer, normalizeEmail, pendingEmailVerifications, recordAuditLog, requireAuth, safeLogStr, saveLocalUsers, supabase, verifyPasswordHash });
+
 startServer(app, { ensureAdminUser, port: PORT, safeLogStr }).catch(error => {
   console.error('Sunucu başlatılamadı:', safeLogStr(error.message));
   process.exit(1);
 });
 
-
-// ── 10.6. E-POSTA DEĞİŞİKLİĞİ İÇİN 6 HANELİ DOĞRULAMA KODU GÖNDERME ─────────
-app.post('/api/auth/request-email-change', authRateLimiter, requireAuth, async (req, res) => {
-  const { newEmail, currentPassword } = req.body;
-  const cleanEmail = normalizeEmail(newEmail);
-  if (!cleanEmail || !isValidEmail(cleanEmail)) {
-    return res.status(400).json({ success: false, reason: 'Geçerli bir yeni e-posta adresi giriniz.' });
-  }
-
-  try {
-    const user = await loadUserById(req.authUser.id);
-    if (!user) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
-
-    if (!currentPassword) {
-      return res.status(400).json({ success: false, reason: 'Güvenliğiniz için lütfen mevcut şifrenizi giriniz.' });
-    }
-
-    const passCheck = await verifyPasswordHash(currentPassword, user.password_hash);
-    if (!passCheck.valid) {
-      return res.status(401).json({ success: false, reason: 'Mevcut şifreniz hatalıdır.' });
-    }
-
-    if (user.email && normalizeEmail(user.email) === cleanEmail) {
-      return res.status(400).json({ success: false, reason: 'Girdiğiniz adres zaten mevcut e-posta adresinizdir.' });
-    }
-
-    // Başka kullanıcıda kayıtlı mı kontrolü
-    if (supabase) {
-      const { data: existing, error } = await supabase.from('app_users').select('id').eq('email', cleanEmail).neq('id', user.id).limit(1);
-      if (error) throw error;
-      if (existing?.length) {
-        return res.status(409).json({ success: false, reason: 'Bu e-posta adresi başka bir kullanıcı tarafından kullanılmaktadır.' });
-      }
-    } else {
-      const local = getLocalUsers();
-      if (local.some(u => u.id !== user.id && normalizeEmail(u.email) === cleanEmail)) {
-        return res.status(409).json({ success: false, reason: 'Bu e-posta adresi başka bir kullanıcı tarafından kullanılmaktadır.' });
-      }
-    }
-
-    const code = crypto.randomInt(100000, 1000000).toString();
-    const expiresAt = Date.now() + 15 * 60 * 1000;
-
-    pendingEmailVerifications.set(user.id, {
-      userId: user.id,
-      code,
-      newEmail: cleanEmail,
-      oldEmail: user.email,
-      expiresAt
-    });
-
-    const mailResult = await mailer.sendEmailChangeCode({
-      to: cleanEmail,
-      fullName: user.full_name || user.username,
-      code,
-      expiresIn: '15'
-    });
-
-    if (!mailResult.sent) {
-      pendingEmailVerifications.delete(user.id);
-      await recordAuditLog({
-        userId: user.id,
-        username: user.username,
-        role: user.role,
-        action: 'EMAIL_CHANGE_CODE_FAILED',
-        target: cleanEmail,
-        details: `Doğrulama kodu gönderilemedi (Durum: ${mailResult.status})`,
-        ip: req.ip
-      });
-      return res.status(503).json({
-        success: false,
-        reason: mailResult.error || mailResult.reason || 'Doğrulama kodu e-posta adresine gönderilemedi.',
-        notification: { email: { sent: false, status: mailResult.status } }
-      });
-    }
-
-    await recordAuditLog({
-      userId: user.id,
-      username: user.username,
-      role: user.role,
-      action: 'EMAIL_CHANGE_CODE_REQUESTED',
-      target: cleanEmail,
-      details: `6 haneli doğrulama kodu gönderildi (Durum: ${mailResult.status})`,
-      ip: req.ip
-    });
-
-    res.json({
-      success: true,
-      message: `'${cleanEmail}' adresine 6 haneli güvenlik doğrulama kodu gönderildi.`,
-      notification: { email: { sent: mailResult.sent, status: mailResult.status } }
-    });
-  } catch (err) {
-    console.warn('E-posta kod talebi hatası:', safeLogStr(err.message));
-    res.status(503).json({ success: false, reason: 'E-posta doğrulama kodu gönderilemedi.' });
-  }
-});
-
-// ── 10.7. 6 HANELİ KOD İLE E-POSTA DEĞİŞİKLİĞİNİ ONAYLAMA ──────────────────
-app.post('/api/auth/confirm-email-change', authRateLimiter, requireAuth, async (req, res) => {
-  const { code } = req.body;
-  const userId = req.authUser.id;
-  const pending = pendingEmailVerifications.get(userId);
-
-  if (!pending || Date.now() > pending.expiresAt) {
-    pendingEmailVerifications.delete(userId);
-    return res.status(400).json({ success: false, reason: 'Doğrulama kodunun süresi dolmuş veya kod talep edilmemiş. Lütfen yeni kod isteyiniz.' });
-  }
-
-  if (String(code || '').trim() !== String(pending.code)) {
-    return res.status(400).json({ success: false, reason: 'Girdiğiniz doğrulama kodu hatalıdır.' });
-  }
-
-  const { newEmail, oldEmail } = pending;
-  try {
-    if (supabase) {
-      const existing = await supabase.from('app_users').select('id').eq('email', newEmail).neq('id', userId).limit(1);
-      if (existing.error) throw existing.error;
-      if (existing.data?.length) return res.status(409).json({ success: false, reason: 'Bu e-posta adresi başka bir kullanıcı tarafından kullanılmaktadır.' });
-      const { error } = await supabase.from('app_users').update({ email: newEmail }).eq('id', userId);
-      if (error) throw error;
-    } else {
-      const local = getLocalUsers();
-      if (local.some(u => String(u.id) !== String(userId) && normalizeEmail(u.email) === newEmail)) {
-        return res.status(409).json({ success: false, reason: 'Bu e-posta adresi başka bir kullanıcı tarafından kullanılmaktadır.' });
-      }
-      const idx = local.findIndex(u => u.id === userId);
-      if (idx === -1) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
-      local[idx].email = newEmail;
-      saveLocalUsers(local);
-    }
-    pendingEmailVerifications.delete(userId);
-
-    const noticeResult = await mailer.sendEmailChangedNotice({
-      to: oldEmail && oldEmail !== newEmail ? oldEmail : '',
-      fullName: req.authUser.full_name || req.authUser.username,
-      newEmail,
-      ip: req.ip
-    });
-
-    await recordAuditLog({
-      userId,
-      username: req.authUser.username,
-      role: req.authUser.role,
-      action: 'EMAIL_CHANGED',
-      target: newEmail,
-      details: `E-posta adresi '${oldEmail}' -> '${newEmail}' olarak doğrulandı ve güncellendi.`,
-      ip: req.ip
-    });
-
-    res.json({
-      success: true,
-      email: newEmail,
-      message: noticeResult.sent
-        ? 'E-posta adresiniz güncellendi; eski adresinize güvenlik bildirimi gönderildi.'
-        : 'E-posta adresiniz başarıyla güncellendi.',
-      notification: { email: { sent: noticeResult.sent, status: noticeResult.status } }
-    });
-  } catch (err) {
-    console.warn('E-posta onaylama hatası:', safeLogStr(err.message));
-    res.status(503).json({ success: false, reason: 'E-posta adresi güncellenirken sunucu hatası oluştu.' });
-  }
-});
 
 // ── ADMİN: KULLANICIYI KALICI SİL ──────────────────────────────────────────
 app.post('/api/admin/delete-user', adminRateLimiter, requireAdmin, async (req, res) => {
