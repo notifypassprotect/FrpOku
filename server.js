@@ -18,6 +18,7 @@ const { createAuthSecurity } = require('./server/services/auth_security');
 const { boundedSetting, plainObject, safeLogStr } = require('./server/services/value_utils');
 const { createUserService } = require('./server/services/user_service');
 const { createAuditService } = require('./server/services/audit_service');
+const { createReportService } = require('./server/services/report_service');
 const { configureHttpMiddleware } = require('./server/middleware/http');
 const { registerCatalogRoutes } = require('./server/routes/catalog');
 const { startServer } = require('./server/bootstrap');
@@ -130,6 +131,8 @@ registerAccountLoginRoutes(app, { PASSWORD_MAX_LENGTH, authRateLimiter, generate
 
 registerAccountRecoveryRoutes(app, { PASSWORD_MAX_LENGTH, authRateLimiter, crypto, getLocalUsers, hashPassword, isValidEmail, isValidUsername, loginFailures, mailer, normalizeEmail, normalizeUsername, recordAuditLog, safeLogStr, signToken, supabase, updateUserById });
 
+const { getReportRecord, loadVisibleReports, readLocalReports, writeLocalReports } = createReportService({ canReadReport, reportId, reportRowToClient, reportRowToSummaryClient, storePath: path.join(__dirname, 'data', 'store.json'), supabase });
+
 registerAdminUserOnboardingRoutes(app, { adminRateLimiter, getLocalUsers, mailer, recordAuditLog, requireAdmin, safeLogStr, supabase, updateUserById });
 
 // ── 6. ADMİN: KULLANICIYI REDDET VEYA SİL ────────────────────
@@ -141,81 +144,6 @@ registerAccountPasswordRoute(app, { PASSWORD_MAX_LENGTH, authRateLimiter, hashPa
 
 
 registerAuditRoutes(app, { adminRateLimiter, apiWriteRateLimiter, getAuditLogs, recordAuditLog, requireAdmin, requireAuth, safeLogStr, supabase });
-
-// ── RAPOR DEPOLAMA VE YÖNETİM ENDPOINTLERİ ──────────────────
-const REPORT_STORE_PATH = path.join(__dirname, 'data', 'store.json');
-const REPORT_STORE_TEMP_PATH = path.join(__dirname, 'data', 'store.json.tmp');
-
-function readLocalReports() {
-  if (!fs.existsSync(REPORT_STORE_PATH)) return [];
-  try {
-    const parsed = JSON.parse(fs.readFileSync(REPORT_STORE_PATH, 'utf8'));
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeLocalReports(reports) {
-  const dataDir = path.dirname(REPORT_STORE_PATH);
-  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-  fs.writeFileSync(REPORT_STORE_TEMP_PATH, JSON.stringify(reports, null, 2), 'utf8');
-  fs.renameSync(REPORT_STORE_TEMP_PATH, REPORT_STORE_PATH);
-}
-
-async function getReportRecord(id) {
-  const strId = String(id || '');
-  let decId = strId;
-  try { decId = decodeURIComponent(strId); } catch {}
-
-  if (supabase) {
-    const { data, error } = await supabase.from('reports').select('*').eq('id', strId).limit(1);
-    if (error) throw error;
-    if (data && data[0]) return data[0];
-    if (decId !== strId) {
-      const { data: d2, error: e2 } = await supabase.from('reports').select('*').eq('id', decId).limit(1);
-      if (!e2 && d2 && d2[0]) return d2[0];
-    }
-    return null;
-  }
-  return readLocalReports().find(report => {
-    const rId = reportId(report);
-    return rId === strId || rId === decId;
-  }) || null;
-}
-
-const SUMMARY_SELECT_COLUMNS = 'id, name, file_size, category, tags, is_favorite, is_pinned, sql_count, memo_count, dataset_count, page_count, has_script, created_at, updated_at, user_note, note_html, note_attachments, is_deleted, deleted_at, user_id, is_public, owner_name, owner_username, owner_department, shared_at, version, meta:data->meta, tableNames:data->tableNames, queryNames:data->queryNames, paramNames:data->paramNames, datasets:data->datasets';
-
-async function loadVisibleReports(user, isDeleted, { summaryOnly = true } = {}) {
-  if (supabase) {
-    let rows = [];
-    let from = 0;
-    const step = 1000;
-    const selectCols = summaryOnly ? SUMMARY_SELECT_COLUMNS : '*';
-
-    while (true) {
-      let query = supabase.from('reports').select(selectCols).eq('is_deleted', isDeleted);
-      if (user.role !== 'admin') {
-        query = isDeleted
-          ? query.eq('user_id', user.id)
-          : query.or(`user_id.eq.${user.id},is_public.eq.true`);
-      }
-      const { data, error } = await query.order('updated_at', { ascending: false }).range(from, from + step - 1);
-      if (error) throw error;
-      if (!data || data.length === 0) break;
-      rows.push(...data);
-      if (data.length < step) break;
-      from += step;
-    }
-    return summaryOnly ? rows.map(reportRowToSummaryClient) : rows.map(reportRowToClient);
-  }
-
-  const rawList = readLocalReports()
-    .filter(report => Boolean(report.isDeleted || report.is_deleted) === isDeleted && canReadReport(user, report))
-    .sort((left, right) => new Date(right.loadedAt || right.updated_at || 0) - new Date(left.loadedAt || left.updated_at || 0));
-
-  return summaryOnly ? rawList.map(reportRowToSummaryClient) : rawList.map(reportRowToClient);
-}
 
 registerReportReadRoutes(app, { canReadReport, getReportRecord, loadVisibleReports, reportRowToClient, requireAuth, safeLogStr });
 
