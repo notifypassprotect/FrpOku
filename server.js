@@ -818,7 +818,6 @@ registerAdminAccountRoutes(app, { PASSWORD_MAX_LENGTH, adminRateLimiter, getLoca
 
 registerAccountPasswordRoute(app, { PASSWORD_MAX_LENGTH, authRateLimiter, hashPassword, loadUserById, mailer, requireAuth, safeLogStr, signToken, updateUserById, verifyPasswordHash });
 
-registerAccountProfileRoute(app, { authRateLimiter, getLocalUsers, isValidText, isValidUsername, normalizeEmail, normalizePhone, normalizeText, normalizeUsername, requireAuth, safeLogStr, saveLocalUsers, saveUserAvatar, supabase });
 
 registerAuditRoutes(app, { adminRateLimiter, apiWriteRateLimiter, getAuditLogs, recordAuditLog, requireAdmin, requireAuth, safeLogStr, supabase });
 
@@ -1232,6 +1231,8 @@ app.get('/api/reports/:id/attachments/:filename', requireAuth, async (req, res) 
 const USER_AVATARS_FILE = path.join(__dirname, 'data', 'user_avatars.json');
 const avatarStore = createJsonStore(USER_AVATARS_FILE, { fallback: {}, label: 'Kullanıcı avatarı' });
 const { getAllUsersWithPresence, getUserAvatars, recordUserPresence, removeUserPresence, saveUserAvatar } = createPresenceService({ avatarStore, getLocalUsers, supabase });
+
+registerAccountProfileRoute(app, { authRateLimiter, getLocalUsers, isValidText, isValidUsername, normalizeEmail, normalizePhone, normalizeText, normalizeUsername, requireAuth, safeLogStr, saveLocalUsers, saveUserAvatar, supabase });
 
 // ── GERÇEK ZAMANLI SOHBET & MESAJLAŞMA SİSTEMİ ──────────────────
 const CHAT_STORE_PATH = path.join(__dirname, 'data', 'chat_messages.json');
