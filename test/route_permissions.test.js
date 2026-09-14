@@ -228,3 +228,54 @@ test('note endpoint does not expose internal database errors', async () => {
   assert.doesNotMatch(JSON.stringify(res.body), /secret_schema|relation reports/);
 });
 
+function registerAttachmentTestRoute() {
+  const registry = createApp();
+  registerReportNoteRoutes(registry.app, {
+    apiWriteRateLimiter: middleware,
+    attachmentsDir: path.join(os.tmpdir(), 'frpoku-upload-validation-test'),
+    canEditReportNote: () => true,
+    canReadReport: () => true,
+    getReportRecord: async () => ({ id: 'report-1' }),
+    readLocalReports: () => [],
+    recordAuditLog() {},
+    reportId: report => report.id,
+    reportRowToClient: report => report,
+    requireAuth: middleware,
+    safeLogStr: String,
+    sanitizeRichHtml: String,
+    supabase: null,
+    writeLocalReports() {}
+  });
+  return registry;
+}
+
+test('attachment upload rejects executable and active document types', async () => {
+  const { handler } = registerAttachmentTestRoute();
+  for (const item of [
+    { filename: 'payload.html', mimeType: 'text/html' },
+    { filename: 'payload.svg', mimeType: 'image/svg+xml' },
+    { filename: 'payload.exe', mimeType: 'application/x-msdownload' }
+  ]) {
+    const res = createResponse();
+    await handler('POST', '/api/reports/:id/attachments')({
+      params: { id: 'report-1' },
+      body: { ...item, base64Data: Buffer.from('payload').toString('base64') },
+      authUser: { id: 'owner' }
+    }, res);
+    assert.equal(res.statusCode, 400);
+    assert.match(res.body.reason, /dosya türünün/);
+  }
+});
+
+test('attachment upload rejects malformed base64 content', async () => {
+  const { handler } = registerAttachmentTestRoute();
+  const res = createResponse();
+  await handler('POST', '/api/reports/:id/attachments')({
+    params: { id: 'report-1' },
+    body: { filename: 'document.pdf', mimeType: 'application/pdf', base64Data: 'not-valid-base64!' },
+    authUser: { id: 'owner' }
+  }, res);
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.reason, /Base64/);
+});
+
