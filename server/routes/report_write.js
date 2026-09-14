@@ -67,6 +67,14 @@ function registerReportWriteRoute(app, deps) {
       res.status(503).json({ success: false, reason: 'Rapor geçici olarak kaydedilemedi.' });
     }
   });
+  app.post('/api/store/save', apiWriteRateLimiter, requireAuth, (req, res) => {
+    res.status(410).json({
+      success: false,
+      code: 'SNAPSHOT_SYNC_REMOVED',
+      reason: 'Toplu arşiv yazımı kaldırıldı. Raporları tekil endpoint üzerinden kaydedin.'
+    });
+  });
+
 }
 
 module.exports = { registerReportWriteRoute };
