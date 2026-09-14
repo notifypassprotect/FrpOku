@@ -43,6 +43,7 @@ const { registerAccountEmailRoutes } = require('./server/routes/account_email');
 const { registerAuditRoutes } = require('./server/routes/audit');
 const { registerReportReadRoutes } = require('./server/routes/report_read');
 const { registerReportLifecycleRoutes } = require('./server/routes/report_lifecycle');
+const { registerReportPoolRoutes } = require('./server/routes/report_pool');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -900,6 +901,8 @@ registerReportReadRoutes(app, { canReadReport, getReportRecord, loadVisibleRepor
 
 registerReportLifecycleRoutes(app, { apiWriteRateLimiter, canManageReport, getReportRecord, nextReportVersion, readLocalReports, reportId, reportRowToClient, requireAuth, supabase, writeLocalReports });
 
+registerReportPoolRoutes(app, { apiWriteRateLimiter, canManageReport, getReportRecord, readLocalReports, reportId, reportRowToClient, requireAuth, supabase, writeLocalReports });
+
 app.put('/api/reports/:id', apiWriteRateLimiter, requireAuth, async (req, res) => {
   const id = String(req.params.id || '');
   if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body) || String(req.body.id || '') !== id) {
@@ -1063,77 +1066,6 @@ app.post('/api/store/save', apiWriteRateLimiter, requireAuth, async (req, res) =
     code: 'SNAPSHOT_SYNC_REMOVED',
     reason: 'Toplu arşiv yazımı kaldırıldı. Raporları tekil endpoint üzerinden kaydedin.'
   });
-});
-
-app.post('/api/reports/toggle-pool', apiWriteRateLimiter, requireAuth, async (req, res) => {
-  const reportIdValue = String(req.body?.reportId || '');
-  if (!reportIdValue) return res.status(400).json({ success: false, reason: 'Rapor ID gerekli.' });
-
-  try {
-    const report = await getReportRecord(reportIdValue);
-    if (!report) return res.status(404).json({ success: false, reason: 'Rapor bulunamadı.' });
-    if (!canManageReport(req.authUser, report)) {
-      return res.status(403).json({ success: false, reason: 'Bu raporu havuzda değiştirme yetkiniz yok.' });
-    }
-
-    const isPublic = Boolean(req.body.makePublic);
-    const sharedAt = isPublic ? new Date().toISOString() : null;
-    if (supabase) {
-      const current = reportRowToClient(report);
-      const data = { ...current, isPublic, is_public: isPublic, inPool: isPublic, in_pool: isPublic, sharedAt, shared_at: sharedAt };
-      const { error } = await supabase.from('reports').update({ is_public: isPublic, shared_at: sharedAt, data, updated_at: new Date().toISOString() }).eq('id', reportIdValue);
-      if (error) throw error;
-    } else {
-      const reports = readLocalReports();
-      const index = reports.findIndex(item => reportId(item) === reportIdValue);
-      if (index === -1) return res.status(404).json({ success: false, reason: 'Rapor bulunamadı.' });
-      reports[index] = { ...reports[index], isPublic, is_public: isPublic, inPool: isPublic, in_pool: isPublic, sharedAt, shared_at: sharedAt };
-      writeLocalReports(reports);
-    }
-    res.json({ success: true, isPublic });
-  } catch (error) {
-    res.status(503).json({ success: false, reason: 'Ortak havuz durumu güncellenemedi.' });
-  }
-});
-
-app.post('/api/reports/bulk-toggle-pool', apiWriteRateLimiter, requireAuth, async (req, res) => {
-  const reportIds = Array.isArray(req.body?.reportIds) ? [...new Set(req.body.reportIds.map(String))] : [];
-  if (reportIds.length === 0 || reportIds.length > 100) {
-    return res.status(400).json({ success: false, reason: '1-100 arasında rapor ID değeri gereklidir.' });
-  }
-
-  try {
-    const reports = [];
-    for (const id of reportIds) {
-      const report = await getReportRecord(id);
-      if (!report) return res.status(404).json({ success: false, reason: 'Raporlardan biri bulunamadı.' });
-      if (!canManageReport(req.authUser, report)) {
-        return res.status(403).json({ success: false, reason: 'Raporlardan biri için yönetim yetkiniz yok.' });
-      }
-      reports.push(report);
-    }
-
-    const isPublic = Boolean(req.body.makePublic);
-    const sharedAt = isPublic ? new Date().toISOString() : null;
-    if (supabase) {
-      for (const report of reports) {
-        const current = reportRowToClient(report);
-        const data = { ...current, isPublic, is_public: isPublic, inPool: isPublic, in_pool: isPublic, sharedAt, shared_at: sharedAt };
-        const { error } = await supabase.from('reports').update({ is_public: isPublic, shared_at: sharedAt, data, updated_at: new Date().toISOString() }).eq('id', String(report.id));
-        if (error) throw error;
-      }
-    } else {
-      const localReports = readLocalReports();
-      const idSet = new Set(reportIds);
-      localReports.forEach((report, index) => {
-        if (idSet.has(reportId(report))) localReports[index] = { ...report, isPublic, is_public: isPublic, inPool: isPublic, in_pool: isPublic, sharedAt, shared_at: sharedAt };
-      });
-      writeLocalReports(localReports);
-    }
-    res.json({ success: true, count: reportIds.length, isPublic });
-  } catch (error) {
-    res.status(503).json({ success: false, reason: 'Ortak havuz durumu güncellenemedi.' });
-  }
 });
 
 // ── RAPOR ZENGİN NOTU & DOSYA EKLERİ (RICH NOTES & ATTACHMENTS) ─
