@@ -41,6 +41,7 @@ const { registerAccountPasswordRoute } = require('./server/routes/account_passwo
 const { registerAccountProfileRoute } = require('./server/routes/account_profile');
 const { registerAccountEmailRoutes } = require('./server/routes/account_email');
 const { registerAuditRoutes } = require('./server/routes/audit');
+const { registerReportReadRoutes } = require('./server/routes/report_read');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -894,42 +895,7 @@ async function loadVisibleReports(user, isDeleted, { summaryOnly = true } = {}) 
   return summaryOnly ? rawList.map(reportRowToSummaryClient) : rawList.map(reportRowToClient);
 }
 
-app.get('/api/store/load', requireAuth, async (req, res) => {
-  try {
-    res.json(await loadVisibleReports(req.authUser, false, { summaryOnly: true }));
-  } catch (error) {
-    console.warn('Raporlar yüklenemedi:', safeLogStr(error.message));
-    res.status(503).json({ success: false, reason: 'Rapor verileri geçici olarak yüklenemiyor.' });
-  }
-});
-
-app.get('/api/store/trash', requireAuth, async (req, res) => {
-  try {
-    res.json(await loadVisibleReports(req.authUser, true, { summaryOnly: true }));
-  } catch (error) {
-    console.warn('Çöp kutusu yüklenemedi:', safeLogStr(error.message));
-    res.status(503).json({ success: false, reason: 'Çöp kutusu geçici olarak yüklenemiyor.' });
-  }
-});
-
-app.get('/api/reports/:id', requireAuth, async (req, res) => {
-  const id = String(req.params.id || '').trim();
-  if (!id) return res.status(400).json({ success: false, reason: 'Rapor kimliği gereklidir.' });
-
-  try {
-    const existing = await getReportRecord(id);
-    if (!existing) {
-      return res.status(404).json({ success: false, reason: 'Rapor bulunamadı.' });
-    }
-    if (!canReadReport(req.authUser, existing)) {
-      return res.status(403).json({ success: false, reason: 'Bu rapora erişim yetkiniz yok.' });
-    }
-    res.json({ success: true, report: reportRowToClient(existing) });
-  } catch (error) {
-    console.warn('Rapor detayı getirilemedi:', safeLogStr(error.message));
-    res.status(503).json({ success: false, reason: 'Rapor detayı geçici olarak yüklenemiyor.' });
-  }
-});
+registerReportReadRoutes(app, { canReadReport, getReportRecord, loadVisibleReports, reportRowToClient, requireAuth, safeLogStr });
 
 app.put('/api/reports/:id', apiWriteRateLimiter, requireAuth, async (req, res) => {
   const id = String(req.params.id || '');
