@@ -4,6 +4,9 @@ const path = require('path');
 function registerReportNoteRoutes(app, deps) {
   const { apiWriteRateLimiter, attachmentsDir, canEditReportNote, canReadReport, getReportRecord, readLocalReports, recordAuditLog, reportId, reportRowToClient, requireAuth, safeLogStr, sanitizeRichHtml, supabase, writeLocalReports } = deps;
   const attachmentRoot = path.resolve(attachmentsDir);
+  const allowedExtensions = new Set(['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'txt', 'csv', 'xlsx', 'xls', 'docx', 'doc']);
+  const blockedMimeTypes = new Set(['text/html', 'image/svg+xml', 'application/javascript', 'text/javascript', 'application/x-httpd-php', 'application/x-msdownload']);
+
 
   function resolveAttachmentPath(...segments) {
     const resolved = path.resolve(attachmentRoot, ...segments.map(value => String(value)));
@@ -107,12 +110,22 @@ function registerReportNoteRoutes(app, deps) {
       }
 
       const baseName = path.basename(filename).replace(/[^a-zA-Z0-9.\-_ğüşıöçĞÜŞİÖÇ]/g, '_');
+      const extension = path.extname(baseName).slice(1).toLowerCase();
+      const normalizedMime = String(mimeType || '').split(';')[0].trim().toLowerCase();
+      if (!extension || !allowedExtensions.has(extension) || blockedMimeTypes.has(normalizedMime)) {
+        return res.status(400).json({ success: false, reason: 'Bu dosya türünün yüklenmesine izin verilmiyor.' });
+      }
       const safeName = Date.now() + '_' + baseName;
       const targetDir = resolveAttachmentPath(reportIdParam);
       if (!targetDir) return res.status(400).json({ success: false, reason: 'Geçersiz rapor kimliği.' });
       if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
 
-      const buffer = Buffer.from(base64Data.replace(/^data:[^;]+;base64,/, ''), 'base64');
+      const encodedData = String(base64Data).replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '');
+      if (!encodedData || encodedData.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(encodedData)) {
+        return res.status(400).json({ success: false, reason: 'Dosya içeriği geçerli Base64 biçiminde değil.' });
+      }
+      const buffer = Buffer.from(encodedData, 'base64');
+      if (buffer.length === 0) return res.status(400).json({ success: false, reason: 'Boş dosya yüklenemez.' });
       if (buffer.length > 15 * 1024 * 1024) {
         return res.status(400).json({ success: false, reason: 'Dosya boyutu 15 MB sınırını aşamaz.' });
       }
@@ -157,6 +170,7 @@ function registerReportNoteRoutes(app, deps) {
       }
 
       res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+      res.setHeader('Content-Type', 'application/octet-stream');
       res.setHeader('X-Content-Type-Options', 'nosniff');
       res.sendFile(filePath);
     } catch (err) {
