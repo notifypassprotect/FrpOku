@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 function registerReportNoteRoutes(app, deps) {
-  const { apiWriteRateLimiter, attachmentsDir, canEditReportNote, canReadReport, getReportRecord, readLocalReports, recordAuditLog, reportId, reportRowToClient, requireAuth, supabase, writeLocalReports } = deps;
+  const { apiWriteRateLimiter, attachmentsDir, canEditReportNote, canReadReport, getReportRecord, readLocalReports, recordAuditLog, reportId, reportRowToClient, requireAuth, safeLogStr, supabase, writeLocalReports } = deps;
   const attachmentRoot = path.resolve(attachmentsDir);
 
   function resolveAttachmentPath(...segments) {
