@@ -38,6 +38,7 @@ const { registerAdminMailRoutes } = require('./server/routes/admin_mail');
 const { registerAdminUserRoutes } = require('./server/routes/admin_users');
 const { registerAdminAccountRoutes } = require('./server/routes/admin_accounts');
 const { registerAccountPasswordRoute } = require('./server/routes/account_password');
+const { registerAccountProfileRoute } = require('./server/routes/account_profile');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -812,88 +813,7 @@ registerAdminAccountRoutes(app, { PASSWORD_MAX_LENGTH, adminRateLimiter, getLoca
 
 registerAccountPasswordRoute(app, { PASSWORD_MAX_LENGTH, authRateLimiter, hashPassword, loadUserById, mailer, requireAuth, safeLogStr, signToken, updateUserById, verifyPasswordHash });
 
-app.post('/api/auth/update-profile', authRateLimiter, requireAuth, async (req, res) => {
-  const { fullName, name, phone, department, email, username, emailChatDigest, email_chat_digest, avatar } = req.body;
-  const userId = req.authUser.id;
-
-  try {
-    const updates = {};
-    const targetName = fullName !== undefined ? fullName : name;
-    if (targetName !== undefined) {
-      if (!isValidText(targetName, { min: 2, max: 120 })) return res.status(400).json({ success: false, reason: 'Ad soyad 2-120 karakter arasında olmalıdır.' });
-      updates.full_name = normalizeText(targetName);
-    }
-    if (phone !== undefined) updates.phone = normalizePhone(phone);
-    if (department !== undefined) {
-      if (!isValidText(department, { min: 1, max: 120 })) return res.status(400).json({ success: false, reason: 'Bölüm 1-120 karakter arasında olmalıdır.' });
-      updates.department = normalizeText(department);
-    }
-    if (avatar !== undefined) {
-      if (typeof avatar === 'string' && avatar.length <= 600000) {
-        updates.avatar = avatar;
-        saveUserAvatar(userId, req.authUser.username, avatar);
-      }
-    }
-    if (email !== undefined) return res.status(409).json({ success: false, reason: 'E-posta adresi doğrulama kodu kullanılmadan değiştirilemez.' });
-    if (username !== undefined) {
-      const cleanUsername = normalizeUsername(username);
-      if (!isValidUsername(cleanUsername)) return res.status(400).json({ success: false, reason: 'Geçerli bir kullanıcı adı giriniz.' });
-      updates.username = cleanUsername;
-    }
-    if (emailChatDigest !== undefined || email_chat_digest !== undefined) {
-      updates.email_chat_digest = emailChatDigest !== undefined ? Boolean(emailChatDigest) : Boolean(email_chat_digest);
-    }
-    if (Object.keys(updates).length === 0) return res.status(400).json({ success: false, reason: 'Güncellenecek profil alanı bulunamadı.' });
-
-    if (supabase) {
-      if (updates.email) {
-        const result = await supabase.from('app_users').select('id').eq('email', updates.email).neq('id', userId).limit(1);
-        if (result.error) throw result.error;
-        if (result.data?.length) return res.status(409).json({ success: false, reason: 'Bu e-posta adresi zaten kullanımda.' });
-      }
-      if (updates.username) {
-        const result = await supabase.from('app_users').select('id').eq('username', updates.username).neq('id', userId).limit(1);
-        if (result.error) throw result.error;
-        if (result.data?.length) return res.status(409).json({ success: false, reason: 'Bu kullanıcı adı zaten kullanımda.' });
-      }
-      let updatePayload = { ...updates };
-      const { error } = await supabase.from('app_users').update(updatePayload).eq('id', userId);
-      if (error) {
-        let hasStripped = false;
-        if (String(error.message || '').includes('email_chat_digest')) {
-          delete updatePayload.email_chat_digest;
-          hasStripped = true;
-        }
-        if (String(error.message || '').includes('avatar')) {
-          delete updatePayload.avatar;
-          hasStripped = true;
-        }
-        if (hasStripped && Object.keys(updatePayload).length > 0) {
-          await supabase.from('app_users').update(updatePayload).eq('id', userId);
-        } else if (!hasStripped) {
-          throw error;
-        }
-      }
-    } else {
-      const localUsers = getLocalUsers();
-      if (updates.email && localUsers.some(user => user.id !== userId && normalizeEmail(user.email) === updates.email)) {
-        return res.status(409).json({ success: false, reason: 'Bu e-posta adresi zaten kullanımda.' });
-      }
-      if (updates.username && localUsers.some(user => user.id !== userId && normalizeUsername(user.username) === updates.username)) {
-        return res.status(409).json({ success: false, reason: 'Bu kullanıcı adı zaten kullanımda.' });
-      }
-      const idx = localUsers.findIndex(u => u.id === userId);
-      if (idx === -1) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
-      localUsers[idx] = { ...localUsers[idx], ...updates };
-      saveLocalUsers(localUsers);
-    }
-
-    res.json({ success: true, user: updates });
-  } catch (err) {
-    console.warn('Profil güncelleme hatası:', safeLogStr(err.message));
-    res.status(503).json({ success: false, reason: 'Profil geçici olarak güncellenemedi.' });
-  }
-});
+registerAccountProfileRoute(app, { authRateLimiter, getLocalUsers, isValidText, isValidUsername, normalizeEmail, normalizePhone, normalizeText, normalizeUsername, requireAuth, safeLogStr, saveLocalUsers, saveUserAvatar, supabase });
 
 // ── 10.5. KULLANICI ŞİFRE DOĞRULAMA (Kritik İşlem Güvenlik Onayı) ──
 app.post('/api/auth/verify-password', authRateLimiter, requireAuth, async (req, res) => {
