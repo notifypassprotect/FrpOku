@@ -54,4 +54,20 @@ test('security middleware applies browser hardening headers', () => {
   assert.match(res.headers['Strict-Transport-Security'], /max-age=31536000/);
   assert.match(res.headers['Content-Security-Policy'], /frame-ancestors 'self'/);
   assert.match(res.headers['Content-Security-Policy'], /base-uri 'self'/);
+  assert.match(res.headers['Content-Security-Policy'], /object-src 'none'/);
+  assert.doesNotMatch(res.headers['Content-Security-Policy'], /script-src[^;]*'unsafe-inline'/);
 });
+
+test('primary HTML pages contain no inline executable JavaScript', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  for (const page of ['index.html', 'detail.html', 'dashboard.html', 'compare.html']) {
+    const html = fs.readFileSync(path.join(__dirname, '..', page), 'utf8');
+    const inlineScripts = [...html.matchAll(/<script\b(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)]
+      .filter(match => match[1].trim());
+    assert.equal(inlineScripts.length, 0, `${page} must not contain inline scripts`);
+    assert.doesNotMatch(html, /\son[a-z]+\s*=/i, `${page} must not contain inline event handlers`);
+    assert.doesNotMatch(html, /javascript\s*:/i, `${page} must not contain javascript URLs`);
+  }
+});
+
