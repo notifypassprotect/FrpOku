@@ -38,6 +38,7 @@ const { registerAdminHealthRoute } = require('./server/routes/admin_health');
 const { registerAdminMailRoutes } = require('./server/routes/admin_mail');
 const { registerAdminUserRoutes } = require('./server/routes/admin_users');
 const { registerAdminUserOnboardingRoutes } = require('./server/routes/admin_user_onboarding');
+const { registerAdminUserStatusRoutes } = require('./server/routes/admin_user_status');
 const { registerAdminAccountRoutes } = require('./server/routes/admin_accounts');
 const { registerAccountPasswordRoute } = require('./server/routes/account_password');
 const { registerAccountProfileRoute } = require('./server/routes/account_profile');
@@ -254,96 +255,15 @@ registerCatalogRoutes(app, { apiWriteRateLimiter, dataRoot: path.join(__dirname,
 
 registerAccountEmailRoutes(app, { authRateLimiter, crypto, getLocalUsers, isValidEmail, loadUserById, mailer, normalizeEmail, pendingEmailVerifications, recordAuditLog, requireAuth, safeLogStr, saveLocalUsers, supabase, verifyPasswordHash });
 
-startServer(app, { ensureAdminUser, port: PORT, safeLogStr }).catch(error => {
-  console.error('Sunucu başlatılamadı:', safeLogStr(error.message));
-  process.exit(1);
-});
-
-
-// ── ADMİN: KULLANICIYI KALICI SİL ──────────────────────────────────────────
-app.post('/api/admin/delete-user', adminRateLimiter, requireAdmin, async (req, res) => {
-  const { userId } = req.body;
-  if (!userId) return res.status(400).json({ success: false, reason: 'Kullanıcı kimliği belirtilmedi.' });
-  if (String(userId) === String(req.adminUser.id)) {
-    return res.status(400).json({ success: false, reason: 'Kendi yönetici hesabınızı silemezsiniz.' });
-  }
-
-  try {
-    const userObj = await loadUserById(userId);
-    if (!userObj) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
-    const targetUsername = userObj.username || String(userId);
-
-    if (supabase) {
-      const reportDelete = await supabase.from('reports').delete().eq('user_id', String(userId));
-      if (reportDelete.error) console.warn('Kullanıcı raporları silme uyarısı:', reportDelete.error.message);
-      const userDelete = await supabase.from('app_users').delete().eq('id', String(userId));
-      if (userDelete.error) throw userDelete.error;
-    } else {
-      saveLocalUsers(getLocalUsers().filter(user => String(user.id) !== String(userId)));
-      writeLocalReports(readLocalReports().filter(report => String(report.user_id) !== String(userId)));
-    }
-
-    await recordAuditLog({
-      userId: req.adminUser.id,
-      username: req.adminUser.username,
-      role: 'admin',
-      action: 'USER_DELETE',
-      target: targetUsername,
-      details: `@${targetUsername} kullanıcısı ve kişisel kayıtları sistemden silindi.`,
-      ip: req.ip
-    });
-
-    res.json({ success: true, message: `@${targetUsername} kullanıcısı başarıyla silindi.` });
-  } catch (err) {
-    console.warn('Kullanıcı silme hatası:', safeLogStr(err.message));
-    res.status(503).json({ success: false, reason: 'Kullanıcı silme işlemi tamamlanamadı.' });
-  }
-});
-
-// ── ADMİN: HESAP DONDUR / AÇ (Freeze / Unfreeze) ───────────────────────────
-app.post('/api/admin/freeze-user', adminRateLimiter, requireAdmin, async (req, res) => {
-  const { userId, freeze = true } = req.body;
-  if (!userId) return res.status(400).json({ success: false, reason: 'Kullanıcı kimliği gerekli.' });
-  if (String(userId) === String(req.adminUser.id) && freeze) {
-    return res.status(400).json({ success: false, reason: 'Kendi yönetici hesabınızı donduramazsınız.' });
-  }
-
-  try {
-    const isFrozen = Boolean(freeze);
-    const updatedUser = await updateUserById(userId, {
-      is_frozen: isFrozen,
-      is_active: !isFrozen
-    });
-    if (!updatedUser) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
-
-    if (updatedUser.email) {
-      mailer.sendAccountStatusChanged({
-        to: updatedUser.email,
-        fullName: updatedUser.full_name || updatedUser.username,
-        username: updatedUser.username,
-        action: isFrozen ? 'frozen' : 'activated'
-      }).catch(() => {});
-    }
-
-    await recordAuditLog({
-      userId: req.adminUser.id,
-      username: req.adminUser.username,
-      role: 'admin',
-      action: isFrozen ? 'USER_FROZEN' : 'USER_UNFROZEN',
-      target: updatedUser.username,
-      details: `Hesap durumu: ${isFrozen ? 'donduruldu' : 'aktifleştirildi'}`,
-      ip: req.ip
-    });
-
-    res.json({ success: true, is_frozen: isFrozen, is_active: !isFrozen });
-  } catch (err) {
-    console.warn('Hesap dondurma hatası:', safeLogStr(err.message));
-    res.status(503).json({ success: false, reason: 'Hesap dondurma işlemi tamamlanamadı.' });
-  }
-});
+registerAdminUserStatusRoutes(app, { adminRateLimiter, getLocalUsers, loadUserById, mailer, readLocalReports, recordAuditLog, requireAdmin, safeLogStr, saveLocalUsers, supabase, updateUserById, writeLocalReports });
 
 // ── ADMİN: CANLI SİSTEM SAĞLIĞI & GECİKME MONİTÖRÜ ─────────────────────────
 registerAdminHealthRoute(app, { adminRateLimiter, getLocalUsers, mailer, requireAdmin, rootDirectory: __dirname, supabase });
 
 // ── ADMİN: SİSTEM & HAVUZ DURUM ÖZETİ E-POSTASI GÖNDERME ──────────────────
 registerAdminMailRoutes(app, { adminRateLimiter, getLocalUsers, isValidEmail, mailer, readLocalReports, recordAuditLog, requireAdmin, supabase });
+
+startServer(app, { ensureAdminUser, port: PORT, safeLogStr }).catch(error => {
+  console.error('Sunucu başlatılamadı:', safeLogStr(error.message));
+  process.exit(1);
+});
