@@ -104,13 +104,6 @@ function registerAccountRecoveryRoutes(app, deps) {
   // In-memory 6-haneli doğrulama kodu deposu
   const passwordResetVerificationCodes = new Map();
   
-  function maskEmailAddress(email) {
-    if (!email || !email.includes('@')) return 'e-posta adresinize';
-    const [local, domain] = email.split('@');
-    if (local.length <= 2) return `${local[0]}***@${domain}`;
-    return `${local.slice(0, 2)}***${local.slice(-1)}@${domain}`;
-  }
-  
   // ── 2.5. E-POSTA İLE DOĞRULAMA KODU GÖNDERME (Self-Service Forgot Password) ──
   app.post('/api/auth/forgot-password-code', authRateLimiter, async (req, res) => {
     const { identifier } = req.body || {};
