@@ -816,25 +816,6 @@ registerAccountPasswordRoute(app, { PASSWORD_MAX_LENGTH, authRateLimiter, hashPa
 
 registerAccountProfileRoute(app, { authRateLimiter, getLocalUsers, isValidText, isValidUsername, normalizeEmail, normalizePhone, normalizeText, normalizeUsername, requireAuth, safeLogStr, saveLocalUsers, saveUserAvatar, supabase });
 
-// ── 10.5. KULLANICI ŞİFRE DOĞRULAMA (Kritik İşlem Güvenlik Onayı) ──
-app.post('/api/auth/verify-password', authRateLimiter, requireAuth, async (req, res) => {
-  const { password } = req.body;
-  const userId = req.authUser.id;
-  if (!password || String(password).length > PASSWORD_MAX_LENGTH) return res.status(400).json({ success: false, verified: false, reason: 'Geçerli bir şifre giriniz.' });
-
-  try {
-    const user = await loadUserById(userId);
-    if (!user) {
-      return res.status(404).json({ success: false, verified: false, reason: 'Kullanıcı bulunamadı.' });
-    }
-
-    const verified = (await verifyPasswordHash(password, user.password_hash)).valid;
-    res.status(verified ? 200 : 401).json({ success: verified, verified, reason: verified ? undefined : 'Girdiğiniz şifre hatalı.' });
-  } catch (err) {
-    res.status(503).json({ success: false, verified: false, reason: 'Şifre doğrulama servisi geçici olarak kullanılamıyor.' });
-  }
-});
-
 // ── 10.6. DENETİM GÜNLÜĞÜ VE İSTEMCİ BİLGİ SERVİSLERİ ────────
 app.get('/api/client-ip', (req, res) => {
   const rawIp = req.ip || req.socket?.remoteAddress || '127.0.0.1';

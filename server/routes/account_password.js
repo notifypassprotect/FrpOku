@@ -25,6 +25,20 @@ function registerAccountPasswordRoute(app, deps) {
       res.status(503).json({ success: false, reason: 'Şifre geçici olarak güncellenemedi.' });
     }
   });
+
+  app.post('/api/auth/verify-password', authRateLimiter, requireAuth, async (req, res) => {
+    const { password } = req.body;
+    if (!password || String(password).length > PASSWORD_MAX_LENGTH) return res.status(400).json({ success: false, verified: false, reason: 'Geçerli bir şifre giriniz.' });
+    try {
+      const user = await loadUserById(req.authUser.id);
+      if (!user) return res.status(404).json({ success: false, verified: false, reason: 'Kullanıcı bulunamadı.' });
+      const verified = (await verifyPasswordHash(password, user.password_hash)).valid;
+      res.status(verified ? 200 : 401).json({ success: verified, verified, reason: verified ? undefined : 'Girdiğiniz şifre hatalı.' });
+    } catch (err) {
+      console.warn('Şifre doğrulama hatası:', safeLogStr(err.message));
+      res.status(503).json({ success: false, verified: false, reason: 'Şifre doğrulama servisi geçici olarak kullanılamıyor.' });
+    }
+  });
 }
 
 module.exports = { registerAccountPasswordRoute };
