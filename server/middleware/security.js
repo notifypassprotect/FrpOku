@@ -12,14 +12,14 @@ const BLOCKED_PATHS = [
 
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+  "script-src 'self' https://cdn.jsdelivr.net",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
   "img-src 'self' data: blob: https:",
   "media-src 'self' data: blob:",
   "frame-src 'self' blob: data: https:",
-  "object-src 'self' blob: data:",
+  "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'self'"
