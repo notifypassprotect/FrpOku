@@ -37,6 +37,7 @@ const { registerAdminHealthRoute } = require('./server/routes/admin_health');
 const { registerAdminMailRoutes } = require('./server/routes/admin_mail');
 const { registerAdminUserRoutes } = require('./server/routes/admin_users');
 const { registerAdminAccountRoutes } = require('./server/routes/admin_accounts');
+const { registerAccountPasswordRoute } = require('./server/routes/account_password');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -809,78 +810,7 @@ registerAdminUserRoutes(app, { adminRateLimiter, getLocalUsers, loadUserById, re
 
 registerAdminAccountRoutes(app, { PASSWORD_MAX_LENGTH, adminRateLimiter, getLocalUsers, hashPassword, isValidUsername, loginFailures, mailer, normalizeUsername, recordAuditLog, requireAdmin, safeLogStr, saveLocalUsers, supabase, updateUserById });
 
-// ── 10. KULLANICI PROFİL VE ŞİFRE GÜNCELLEME (Self) ───────────
-app.post('/api/auth/change-password', authRateLimiter, requireAuth, async (req, res) => {
-  const { oldPassword, newPassword } = req.body;
-  const userId = req.authUser.id;
-  if (!oldPassword || !newPassword) {
-    return res.status(400).json({ success: false, reason: 'Lütfen mevcut ve yeni şifrenizi giriniz.' });
-  }
-
-  if (newPassword.length < 6 || newPassword.length > PASSWORD_MAX_LENGTH) {
-    return res.status(400).json({ success: false, reason: `Yeni şifre en az 6, en fazla ${PASSWORD_MAX_LENGTH} karakter arasında olmalıdır.` });
-  }
-
-  try {
-    const user = await loadUserById(userId);
-    if (!user) return res.status(404).json({ success: false, reason: 'Kullanıcı hesabı bulunamadı.' });
-
-    const oldPasswordCheck = await verifyPasswordHash(oldPassword, user.password_hash);
-    if (!oldPasswordCheck.valid) {
-      return res.status(400).json({ success: false, reason: 'Mevcut şifrenizi hatalı girdiniz!' });
-    }
-
-    // Şifre Geçmişi Kontrolü: Mevcut şifre veya önceki 3 şifre ile aynı olamaz
-    const prevList = Array.isArray(user.previous_password_hashes) ? user.previous_password_hashes : [];
-    const hashesToCheck = [user.password_hash, ...prevList].filter(Boolean);
-    for (const h of hashesToCheck) {
-      const match = await verifyPasswordHash(newPassword, h);
-      if (match.valid) {
-        return res.status(400).json({
-          success: false,
-          reason: 'Yeni şifreniz, mevcut şifreniz veya daha önce kullandığınız son 3 şifrenizden biriyle aynı olamaz.'
-        });
-      }
-    }
-
-    const newHash = await hashPassword(newPassword);
-    const nowIso = new Date().toISOString();
-    const updatedPrevHashes = [user.password_hash, ...prevList].filter(Boolean).slice(0, 3);
-
-    await updateUserById(userId, {
-      password_hash: newHash,
-      password_changed_at: nowIso,
-      previous_password_hashes: updatedPrevHashes
-    });
-
-    const newToken = signToken({
-      id: user.id,
-      username: user.username,
-      role: user.role,
-      department: user.department,
-      iat: Date.now()
-    });
-
-    const mailResult = await mailer.sendPasswordChanged({
-      to: user.email,
-      fullName: user.full_name || user.username,
-      username: user.username,
-      ip: req.ip,
-      timestamp: nowIso
-    });
-    res.json({
-      success: true,
-      message: mailResult.sent
-        ? 'Şifreniz değiştirildi ve güvenlik bildirimi e-posta adresinize gönderildi.'
-        : 'Şifreniz değiştirildi; ancak güvenlik bildirimi gönderilemedi.',
-      token: newToken,
-      notification: { email: { sent: mailResult.sent, status: mailResult.status } }
-    });
-  } catch (err) {
-    console.warn('Şifre güncelleme hatası:', safeLogStr(err.message));
-    res.status(503).json({ success: false, reason: 'Şifre geçici olarak güncellenemedi.' });
-  }
-});
+registerAccountPasswordRoute(app, { PASSWORD_MAX_LENGTH, authRateLimiter, hashPassword, loadUserById, mailer, requireAuth, safeLogStr, signToken, updateUserById, verifyPasswordHash });
 
 app.post('/api/auth/update-profile', authRateLimiter, requireAuth, async (req, res) => {
   const { fullName, name, phone, department, email, username, emailChatDigest, email_chat_digest, avatar } = req.body;
