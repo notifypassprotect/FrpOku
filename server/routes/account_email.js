@@ -1,6 +1,10 @@
 function registerAccountEmailRoutes(app, deps) {
   const { authRateLimiter, crypto, getLocalUsers, isValidEmail, loadUserById, mailer, normalizeEmail, pendingEmailVerifications, recordAuditLog, requireAuth, safeLogStr, saveLocalUsers, supabase, verifyPasswordHash } = deps;
 
+  app.post('/api/auth/change-email', authRateLimiter, requireAuth, (req, res) => {
+    res.status(409).json({ success: false, reason: 'E-posta adresi yalnızca mevcut şifre ve 6 haneli doğrulama kodu ile güncellenebilir.' });
+  });
+
   app.post('/api/auth/request-email-change', authRateLimiter, requireAuth, async (req, res) => {
     const { newEmail, currentPassword } = req.body;
     const cleanEmail = normalizeEmail(newEmail);

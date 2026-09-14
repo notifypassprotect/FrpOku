@@ -819,11 +819,6 @@ registerAccountProfileRoute(app, { authRateLimiter, getLocalUsers, isValidText, 
 
 registerAuditRoutes(app, { adminRateLimiter, apiWriteRateLimiter, getAuditLogs, recordAuditLog, requireAdmin, requireAuth, safeLogStr, supabase });
 
-// ── 12. E-POSTA DEĞİŞTİRME ────────────────────────────────────
-app.post('/api/auth/change-email', authRateLimiter, requireAuth, (req, res) => {
-  res.status(409).json({ success: false, reason: 'E-posta adresi yalnızca mevcut şifre ve 6 haneli doğrulama kodu ile güncellenebilir.' });
-});
-
 // ── RAPOR DEPOLAMA VE YÖNETİM ENDPOINTLERİ ──────────────────
 const REPORT_STORE_PATH = path.join(__dirname, 'data', 'store.json');
 const REPORT_STORE_TEMP_PATH = path.join(__dirname, 'data', 'store.json.tmp');
