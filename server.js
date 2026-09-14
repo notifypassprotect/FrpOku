@@ -36,6 +36,7 @@ const { createChatEmailService } = require('./server/services/chat_email_service
 const { registerAdminHealthRoute } = require('./server/routes/admin_health');
 const { registerAdminMailRoutes } = require('./server/routes/admin_mail');
 const { registerAdminUserRoutes } = require('./server/routes/admin_users');
+const { registerAdminAccountRoutes } = require('./server/routes/admin_accounts');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -806,115 +807,7 @@ app.post('/api/admin/approve-user', adminRateLimiter, requireAdmin, async (req, 
 // ── 6. ADMİN: KULLANICIYI REDDET VEYA SİL ────────────────────
 registerAdminUserRoutes(app, { adminRateLimiter, getLocalUsers, loadUserById, readLocalReports, recordAuditLog, requireAdmin, safeLogStr, saveLocalUsers, supabase, updateUserById, writeLocalReports });
 
-// ── 9. ADMİN: DOĞRUDAN ŞİFRE SIFIRLAMA ────────────────────────
-async function handleAdminPasswordReset(req, res) {
-  const { userId, newPassword } = req.body;
-  if (!userId || !newPassword || newPassword.length < 6 || newPassword.length > PASSWORD_MAX_LENGTH) {
-    return res.status(400).json({ success: false, reason: `Lütfen 6-${PASSWORD_MAX_LENGTH} karakter arasında geçerli bir yeni şifre giriniz.` });
-  }
-
-  try {
-    const passwordHash = await hashPassword(newPassword);
-    const nowIso = new Date().toISOString();
-    const updatedUser = await updateUserById(userId, {
-      password_hash: passwordHash,
-      password_changed_at: nowIso
-    });
-    if (!updatedUser) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
-
-    // Kullanıcının varsa geçmiş hatalı denemelerden kaynaklı blokajını temizle:
-    const cleanU = (updatedUser.username || '').toLowerCase();
-    const cleanE = (updatedUser.email || '').toLowerCase();
-    for (const [key] of loginFailures.entries()) {
-      if (key.startsWith(cleanU + '_') || (cleanE && key.startsWith(cleanE + '_'))) {
-        loginFailures.delete(key);
-      }
-    }
-
-    const mailResult = await mailer.sendPasswordResetByAdmin({
-      to: updatedUser.email,
-      fullName: updatedUser.full_name || updatedUser.username,
-      username: updatedUser.username,
-      timestamp: nowIso
-    });
-
-    await recordAuditLog({
-      userId: req.adminUser.id,
-      username: req.adminUser.username,
-      role: 'admin',
-      action: 'USER_PASSWORD_RESET',
-      target: updatedUser.username,
-      details: `Yönetici tarafından parola sıfırlandı. Bildirim durumu: ${mailResult.status}`,
-      ip: req.ip
-    });
-
-    res.json({
-      success: true,
-      message: mailResult.sent
-        ? `"${updatedUser.full_name || updatedUser.username}" kullanıcısının şifresi güncellendi ve güvenlik bildirimi gönderildi.`
-        : `"${updatedUser.full_name || updatedUser.username}" kullanıcısının şifresi güncellendi; ancak güvenlik bildirimi gönderilemedi.`,
-      notification: { email: { sent: mailResult.sent, status: mailResult.status } }
-    });
-  } catch (err) {
-    console.warn('Yönetici parola sıfırlama hatası:', safeLogStr(err.message));
-    res.status(503).json({ success: false, reason: 'Kullanıcı şifresi geçici olarak güncellenemedi.' });
-  }
-}
-
-app.post('/api/admin/reset-password', adminRateLimiter, requireAdmin, handleAdminPasswordReset);
-app.post('/api/admin/reset-user-password', adminRateLimiter, requireAdmin, handleAdminPasswordReset);
-
-// ── 9.5. ADMİN: KULLANICI ADI GÜNCELLEME ──────────────────────
-async function handleAdminUsernameChange(req, res) {
-  const { userId, newUsername } = req.body;
-  const cleanUser = normalizeUsername(newUsername);
-  if (!userId || !isValidUsername(cleanUser)) {
-    return res.status(400).json({ success: false, reason: 'Kullanıcı ID ve 3-50 karakterlik geçerli bir kullanıcı adı gereklidir.' });
-  }
-
-  try {
-    let oldUsername = '';
-    if (supabase) {
-      const current = await supabase.from('app_users').select('id,username').eq('id', userId).limit(1);
-      if (current.error) throw current.error;
-      if (!current.data?.length) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
-      oldUsername = current.data[0].username || '';
-
-      const existing = await supabase.from('app_users').select('id').eq('username', cleanUser).neq('id', userId).limit(1);
-      if (existing.error) throw existing.error;
-      if (existing.data?.length) return res.status(409).json({ success: false, reason: `'${cleanUser}' kullanıcı adı zaten kullanımda.` });
-
-      const update = await supabase.from('app_users').update({ username: cleanUser }).eq('id', userId);
-      if (update.error) throw update.error;
-    } else {
-      const localUsers = getLocalUsers();
-      if (localUsers.some(u => u.id !== userId && normalizeUsername(u.username) === cleanUser)) {
-        return res.status(409).json({ success: false, reason: `'${cleanUser}' kullanıcı adı zaten kullanımda.` });
-      }
-      const idx = localUsers.findIndex(u => u.id === userId);
-      if (idx === -1) return res.status(404).json({ success: false, reason: 'Kullanıcı bulunamadı.' });
-      oldUsername = localUsers[idx].username || '';
-      localUsers[idx].username = cleanUser;
-      saveLocalUsers(localUsers);
-    }
-
-    await recordAuditLog({
-      userId: req.adminUser.id,
-      username: req.adminUser.username,
-      role: 'admin',
-      action: 'USER_UPDATE',
-      target: `@${cleanUser}`,
-      details: `Kullanıcı adı değiştirildi: @${oldUsername} -> @${cleanUser}`,
-      ip: req.ip
-    });
-    res.json({ success: true, message: 'Kullanıcı adı güncellendi.', username: cleanUser });
-  } catch (err) {
-    console.warn('Kullanıcı adı güncelleme hatası:', safeLogStr(err.message));
-    res.status(503).json({ success: false, reason: 'Kullanıcı adı geçici olarak güncellenemedi.' });
-  }
-}
-
-app.post('/api/admin/update-username', adminRateLimiter, requireAdmin, handleAdminUsernameChange);
+registerAdminAccountRoutes(app, { PASSWORD_MAX_LENGTH, adminRateLimiter, getLocalUsers, hashPassword, isValidUsername, loginFailures, mailer, normalizeUsername, recordAuditLog, requireAdmin, safeLogStr, saveLocalUsers, supabase, updateUserById });
 
 // ── 10. KULLANICI PROFİL VE ŞİFRE GÜNCELLEME (Self) ───────────
 app.post('/api/auth/change-password', authRateLimiter, requireAuth, async (req, res) => {
@@ -1158,9 +1051,6 @@ app.get('/api/admin/audit-logs', adminRateLimiter, requireAdmin, async (req, res
   }
   res.json({ success: true, logs: logs.slice(0, limit) });
 });
-
-// ── 11. ADMİN: KULLANICI ADI DEĞİŞTİRME ───────────────────────
-app.post('/api/admin/change-username', adminRateLimiter, requireAdmin, handleAdminUsernameChange);
 
 // ── 12. E-POSTA DEĞİŞTİRME ────────────────────────────────────
 app.post('/api/auth/change-email', authRateLimiter, requireAuth, (req, res) => {
