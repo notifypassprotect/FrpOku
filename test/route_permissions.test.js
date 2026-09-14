@@ -138,3 +138,69 @@ test('administrator cannot delete their own account', async () => {
   assert.equal(res.statusCode, 400);
   assert.match(res.body.reason, /Kendi yönetici hesabınızı silemezsiniz/);
 });
+
+test('bulk pool update enforces the 1-100 report limit', async () => {
+  const { app, handler } = createApp();
+  registerReportPoolRoutes(app, {
+    apiWriteRateLimiter: middleware,
+    canManageReport: () => true,
+    getReportRecord: async id => ({ id }),
+    readLocalReports: () => [],
+    reportId: report => report.id,
+    reportRowToClient: report => report,
+    requireAuth: middleware,
+    supabase: null,
+    writeLocalReports() {}
+  });
+  for (const reportIds of [[], Array.from({ length: 101 }, (_, index) => `report-${index}`)]) {
+    const res = createResponse();
+    await handler('POST', '/api/reports/bulk-toggle-pool')({ body: { reportIds }, authUser: { id: 'owner' } }, res);
+    assert.equal(res.statusCode, 400);
+    assert.match(res.body.reason, /1-100/);
+  }
+});
+
+test('report note update rejects users without note permission', async () => {
+  const { app, handler } = createApp();
+  registerReportNoteRoutes(app, {
+    apiWriteRateLimiter: middleware,
+    attachmentsDir: path.join(os.tmpdir(), 'frpoku-note-permission-test'),
+    canEditReportNote: () => false,
+    canReadReport: () => true,
+    getReportRecord: async () => ({ id: 'report-1' }),
+    readLocalReports: () => [],
+    recordAuditLog() {},
+    reportId: report => report.id,
+    reportRowToClient: report => report,
+    requireAuth: middleware,
+    safeLogStr: String,
+    supabase: null,
+    writeLocalReports() {}
+  });
+  const res = createResponse();
+  await handler('PATCH', '/api/reports/:id/note')({ params: { id: 'report-1' }, body: {}, authUser: { id: 'other' } }, res);
+  assert.equal(res.statusCode, 403);
+});
+
+test('administrator cannot freeze their own account', async () => {
+  const { app, handler } = createApp();
+  registerAdminUserStatusRoutes(app, {
+    adminRateLimiter: middleware,
+    getLocalUsers: () => [],
+    loadUserById: async () => null,
+    mailer: {},
+    readLocalReports: () => [],
+    recordAuditLog() {},
+    requireAdmin: middleware,
+    safeLogStr: String,
+    saveLocalUsers() {},
+    supabase: null,
+    updateUserById: async () => null,
+    writeLocalReports() {}
+  });
+  const res = createResponse();
+  await handler('POST', '/api/admin/freeze-user')({ body: { userId: 'admin-1', freeze: true }, adminUser: { id: 'admin-1' } }, res);
+  assert.equal(res.statusCode, 400);
+  assert.match(res.body.reason, /Kendi yönetici hesabınızı donduramazsınız/);
+});
+
