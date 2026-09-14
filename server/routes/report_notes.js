@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 function registerReportNoteRoutes(app, deps) {
-  const { apiWriteRateLimiter, attachmentsDir, canEditReportNote, canReadReport, getReportRecord, readLocalReports, recordAuditLog, reportId, reportRowToClient, requireAuth, safeLogStr, supabase, writeLocalReports } = deps;
+  const { apiWriteRateLimiter, attachmentsDir, canEditReportNote, canReadReport, getReportRecord, readLocalReports, recordAuditLog, reportId, reportRowToClient, requireAuth, safeLogStr, sanitizeRichHtml, supabase, writeLocalReports } = deps;
   const attachmentRoot = path.resolve(attachmentsDir);
 
   function resolveAttachmentPath(...segments) {
@@ -23,7 +23,7 @@ function registerReportNoteRoutes(app, deps) {
 
       const { userNote, noteHtml, attachments } = req.body || {};
       const cleanNote = String(userNote || '').slice(0, 500000);
-      const cleanHtml = String(noteHtml || '').slice(0, 500000);
+      const cleanHtml = sanitizeRichHtml(noteHtml, 500000);
       const cleanAttachments = Array.isArray(attachments) ? attachments.slice(0, 50) : (existing.data?.attachments || []);
 
       const now = new Date().toISOString();
