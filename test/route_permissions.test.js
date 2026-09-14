@@ -204,3 +204,27 @@ test('administrator cannot freeze their own account', async () => {
   assert.match(res.body.reason, /Kendi yönetici hesabınızı donduramazsınız/);
 });
 
+test('note endpoint does not expose internal database errors', async () => {
+  const { app, handler } = createApp();
+  registerReportNoteRoutes(app, {
+    apiWriteRateLimiter: middleware,
+    attachmentsDir: path.join(os.tmpdir(), 'frpoku-error-isolation-test'),
+    canEditReportNote: () => true,
+    canReadReport: () => true,
+    getReportRecord: async () => { throw new Error('relation reports secret_schema does not exist'); },
+    readLocalReports: () => [],
+    recordAuditLog() {},
+    reportId: report => report.id,
+    reportRowToClient: report => report,
+    requireAuth: middleware,
+    safeLogStr: String,
+    sanitizeRichHtml: String,
+    supabase: null,
+    writeLocalReports() {}
+  });
+  const res = createResponse();
+  await handler('PATCH', '/api/reports/:id/note')({ params: { id: 'report-1' }, body: {}, authUser: { id: 'owner' } }, res);
+  assert.equal(res.statusCode, 500);
+  assert.doesNotMatch(JSON.stringify(res.body), /secret_schema|relation reports/);
+});
+
