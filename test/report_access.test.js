@@ -108,3 +108,9 @@ test('reportRowToClient kolonu olmayan is_public ve version alanlarını data i�
   assert.equal(clientObj.ownerName, 'Ali Veli');
   assert.equal(clientObj.version, 5);
 });
+
+test('sahipsiz raporları yalnızca admin yönetebilir', () => {
+  const report = { id: 'legacy_report', is_public: true };
+  assert.equal(canManageReport(other, report), false);
+  assert.equal(canManageReport({ ...other, role: 'admin' }, report), true);
+});
