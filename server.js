@@ -40,6 +40,7 @@ const { registerAdminAccountRoutes } = require('./server/routes/admin_accounts')
 const { registerAccountPasswordRoute } = require('./server/routes/account_password');
 const { registerAccountProfileRoute } = require('./server/routes/account_profile');
 const { registerAccountEmailRoutes } = require('./server/routes/account_email');
+const { registerAuditRoutes } = require('./server/routes/audit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -816,73 +817,7 @@ registerAccountPasswordRoute(app, { PASSWORD_MAX_LENGTH, authRateLimiter, hashPa
 
 registerAccountProfileRoute(app, { authRateLimiter, getLocalUsers, isValidText, isValidUsername, normalizeEmail, normalizePhone, normalizeText, normalizeUsername, requireAuth, safeLogStr, saveLocalUsers, saveUserAvatar, supabase });
 
-// ── 10.6. DENETİM GÜNLÜĞÜ VE İSTEMCİ BİLGİ SERVİSLERİ ────────
-app.get('/api/client-ip', (req, res) => {
-  const rawIp = req.ip || req.socket?.remoteAddress || '127.0.0.1';
-  const ip = rawIp === '::1' || rawIp === '::ffff:127.0.0.1' ? '127.0.0.1' : rawIp;
-  res.json({ success: true, ip });
-});
-
-app.post('/api/audit-log', apiWriteRateLimiter, requireAuth, async (req, res) => {
-  const { action, target, details } = req.body;
-  const cleanAction = String(action || '').trim().toUpperCase().slice(0, 80);
-  if (!/^[A-Z0-9_:-]{2,80}$/.test(cleanAction)) return res.status(400).json({ success: false, reason: 'Geçersiz audit işlem kodu.' });
-  const rawIp = req.ip || req.socket?.remoteAddress || '127.0.0.1';
-  const ip = rawIp === '::1' || rawIp === '::ffff:127.0.0.1' ? '127.0.0.1' : rawIp;
-  const entry = await recordAuditLog({
-    userId: req.authUser.id,
-    username: req.authUser.username,
-    fullName: req.authUser.full_name,
-    role: req.authUser.role,
-    action: cleanAction,
-    target: String(target || '').slice(0, 300),
-    details: String(details || '').slice(0, 2000),
-    ip
-  });
-  if (!entry) return res.status(503).json({ success: false, reason: 'Denetim kaydı geçici olarak yazılamadı.' });
-  res.json({ success: true, log: entry });
-});
-
-app.get('/api/admin/audit-logs', adminRateLimiter, requireAdmin, async (req, res) => {
-  const q = String(req.query.q || '').trim().toLowerCase().slice(0, 200);
-  const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit, 10) || 500));
-  let logs;
-  if (supabase) {
-    const { data, error } = await supabase
-      .from('audit_logs')
-      .select('id, occurred_at, user_id, username, full_name, role, action, target, details, ip')
-      .order('occurred_at', { ascending: false })
-      .limit(q ? 1000 : limit);
-    if (error) {
-      console.warn('Audit log listesi alınamadı:', safeLogStr(error.message));
-      return res.status(503).json({ success: false, reason: 'Denetim kayıtları geçici olarak alınamıyor.' });
-    }
-    logs = (data || []).map(row => ({
-      id: row.id,
-      timestamp: row.occurred_at,
-      userId: row.user_id,
-      username: row.username,
-      fullName: row.full_name,
-      role: row.role,
-      action: row.action,
-      target: row.target,
-      details: row.details,
-      ip: row.ip
-    }));
-  } else {
-    logs = getAuditLogs();
-  }
-  if (q) {
-    logs = logs.filter(l =>
-      (l.username || '').toLowerCase().includes(q) ||
-      (l.action || '').toLowerCase().includes(q) ||
-      (l.target || '').toLowerCase().includes(q) ||
-      (l.details || '').toLowerCase().includes(q) ||
-      (l.ip || '').includes(q)
-    );
-  }
-  res.json({ success: true, logs: logs.slice(0, limit) });
-});
+registerAuditRoutes(app, { adminRateLimiter, apiWriteRateLimiter, getAuditLogs, recordAuditLog, requireAdmin, requireAuth, safeLogStr, supabase });
 
 // ── 12. E-POSTA DEĞİŞTİRME ────────────────────────────────────
 app.post('/api/auth/change-email', authRateLimiter, requireAuth, (req, res) => {
