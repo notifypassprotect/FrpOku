@@ -9,6 +9,22 @@
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  function sanitizeRichHtml(html) {
+    const template = document.createElement('template');
+    template.innerHTML = String(html || '');
+    template.content.querySelectorAll('script,style,iframe,object,embed,link,meta,base,form,svg,math').forEach(node => node.remove());
+    template.content.querySelectorAll('*').forEach(node => {
+      for (const attr of [...node.attributes]) {
+        const name = attr.name.toLowerCase();
+        const value = attr.value.replace(/[\u0000-\u0020\u007f-\u009f]/g, '').toLowerCase();
+        if (name.startsWith('on') || ['srcdoc', 'xmlns', 'formaction'].includes(name)) node.removeAttribute(attr.name);
+        else if (['href', 'src', 'xlink:href', 'action'].includes(name) && /^(javascript|vbscript|data:text\/html):/.test(value)) node.removeAttribute(attr.name);
+        else if (name === 'style' && /(expression\s*\(|url\s*\(|behavior\s*:|@import|-moz-binding)/i.test(attr.value)) node.removeAttribute(attr.name);
+      }
+    });
+    return template.innerHTML;
+  }
+
   function formatFileSize(bytes) {
     if (!bytes || isNaN(bytes)) return '0 B';
     const units = ['B', 'KB', 'MB', 'GB'];
@@ -644,7 +660,7 @@
     if (!file) return;
 
     const reportName = file.meta?.reportName || file.name || 'Rapor';
-    let currentNoteHtml = file.noteHtml || file.note_html || '';
+    let currentNoteHtml = sanitizeRichHtml(file.noteHtml || file.note_html || '');
     let currentNoteText = file.userNote || file.user_note || '';
     if (!currentNoteHtml && currentNoteText) {
       currentNoteHtml = `<p>${escHtml(currentNoteText).replace(/\n/g, '<br>')}</p>`;
