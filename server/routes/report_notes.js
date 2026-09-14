@@ -86,7 +86,7 @@ function registerReportNoteRoutes(app, deps) {
       });
     } catch (err) {
       console.warn('Rapor notu kaydedilemedi:', safeLogStr(err.message));
-      res.status(500).json({ success: false, reason: 'Rapor notu kaydedilemedi: ' + err.message });
+      res.status(500).json({ success: false, reason: 'Rapor notu geçici olarak kaydedilemedi.' });
     }
   });
 
@@ -134,7 +134,7 @@ function registerReportNoteRoutes(app, deps) {
       res.json({ success: true, attachment: attachmentItem });
     } catch (err) {
       console.warn('Ek yükleme hatası:', safeLogStr(err.message));
-      res.status(500).json({ success: false, reason: 'Ek yüklenemedi: ' + err.message });
+      res.status(500).json({ success: false, reason: 'Ek dosya geçici olarak yüklenemedi.' });
     }
   });
 
