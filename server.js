@@ -1068,7 +1068,7 @@ app.post('/api/store/save', apiWriteRateLimiter, requireAuth, async (req, res) =
   });
 });
 
-registerReportNoteRoutes(app, { apiWriteRateLimiter, attachmentsDir: path.join(__dirname, 'data', 'attachments'), canEditReportNote, canReadReport, getReportRecord, readLocalReports, recordAuditLog, reportId, reportRowToClient, requireAuth, supabase, writeLocalReports });
+registerReportNoteRoutes(app, { apiWriteRateLimiter, attachmentsDir: path.join(__dirname, 'data', 'attachments'), canEditReportNote, canReadReport, getReportRecord, readLocalReports, recordAuditLog, reportId, reportRowToClient, requireAuth, safeLogStr, supabase, writeLocalReports });
 
 // ── ÇEVRİMİÇİ KULLANICI & VARLIK (PRESENCE) YÖNETİMİ ──────────
 const USER_AVATARS_FILE = path.join(__dirname, 'data', 'user_avatars.json');
