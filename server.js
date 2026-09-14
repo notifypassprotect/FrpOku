@@ -4,6 +4,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const { isValidEmail, isValidText, isValidUsername, normalizeEmail, normalizePhone, normalizeText, normalizeUsername } = require('./lib/input_validation');
+const { sanitizeRichHtml } = require('./lib/html_sanitizer');
 const { createMailer } = require('./lib/mailer');
 const { PASSWORD_MAX_LENGTH, hashPassword, verifyPassword: verifyPasswordHash } = require('./lib/passwords');
 const { buildOwnedReportRow, canManageReport, canEditReportNote, canReadReport, nextReportVersion, reportId, reportRowToClient, reportRowToSummaryClient, toSupabaseReportRow } = require('./lib/report_access');
@@ -155,7 +156,7 @@ registerReportWriteRoute(app, { apiWriteRateLimiter, buildOwnedReportRow, canMan
 
 registerSettingsRoutes(app, { apiWriteRateLimiter, boundedSetting, plainObject, requireAuth, safeLogStr, settingsPath: path.join(__dirname, 'data', 'user_settings.json'), supabase });
 
-registerReportNoteRoutes(app, { apiWriteRateLimiter, attachmentsDir: path.join(__dirname, 'data', 'attachments'), canEditReportNote, canReadReport, getReportRecord, readLocalReports, recordAuditLog, reportId, reportRowToClient, requireAuth, safeLogStr, supabase, writeLocalReports });
+registerReportNoteRoutes(app, { apiWriteRateLimiter, attachmentsDir: path.join(__dirname, 'data', 'attachments'), canEditReportNote, canReadReport, getReportRecord, readLocalReports, recordAuditLog, reportId, reportRowToClient, requireAuth, safeLogStr, sanitizeRichHtml, supabase, writeLocalReports });
 
 // ── ÇEVRİMİÇİ KULLANICI & VARLIK (PRESENCE) YÖNETİMİ ──────────
 const USER_AVATARS_FILE = path.join(__dirname, 'data', 'user_avatars.json');
