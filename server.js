@@ -42,6 +42,7 @@ const { registerAccountProfileRoute } = require('./server/routes/account_profile
 const { registerAccountEmailRoutes } = require('./server/routes/account_email');
 const { registerAuditRoutes } = require('./server/routes/audit');
 const { registerReportReadRoutes } = require('./server/routes/report_read');
+const { registerReportLifecycleRoutes } = require('./server/routes/report_lifecycle');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -897,6 +898,8 @@ async function loadVisibleReports(user, isDeleted, { summaryOnly = true } = {}) 
 
 registerReportReadRoutes(app, { canReadReport, getReportRecord, loadVisibleReports, reportRowToClient, requireAuth, safeLogStr });
 
+registerReportLifecycleRoutes(app, { apiWriteRateLimiter, canManageReport, getReportRecord, nextReportVersion, readLocalReports, reportId, reportRowToClient, requireAuth, supabase, writeLocalReports });
+
 app.put('/api/reports/:id', apiWriteRateLimiter, requireAuth, async (req, res) => {
   const id = String(req.params.id || '');
   if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body) || String(req.body.id || '') !== id) {
@@ -1060,108 +1063,6 @@ app.post('/api/store/save', apiWriteRateLimiter, requireAuth, async (req, res) =
     code: 'SNAPSHOT_SYNC_REMOVED',
     reason: 'Toplu arşiv yazımı kaldırıldı. Raporları tekil endpoint üzerinden kaydedin.'
   });
-});
-
-app.delete('/api/reports', apiWriteRateLimiter, requireAuth, async (req, res) => {
-  try {
-    if (supabase) {
-      const { error } = await supabase.from('reports').delete().eq('user_id', String(req.authUser.id));
-      if (error) throw error;
-    } else {
-      writeLocalReports(readLocalReports().filter(report => String(report.userId || report.user_id) !== String(req.authUser.id)));
-    }
-    res.json({ success: true });
-  } catch {
-    res.status(503).json({ success: false, reason: 'Kullanıcı raporları silinemedi.' });
-  }
-});
-
-app.delete('/api/reports/trash/all', apiWriteRateLimiter, requireAuth, async (req, res) => {
-  try {
-    const isAdmin = req.authUser?.role === 'admin';
-    if (supabase) {
-      let query = supabase.from('reports').delete().eq('is_deleted', true);
-      if (!isAdmin) {
-        query = query.eq('user_id', String(req.authUser.id));
-      }
-      const { error } = await query;
-      if (error) throw error;
-    } else {
-      writeLocalReports(readLocalReports().filter(report => {
-        const isDel = Boolean(report.isDeleted || report.is_deleted);
-        if (!isDel) return true;
-        if (isAdmin) return false;
-        return String(report.userId || report.user_id) !== String(req.authUser.id);
-      }));
-    }
-    res.json({ success: true });
-  } catch {
-    res.status(503).json({ success: false, reason: 'Çöp kutusu boşaltılamadı.' });
-  }
-});
-
-app.delete('/api/reports/:id', apiWriteRateLimiter, requireAuth, async (req, res) => {
-  try {
-    const report = await getReportRecord(req.params.id);
-    if (!report) return res.status(404).json({ success: false, reason: 'Rapor bulunamadı.' });
-    if (!canManageReport(req.authUser, report)) {
-      return res.status(403).json({ success: false, reason: 'Bu raporu silme yetkiniz yok.' });
-    }
-
-    if (supabase) {
-      const { error } = await supabase.from('reports').delete().eq('id', String(req.params.id));
-      if (error) throw error;
-    } else {
-      writeLocalReports(readLocalReports().filter(item => reportId(item) !== String(req.params.id)));
-    }
-    res.json({ success: true });
-  } catch (error) {
-    res.status(503).json({ success: false, reason: 'Rapor silinemedi.' });
-  }
-});
-
-app.patch('/api/reports/:id/trash', apiWriteRateLimiter, requireAuth, async (req, res) => {
-  try {
-    const report = await getReportRecord(req.params.id);
-    if (!report) return res.status(404).json({ success: false, reason: 'Rapor bulunamadı.' });
-    if (!canManageReport(req.authUser, report)) {
-      return res.status(403).json({ success: false, reason: 'Bu raporu değiştirme yetkiniz yok.' });
-    }
-
-    const isDeleted = req.body?.deleted !== false;
-    const deletedAt = isDeleted ? new Date().toISOString() : null;
-    let nextVersion;
-    const currentVersion = Math.max(1, Number(report.version != null ? report.version : report.data?.version) || 1);
-    try {
-      // Sürüm belirtilmemişse veya 0 ise mevcut sürümü baz al
-      const requestedVer = req.body?.version ? Number(req.body.version) : currentVersion;
-      nextVersion = nextReportVersion(report, requestedVer);
-    } catch (versionError) {
-      return res.status(409).json({ success: false, code: versionError.code, reason: 'Rapor başka bir oturumda güncellendi.', currentVersion: versionError.currentVersion });
-    }
-    let savedReport;
-    if (supabase) {
-      const current = reportRowToClient(report);
-      const data = { ...current, isDeleted, is_deleted: isDeleted, deletedAt, deleted_at: deletedAt, version: nextVersion };
-      let updateQuery = supabase.from('reports')
-        .update({ is_deleted: isDeleted, deleted_at: deletedAt, version: nextVersion, data, updated_at: new Date().toISOString() })
-        .eq('id', String(req.params.id)).eq('version', currentVersion);
-      const result = await updateQuery.select('*').limit(1);
-      if (result.error) throw result.error;
-      if (!result.data?.length) return res.status(409).json({ success: false, code: 'REPORT_CONFLICT', reason: 'Rapor aynı anda başka bir oturumda güncellendi.' });
-      savedReport = reportRowToClient(result.data[0]);
-    } else {
-      const reports = readLocalReports();
-      const index = reports.findIndex(item => reportId(item) === String(req.params.id));
-      if (index === -1) return res.status(404).json({ success: false, reason: 'Rapor bulunamadı.' });
-      reports[index] = { ...reports[index], isDeleted, is_deleted: isDeleted, deletedAt, deleted_at: deletedAt, version: nextVersion };
-      writeLocalReports(reports);
-      savedReport = reports[index];
-    }
-    res.json({ success: true, isDeleted, report: savedReport });
-  } catch (error) {
-    res.status(503).json({ success: false, reason: 'Rapor durumu güncellenemedi.' });
-  }
 });
 
 app.post('/api/reports/toggle-pool', apiWriteRateLimiter, requireAuth, async (req, res) => {
