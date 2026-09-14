@@ -102,7 +102,9 @@ test('forgot-password response does not expose whether an unknown account exists
   const registry = registerRecovery();
   const res = response();
   await registry.route('POST', '/api/auth/forgot-password-code')({ body: { identifier: 'unknown-user' } }, res);
-  assert.equal(res.statusCode, 400);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.success, true);
+  assert.match(res.body.message, /eşleşiyorsa/);
   assert.doesNotMatch(JSON.stringify(res.body), /unknown-user/);
 });
 
