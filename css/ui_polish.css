@@ -356,3 +356,32 @@ html[data-ui-scale="micro"][data-density="minimal"] :is(.badge, .tag-pill, .pool
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Rapor listesi: arama odağı ve dar ekran araç çubuğu */
+.toolbar-left { min-width: 0; }
+#searchWrap #searchInput { min-width: 0; }
+#searchWrap #searchInput:focus,
+#searchWrap #searchInput:focus-visible {
+  box-shadow: none !important;
+}
+#searchWrap.error {
+  border-color: var(--red) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 18%, transparent) !important;
+}
+#resultCount {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--border-light);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+@media (max-width: 768px) {
+  .toolbar-left { flex-basis: 100%; }
+  .toolbar-right { min-width: 0; flex-wrap: wrap; }
+  #searchWrap { width: 100%; min-width: 0 !important; }
+  #regexBtn { flex-shrink: 0; }
+  #regexErrMsg { grid-column: 1 / -1; }
+  #viewModeToggle { flex-wrap: wrap; }
+  #viewModeToggle .view-btn { white-space: normal; }
+}
