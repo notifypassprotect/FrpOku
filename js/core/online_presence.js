@@ -1475,6 +1475,14 @@
         ${isReadOnlyRoom ? `
           <div class="frp-chat-readonly-notice">📢 Bu resmi duyuru kanalıdır. Sadece sistem yöneticileri paylaşım yapabilir.</div>
         ` : `
+          <div class="frp-chat-reply-composer" hidden>
+            <div class="frp-chat-reply-accent"></div>
+            <div class="frp-chat-reply-composer-text">
+              <strong class="frp-chat-reply-name"></strong>
+              <span class="frp-chat-reply-preview"></span>
+            </div>
+            <button type="button" class="frp-chat-reply-cancel" aria-label="Yanıtlamayı iptal et">×</button>
+          </div>
           <div class="frp-chat-input-row">
             <input type="file" class="frp-chat-file-input" accept="image/*,application/pdf" style="display: none;" />
             <input type="file" class="frp-chat-audio-fallback" accept="audio/*" style="display: none;" />
@@ -1549,12 +1557,17 @@
     const chatHeader = chatEl.querySelector('.frp-chat-header');
     const btnNudgeHeader = chatEl.querySelector('.btn-nudge');
     const btnNudgeAction = chatEl.querySelector('.btn-nudge-action');
+    const replyComposer = chatEl.querySelector('.frp-chat-reply-composer');
+    const replyName = chatEl.querySelector('.frp-chat-reply-name');
+    const replyPreview = chatEl.querySelector('.frp-chat-reply-preview');
+    const replyCancel = chatEl.querySelector('.frp-chat-reply-cancel');
 
     let isRecordingVoice = false;
     let mediaRecorder = null;
     let audioChunks = [];
     let recordingStartTime = 0;
     let recordingTimer = null;
+    let recordingReplyTo = null;
     let seenMsgIds = new Set();
     let isInitialStream = true;
     const draftKey = `frp_chat_draft_${myId}_${isGroup ? 'group' : (isRoom ? 'room' : 'user')}_${chatId}`;
@@ -1565,6 +1578,22 @@
     let autoRetryAttempts = 0;
     let autoRetryTimer = null;
     try { failedText = JSON.parse(localStorage.getItem(retryKey) || 'null'); } catch {}
+    let replyingTo = failedText?.replyTo || null;
+
+    function replySummary(reply) {
+      if (!reply) return '';
+      return reply.text || (reply.hasVoice ? '🎙️ Sesli mesaj' : (reply.hasAttachment ? '📎 Dosya veya görsel' : 'Mesaj'));
+    }
+    function renderReplyComposer() {
+      if (!replyComposer) return;
+      replyComposer.hidden = !replyingTo;
+      if (!replyingTo) return;
+      replyName.textContent = `${replyingTo.senderName || 'Kullanıcı'} kişisine yanıt`;
+      replyPreview.textContent = replySummary(replyingTo);
+    }
+    function clearReply() { replyingTo = null; renderReplyComposer(); }
+    replyCancel?.addEventListener('click', () => { clearReply(); input?.focus(); });
+    renderReplyComposer();
 
     function updateComposerState() {
       if (!input) return;
@@ -1932,7 +1961,7 @@
       msgStream.querySelector(`[data-msg-id="temp_${failedText.id}"]`)?.remove();
       const retry = { ...failedText };
       try {
-        const sent = await sendMessage({ text: retry.text }, retry.id);
+        const sent = await sendMessage({ text: retry.text, replyTo: retry.replyTo || null }, retry.id);
         if (sent) window.toast?.('Bağlantı geri geldi; mesajınız gönderildi.', 'success');
       } finally { autoRetryInFlight = false; }
     }
@@ -2095,7 +2124,7 @@
             const item = document.createElement('div');
             item.className = 'frp-chat-media-item';
 
-            if (m.attachment) {
+            if (m.attachment?.dataUrl) {
               const isImg = (m.attachment.type || '').startsWith('image/');
               if (isImg) {
                 const safeImgUrl = (m.attachment.dataUrl && (m.attachment.dataUrl.startsWith('data:image/') || /^https?:\/\//i.test(m.attachment.dataUrl))) ? escHtml(m.attachment.dataUrl) : '';
@@ -2225,6 +2254,7 @@
         if (file.size > 4 * 1024 * 1024) { window.toast?.('Sohbet dosyası en fazla 4 MB olabilir.', 'warning'); return; }
         const reader = new FileReader();
         reader.onload = () => {
+          const replyTo = replyingTo; clearReply();
           sendMessage({
             text: `[Ek: ${file.name}]`,
             attachment: {
@@ -2232,7 +2262,7 @@
               size: file.size,
               type: file.type,
               dataUrl: reader.result
-            }
+            }, replyTo
           });
         };
         reader.readAsDataURL(file);
@@ -2249,12 +2279,13 @@
         if (file.size > 4 * 1024 * 1024) { window.toast?.('Sohbet dosyası en fazla 4 MB olabilir.', 'warning'); return; }
         const reader = new FileReader();
         reader.onload = () => {
+          const replyTo = replyingTo; clearReply();
           sendMessage({
             text: `🎙️ Ses Kaydı (${file.name})`,
             voice: {
               dataUrl: reader.result,
               duration: 10
-            }
+            }, replyTo
           });
         };
         reader.readAsDataURL(file);
@@ -2279,6 +2310,7 @@
             mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
             audioChunks = [];
             recordingStartTime = Date.now();
+            recordingReplyTo = replyingTo;
 
             mediaRecorder.ondataavailable = (e) => {
               if (e.data && e.data.size > 0) audioChunks.push(e.data);
@@ -2296,8 +2328,10 @@
                   voice: {
                     dataUrl: reader.result,
                     duration: durationSec
-                  }
+                  }, replyTo: recordingReplyTo
                 });
+                if (recordingReplyTo && replyingTo?.id === recordingReplyTo.id) clearReply();
+                recordingReplyTo = null;
               };
               reader.readAsDataURL(audioBlob);
               stream.getTracks().forEach(t => t.stop());
@@ -2352,7 +2386,8 @@
         groupId: isGroup ? chatId : null,
         text: payload.text || '',
         attachment: payload.attachment || null,
-        voice: payload.voice || null
+        voice: payload.voice || null,
+        replyTo: payload.replyTo?.id ? { id: payload.replyTo.id } : null
       };
 
       localLastInteractions[chatId] = Date.now();
@@ -2368,6 +2403,7 @@
         text: payload.text || '',
         attachment: payload.attachment || null,
         voice: payload.voice || null,
+        replyTo: payload.replyTo || null,
         reactions: {},
         isRead: false,
         createdAt: new Date().toISOString(),
@@ -2413,12 +2449,13 @@
       } catch (err) {
         console.warn('Mesaj gönderilemedi:', err);
         if (payload.text && !payload.attachment && !payload.voice) {
-          failedText = { id: clientMessageId, text: payload.text, failedAt: Date.now() };
+          failedText = { id: clientMessageId, text: payload.text, replyTo: payload.replyTo || null, failedAt: Date.now() };
           autoRetryCandidate = navigator.onLine === false || err.name === 'AbortError' || err.retryable === true;
           try { localStorage.setItem(retryKey, JSON.stringify(failedText)); } catch {}
           if (autoRetryCandidate && navigator.onLine !== false && autoRetryAttempts === 0) {
             clearTimeout(autoRetryTimer); autoRetryTimer = setTimeout(retryRecentFailedMessage, 3000);
           }
+          if (payload.replyTo && !replyingTo && !(input?.value || '').trim()) { replyingTo = payload.replyTo; renderReplyComposer(); }
         }
         optimisticDiv.classList.remove('optimistic-pending');
         optimisticDiv.classList.add('send-failed');
@@ -2463,6 +2500,8 @@
       const text = (input.value || '').trim();
       if (!text) return;
       textSendPending = true;
+      const replyTo = replyingTo;
+      clearReply();
       input.value = ''; updateComposerState(); stopTyping();
       try { localStorage.removeItem(draftKey); } catch {}
       if (emojiPicker) emojiPicker.style.display = 'none';
@@ -2470,7 +2509,7 @@
       try {
         const retryId = failedText?.text === text ? failedText.id : crypto.randomUUID();
         msgStream.querySelectorAll('.send-failed').forEach(node => { if (node.dataset.msgId === 'temp_' + retryId) node.remove(); });
-        const sent = await sendMessage({ text }, retryId);
+        const sent = await sendMessage({ text, replyTo }, retryId);
         if (sent && areChatNotificationsEnabled()) playMessageSentSound();
         // A failed bubble retains the text and its retry identity. Never overwrite
         // a new draft typed while the previous message was being submitted.
@@ -2732,6 +2771,13 @@
         `;
       }
 
+      const replyHtml = m.replyTo?.id ? `
+        <button type="button" class="frp-chat-reply-quote" data-reply-id="${escHtml(String(m.replyTo.id))}" title="Yanıtlanan mesaja git">
+          <strong>${escHtml(m.replyTo.senderName || 'Kullanıcı')}</strong>
+          <span>${escHtml(replySummary(m.replyTo))}</span>
+        </button>
+      ` : '';
+
       let reactionsHtml = '';
       if (m.reactions && Object.keys(m.reactions).length > 0) {
         reactionsHtml = '<div class="frp-chat-reactions-row">';
@@ -2748,6 +2794,7 @@
       const canDelete = isSelf || (currentAuthUser && currentAuthUser.role === 'admin');
       const hoverReactionHtml = `
         <div class="frp-chat-hover-bar">
+          <button type="button" class="btn-reply-msg" aria-label="Mesajı yanıtla" title="Yanıtla">↩</button>
           <button type="button" class="btn-react" data-emoji="👍" aria-label="Beğen">👍</button>
           <button type="button" class="btn-react" data-emoji="❤️" aria-label="Kalp tepkisi">❤️</button>
           <button type="button" class="btn-react" data-emoji="😂" aria-label="Gülme tepkisi">😂</button>
@@ -2766,7 +2813,7 @@
             ${!isRoom && !isGroup && !targetUser?.isSelfNote && targetUser?.department ? `<span class="frp-presence-dept-badge" style="font-size:0.58rem;padding:0 4px;font-weight:600;">${escHtml(targetUser.department)}</span>` : ''}
           </div>
         ` : ''}
-        <div class="frp-chat-bubble">${contentHtml}</div>
+        <div class="frp-chat-bubble">${replyHtml}${contentHtml}</div>
         ${reactionsHtml}
         <div class="frp-chat-msg-time">
           <span>${timeStr}</span>
@@ -2796,6 +2843,21 @@
       }
 
       // Event binding
+      msgDiv.querySelector('.btn-reply-msg')?.addEventListener('click', event => {
+        event.stopPropagation();
+        replyingTo = { id: String(m.id), senderId: String(m.senderId || ''),
+          senderName: isSelf ? 'Siz' : (m.senderName || senderLabel || 'Kullanıcı'), text: String(m.text || '').slice(0, 180),
+          hasAttachment: Boolean(m.attachment?.dataUrl), hasVoice: Boolean(m.voice?.dataUrl) };
+        renderReplyComposer(); input?.focus(); replyComposer?.scrollIntoView({ block: 'nearest' });
+      });
+      msgDiv.querySelector('.frp-chat-reply-quote')?.addEventListener('click', event => {
+        event.stopPropagation();
+        const targetId = event.currentTarget.dataset.replyId;
+        const target = Array.from(msgStream.querySelectorAll('.frp-chat-msg')).find(node => node.dataset.msgId === targetId);
+        if (!target) { window.toast?.('Yanıtlanan mesaj mevcut görünümde bulunamadı.', 'info'); return; }
+        target.scrollIntoView({ block: 'center', behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+        target.classList.add('reply-highlight'); setTimeout(() => target.classList.remove('reply-highlight'), 1400);
+      });
       msgDiv.querySelectorAll('.btn-react').forEach(rbtn => {
         rbtn.addEventListener('click', async (ev) => {
           ev.stopPropagation();

@@ -4,6 +4,7 @@ const { EventEmitter } = require('node:events');
 const { registerChatMessageListRoute } = require('../server/routes/chat_messages');
 const { registerChatSendRoute } = require('../server/routes/chat_send');
 const { registerChatStateRoutes } = require('../server/routes/chat_state');
+const { createChatMessageService } = require('../server/services/chat_message_service');
 function harness() {
   const handlers = new Map();
   const app = Object.fromEntries(['get','post'].map(method => [method, (path, ...fns) => handlers.set(path, fns.at(-1))]));
@@ -45,6 +46,11 @@ test('identical client message retries, including concurrent sends, persist once
   assert.equal(saves,1);assert.equal(messages.length,1);assert.equal(a.body.message.id,b.body.message.id);
   const other=h.response();await handler(req({...body,clientMessageId:'different-456'}),other);
   assert.equal(messages.length,2,'same text is still a distinct message when intentionally sent again');
+  const reply=h.response();await handler(req({receiverId:'peer',text:'reply',clientMessageId:'reply-id-789',replyTo:{id:a.body.message.id,text:'spoof'}}),reply);
+  assert.equal(reply.statusCode,200);assert.equal(reply.body.message.replyTo.id,a.body.message.id);
+  assert.equal(reply.body.message.replyTo.text,'same','reply preview is rebuilt from the server message');
+  const invalid=h.response();await handler(req({receiverId:'peer',text:'bad reply',clientMessageId:'reply-id-000',replyTo:{id:'missing'}}),invalid);
+  assert.equal(invalid.statusCode,400);assert.equal(messages.length,3);
 });
 
 test('typing stop clears only the matching conversation and read receipt is bounded by ids', async () => {
@@ -89,4 +95,28 @@ test('chat reconnect, deletion and mobile viewport flows fail safely', () => {
   assert.match(source,/if \(!response\.ok \|\| !data\.success\) throw new Error/);
   assert.match(source,/window\.visualViewport\?\.addEventListener\('resize', syncMobileViewport\)/);
   assert.match(css,/@media \(prefers-reduced-motion: reduce\)/);
+});
+
+test('reply metadata is validated, persisted and rendered as navigation', () => {
+  const fs=require('node:fs'), path=require('node:path');
+  const source=fs.readFileSync(path.join(__dirname,'../js/core/online_presence.js'),'utf8');
+  const service=fs.readFileSync(path.join(__dirname,'../server/services/chat_message_service.js'),'utf8');
+  const migration=fs.readFileSync(path.join(__dirname,'../supabase/migrations/012_chat_replies.sql'),'utf8');
+  assert.ok(source.includes('class="frp-chat-reply-composer"'));
+  assert.ok(source.includes('class="frp-chat-reply-quote"'));
+  assert.match(source,/replyTo: payload\.replyTo\?\.id \? \{ id: payload\.replyTo\.id \} : null/);
+  assert.match(service,/reply_to: message\.replyTo \|\| null/);
+  assert.match(migration,/add column if not exists reply_to jsonb/);
+});
+
+test('reply persistence falls back safely before the reply column migration runs', async () => {
+  const calls=[];
+  const supabase={from:()=>({upsert:async row=>{calls.push(row);return calls.length===1
+    ? {error:{message:"Could not find the 'reply_to' column"}}:{error:null};}})};
+  const service=createChatMessageService({safeLogStr:String,store:{read:()=>[],write:()=>{}},supabase});
+  await service.persistChatMessage({id:'m1',senderId:'me',receiverId:'peer',roomId:null,groupId:null,
+    senderName:'Me',senderUsername:'me',senderAvatar:'M',text:'reply',attachment:null,voice:null,
+    replyTo:{id:'original',senderName:'Peer',text:'hello'},reactions:{},createdAt:new Date().toISOString()});
+  assert.equal(calls.length,2);assert.equal(calls[1].reply_to,undefined);
+  assert.equal(calls[1].attachment.replyTo.id,'original');
 });

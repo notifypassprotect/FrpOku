@@ -27,7 +27,8 @@ function createChatMessageService({ safeLogStr, store, supabase }) {
       senderAvatar: row.sender_avatar || '', receiverId: row.receiver_id == null ? null : String(row.receiver_id),
       roomId: legacyGroupId ? null : row.room_id == null ? null : String(row.room_id),
       groupId: row.group_id == null ? legacyGroupId : String(row.group_id), text: row.text || '',
-      attachment: row.attachment || null, voice: row.voice || null, isNudge: Boolean(row.is_nudge),
+      attachment: row.attachment?.dataUrl ? row.attachment : null, voice: row.voice || null,
+      replyTo: row.reply_to || row.attachment?.replyTo || null, isNudge: Boolean(row.is_nudge),
       reactions: row.reactions || {}, isRead: Boolean(row.is_read), readAt: row.read_at || null,
       createdAt: row.created_at || new Date().toISOString()
     };
@@ -55,18 +56,21 @@ function createChatMessageService({ safeLogStr, store, supabase }) {
       id: message.id, sender_id: message.senderId, receiver_id: message.receiverId, room_id: message.roomId,
       group_id: message.groupId, sender_name: message.senderName, sender_username: message.senderUsername,
       sender_avatar: message.senderAvatar, text: message.text, attachment: message.attachment, voice: message.voice,
+      reply_to: message.replyTo || null,
       is_nudge: Boolean(message.isNudge), reactions: message.reactions || {}, is_read: Boolean(message.isRead),
       read_at: message.readAt, created_at: message.createdAt
     };
     let result = await supabase.from('chat_messages').upsert(row, { onConflict: 'id' });
-    if (result.error && /group_id|sender_name|sender_username|sender_avatar|is_nudge/i.test(String(result.error.message || ''))) {
+    if (result.error && /group_id|sender_name|sender_username|sender_avatar|is_nudge|reply_to/i.test(String(result.error.message || ''))) {
       const legacyRow = { ...row };
       if (message.groupId) legacyRow.room_id = `group:${message.groupId}`;
+      if (message.replyTo) legacyRow.attachment = { ...(message.attachment || {}), replyTo: message.replyTo };
       delete legacyRow.group_id;
       delete legacyRow.sender_name;
       delete legacyRow.sender_username;
       delete legacyRow.sender_avatar;
       delete legacyRow.is_nudge;
+      delete legacyRow.reply_to;
       result = await supabase.from('chat_messages').upsert(legacyRow, { onConflict: 'id' });
     }
     if (result.error) throw result.error;

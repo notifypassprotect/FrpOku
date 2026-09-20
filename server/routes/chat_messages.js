@@ -23,7 +23,7 @@ function registerChatMessageListRoute(app, deps) {
         });
         const since = req.query.since ? new Date(req.query.since).getTime() : 0;
         if (since > 0) messages = messages.filter(message => new Date(message.createdAt).getTime() > since);
-        if (req.query.mediaOnly === 'true') messages = messages.filter(message => Boolean(message.attachment));
+        if (req.query.mediaOnly === 'true') messages = messages.filter(message => Boolean(message.attachment?.dataUrl || message.voice?.dataUrl));
         messages = messages.slice(-100);
         const typingUsers = [];
         const now = Date.now();
@@ -36,7 +36,7 @@ function registerChatMessageListRoute(app, deps) {
         }
         // Attachments are immutable; avoid repeatedly hashing their large base64 contents.
         const revision = createHash('sha256').update(JSON.stringify([
-          messages.map(m => [m.id, m.text, m.isRead, m.readAt, m.reactions]), typingUsers
+          messages.map(m => [m.id, m.text, m.isRead, m.readAt, m.reactions, m.replyTo]), typingUsers
         ])).digest('hex');
         return { success: true, messages, typingUsers, revision };
       }
