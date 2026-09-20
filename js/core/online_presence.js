@@ -1459,17 +1459,6 @@
         <div class="frp-chat-emoji-grid"></div>
       </div>
 
-      <!-- HIZLI YANIT ÇİPLERİ (QUICK REPLIES) -->
-      ${!isReadOnlyRoom ? `
-        <div class="frp-chat-quick-replies">
-          <button type="button" class="frp-chat-quick-chip" data-quick="👍 İnceliyorum" title="İnceliyorum">👍 İnceliyorum</button>
-          <button type="button" class="frp-chat-quick-chip" data-quick="✅ Onaylandı" title="Onaylandı">✅ Onaylandı</button>
-          <button type="button" class="frp-chat-quick-chip" data-quick="📋 Rapor hazır" title="Rapor hazır">📋 Rapor hazır</button>
-          <button type="button" class="frp-chat-quick-chip" data-quick="📞 Arıyorum" title="Arıyorum">📞 Arıyorum</button>
-          <button type="button" class="frp-chat-quick-chip" data-quick="⏳ Birazdan döneceğim" title="Birazdan döneceğim">⏳ Birazdan döneceğim</button>
-        </div>
-      ` : ''}
-
       <!-- FOOTER / GİRİŞ ALANI (INSTAGRAM DM KAPSÜLÜ VEYA DUYURU BİLGİSİ) -->
       <div class="frp-chat-footer" ${isReadOnlyRoom ? 'style="padding:0;"' : ''}>
         ${isReadOnlyRoom ? `
@@ -1491,7 +1480,7 @@
             <button type="button" class="frp-chat-btn-action btn-emoji-toggle" title="Emoji Ekle" aria-label="Emoji ekle">${chatIcon('smile')}</button>
             <div class="frp-chat-composer-field">
               <textarea class="frp-chat-input" placeholder="Bir mesaj yazın..." maxlength="1000" rows="1" aria-label="Mesaj"></textarea>
-              <span class="frp-chat-char-count" aria-live="polite">0/1000</span>
+              <span class="frp-chat-char-count" aria-live="polite" hidden>0/1000</span>
             </div>
             <button type="button" class="frp-chat-btn-action btn-mic" title="Gerçek Ses Kaydı (Bas Konuş)" aria-label="Ses kaydet">${chatIcon('mic')}</button>
             ${!isRoom ? `<button type="button" class="frp-chat-btn-action btn-nudge-action" title="Titreşim Gönder" aria-label="Titreşim gönder">${chatIcon('nudge')}</button>` : ''}
@@ -1508,17 +1497,6 @@
 
     document.body.appendChild(chatEl);
     document.body.classList.add('frp-mobile-chat-open');
-
-    // Hızlı yanıt çipleri dinleyicileri
-    chatEl.querySelectorAll('.frp-chat-quick-chip').forEach(chip => {
-      chip.addEventListener('click', () => {
-        if (input) {
-          input.value = chip.dataset.quick || chip.textContent;
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          input.focus();
-        }
-      });
-    });
 
     // Kontroller
     const btnClose = chatEl.querySelector('.btn-close');
@@ -1602,6 +1580,7 @@
       if (charCount) {
         const length = input.value.length;
         charCount.textContent = `${length}/1000`;
+        charCount.hidden = length < 800;
         charCount.classList.toggle('near-limit', length >= 900);
       }
     }
@@ -2696,6 +2675,7 @@
       msgDiv.className = `frp-chat-msg ${isSelf ? 'outgoing' : 'incoming'}`;
       msgDiv.dataset.msgId = m.id;
       msgDiv.dataset.createdAt = m.createdAt || new Date().toISOString();
+      msgDiv.dataset.senderId = String(m.senderId || '');
       msgDiv.tabIndex = 0;
       msgDiv.setAttribute('aria-label', `${isSelf ? 'Sizin' : (m.senderName || 'Gelen')} mesajınız: ${String(m.text || 'medya').slice(0, 120)}`);
 
@@ -3042,14 +3022,26 @@
         previous = node;
       });
       let lastDay = '';
+      let previousMessage = null;
       nodes.forEach(node => {
         const date = new Date(node.dataset.createdAt);
         const day = date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+        node.classList.remove('grouped-with-previous');
         if (day !== lastDay) {
           const label = document.createElement('div'); label.className = 'frp-chat-day-label';
           label.textContent = date.toDateString() === new Date().toDateString() ? 'Bugün' : day;
           node.before(label); lastDay = day;
         }
+        if (previousMessage) {
+          const previousDate = new Date(previousMessage.dataset.createdAt);
+          const elapsed = date.getTime() - previousDate.getTime();
+          const sameSender = node.dataset.senderId === previousMessage.dataset.senderId;
+          const sameDay = date.toDateString() === previousDate.toDateString();
+          if (sameSender && sameDay && elapsed >= 0 && elapsed <= 5 * 60 * 1000) {
+            node.classList.add('grouped-with-previous');
+          }
+        }
+        previousMessage = node;
       });
       if (!nodes.length) {
         const empty = document.createElement('div'); empty.className = 'frp-chat-empty';

@@ -97,6 +97,18 @@ test('chat reconnect, deletion and mobile viewport flows fail safely', () => {
   assert.match(css,/@media \(prefers-reduced-motion: reduce\)/);
 });
 
+test('chat removes canned replies and groups nearby messages from the same sender', () => {
+  const fs=require('node:fs'), path=require('node:path');
+  const source=fs.readFileSync(path.join(__dirname,'../js/core/online_presence.js'),'utf8');
+  const css=fs.readFileSync(path.join(__dirname,'../css/online_presence.css'),'utf8');
+  assert.doesNotMatch(source,/frp-chat-quick-replies|frp-chat-quick-chip|data-quick=/);
+  assert.match(source,/charCount\.hidden = length < 800/);
+  assert.match(source,/elapsed <= 5 \* 60 \* 1000/);
+  assert.match(source,/classList\.add\('grouped-with-previous'\)/);
+  assert.match(css,/\.frp-chat-msg\.grouped-with-previous/);
+  assert.match(css,/\.frp-chat-msg\.incoming\.grouped-with-previous \.frp-chat-sender-name/);
+});
+
 test('reply metadata is validated, persisted and rendered as navigation', () => {
   const fs=require('node:fs'), path=require('node:path');
   const source=fs.readFileSync(path.join(__dirname,'../js/core/online_presence.js'),'utf8');
