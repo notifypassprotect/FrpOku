@@ -63,3 +63,15 @@ test('theme observer settles after DOM changes, toggles and new buttons', () => 
   settle();
   assert.equal(added.textContent, 'Koyu Mod');
 });
+
+test('all application pages load the same current visual system', () => {
+  for (const page of ['index.html', 'detail.html', 'compare.html', 'dashboard.html']) {
+    const html = fs.readFileSync(path.join(__dirname, '..', page), 'utf8');
+    assert.match(html, /css\/ui_polish\.css\?v=5\.7\.0/, `${page} must load the current UI layer`);
+  }
+  const css = fs.readFileSync(path.join(__dirname, '../css/ui_polish.css'), 'utf8');
+  assert.match(css, /--ui-shadow-panel:/);
+  assert.match(css, /\/\* ── 2026 UYGULAMA GENELİ GÖRSEL SİSTEM/);
+  assert.match(css, /\[data-theme="dark"\]/);
+  assert.match(css, /@media \(max-width: 520px\)/);
+});

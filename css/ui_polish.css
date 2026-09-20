@@ -3,10 +3,14 @@
   --ui-radius-sm: 9px;
   --ui-radius-md: 13px;
   --ui-radius-lg: 18px;
+  --ui-radius-xl: 24px;
   --ui-control-h: 38px;
   --ui-focus: 0 0 0 3px rgba(37, 99, 235, 0.17);
   --ui-shadow-soft: 0 8px 24px rgba(15, 23, 42, 0.07);
   --ui-shadow-lift: 0 14px 34px rgba(15, 23, 42, 0.12);
+  --ui-shadow-panel: 0 18px 48px -28px rgba(15, 23, 42, 0.32), 0 3px 12px rgba(15, 23, 42, 0.045);
+  --ui-border-subtle: color-mix(in srgb, var(--border) 76%, transparent);
+  --ui-surface-glass: color-mix(in srgb, var(--bg-surface) 92%, transparent);
 }
 
 /* Görünüm ayarları gerçek bir ölçek sistemi olarak çalışır. Rem tabanlı
@@ -458,4 +462,380 @@ html[data-ui-scale="micro"][data-density="minimal"] :is(.badge, .tag-pill, .pool
 @media (max-width: 768px) {
   #frpRichNoteModalOverlay .rich-note-dialog > div:first-child { padding: 0.7rem !important; }
   #frpRichNoteModalOverlay .rich-note-dialog > div:first-child > div:first-child > div:last-child { min-width: 0; }
+}
+
+/* ── 2026 UYGULAMA GENELİ GÖRSEL SİSTEM ───────────────────── */
+::selection {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  color: var(--text-primary);
+}
+
+:where(button, [role="button"], a, input, select, textarea) {
+  outline-offset: 2px;
+}
+
+:where(input, textarea)::placeholder {
+  color: color-mix(in srgb, var(--text-muted) 76%, transparent);
+  opacity: 1;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--accent);
+}
+
+/* Üst seviye gezinme ve çalışma alanları */
+.topbar,
+.cmp-topbar {
+  background: var(--ui-surface-glass) !important;
+  border-bottom: 1px solid var(--ui-border-subtle) !important;
+  backdrop-filter: blur(18px) saturate(135%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(135%) !important;
+}
+
+.topbar::after,
+.cmp-topbar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 30%, transparent), transparent);
+  pointer-events: none;
+}
+
+.brand,
+.cmp-brand {
+  letter-spacing: -0.025em;
+}
+
+.brand-sub,
+.cmp-brand-sub,
+.dash-sub {
+  color: var(--text-muted) !important;
+  font-weight: 500;
+}
+
+.workspace-bar,
+.toolbar,
+.cmp-selector-bar,
+.code-toolbar {
+  border-color: var(--ui-border-subtle) !important;
+}
+
+/* Güncel kontrol yüzeyleri */
+.btn,
+.dash-action-btn,
+.filter-chip,
+.view-btn,
+.workspace-tab-btn,
+.cmp-slot-btn,
+.theme-switch-pill,
+.topbar-dropdown-item,
+.mobile-drawer-item,
+.font-ctrl-btn,
+.search-nav-btn {
+  border-color: var(--ui-border-subtle) !important;
+}
+
+.btn-primary,
+.dash-action-btn.back-btn,
+.view-btn.active {
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 72%, #7c3aed)) !important;
+  box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--accent) 52%, transparent) !important;
+}
+
+.btn-primary:not(:disabled):hover,
+.dash-action-btn.back-btn:not(:disabled):hover,
+.view-btn.active:not(:disabled):hover {
+  filter: brightness(1.06) saturate(1.08);
+  box-shadow: 0 11px 24px -9px color-mix(in srgb, var(--accent) 65%, transparent) !important;
+}
+
+.btn-ghost:hover,
+.topbar-dropdown-item:hover,
+.mobile-drawer-item:hover {
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-surface)) !important;
+  color: var(--accent) !important;
+}
+
+.search-wrap,
+.code-search-box,
+.font-ctrl,
+.select-field,
+.field-select,
+.master-search-input,
+.cmp-query-dropdown,
+input[type="text"],
+input[type="search"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+textarea,
+select {
+  background: color-mix(in srgb, var(--bg-raised) 74%, var(--bg-surface)) !important;
+  border-color: var(--ui-border-subtle) !important;
+}
+
+.search-wrap:hover,
+.code-search-box:hover,
+.font-ctrl:hover,
+.select-field:hover,
+.field-select:hover,
+select:hover {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border)) !important;
+}
+
+/* Kartlar ve bilgi yüzeyleri */
+:is(.stat-card, .report-card, .meta-card, .detail-group-card, .dash-card, .chart-box, .dash-table-wrap, .health-dist-item, .cmp-slot, .cmp-picker-item) {
+  border-color: var(--ui-border-subtle) !important;
+  box-shadow: var(--ui-shadow-panel) !important;
+}
+
+:is(.stat-card, .meta-card, .health-dist-item) {
+  background: color-mix(in srgb, var(--bg-surface) 94%, var(--bg-raised)) !important;
+}
+
+.stat-card {
+  border-radius: var(--ui-radius-md) !important;
+  min-height: 66px;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::after {
+  content: '';
+  position: absolute;
+  inset: auto -22px -28px auto;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  pointer-events: none;
+}
+
+.stat-value,
+.dash-card-value,
+.health-dist-score {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.045em !important;
+}
+
+.report-card,
+.meta-card,
+.detail-group-card,
+.chart-box,
+.dash-card,
+.dash-table-wrap {
+  border-radius: var(--ui-radius-lg) !important;
+}
+
+.report-card:hover,
+.meta-card:hover,
+.cmp-picker-item:hover {
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--border)) !important;
+}
+
+.dropzone {
+  border-radius: var(--ui-radius-xl) !important;
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border)) !important;
+  background:
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 55%),
+    var(--bg-surface) !important;
+  box-shadow: var(--ui-shadow-panel) !important;
+}
+
+.dropzone:hover,
+.dropzone.drag {
+  transform: translateY(-2px);
+  border-color: var(--accent) !important;
+}
+
+/* Sekmeler ve segment seçiciler */
+.tab-bar {
+  gap: 0.25rem;
+  padding: 0.35rem 0.6rem !important;
+  background: color-mix(in srgb, var(--bg-surface) 94%, transparent) !important;
+  border-color: var(--ui-border-subtle) !important;
+}
+
+.tab {
+  height: 36px !important;
+  padding-inline: 0.85rem !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--ui-radius-sm) !important;
+}
+
+.tab:hover {
+  background: var(--bg-raised) !important;
+}
+
+.tab.active {
+  border-color: color-mix(in srgb, var(--accent) 25%, var(--border)) !important;
+  border-bottom-color: var(--accent) !important;
+  background: color-mix(in srgb, var(--accent) 9%, var(--bg-surface)) !important;
+  box-shadow: 0 4px 12px -9px rgba(15, 23, 42, 0.5);
+}
+
+.workspace-switcher,
+.view-mode-toggle,
+.cmp-diff-nav {
+  background: color-mix(in srgb, var(--bg-raised) 80%, var(--bg-surface)) !important;
+  padding: 3px !important;
+}
+
+/* Veri tabloları */
+:is(.report-table, .dash-tbl, .diff-table) {
+  font-variant-numeric: tabular-nums;
+}
+
+:is(.report-table, .dash-tbl) thead th {
+  background: color-mix(in srgb, var(--bg-raised) 88%, var(--bg-surface)) !important;
+  border-bottom-color: var(--ui-border-subtle) !important;
+  color: var(--text-secondary) !important;
+  font-size: 0.69rem !important;
+  letter-spacing: 0.055em !important;
+}
+
+:is(.report-table, .dash-tbl) tbody td {
+  border-bottom-color: color-mix(in srgb, var(--border-light) 70%, transparent) !important;
+}
+
+:is(.report-table, .dash-tbl) tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--bg-raised) 34%, transparent);
+}
+
+:is(.report-table, .dash-tbl) tbody tr:hover td {
+  background: color-mix(in srgb, var(--accent) 7%, var(--bg-surface)) !important;
+}
+
+.dash-table-header,
+.cmp-picker-header,
+.detail-header {
+  background: color-mix(in srgb, var(--bg-raised) 82%, var(--bg-surface)) !important;
+  border-color: var(--ui-border-subtle) !important;
+}
+
+/* Detay ve karşılaştırma sayfaları */
+.sidebar {
+  box-shadow: 10px 0 30px -28px rgba(15, 23, 42, 0.5);
+}
+
+.sidebar-header {
+  background: color-mix(in srgb, var(--bg-surface) 90%, var(--bg-raised)) !important;
+  border-color: var(--ui-border-subtle) !important;
+}
+
+.code-toolbar {
+  background: var(--ui-surface-glass) !important;
+  backdrop-filter: blur(12px);
+}
+
+.code-editor-wrap,
+.code-scroll,
+.editor-main {
+  scrollbar-gutter: stable;
+}
+
+.cmp-selector-bar {
+  padding-block: 0.7rem !important;
+  box-shadow: 0 8px 24px -22px rgba(15, 23, 42, 0.45);
+}
+
+.cmp-slot {
+  border-radius: var(--ui-radius-md) !important;
+  background: color-mix(in srgb, var(--bg-surface) 94%, var(--bg-raised)) !important;
+}
+
+.cmp-vs-badge,
+.cmp-summary-pill,
+.badge,
+.tag-pill,
+.ds-pill,
+.pool-count-badge,
+.result-count,
+.tab-badge {
+  border-radius: 999px !important;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Modal, açılır menü ve bildirim katmanları */
+.modal,
+.cmp-picker-modal,
+.modal-box,
+.dialog-box,
+.custom-modal-content,
+.settings-modal-box {
+  border: 1px solid var(--ui-border-subtle) !important;
+  border-radius: var(--ui-radius-xl) !important;
+  box-shadow: 0 30px 90px -26px rgba(15, 23, 42, 0.52) !important;
+}
+
+.modal-header,
+.cmp-picker-header {
+  border-bottom-color: var(--ui-border-subtle) !important;
+}
+
+.modal-actions,
+.cmp-picker-footer {
+  background: color-mix(in srgb, var(--bg-raised) 52%, var(--bg-surface)) !important;
+  border-top-color: var(--ui-border-subtle) !important;
+}
+
+.topbar-dropdown,
+[class*="dropdown-menu"],
+[class*="context-menu"] {
+  border-color: var(--ui-border-subtle) !important;
+  border-radius: var(--ui-radius-md) !important;
+  box-shadow: 0 20px 48px -18px rgba(15, 23, 42, 0.4) !important;
+}
+
+.toast-item {
+  backdrop-filter: blur(16px) saturate(120%);
+  -webkit-backdrop-filter: blur(16px) saturate(120%);
+}
+
+/* Boş ve yükleniyor durumları */
+.empty-state,
+.sidebar-empty,
+.cmp-picker-empty {
+  border-radius: var(--ui-radius-lg);
+}
+
+.empty-icon,
+.sidebar-empty-icon {
+  filter: grayscale(0.2);
+  opacity: 0.72 !important;
+}
+
+/* Koyu temada yüzey derinliği */
+[data-theme="dark"] {
+  --ui-shadow-panel: 0 18px 48px -26px rgba(0, 0, 0, 0.72), 0 2px 10px rgba(0, 0, 0, 0.24);
+  --ui-border-subtle: color-mix(in srgb, var(--border) 86%, #64748b 14%);
+  --ui-surface-glass: color-mix(in srgb, var(--bg-surface) 88%, transparent);
+}
+
+[data-theme="dark"] :is(.report-card, .meta-card, .dash-card, .chart-box, .dash-table-wrap, .cmp-slot) {
+  background: color-mix(in srgb, var(--bg-surface) 94%, #020617) !important;
+}
+
+@media (max-width: 860px) {
+  .stats-bar { padding: 0.75rem !important; gap: 0.55rem !important; }
+  .stat-card { min-width: min(145px, calc(50vw - 1.1rem)) !important; padding: 0.65rem 0.75rem !important; }
+  .toolbar { gap: 0.55rem !important; }
+  .dropzone-wrap { padding: 1rem !important; }
+  .dropzone { padding: 2.5rem 1.2rem !important; }
+  .modal,
+  .cmp-picker-modal { max-width: calc(100vw - 1rem) !important; }
+}
+
+@media (max-width: 520px) {
+  .stat-card { min-width: 100% !important; max-width: none !important; }
+  .dash-wrap { gap: 1rem !important; }
+  .report-card,
+  .meta-card,
+  .dash-card,
+  .chart-box,
+  .dash-table-wrap { border-radius: var(--ui-radius-md) !important; }
 }
