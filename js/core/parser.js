@@ -428,6 +428,9 @@ function parseFrp(xmlText) {
     
     // Frame & Fill
     const fillBackColor = getAttr(attrsChunk, 'Fill.BackColor') || getAttr(attrsChunk, 'Color') || 'clNone';
+    const fillForeColor = getAttr(attrsChunk, 'Fill.ForeColor') || 'clNone';
+    const fillStyle = getAttr(attrsChunk, 'Fill.Style') || getAttr(attrsChunk, 'BrushStyle') || '';
+    const fillType = getAttr(attrsChunk, 'FillType') || 'ftBrush';
     const frameTyp = numVal(getAttr(attrsChunk, 'Frame.Typ'), 0);
     const frameColor = getAttr(attrsChunk, 'Frame.Color') || '-16777208';
     const frameWidth = numVal(getAttr(attrsChunk, 'Frame.Width'), 1);
@@ -503,6 +506,9 @@ function parseFrp(xmlText) {
       fontColor,
       fontStyle,
       fillBackColor,
+      fillForeColor,
+      fillStyle,
+      fillType,
       frameTyp,
       frameColor,
       frameWidth,
@@ -748,6 +754,7 @@ function parseFrp(xmlText) {
     const dContent = dMatch[2];
 
     const dialogObj = {
+      type: 'TfrxDialogPage',
       name: getAttr(dAttrs, 'Name') || 'DialogPage1',
       caption: getAttr(dAttrs, 'Caption') || 'Parametre Formu',
       left: numVal(getAttr(dAttrs, 'Left'), 100),
@@ -756,6 +763,7 @@ function parseFrp(xmlText) {
       height: numVal(getAttr(dAttrs, 'Height'), 450),
       position: getAttr(dAttrs, 'Position') || 'poScreenCenter',
       color: getAttr(dAttrs, 'Color') || 'clBtnFace',
+      fillBackColor: getAttr(dAttrs, 'Color') || 'clBtnFace',
       controls: []
     };
 

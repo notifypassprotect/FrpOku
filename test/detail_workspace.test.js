@@ -8,16 +8,14 @@ const html = fs.readFileSync(path.join(root, 'detail.html'), 'utf8');
 const source = fs.readFileSync(path.join(root, 'js/detail/app.js'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'css/ui_polish.css'), 'utf8');
 
-test('detail workspace exposes persistent accessible viewing controls', () => {
+test('detail workspace exposes a persistent accessible information panel control', () => {
   assert.match(html, /id="btnToggleDetailSidebar"[^>]+aria-controls="detailSidebar"[^>]+aria-expanded="true"/);
-  assert.match(html, /id="btnToggleCodeWrap"[^>]+aria-pressed="false"/);
   assert.match(html, /id="detailSidebar"/);
   assert.match(source, /frp_detail_sidebar_collapsed/);
-  assert.match(source, /frp_detail_code_wrap/);
   assert.match(source, /matchMedia\('\(min-width: 861px\)'\)/);
-  assert.match(source, /event\.altKey && event\.key\.toLowerCase\(\) === 'z'/);
   assert.match(css, /body\.detail-sidebar-collapsed #detailSidebar/);
-  assert.match(css, /\.detail-code-wrap \.line-src/);
+  assert.doesNotMatch(html, /btnToggleCodeWrap/);
+  assert.doesNotMatch(source, /frp_detail_code_wrap/);
 });
 
 test('detail toolbar stays compact and horizontally navigable', () => {
@@ -36,7 +34,7 @@ test('detail theme synchronization uses a single custom-event listener', () => {
 test('shared visual stylesheet cache version is aligned across pages', () => {
   for (const page of ['index.html', 'detail.html', 'compare.html', 'dashboard.html']) {
     const pageHtml = fs.readFileSync(path.join(root, page), 'utf8');
-    assert.match(pageHtml, /css\/ui_polish\.css\?v=5\.7\.1/);
+    assert.match(pageHtml, /css\/ui_polish\.css\?v=5\.7\.2/);
   }
-  assert.match(html, /js\/detail\/app\.js\?v=5\.7\.1/);
+  assert.match(html, /js\/detail\/app\.js\?v=5\.7\.2/);
 });

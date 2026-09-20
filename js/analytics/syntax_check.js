@@ -607,6 +607,60 @@
     return { line: lineIdx + 1, col: index - lineStartOffsets[lineIdx] + 1 };
   }
 
+  function parenthesisDepthAt(text, end) {
+    let depth = 0;
+    for (let i = 0; i < end; i++) {
+      if (text[i] === '(') depth++;
+      else if (text[i] === ')') depth = Math.max(0, depth - 1);
+    }
+    return depth;
+  }
+
+  function consumeJoinSource(text, start) {
+    let pos = start;
+    while (/\s/.test(text[pos] || '')) pos++;
+    if (text[pos] === '(') {
+      let depth = 1;
+      pos++;
+      while (pos < text.length && depth > 0) {
+        if (text[pos] === '(') depth++;
+        else if (text[pos] === ')') depth--;
+        pos++;
+      }
+      if (depth !== 0) return -1;
+    } else {
+      const table = /^[a-zA-Z0-9_$.#]+(?:@[a-zA-Z0-9_$.#]+)?/.exec(text.slice(pos));
+      if (!table) return -1;
+      pos += table[0].length;
+    }
+    while (/\s/.test(text[pos] || '')) pos++;
+    const asMatch = /^AS\b/i.exec(text.slice(pos));
+    if (asMatch) {
+      pos += asMatch[0].length;
+      while (/\s/.test(text[pos] || '')) pos++;
+    }
+    const alias = /^[a-zA-Z_][\w$#]*/.exec(text.slice(pos));
+    const reserved = /^(?:ON|USING|WHERE|GROUP|ORDER|HAVING|UNION|MINUS|INTERSECT|CONNECT|START|JOIN|LEFT|RIGHT|FULL|INNER|CROSS|NATURAL)$/i;
+    if (alias && !reserved.test(alias[0])) pos += alias[0].length;
+    return pos;
+  }
+
+  function findJoinBoundary(text, start) {
+    const baseDepth = parenthesisDepthAt(text, start);
+    let depth = baseDepth;
+    const clause = /^(?:(?:CROSS\s+|NATURAL(?:\s+\w+)*\s+|(?:LEFT|RIGHT|FULL)(?:\s+OUTER)?\s+|INNER\s+)?JOIN\b|WHERE\b|GROUP\s+BY\b|ORDER\s+BY\b|HAVING\b|UNION\b|MINUS\b|INTERSECT\b|CONNECT\s+BY\b|START\s+WITH\b)/i;
+    for (let i = start; i < text.length; i++) {
+      if (text[i] === '(') { depth++; continue; }
+      if (text[i] === ')') {
+        if (depth <= baseDepth) return i;
+        depth--;
+        continue;
+      }
+      if (depth === baseDepth && (i === 0 || !/[\w$#]/.test(text[i - 1])) && clause.test(text.slice(i))) return i;
+    }
+    return text.length;
+  }
+
   // Mask strings and comments while strictly preserving character offsets and newlines
   let maskedSql = '';
   let inSingleQuote = false;
@@ -762,16 +816,10 @@
     const isNatural = upperJoinKw.startsWith('NATURAL');
 
     const afterJoinStart = joinPos + jm[0].length;
-    const afterJoinSub = maskedSql.slice(afterJoinStart);
+    const tableEndPos = consumeJoinSource(maskedSql, afterJoinStart);
+    const boundaryPos = tableEndPos >= 0 ? findJoinBoundary(maskedSql, tableEndPos) : afterJoinStart;
 
-    const tableMatch = /^\s*(?:\(([\s\S]*?)\)\s*(?:AS\s+)?([a-zA-Z0-9_#$]+)|([a-zA-Z0-9_$.]+)(?:\s+(?:AS\s+)?([a-zA-Z0-9_#$]+))?)/i.exec(afterJoinSub);
-
-    const boundaryRx = /\b(?:(?:CROSS\s+|NATURAL(?:\s+\w+)*\s+|(?:LEFT|RIGHT|FULL)(?:\s+OUTER)?\s+|INNER\s+)?JOIN|WHERE|GROUP\s+BY|ORDER\s+BY|HAVING|UNION|MINUS|INTERSECT|CONNECT\s+BY|START\s+WITH)\b|\)/gi;
-    boundaryRx.lastIndex = afterJoinStart + 1;
-    const boundaryMatch = boundaryRx.exec(maskedSql);
-    const boundaryPos = boundaryMatch ? boundaryMatch.index : maskedSql.length;
-
-    if (!tableMatch || !tableMatch[0].trim() || (afterJoinStart + tableMatch.index >= boundaryPos)) {
+    if (tableEndPos < 0) {
       errors.push(`Satır ${line}: JOIN sonrasında tablo adı eksik.`);
       continue;
     }
@@ -780,7 +828,6 @@
       continue; // CROSS JOIN ve NATURAL JOIN koşul gerektirmez
     }
 
-    const tableEndPos = afterJoinStart + tableMatch[0].length;
     const conditionSegment = maskedSql.slice(tableEndPos, boundaryPos).trim();
 
     const hasOn = /\bON\b/i.test(conditionSegment);
@@ -954,8 +1001,11 @@
           const endsWithOp = /(=|<>|!=|<=|>=|<|>|\+|-|\*|\/|\|\||\bAS|\bAND|\bOR|\bCASE|\bWHEN|\bTHEN|\bELSE)\s*$/i.test(curTrim);
           const startsWithComma = /^\s*,/.test(nextTrimClean);
           const startsWithFrom = /^\s*FROM\b/i.test(nextTrimClean);
+          const isSqlContinuation = /^(?:AND|OR|WHEN|THEN|ELSE|END)\b/i.test(curTrim) || /^(?:AND|OR|WHEN|THEN|ELSE|END)\b/i.test(nextTrimClean);
+          const lineOffset = lineStartOffsets[l - 1] || 0;
+          const isNestedExpression = parenthesisDepthAt(maskedSql, lineOffset) > 0;
 
-          if (!endsWithComma && !endsWithOp && !startsWithComma && !startsWithFrom) {
+          if (!endsWithComma && !endsWithOp && !startsWithComma && !startsWithFrom && !isSqlContinuation && !isNestedExpression) {
             const nextStartsWithOp = /^(=|<>|!=|<=|>=|<|>|\+|-|\*|\/|\|\|)/.test(nextTrimClean);
             const nextStartsNewExpr = !nextStartsWithOp && (
               /^(?:[a-zA-Z_]\w*\s*\(|CASE\b|\(|\d+|'|[a-zA-Z_]\w*\.[a-zA-Z0-9_#$*]+)/i.test(nextTrimClean) ||

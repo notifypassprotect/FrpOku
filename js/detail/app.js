@@ -49,10 +49,9 @@ function updateFontSize(size) {
 if (fontDec) fontDec.addEventListener('click', () => updateFontSize(currentFontSize - 1));
 if (fontInc) fontInc.addEventListener('click', () => updateFontSize(currentFontSize + 1));
 
-// Detay çalışma alanı: bilgi paneli ve uzun kod satırları
+// Detay çalışma alanı: masaüstü bilgi paneli
 function setupDetailWorkspaceControls() {
  const sidebarBtn = document.getElementById('btnToggleDetailSidebar');
- const wrapBtn = document.getElementById('btnToggleCodeWrap');
  const desktopQuery = window.matchMedia('(min-width: 861px)');
  const readPreference = (key) => {
  try { return localStorage.getItem(key) === '1'; } catch { return false; }
@@ -62,7 +61,6 @@ function setupDetailWorkspaceControls() {
  };
 
  let sidebarCollapsed = readPreference('frp_detail_sidebar_collapsed');
- let codeWrapEnabled = readPreference('frp_detail_code_wrap');
 
  const renderSidebarState = () => {
  const isCollapsed = desktopQuery.matches && sidebarCollapsed;
@@ -74,16 +72,6 @@ function setupDetailWorkspaceControls() {
  sidebarBtn.title = isCollapsed? 'Rapor bilgilerini göster': 'Rapor bilgilerini gizle';
  };
 
- const renderWrapState = () => {
- document.body.classList.toggle('detail-code-wrap', codeWrapEnabled);
- if (!wrapBtn) return;
- wrapBtn.classList.toggle('active', codeWrapEnabled);
- wrapBtn.setAttribute('aria-pressed', String(codeWrapEnabled));
- wrapBtn.title = codeWrapEnabled? 'Satır sarmayı kapat (Alt+Z)': 'Uzun satırları sar (Alt+Z)';
- const label = wrapBtn.querySelector('span');
- if (label) label.textContent = codeWrapEnabled? 'Sarma Açık': 'Satırları Sar';
- };
-
  if (sidebarBtn) {
  sidebarBtn.addEventListener('click', () => {
  sidebarCollapsed = !sidebarCollapsed;
@@ -92,29 +80,9 @@ function setupDetailWorkspaceControls() {
  });
  }
 
- if (wrapBtn) {
- wrapBtn.addEventListener('click', () => {
- codeWrapEnabled = !codeWrapEnabled;
- savePreference('frp_detail_code_wrap', codeWrapEnabled);
- renderWrapState();
- });
- }
-
- document.addEventListener('keydown', (event) => {
- const target = event.target;
- const isTyping = target && (target.matches?.('input, textarea, select') || target.isContentEditable);
- if (!isTyping && event.altKey && event.key.toLowerCase() === 'z') {
- event.preventDefault();
- codeWrapEnabled = !codeWrapEnabled;
- savePreference('frp_detail_code_wrap', codeWrapEnabled);
- renderWrapState();
- }
- });
-
  if (typeof desktopQuery.addEventListener === 'function') desktopQuery.addEventListener('change', renderSidebarState);
  else if (typeof desktopQuery.addListener === 'function') desktopQuery.addListener(renderSidebarState);
  renderSidebarState();
- renderWrapState();
 }
 
 const btnPrint = document.getElementById('btnPrintDoc');

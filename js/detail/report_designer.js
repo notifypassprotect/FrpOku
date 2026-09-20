@@ -8,20 +8,54 @@
 
  // ── DELPHI RENK DÖNÜŞTÜRÜCÜ & ETİKETLEYİCİ (BGR <-> RGB/HEX) ─────────────────
  function delphiColorToRgb(val, isBackground = true) {
+ val = String(val ?? '').trim();
  if (!val || val === 'clNone' || val === 'None' || val === '-1' || val === '536870911') {
  return { r: 255, g: 255, b: 255, a: 0, isNone: true, hex: '#ffffff', rgb: 'clNone', label: 'clNone (Şeffaf)' };
  }
- if (val === '-16777208' || val === 'clWindowText' || val === '0' || val === 'clBlack') {
+ if (val === 'clWindowText' || val === '0' || val === 'clBlack') {
  return { r: 0, g: 0, b: 0, a: 1, isNone: false, hex: '#000000', rgb: 'rgb(0, 0, 0)', label: 'clWindowText (Siyah)' };
  }
- if (val === '16777215' || val === 'clWhite' || val === '-16777211' || val === 'clWindow') {
+ if (val === '16777215' || val === 'clWhite' || val === 'clWindow') {
  return { r: 255, g: 255, b: 255, a: 1, isNone: false, hex: '#ffffff', rgb: 'rgb(255, 255, 255)', label: 'clWhite (Beyaz)' };
  }
- if (val === '-16777201' || val === 'clBtnFace') {
+ if (val === 'clBtnFace') {
  return { r: 236, g: 233, b: 216, a: 1, isNone: false, hex: '#ece9d8', rgb: 'rgb(236, 233, 216)', label: 'clBtnFace (Form Grisi)' };
  }
- if (val === '-16777188' || val === 'clMenuHighlight') {
- return { r: 91, g: 192, b: 222, a: 1, isNone: false, hex: '#5bc0de', rgb: 'rgb(91, 192, 222)', label: 'Sky Cyan' };
+ const systemColorNames = {
+ clScrollBar: 0, clBackground: 1, clActiveCaption: 2, clInactiveCaption: 3,
+ clMenu: 4, clWindow: 5, clWindowFrame: 6, clMenuText: 7, clWindowText: 8,
+ clCaptionText: 9, clActiveBorder: 10, clInactiveBorder: 11, clAppWorkSpace: 12,
+ clHighlight: 13, clHighlightText: 14, clBtnFace: 15, clBtnShadow: 16,
+ clGrayText: 17, clBtnText: 18, clInactiveCaptionText: 19, clBtnHighlight: 20,
+ cl3DDkShadow: 21, cl3DLight: 22, clInfoText: 23, clInfoBk: 24,
+ clHotLight: 26, clGradientActiveCaption: 27, clGradientInactiveCaption: 28,
+ clMenuHighlight: 29, clMenuBar: 30
+ };
+ const systemColors = {
+ 0: ['#c8c8c8', 'clScrollBar'], 1: ['#1f2937', 'clBackground'], 2: ['#0a64ad', 'clActiveCaption'],
+ 3: ['#bfcdde', 'clInactiveCaption'], 4: ['#f0f0f0', 'clMenu'], 5: ['#ffffff', 'clWindow'],
+ 6: ['#646464', 'clWindowFrame'], 7: ['#000000', 'clMenuText'], 8: ['#000000', 'clWindowText'],
+ 9: ['#ffffff', 'clCaptionText'], 10: ['#b4b4b4', 'clActiveBorder'], 11: ['#f4f7fc', 'clInactiveBorder'],
+ 12: ['#ababab', 'clAppWorkSpace'], 13: ['#3399ff', 'clHighlight'], 14: ['#ffffff', 'clHighlightText'],
+ 15: ['#f0f0f0', 'clBtnFace'], 16: ['#a0a0a0', 'clBtnShadow'], 17: ['#6d6d6d', 'clGrayText'],
+ 18: ['#000000', 'clBtnText'], 19: ['#434e54', 'clInactiveCaptionText'], 20: ['#ffffff', 'clBtnHighlight'],
+ 21: ['#696969', 'cl3DDkShadow'], 22: ['#e3e3e3', 'cl3DLight'], 23: ['#000000', 'clInfoText'],
+ 24: ['#ffffe1', 'clInfoBk'], 26: ['#0066cc', 'clHotLight'], 27: ['#b9d1ea', 'clGradientActiveCaption'],
+ 28: ['#d7e4f2', 'clGradientInactiveCaption'], 29: ['#3399ff', 'clMenuHighlight'], 30: ['#f0f0f0', 'clMenuBar']
+ };
+ const namedSystemIndex = Object.prototype.hasOwnProperty.call(systemColorNames, val) ? systemColorNames[val] : null;
+ const numericColor = /^-?\d+$/.test(val) ? Number(val) : NaN;
+ const unsignedColor = Number.isInteger(numericColor) ? (numericColor >>> 0) : 0;
+ const encodedSystemIndex = (unsignedColor >>> 24) === 0xff
+ ? (unsignedColor & 0xff)
+ : (Number.isInteger(numericColor) && numericColor > 0 && numericColor <= 30 ? numericColor : null);
+ const systemIndex = namedSystemIndex ?? encodedSystemIndex;
+ if (systemIndex !== null) {
+ const entry = systemColors[systemIndex] || [isBackground ? '#f0f0f0' : '#000000', `SystemColor(${systemIndex})`];
+ const r = parseInt(entry[0].slice(1, 3), 16);
+ const g = parseInt(entry[0].slice(3, 5), 16);
+ const b = parseInt(entry[0].slice(5, 7), 16);
+ return { r, g, b, a: 1, isNone: false, hex: entry[0], rgb: `rgb(${r}, ${g}, ${b})`, label: entry[1] };
  }
  if (val === 'clRed' || val === '255') return { r: 220, g: 38, b: 38, a: 1, isNone: false, hex: '#dc2626', rgb: 'rgb(220, 38, 38)', label: 'clRed (Kırmızı)' };
  if (val === 'clYellow' || val === '65535') return { r: 202, g: 138, b: 4, a: 1, isNone: false, hex: '#ca8a04', rgb: 'rgb(202, 138, 4)', label: 'clYellow (Sarı)' };
@@ -579,7 +613,8 @@ function esc(str) {
 
  const componentsHtml = (band.components || []).map((comp, cIdx) => {
  const frameCss = getFrameBorderCss(comp.frameTyp, comp.frameColor, comp.frameWidth);
- const fillBg = decodeDelphiColor(comp.fillBackColor, true);
+ const fillIsClear = /^(?:bsClear|clear)$/i.test(String(comp.fillStyle || '')) || comp.fillBackColor === 'clNone';
+ const fillBg = fillIsClear ? 'transparent' : decodeDelphiColor(comp.fillBackColor, true);
  const textColor = decodeDelphiColor(comp.fontColor, false);
  const isBold = comp.fontStyle === '1' || String(comp.fontStyle).includes('fsBold');
  const isItalic = comp.fontStyle === '2' || String(comp.fontStyle).includes('fsItalic');
@@ -1319,6 +1354,7 @@ function esc(str) {
 
  let propList = [];
  const isPage = (obj.type === 'TfrxReportPage' || obj.type === 'TfrxDMPPage' || (!obj.type && obj.bands) || obj.name === 'Page1');
+ const isDialogPage = obj.type === 'TfrxDialogPage' || Array.isArray(obj.controls);
  const isBand = (obj.type && (BAND_META[obj.type] || obj.type.includes('Band') || obj.type.includes('Header') || obj.type.includes('Footer') || obj.type === 'TfrxMasterData' || obj.type === 'TfrxReportTitle'));
 
  if (inspectorTab === 'events') {
@@ -1358,6 +1394,19 @@ function esc(str) {
       { name: 'Duplex', val: 'dmNone', readOnly: true },
       { name: 'Visible', val: obj.visible !== false ? 'true' : 'false', propKey: 'visible', isSelect: isDesignEditing, options: ['true', 'false'] }
     ];
+  } else if (isDialogPage) {
+    propList = [
+      { name: 'Name', val: obj.name || 'DialogPage1', propKey: 'name', editable: isDesignEditing },
+      { name: 'Class', val: 'TfrxDialogPage', readOnly: true },
+      { name: 'Caption', val: obj.caption || '', propKey: 'caption', editable: isDesignEditing },
+      { name: 'Left', val: obj.left ?? 0, propKey: 'left', isNumber: true, editable: isDesignEditing },
+      { name: 'Top', val: obj.top ?? 0, propKey: 'top', isNumber: true, editable: isDesignEditing },
+      { name: 'Width', val: obj.width ?? 360, propKey: 'width', isNumber: true, editable: isDesignEditing },
+      { name: 'Height', val: obj.height ?? 240, propKey: 'height', isNumber: true, editable: isDesignEditing },
+      { name: 'Position', val: obj.position || 'poScreenCenter', propKey: 'position', readOnly: true },
+      { name: 'Color', rawVal: obj.color, val: obj.color || 'clBtnFace', propKey: 'color', isColor: true, editable: isDesignEditing },
+      { name: 'Controls', val: String((obj.controls || []).length), readOnly: true }
+    ];
   } else {
     // BANT, MEMO (TfrxMemoView), VE DİĞER BİLEŞENLERİN TÜM DELPHI ÖZELLİKLERİ
     const isBoldVal = (obj.fontStyle && (obj.fontStyle.includes('fsBold') || obj.fontStyle.includes('bold'))) || obj.isBold;
@@ -1384,7 +1433,8 @@ function esc(str) {
       { name: 'Font.Italic', val: isItalicVal ? 'true' : 'false', propKey: 'isItalic', isSelect: isDesignEditing, options: ['true', 'false'] },
       { name: 'Font.Underline', val: isUnderlineVal ? 'true' : 'false', propKey: 'isUnderline', isSelect: isDesignEditing, options: ['true', 'false'] },
       { name: 'Font.Color', rawVal: obj.fontColor, val: obj.fontColor || '-16777208', propKey: 'fontColor', isColor: true, editable: isDesignEditing },
-      { name: 'Fill.BackColor', rawVal: (obj.fillBackColor || obj.color), val: obj.fillBackColor || obj.color || 'clNone', propKey: 'fillBackColor', isColor: true, editable: isDesignEditing },
+      { name: 'Fill.BackColor', rawVal: (/^(?:bsClear|clear)$/i.test(String(obj.fillStyle || '')) ? 'clNone' : (obj.fillBackColor || obj.color)), val: /^(?:bsClear|clear)$/i.test(String(obj.fillStyle || '')) ? 'clNone' : (obj.fillBackColor || obj.color || 'clNone'), propKey: 'fillBackColor', isColor: true, editable: isDesignEditing },
+      { name: 'Fill.Style', val: obj.fillStyle || 'bsSolid', propKey: 'fillStyle', isSelect: isDesignEditing, options: ['bsSolid', 'bsClear', 'bsHorizontal', 'bsVertical', 'bsFDiagonal', 'bsBDiagonal', 'bsCross', 'bsDiagCross'] },
       { name: 'Frame.Typ', val: obj.frameTyp || '[ftLeft, ftRight, ftTop, ftBottom]', propKey: 'frameTyp', isSelect: isDesignEditing, options: ['[ftLeft, ftRight, ftTop, ftBottom]', '[ftLeft, ftRight]', '[ftTop, ftBottom]', '[]', '[ftLeft]', '[ftRight]', '[ftTop]', '[ftBottom]'] },
       { name: 'Frame.Width', val: obj.frameWidth || 1, propKey: 'frameWidth', isNumber: true, editable: isDesignEditing },
       { name: 'Frame.Style', val: obj.frameStyle || 'fsSolid', propKey: 'frameStyle', isSelect: isDesignEditing, options: ['fsSolid', 'fsDash', 'fsDot', 'fsDashDot'] },
@@ -2457,6 +2507,7 @@ function esc(str) {
 
  window.FastReportDesigner = {
  render: createDesigner,
+ decodeColor: decodeDelphiColor,
  switchDialogTab: window.switchDialogTab,
  copyDataTreeField: window.copyDataTreeField
  };
