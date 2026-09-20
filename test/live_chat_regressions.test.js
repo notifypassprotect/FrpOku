@@ -115,10 +115,23 @@ test('conversation list reflects open chats and the composer uses a unified focu
   const fs=require('node:fs'), path=require('node:path');
   const source=fs.readFileSync(path.join(__dirname,'../js/core/online_presence.js'),'utf8');
   const css=fs.readFileSync(path.join(__dirname,'../css/online_presence.css'),'utf8');
-  assert.match(source,/row\.classList\.toggle\('conversation-open', activeChatWindows\.has\(chatKey\)\)/);
+  assert.match(source,/row\.classList\.toggle\('conversation-open', isOpen\)/);
   assert.match(source,/syncOpenConversationRows\(\)/);
   assert.match(css,/\.frp-presence-item\.conversation-open/);
   assert.match(css,/\.frp-chat-input-row:focus-within/);
+});
+
+test('message actions use an accessible modern toolbar on pointer and touch devices', () => {
+  const fs=require('node:fs'), path=require('node:path');
+  const source=fs.readFileSync(path.join(__dirname,'../js/core/online_presence.js'),'utf8');
+  const css=fs.readFileSync(path.join(__dirname,'../css/online_presence.css'),'utf8');
+  assert.match(source,/class="frp-chat-hover-bar" role="toolbar" aria-label="Mesaj işlemleri"/);
+  assert.match(source,/class="frp-chat-action-btn btn-reply-msg"/);
+  assert.match(source,/chatIcon\('reply'\)/);
+  assert.match(source,/window\.matchMedia\?\.\('\(hover: none\)'\)/);
+  assert.match(source,/classList\.toggle\('conversation-open', isOpen\)/);
+  assert.match(css,/\.frp-chat-msg\.actions-open \.frp-chat-hover-bar/);
+  assert.doesNotMatch(source,/>↩<\/button>/);
 });
 
 test('reply metadata is validated, persisted and rendered as navigation', () => {

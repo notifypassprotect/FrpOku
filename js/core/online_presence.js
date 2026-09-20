@@ -20,13 +20,19 @@
   function markConversationRow(row, chatKey) {
     if (!row || !chatKey) return;
     row.dataset.conversationKey = chatKey;
-    row.classList.toggle('conversation-open', activeChatWindows.has(chatKey));
+    const isOpen = activeChatWindows.has(chatKey);
+    row.classList.toggle('conversation-open', isOpen);
+    if (isOpen) row.setAttribute('aria-current', 'true');
+    else row.removeAttribute('aria-current');
   }
 
   function syncOpenConversationRows() {
     if (!dockEl) return;
     dockEl.querySelectorAll('[data-conversation-key]').forEach(row => {
-      row.classList.toggle('conversation-open', activeChatWindows.has(row.dataset.conversationKey));
+      const isOpen = activeChatWindows.has(row.dataset.conversationKey);
+      row.classList.toggle('conversation-open', isOpen);
+      if (isOpen) row.setAttribute('aria-current', 'true');
+      else row.removeAttribute('aria-current');
     });
   }
 
@@ -124,7 +130,8 @@
     smile: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"></path></svg>',
     mic: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"></rect><path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8"></path></svg>',
     play: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7z"></path></svg>',
-    pause: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14"></path></svg>'
+    pause: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14"></path></svg>',
+    reply: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7 4 12l5 5"></path><path d="M5 12h8a7 7 0 0 1 7 7"></path></svg>'
   };
 
   function chatIcon(name) {
@@ -922,10 +929,8 @@
     const showSelfNote = !q && currentAuthUser && userListFilter === 'all';
     if (showSelfNote) {
       const selfLi = document.createElement('li');
-      selfLi.className = 'frp-presence-item';
+      selfLi.className = 'frp-presence-item personal-notes';
       markConversationRow(selfLi, `peer:${String(currentAuthUser.id)}`);
-      selfLi.style.background = 'linear-gradient(135deg, rgba(37,99,235,0.08), rgba(99,102,241,0.06))';
-      selfLi.style.borderBottom = '1px solid var(--border-light, #e2e8f0)';
       selfLi.innerHTML = `
         <div class="frp-presence-avatar-wrap">
           <div class="frp-presence-avatar" style="background: linear-gradient(135deg, #2563eb, #6366f1); font-size: 1rem;">📌</div>
@@ -2792,14 +2797,17 @@
       const currentAuthUser = window.FrpAuth && window.FrpAuth.getUser ? window.FrpAuth.getUser() : null;
       const canDelete = isSelf || (currentAuthUser && currentAuthUser.role === 'admin');
       const hoverReactionHtml = `
-        <div class="frp-chat-hover-bar">
-          <button type="button" class="btn-reply-msg" aria-label="Mesajı yanıtla" title="Yanıtla">↩</button>
-          <button type="button" class="btn-react" data-emoji="👍" aria-label="Beğen">👍</button>
-          <button type="button" class="btn-react" data-emoji="❤️" aria-label="Kalp tepkisi">❤️</button>
-          <button type="button" class="btn-react" data-emoji="😂" aria-label="Gülme tepkisi">😂</button>
-          <button type="button" class="btn-react" data-emoji="😮" aria-label="Şaşırma tepkisi">😮</button>
-          <button type="button" class="btn-react" data-emoji="🔥" aria-label="Ateş tepkisi">🔥</button>
-          ${canDelete ? `<button type="button" class="btn-delete-msg" title="Mesajı Sil / Geri Al" aria-label="Mesajı sil">${chatIcon('trash')}</button>` : ''}
+        <div class="frp-chat-hover-bar" role="toolbar" aria-label="Mesaj işlemleri">
+          <button type="button" class="frp-chat-action-btn btn-reply-msg" aria-label="Mesajı yanıtla" title="Yanıtla">${chatIcon('reply')}</button>
+          <span class="frp-chat-action-divider" aria-hidden="true"></span>
+          <div class="frp-chat-quick-reactions" aria-label="Hızlı tepkiler">
+            <button type="button" class="btn-react" data-emoji="👍" aria-label="Beğen">👍</button>
+            <button type="button" class="btn-react" data-emoji="❤️" aria-label="Kalp tepkisi">❤️</button>
+            <button type="button" class="btn-react" data-emoji="😂" aria-label="Gülme tepkisi">😂</button>
+            <button type="button" class="btn-react" data-emoji="😮" aria-label="Şaşırma tepkisi">😮</button>
+            <button type="button" class="btn-react" data-emoji="🔥" aria-label="Ateş tepkisi">🔥</button>
+          </div>
+          ${canDelete ? `<span class="frp-chat-action-divider" aria-hidden="true"></span><button type="button" class="frp-chat-action-btn btn-delete-msg" title="Mesajı sil" aria-label="Mesajı sil">${chatIcon('trash')}</button>` : ''}
         </div>
       `;
 
@@ -2819,6 +2827,15 @@
           ${isSelf ? `<span class="frp-chat-tick ${m.isRead ? 'read' : ''}" title="${m.isRead ? 'Okundu' : 'Sunucuya ulaştı'}">${m.isRead ? '✓✓' : '✓'}</span>` : ''}
         </div>
       `;
+
+      const messageBubble = msgDiv.querySelector('.frp-chat-bubble');
+      messageBubble?.addEventListener('click', event => {
+        if (!window.matchMedia?.('(hover: none)').matches) return;
+        if (event.target.closest('button, a, img, audio')) return;
+        const willOpen = !msgDiv.classList.contains('actions-open');
+        msgStream.querySelectorAll('.frp-chat-msg.actions-open').forEach(node => node.classList.remove('actions-open'));
+        if (willOpen) msgDiv.classList.add('actions-open');
+      });
 
       // Görsel önizleme ve indirme tıklama olayları
       const imgThumb = msgDiv.querySelector('.frp-chat-img-thumb-wrap');
@@ -2844,6 +2861,7 @@
       // Event binding
       msgDiv.querySelector('.btn-reply-msg')?.addEventListener('click', event => {
         event.stopPropagation();
+        msgDiv.classList.remove('actions-open');
         replyingTo = { id: String(m.id), senderId: String(m.senderId || ''),
           senderName: isSelf ? 'Siz' : (m.senderName || senderLabel || 'Kullanıcı'), text: String(m.text || '').slice(0, 180),
           hasAttachment: Boolean(m.attachment?.dataUrl), hasVoice: Boolean(m.voice?.dataUrl) };
@@ -2860,6 +2878,7 @@
       msgDiv.querySelectorAll('.btn-react').forEach(rbtn => {
         rbtn.addEventListener('click', async (ev) => {
           ev.stopPropagation();
+          msgDiv.classList.remove('actions-open');
           const emoji = rbtn.dataset.emoji;
           const targetMsgId = msgDiv.dataset.msgId || m.id;
 
@@ -2922,6 +2941,7 @@
       if (btnDel) {
         btnDel.addEventListener('click', (ev) => {
           ev.stopPropagation();
+          msgDiv.classList.remove('actions-open');
           const deleteMessage = async () => {
             btnDel.disabled = true;
             msgDiv.classList.add('deleting');
