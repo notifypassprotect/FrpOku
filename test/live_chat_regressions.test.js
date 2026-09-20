@@ -68,3 +68,13 @@ test('unread snapshot updates badges without const reassignment failure', () => 
   assert.equal(ctx.unreadData.total,3);assert.equal(ctx.unreadData.bySender.peer,3);
   ctx.handleUnreadUpdate({bySender:{},total:0});assert.equal(ctx.unreadData.total,0);
 });
+
+test('chat UI keeps read-only reconnect safe and reaction pills interactive', () => {
+  const fs=require('node:fs'), path=require('node:path');
+  const source=fs.readFileSync(path.join(__dirname,'../js/core/online_presence.js'),'utf8');
+  assert.match(source,/if \(input\) input\.disabled = true/);
+  assert.match(source,/if \(btnSend\) btnSend\.disabled = true/);
+  assert.ok(source.includes('class="frp-chat-reaction-pill'));
+  assert.match(source,/pendingNewCount \+= newIncomingCount/);
+  assert.match(source,/msgStream\.scrollTo\(\{ top: msgStream\.scrollHeight, behavior: 'smooth' \}\)/);
+});

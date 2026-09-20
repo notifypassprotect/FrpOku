@@ -1324,9 +1324,12 @@
     const baseOffset = getChatBaseOffset();
     const rightOffset = baseOffset + (activeChatWindows.size * 398);
 
+    const previousFocus = document.activeElement;
     const chatEl = document.createElement('div');
     chatEl.className = 'frp-chat-window';
     chatEl.style.right = `${rightOffset}px`;
+    chatEl.setAttribute('role', 'dialog');
+    chatEl.setAttribute('aria-label', `${chatTitle || 'Sohbet'} konuşması`);
 
     const userStatus = (!isRoom && !isGroup) ? (targetUser.status || (targetUser.isOnline ? 'online' : 'offline')) : 'online';
     let statusDotColor = '#10b981';
@@ -1433,7 +1436,7 @@
       <div class="frp-chat-body">
         <div class="frp-chat-connection" role="status" aria-live="polite">Bağlanıyor…</div>
         <div class="frp-chat-messages-stream" role="log" aria-label="Sohbet mesajları" aria-relevant="additions"></div>
-        <button type="button" class="frp-chat-jump" hidden>Yeni mesajlar ↓</button>
+        <button type="button" class="frp-chat-jump" aria-live="polite" hidden>Yeni mesajlar ↓</button>
         <!-- CANLI YAZIYOR GÖSTERGESİ -->
         <div class="frp-typing-indicator" style="display: none;">
           <div class="typing-bubble">
@@ -1807,6 +1810,13 @@
     // Pencere Takibi ve Otomatik Polling (Her 2.5 saniyede bir yeni mesajları sorgula)
     let currentMessages = [];
     let readMarkPending = false;
+    let pendingNewCount = 0;
+
+    function updateJumpButton(reset = false) {
+      if (reset) pendingNewCount = 0;
+      jumpButton.textContent = pendingNewCount > 1 ? `${pendingNewCount} yeni mesaj ↓` : 'Yeni mesaj ↓';
+      jumpButton.hidden = pendingNewCount === 0;
+    }
 
     async function markVisibleMessagesRead() {
       if (isRoom || isGroup || targetUser?.isSelfNote || chatId === myId || readMarkPending) return;
@@ -1848,6 +1858,7 @@
     let pollTimer = null, liveController = null, liveRevision = '', reconnectDelay = 1000;
     let closed = false, requestSerial = 0;
     function setConnection(text, state) {
+      if (connectionStatus.textContent === text && connectionStatus.dataset.state === state) return;
       connectionStatus.textContent = text;
       connectionStatus.dataset.state = state;
     }
@@ -1873,7 +1884,8 @@
         if (serial !== requestSerial || !canListen()) return;
         if (res.status === 401 || res.status === 403) {
           setConnection('Oturum veya sohbet erişimi sona erdi.', 'error');
-          input.disabled = true; btnSend.disabled = true;
+          if (input) input.disabled = true;
+          if (btnSend) btnSend.disabled = true;
           nextDelay = 0; return;
         }
         if (!res.ok) throw new Error('Bağlantı kurulamadı.');
@@ -1923,6 +1935,7 @@
       chatEl.remove(); activeChatWindows.delete(chatKey);
       if (!activeChatWindows.size) document.body.classList.remove('frp-mobile-chat-open');
       realignChatWindows();
+      if (previousFocus?.isConnected && typeof previousFocus.focus === 'function') previousFocus.focus();
     }
     function onChatFocus() { markVisibleMessagesRead(); }
     document.addEventListener('visibilitychange', resumeLive);
@@ -1930,12 +1943,13 @@
     window.addEventListener('focus', onChatFocus);
     msgStream.addEventListener('scroll', () => {
       if (msgStream.scrollHeight - msgStream.scrollTop - msgStream.clientHeight < 100) {
-        jumpButton.hidden = true;
+        updateJumpButton(true);
       }
       markVisibleMessagesRead();
     }, { passive: true });
     jumpButton.addEventListener('click', () => {
-      msgStream.scrollTop = msgStream.scrollHeight; jumpButton.hidden = true; markVisibleMessagesRead();
+      msgStream.scrollTo({ top: msgStream.scrollHeight, behavior: 'smooth' });
+      updateJumpButton(true); markVisibleMessagesRead();
     });
     function updatePeer() {
       if (isRoom || isGroup || targetUser?.isSelfNote) return;
@@ -1950,6 +1964,14 @@
       if (badge) badge.hidden = status !== 'online';
     }
     activeChatWindows.set(chatKey, { el: chatEl, close: closeChat, resume: resumeLive, updatePeer });
+    chatEl.addEventListener('keydown', event => {
+      if (event.key !== 'Escape') return;
+      if (emojiPicker && emojiPicker.style.display !== 'none') { emojiPicker.style.display = 'none'; event.stopPropagation(); return; }
+      if (mediaDrawer && mediaDrawer.style.display !== 'none') { mediaDrawer.style.display = 'none'; event.stopPropagation(); return; }
+      if (groupInfoDrawer?.classList.contains('open')) { groupInfoDrawer.classList.remove('open'); event.stopPropagation(); return; }
+      if (searchBar && searchBar.style.display !== 'none') { searchBar.style.display = 'none'; event.stopPropagation(); return; }
+      event.stopPropagation(); closeChat();
+    });
     // Start after the composer and typing state have been initialized.
     pollTimer = setTimeout(() => loadMessages(), 0);
     realignChatWindows();
@@ -2593,6 +2615,8 @@
       msgDiv.className = `frp-chat-msg ${isSelf ? 'outgoing' : 'incoming'}`;
       msgDiv.dataset.msgId = m.id;
       msgDiv.dataset.createdAt = m.createdAt || new Date().toISOString();
+      msgDiv.tabIndex = 0;
+      msgDiv.setAttribute('aria-label', `${isSelf ? 'Sizin' : (m.senderName || 'Gelen')} mesajınız: ${String(m.text || 'medya').slice(0, 120)}`);
 
       const isNudgeMsg = Boolean(m.isNudge || (m.text && m.text.includes('📳')));
       if (isNudgeMsg) msgDiv.classList.add('nudge-msg');
@@ -2672,7 +2696,7 @@
         Object.entries(m.reactions).forEach(([emoji, userIds]) => {
           if (userIds && userIds.length > 0) {
             const hasMy = userIds.includes(myId);
-            reactionsHtml += `<span class="frp-chat-reaction-pill ${hasMy ? 'active' : ''}">${escHtml(emoji)} ${userIds.length}</span>`;
+            reactionsHtml += `<button type="button" class="frp-chat-reaction-pill ${hasMy ? 'active' : ''}" data-emoji="${escHtml(emoji)}" aria-pressed="${hasMy}" title="${escHtml(emoji)} tepkisini ${hasMy ? 'kaldır' : 'ekle'}">${escHtml(emoji)} ${userIds.length}</button>`;
           }
         });
         reactionsHtml += '</div>';
@@ -2682,11 +2706,11 @@
       const canDelete = isSelf || (currentAuthUser && currentAuthUser.role === 'admin');
       const hoverReactionHtml = `
         <div class="frp-chat-hover-bar">
-          <button type="button" class="btn-react" data-emoji="👍">👍</button>
-          <button type="button" class="btn-react" data-emoji="❤️">❤️</button>
-          <button type="button" class="btn-react" data-emoji="😂">😂</button>
-          <button type="button" class="btn-react" data-emoji="😮">😮</button>
-          <button type="button" class="btn-react" data-emoji="🔥">🔥</button>
+          <button type="button" class="btn-react" data-emoji="👍" aria-label="Beğen">👍</button>
+          <button type="button" class="btn-react" data-emoji="❤️" aria-label="Kalp tepkisi">❤️</button>
+          <button type="button" class="btn-react" data-emoji="😂" aria-label="Gülme tepkisi">😂</button>
+          <button type="button" class="btn-react" data-emoji="😮" aria-label="Şaşırma tepkisi">😮</button>
+          <button type="button" class="btn-react" data-emoji="🔥" aria-label="Ateş tepkisi">🔥</button>
           ${canDelete ? `<button type="button" class="btn-delete-msg" title="Mesajı Sil / Geri Al" aria-label="Mesajı sil">${chatIcon('trash')}</button>` : ''}
         </div>
       `;
@@ -2751,15 +2775,23 @@
             const curCount = parseInt(pill.textContent.replace(emoji, '').trim(), 10) || 1;
             if (isActive) {
               pill.classList.remove('active');
+              pill.setAttribute('aria-pressed', 'false');
+              pill.title = `${emoji} tepkisini ekle`;
               if (curCount <= 1) pill.remove();
               else pill.textContent = `${emoji} ${curCount - 1}`;
             } else {
               pill.classList.add('active');
+              pill.setAttribute('aria-pressed', 'true');
+              pill.title = `${emoji} tepkisini kaldır`;
               pill.textContent = `${emoji} ${curCount + 1}`;
             }
           } else {
-            const newPill = document.createElement('span');
+            const newPill = document.createElement('button');
+            newPill.type = 'button';
             newPill.className = 'frp-chat-reaction-pill active';
+            newPill.dataset.emoji = emoji;
+            newPill.setAttribute('aria-pressed', 'true');
+            newPill.title = `${emoji} tepkisini kaldır`;
             newPill.textContent = `${emoji} 1`;
             reactionsWrap.appendChild(newPill);
           }
@@ -2771,12 +2803,15 @@
               body: JSON.stringify({ messageId: targetMsgId, emoji })
             });
             const data = await res.json().catch(() => ({}));
-            if (data && data.success && data.reactions) {
+            if (res.ok && data && data.success && data.reactions) {
               m.reactions = data.reactions;
               const cur = currentMessages.find(x => x.id === targetMsgId);
               if (cur) cur.reactions = data.reactions;
-            }
-          } catch (e) {}
+            } else throw new Error(data.reason || 'Tepki kaydedilemedi.');
+          } catch (error) {
+            loadMessages();
+            window.toast?.(error.message || 'Tepki kaydedilemedi.', 'error');
+          }
         });
       });
 
@@ -2807,6 +2842,17 @@
       return msgDiv;
     }
 
+    // Mevcut tepki rozetleri yeniden çizilse bile tıklanabilir kalır.
+    msgStream.addEventListener('click', event => {
+      const pill = event.target.closest('.frp-chat-reaction-pill');
+      if (!pill || !msgStream.contains(pill)) return;
+      event.stopPropagation();
+      const message = pill.closest('.frp-chat-msg');
+      const quickReaction = Array.from(message?.querySelectorAll('.btn-react') || [])
+        .find(button => button.dataset.emoji === pill.dataset.emoji);
+      quickReaction?.click();
+    });
+
     // Mesajları Akışa Basma (Artımlı / Incremental DOM Güncellemesi & Kesintisiz Ses)
     function renderMessageStream(messages) {
       const currentAuthUser = window.FrpAuth && window.FrpAuth.getUser ? window.FrpAuth.getUser() : null;
@@ -2826,6 +2872,7 @@
       // 2. Mesajları ekle veya güncelle
       const isNearBottom = (msgStream.scrollHeight - msgStream.scrollTop - msgStream.clientHeight) < 100;
       let hasNewMessage = false;
+      let newIncomingCount = 0;
 
       messages.forEach(m => {
         const isSelf = String(m.senderId) === myId;
@@ -2845,7 +2892,7 @@
             Object.entries(m.reactions).forEach(([emoji, userIds]) => {
               if (userIds && userIds.length > 0) {
                 const hasMy = userIds.includes(myId);
-                reactionsHtml += `<span class="frp-chat-reaction-pill ${hasMy ? 'active' : ''}">${escHtml(emoji)} ${userIds.length}</span>`;
+                reactionsHtml += `<button type="button" class="frp-chat-reaction-pill ${hasMy ? 'active' : ''}" data-emoji="${escHtml(emoji)}" aria-pressed="${hasMy}" title="${escHtml(emoji)} tepkisini ${hasMy ? 'kaldır' : 'ekle'}">${escHtml(emoji)} ${userIds.length}</button>`;
               }
             });
             if (reactionsWrap) {
@@ -2865,6 +2912,7 @@
         }
 
         hasNewMessage = true;
+        if (!isSelf) newIncomingCount++;
         const msgDiv = createMessageDiv(m, isSelf, myId);
         msgStream.appendChild(msgDiv);
       });
@@ -2893,9 +2941,13 @@
         const empty = document.createElement('div'); empty.className = 'frp-chat-empty';
         empty.textContent = 'Henüz mesaj yok. İlk mesajı siz yazın.'; msgStream.appendChild(empty);
       }
-      if (hasNewMessage && !isInitialStream && !isNearBottom) jumpButton.hidden = false;
+      if (hasNewMessage && !isInitialStream && !isNearBottom && newIncomingCount) {
+        pendingNewCount += newIncomingCount;
+        updateJumpButton();
+      }
       if (isInitialStream || (hasNewMessage && isNearBottom)) {
         msgStream.scrollTop = msgStream.scrollHeight;
+        updateJumpButton(true);
       } else if (!isNearBottom) { msgStream.scrollTop = previousScrollTop; }
       if (searchInput?.value) filterStreamMessages(searchInput.value);
       isInitialStream = false;

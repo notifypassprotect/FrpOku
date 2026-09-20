@@ -1375,8 +1375,15 @@
 }
 
 .frp-chat-msg:hover .frp-chat-hover-bar,
+.frp-chat-msg:focus-within .frp-chat-hover-bar,
 .frp-chat-hover-bar:hover {
   display: flex !important;
+}
+
+.frp-chat-msg:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent, #2563eb) 55%, transparent);
+  outline-offset: 3px;
+  border-radius: 12px;
 }
 
 .frp-chat-msg.outgoing .frp-chat-hover-bar {
@@ -1438,6 +1445,15 @@
   font-size: 0.66rem;
   font-weight: 700;
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  color: var(--text-primary, #0f172a);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.frp-chat-reaction-pill:hover,
+.frp-chat-reaction-pill:focus-visible {
+  transform: translateY(-1px);
+  border-color: var(--accent, #2563eb);
 }
 
 .frp-chat-reaction-pill.active {
@@ -1910,6 +1926,7 @@
   .frp-chat-composer-field { order: 1; flex: 1 1 calc(100% - 44px); }
   .frp-chat-send-btn { order: 1; }
   .frp-chat-btn-action { order: 2; }
+  .frp-chat-msg:focus-within { margin-top: 20px; }
 }
 
 /* ── GÖNDEREN KİŞİ ETİKETİ ── */
