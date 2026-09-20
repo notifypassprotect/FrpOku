@@ -3,10 +3,11 @@ const crypto = require('crypto');
 function registerChatSendRoute(app, deps) {
   const { canAccessChatGroup, canAccessChatRoom, chatPayloadSize, ensureChatMessagesHydrated, getChatMessages, persistChatMessage, requireAuth, saveChatMessages, scheduleChatEmailDigest } = deps;
 
+  const pendingSends = new Map();
   app.post('/api/chat/send', requireAuth, async (req, res) => {
     try {
       await ensureChatMessagesHydrated();
-      const { receiverId, roomId, groupId, text, attachment, voice, isNudge } = req.body || {};
+      const { receiverId, roomId, groupId, text, attachment, voice, isNudge, clientMessageId } = req.body || {};
       if (!text && !attachment && !voice && !isNudge) return res.status(400).json({ success: false, reason: 'Mesaj içeriği boş olamaz.' });
       const targets = [receiverId, roomId, groupId].filter(Boolean);
       if (!targets.length) return res.status(400).json({ success: false, reason: 'Alıcı, oda veya grup belirtilmelidir.' });
@@ -20,17 +21,30 @@ function registerChatSendRoute(app, deps) {
       if (roomId && !canAccessChatRoom(req.authUser, roomId)) return res.status(403).json({ success: false, reason: 'Bu kanala erişim yetkiniz yok.' });
       if (roomId && req.authUser.role !== 'admin') return res.status(403).json({ success: false, reason: 'Bu kurumsal kanala yalnızca sistem yöneticileri (Admin) duyuru ve mesaj gönderebilir.' });
 
+      let messageId = crypto.randomUUID();
+      if (clientMessageId) {
+        if (!/^[a-zA-Z0-9_-]{8,100}$/.test(String(clientMessageId))) return res.status(400).json({ success: false, reason: 'Geçersiz mesaj kimliği.' });
+        const digest = crypto.createHash('sha256').update(JSON.stringify([String(req.authUser.id), String(clientMessageId)])).digest('hex');
+        messageId = `${digest.slice(0,8)}-${digest.slice(8,12)}-4${digest.slice(13,16)}-a${digest.slice(17,20)}-${digest.slice(20,32)}`;
+        if (pendingSends.has(messageId)) await pendingSends.get(messageId);
+        const existing = getChatMessages().find(m => m.id === messageId);
+        if (existing) return res.json({ success: true, message: existing });
+      }
       const message = {
-        id: crypto.randomUUID(), senderId: String(req.authUser.id), senderName: req.authUser.full_name || req.authUser.username,
+        id: messageId, senderId: String(req.authUser.id), senderName: req.authUser.full_name || req.authUser.username,
         senderUsername: req.authUser.username, senderAvatar: req.authUser.avatar || (req.authUser.username ? req.authUser.username[0].toUpperCase() : 'U'),
         receiverId: receiverId ? String(receiverId) : null, roomId: roomId ? String(roomId) : null,
         groupId: groupId ? String(groupId) : null, text: cleanText, attachment: attachment || null,
         voice: voice || null, isNudge: Boolean(isNudge), reactions: {}, isRead: false, readAt: null,
         createdAt: new Date().toISOString()
       };
-      await persistChatMessage(message);
-      getChatMessages().push(message);
-      saveChatMessages();
+      const pending = (async () => {
+        await persistChatMessage(message);
+        getChatMessages().push(message);
+        saveChatMessages();
+      })();
+      pendingSends.set(messageId, pending);
+      try { await pending; } finally { pendingSends.delete(messageId); }
       if (receiverId && !roomId && !groupId) scheduleChatEmailDigest(req.authUser, receiverId, message.text).catch(() => {});
       res.json({ success: true, message });
     } catch (error) {

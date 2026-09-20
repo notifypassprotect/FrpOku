@@ -2414,3 +2414,20 @@
   justify-content: center;
   gap: 0.4rem;
 }
+
+/* Canlı sohbet: tek kaydırma alanı, bağlantı bilgisi ve yeni mesaj geçişi. */
+.frp-chat-body { overflow: hidden; min-height: 0; }
+.frp-chat-messages-stream { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0.25rem 0.3rem 0.6rem; scrollbar-gutter: stable; }
+.frp-chat-connection { flex-shrink: 0; font-size: 0.66rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem; }
+.frp-chat-connection::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); }
+.frp-chat-connection[data-state="online"]::before { background: var(--green, #10b981); }
+.frp-chat-connection[data-state="reconnecting"]::before { background: #f59e0b; }
+.frp-chat-connection[data-state="error"] { color: var(--red, #ef4444); }
+.frp-chat-jump { position: absolute; bottom: 0.75rem; align-self: center; z-index: 2; border: 1px solid var(--border); border-radius: 999px; background: var(--bg-surface); color: var(--accent); padding: 0.5rem 0.85rem; box-shadow: 0 3px 12px #0002; cursor: pointer; font: inherit; font-size: 0.75rem; }
+.frp-chat-jump[hidden] { display: none; }
+.frp-chat-day-label { align-self: center; flex-shrink: 0; font-size: 0.65rem; color: var(--text-muted); margin: 0.4rem 0; padding: 0.2rem 0.65rem; background: var(--bg-surface); border: 1px solid var(--border-light); border-radius: 999px; }
+.frp-chat-empty { margin: auto; padding: 2rem 1rem; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
+.frp-chat-send-error button { border: 0; background: transparent; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; }
+.frp-chat-msg { flex-shrink: 0; }
+.frp-chat-bubble { overflow-wrap: anywhere; }
+.frp-typing-indicator { flex-shrink: 0; }

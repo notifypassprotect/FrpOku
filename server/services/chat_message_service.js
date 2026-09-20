@@ -37,7 +37,7 @@ function createChatMessageService({ safeLogStr, store, supabase }) {
     if (!supabase) return getChatMessages();
     if (hydrationPromise) return hydrationPromise;
     hydrationPromise = (async () => {
-      const { data, error } = await supabase.from('chat_messages').select('*').order('created_at', { ascending: true }).limit(3000);
+      const { data, error } = await supabase.from('chat_messages').select('*').order('created_at', { ascending: false }).limit(3000);
       if (error) throw error;
       const merged = new Map(getChatMessages().map(message => [String(message.id), message]));
       (Array.isArray(data) ? data : []).forEach(row => merged.set(String(row.id), chatRowToMessage(row)));
