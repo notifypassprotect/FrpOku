@@ -106,14 +106,14 @@
 /* ── AÇILIR PANEL ── */
 .frp-presence-panel {
   display: none;
-  width: 380px;
+  width: 400px;
   max-width: calc(100vw - 32px);
-  height: 820px;
+  height: min(760px, calc(100vh - 40px));
   max-height: calc(100vh - 24px);
-  background: var(--bg-surface, #ffffff);
-  border: 1px solid var(--border, #cbd5e1);
-  border-radius: 16px;
-  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.25), 0 0 1px 1px rgba(0, 0, 0, 0.05);
+  background: color-mix(in srgb, var(--bg-surface, #ffffff) 96%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border, #cbd5e1) 76%, transparent);
+  border-radius: 22px;
+  box-shadow: 0 24px 70px -22px rgba(15, 23, 42, 0.42), 0 8px 24px -16px rgba(15, 23, 42, 0.3);
   overflow: hidden;
   flex-direction: column;
   animation: presenceSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
@@ -134,8 +134,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.85rem 1rem;
-  background: var(--bg-surface, #ffffff);
+  padding: 1rem 1.05rem 0.85rem;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent, #2563eb) 9%, var(--bg-surface, #ffffff)), var(--bg-surface, #ffffff) 62%);
   border-bottom: 1px solid var(--border-light, #e2e8f0);
 }
 
@@ -146,7 +146,7 @@
 }
 
 .frp-presence-title {
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 800;
   color: var(--text-primary, #0f172a);
 }
@@ -448,17 +448,31 @@
   min-height: 0;
   height: 100%;
   max-height: none;
-  padding: 0.35rem 0.45rem;
+  padding: 0.35rem 0.65rem 0.7rem;
   list-style: none;
   margin: 0;
+}
+
+.frp-presence-list::-webkit-scrollbar,
+.frp-chat-messages-stream::-webkit-scrollbar {
+  width: 5px;
+}
+
+.frp-presence-list::-webkit-scrollbar-thumb,
+.frp-chat-messages-stream::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-muted, #64748b) 34%, transparent);
+  border-radius: 999px;
 }
 
 .frp-presence-item {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.55rem 0.65rem;
-  border-radius: 10px;
+  gap: 0.72rem;
+  min-height: 58px;
+  margin: 0.2rem 0;
+  padding: 0.58rem 0.68rem;
+  border: 1px solid transparent;
+  border-radius: 14px;
   cursor: pointer;
   transition: all 0.15s ease;
   position: relative;
@@ -467,8 +481,26 @@
 }
 
 .frp-presence-item:hover {
-  background: var(--bg-raised, #f1f5f9);
-  transform: translateX(2px);
+  background: color-mix(in srgb, var(--accent, #2563eb) 7%, var(--bg-surface, #ffffff));
+  border-color: color-mix(in srgb, var(--accent, #2563eb) 14%, var(--border-light, #e2e8f0));
+  transform: translateY(-1px);
+  box-shadow: 0 7px 18px -14px rgba(15, 23, 42, 0.5);
+}
+
+.frp-presence-item.conversation-open {
+  background: color-mix(in srgb, var(--accent, #2563eb) 10%, var(--bg-surface, #ffffff));
+  border-color: color-mix(in srgb, var(--accent, #2563eb) 28%, var(--border-light, #e2e8f0));
+  box-shadow: inset 3px 0 0 var(--accent, #2563eb);
+}
+
+.frp-presence-item.conversation-open::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: var(--accent, #2563eb);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent, #2563eb) 13%, transparent);
 }
 
 .frp-presence-item:focus-visible {
@@ -478,9 +510,9 @@
 }
 
 .frp-presence-item.unread {
-  background: linear-gradient(90deg, rgba(37, 99, 235, 0.22), rgba(59, 130, 246, 0.08)) !important;
-  border-left: 4px solid var(--accent, #2563eb) !important;
-  box-shadow: inset 0 0 12px rgba(37, 99, 235, 0.1);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent, #2563eb) 14%, var(--bg-surface, #ffffff)), color-mix(in srgb, var(--accent, #2563eb) 5%, var(--bg-surface, #ffffff))) !important;
+  border-color: color-mix(in srgb, var(--accent, #2563eb) 24%, var(--border-light, #e2e8f0)) !important;
+  box-shadow: inset 3px 0 0 var(--accent, #2563eb);
 }
 
 .frp-presence-item.unread .frp-presence-name {
@@ -509,8 +541,8 @@
 .frp-presence-avatar-wrap {
   position: relative;
   flex-shrink: 0;
-  width: 38px;
-  height: 38px;
+  width: 42px;
+  height: 42px;
 }
 
 .frp-presence-avatar {
@@ -524,6 +556,7 @@
   justify-content: center;
   font-size: 0.95rem;
   font-weight: 700;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28), 0 4px 12px rgba(15, 23, 42, 0.1);
 }
 
 .frp-presence-status-dot {
@@ -554,7 +587,7 @@
 }
 
 .frp-presence-name {
-  font-size: 0.85rem;
+  font-size: 0.86rem;
   font-weight: 700;
   color: var(--text-primary, #0f172a);
   white-space: nowrap;
@@ -582,7 +615,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-top: 2px;
+  margin-top: 3px;
 }
 
 .frp-presence-dept-badge {
@@ -771,15 +804,15 @@
 .frp-chat-window {
   position: fixed;
   bottom: 0;
-  width: 390px;
-  height: 640px;
+  width: 410px;
+  height: 680px;
   max-height: 90vh;
   background: var(--bg-surface, #ffffff);
-  border-top-left-radius: 20px;
-  border-top-right-radius: 20px;
-  border: 1px solid var(--border, #cbd5e1);
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  border: 1px solid color-mix(in srgb, var(--border, #cbd5e1) 78%, transparent);
   border-bottom: none;
-  box-shadow: 0 -10px 35px rgba(0, 0, 0, 0.18), 0 0 1px 1px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 -18px 54px -20px rgba(15, 23, 42, 0.5), 0 0 0 1px rgba(15, 23, 42, 0.03);
   display: flex;
   flex-direction: column;
   z-index: 100001;
@@ -1002,8 +1035,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.78rem 0.9rem;
-  background: var(--bg-surface, #ffffff);
+  min-height: 62px;
+  padding: 0.72rem 0.82rem;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent, #2563eb) 8%, var(--bg-surface, #ffffff)), var(--bg-surface, #ffffff) 58%);
   border-bottom: 1px solid var(--border-light, #e2e8f0);
   cursor: pointer;
 }
@@ -1018,8 +1052,8 @@
 .frp-chat-avatar-wrap {
   position: relative;
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
+  width: 38px;
+  height: 38px;
 }
 
 .frp-chat-avatar {
@@ -1033,6 +1067,7 @@
   justify-content: center;
   font-size: 0.85rem;
   font-weight: 700;
+  box-shadow: 0 5px 14px rgba(37, 99, 235, 0.2), inset 0 0 0 1px rgba(255, 255, 255, 0.28);
 }
 
 .frp-chat-status-dot {
@@ -1102,6 +1137,10 @@
   display: flex;
   align-items: center;
   gap: 0.15rem;
+  padding: 0.2rem;
+  border: 1px solid color-mix(in srgb, var(--border-light, #e2e8f0) 80%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-card, #f8fafc) 76%, transparent);
 }
 
 .frp-chat-btn-ctrl {
@@ -1166,7 +1205,7 @@
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  padding: 0.75rem 0.85rem;
+  padding: 0.72rem 0.85rem 0.35rem;
   gap: 0.6rem;
   position: relative;
 }
@@ -1202,14 +1241,26 @@
 .frp-chat-msg {
   display: flex;
   flex-direction: column;
-  max-width: 82%;
+  max-width: 84%;
   position: relative;
   margin-top: 0.65rem;
   animation: msgEntrance 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .frp-chat-msg.grouped-with-previous {
-  margin-top: 0.16rem;
+  margin-top: 0.13rem;
+}
+
+.frp-chat-msg.grouped-with-next .frp-chat-msg-time {
+  display: none;
+}
+
+.frp-chat-msg.outgoing.grouped-with-next .frp-chat-bubble {
+  border-bottom-right-radius: 5px;
+}
+
+.frp-chat-msg.incoming.grouped-with-next .frp-chat-bubble {
+  border-bottom-left-radius: 5px;
 }
 
 .frp-chat-msg.incoming.grouped-with-previous .frp-chat-sender-name {
@@ -1240,7 +1291,7 @@
 }
 
 .frp-chat-bubble {
-  padding: 0.6rem 0.9rem;
+  padding: 0.62rem 0.88rem;
   border-radius: 18px;
   font-size: 0.82rem;
   line-height: 1.45;
@@ -1580,9 +1631,9 @@
 
 /* ── CHAT FOOTER & INPUT ── */
 .frp-chat-footer {
-  padding: 0.6rem 0.7rem 0.7rem;
-  background: var(--bg-surface, #ffffff);
-  border-top: 1px solid var(--border-light, #e2e8f0);
+  padding: 0.55rem 0.65rem 0.68rem;
+  background: color-mix(in srgb, var(--bg-surface, #ffffff) 96%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--border-light, #e2e8f0) 72%, transparent);
 }
 
 .frp-chat-reply-composer { display: flex; align-items: center; gap: 0.55rem; margin: -0.1rem 0 0.5rem; padding: 0.45rem 0.55rem; border-radius: 10px; background: var(--bg-card, #f8fafc); border: 1px solid var(--border-light, #e2e8f0); }
@@ -1597,7 +1648,18 @@
 .frp-chat-input-row {
   display: flex;
   align-items: flex-end;
-  gap: 0.35rem;
+  gap: 0.22rem;
+  padding: 0.28rem 0.32rem;
+  border: 1px solid var(--border-light, #e2e8f0);
+  border-radius: 22px;
+  background: var(--bg-card, #f8fafc);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.frp-chat-input-row:focus-within {
+  border-color: color-mix(in srgb, var(--accent, #2563eb) 55%, var(--border, #cbd5e1));
+  background: var(--bg-surface, #ffffff);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #2563eb) 11%, transparent);
 }
 
 .frp-chat-composer-field {
@@ -1638,12 +1700,12 @@
   width: 100%;
   min-height: 38px;
   max-height: 112px;
-  padding: 0.58rem 3rem 0.58rem 0.78rem;
+  padding: 0.52rem 2.8rem 0.52rem 0.62rem;
   font-size: 0.8rem;
   line-height: 1.35;
   border-radius: 18px;
-  border: 1px solid var(--border, #cbd5e1);
-  background: var(--bg-card, #f8fafc);
+  border: 0;
+  background: transparent;
   color: var(--text-primary, #0f172a);
   outline: none;
   resize: none;
@@ -1653,9 +1715,8 @@
 }
 
 .frp-chat-input:focus {
-  border-color: var(--accent, #2563eb);
-  background: var(--bg-surface, #ffffff);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  background: transparent;
+  box-shadow: none;
 }
 
 .frp-chat-char-count {
@@ -1676,8 +1737,8 @@
   background: var(--accent, #2563eb);
   border: none;
   color: #ffffff;
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   display: flex;
   align-items: center;

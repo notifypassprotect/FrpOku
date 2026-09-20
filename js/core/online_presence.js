@@ -17,6 +17,19 @@
   let userListFilter = 'all';
   const localLastInteractions = {};
 
+  function markConversationRow(row, chatKey) {
+    if (!row || !chatKey) return;
+    row.dataset.conversationKey = chatKey;
+    row.classList.toggle('conversation-open', activeChatWindows.has(chatKey));
+  }
+
+  function syncOpenConversationRows() {
+    if (!dockEl) return;
+    dockEl.querySelectorAll('[data-conversation-key]').forEach(row => {
+      row.classList.toggle('conversation-open', activeChatWindows.has(row.dataset.conversationKey));
+    });
+  }
+
   // MSN Nudge Buzzer Sesi (Web Audio API ile otantik çift ton titreşim sesi)
   function playMsnNudgeSound() {
     try {
@@ -910,6 +923,7 @@
     if (showSelfNote) {
       const selfLi = document.createElement('li');
       selfLi.className = 'frp-presence-item';
+      markConversationRow(selfLi, `peer:${String(currentAuthUser.id)}`);
       selfLi.style.background = 'linear-gradient(135deg, rgba(37,99,235,0.08), rgba(99,102,241,0.06))';
       selfLi.style.borderBottom = '1px solid var(--border-light, #e2e8f0)';
       selfLi.innerHTML = `
@@ -954,6 +968,7 @@
     filtered.forEach(u => {
       const li = document.createElement('li');
       li.className = 'frp-presence-item';
+      markConversationRow(li, `peer:${String(u.id)}`);
 
       const unreadCount = (unreadData.bySender && unreadData.bySender[String(u.id)]) || 0;
       if (unreadCount > 0) {
@@ -1027,6 +1042,7 @@
     filtered.forEach(room => {
       const li = document.createElement('li');
       li.className = 'frp-presence-item';
+      markConversationRow(li, `room:${String(room.id)}`);
 
       li.innerHTML = `
         <div class="frp-presence-avatar-wrap">
@@ -1093,6 +1109,7 @@
     filtered.forEach(group => {
       const li = document.createElement('li');
       li.className = 'frp-presence-item';
+      markConversationRow(li, `group:${String(group.id)}`);
 
       const memberCount = Array.isArray(group.memberUserIds) ? group.memberUserIds.length : 2;
       const groupIcon = group.icon || '👥';
@@ -1257,7 +1274,7 @@
     const vpWidth = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 1920;
 
     // Ekrana sığabilecek maksimum açık (genişletilmiş) pencere sayısı
-    const maxExpanded = Math.max(1, Math.min(3, Math.floor((vpWidth - baseOffset - 60) / 405)));
+    const maxExpanded = Math.max(1, Math.min(3, Math.floor((vpWidth - baseOffset - 60) / 425)));
 
     const windowsArr = Array.from(activeChatWindows.values());
     const expandedWins = windowsArr.filter(w => !w.el.classList.contains('minimized'));
@@ -1273,7 +1290,7 @@
     let currentRight = baseOffset;
     windowsArr.forEach((winObj) => {
       const isMin = winObj.el.classList.contains('minimized');
-      const winWidth = isMin ? 220 : 390;
+      const winWidth = isMin ? 220 : 410;
 
       // Sol kenardan taşmayı önle
       if (currentRight + winWidth > vpWidth - 16) {
@@ -1285,7 +1302,7 @@
       winObj.el.style.right = `${currentRight}px`;
       winObj.el.style.transition = 'right 0.25s cubic-bezier(0.16, 1, 0.3, 1), height 0.2s ease, width 0.2s ease';
 
-      const step = winObj.el.classList.contains('minimized') ? 228 : 398;
+      const step = winObj.el.classList.contains('minimized') ? 228 : 418;
       currentRight += step;
     });
   }
@@ -1322,7 +1339,7 @@
     }
 
     const baseOffset = getChatBaseOffset();
-    const rightOffset = baseOffset + (activeChatWindows.size * 398);
+    const rightOffset = baseOffset + (activeChatWindows.size * 418);
 
     const previousFocus = document.activeElement;
     const chatEl = document.createElement('div');
@@ -1972,6 +1989,7 @@
       mediaRecorder?.stream?.getTracks().forEach(track => track.stop());
       chatEl.querySelectorAll('audio').forEach(audio => { audio.pause(); audio.removeAttribute('src'); audio.load(); });
       chatEl.remove(); activeChatWindows.delete(chatKey);
+      syncOpenConversationRows();
       if (!activeChatWindows.size) document.body.classList.remove('frp-mobile-chat-open');
       realignChatWindows();
       if (previousFocus?.isConnected && typeof previousFocus.focus === 'function') previousFocus.focus();
@@ -2007,6 +2025,7 @@
       if (badge) badge.hidden = status !== 'online';
     }
     activeChatWindows.set(chatKey, { el: chatEl, close: closeChat, resume: resumeLive, updatePeer });
+    syncOpenConversationRows();
     chatEl.addEventListener('keydown', event => {
       if (event.key !== 'Escape') return;
       if (emojiPicker && emojiPicker.style.display !== 'none') { emojiPicker.style.display = 'none'; event.stopPropagation(); return; }
@@ -3021,12 +3040,12 @@
         if (expected !== node) msgStream.insertBefore(node, expected);
         previous = node;
       });
+      nodes.forEach(node => node.classList.remove('grouped-with-previous', 'grouped-with-next'));
       let lastDay = '';
       let previousMessage = null;
       nodes.forEach(node => {
         const date = new Date(node.dataset.createdAt);
         const day = date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
-        node.classList.remove('grouped-with-previous');
         if (day !== lastDay) {
           const label = document.createElement('div'); label.className = 'frp-chat-day-label';
           label.textContent = date.toDateString() === new Date().toDateString() ? 'Bugün' : day;
@@ -3039,6 +3058,7 @@
           const sameDay = date.toDateString() === previousDate.toDateString();
           if (sameSender && sameDay && elapsed >= 0 && elapsed <= 5 * 60 * 1000) {
             node.classList.add('grouped-with-previous');
+            previousMessage.classList.add('grouped-with-next');
           }
         }
         previousMessage = node;

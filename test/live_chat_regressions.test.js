@@ -105,8 +105,20 @@ test('chat removes canned replies and groups nearby messages from the same sende
   assert.match(source,/charCount\.hidden = length < 800/);
   assert.match(source,/elapsed <= 5 \* 60 \* 1000/);
   assert.match(source,/classList\.add\('grouped-with-previous'\)/);
+  assert.match(source,/previousMessage\.classList\.add\('grouped-with-next'\)/);
   assert.match(css,/\.frp-chat-msg\.grouped-with-previous/);
+  assert.match(css,/\.frp-chat-msg\.grouped-with-next \.frp-chat-msg-time/);
   assert.match(css,/\.frp-chat-msg\.incoming\.grouped-with-previous \.frp-chat-sender-name/);
+});
+
+test('conversation list reflects open chats and the composer uses a unified focus surface', () => {
+  const fs=require('node:fs'), path=require('node:path');
+  const source=fs.readFileSync(path.join(__dirname,'../js/core/online_presence.js'),'utf8');
+  const css=fs.readFileSync(path.join(__dirname,'../css/online_presence.css'),'utf8');
+  assert.match(source,/row\.classList\.toggle\('conversation-open', activeChatWindows\.has\(chatKey\)\)/);
+  assert.match(source,/syncOpenConversationRows\(\)/);
+  assert.match(css,/\.frp-presence-item\.conversation-open/);
+  assert.match(css,/\.frp-chat-input-row:focus-within/);
 });
 
 test('reply metadata is validated, persisted and rendered as navigation', () => {
