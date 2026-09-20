@@ -986,6 +986,73 @@ select:hover {
   backdrop-filter: blur(12px);
 }
 
+/* Detay çalışma alanı */
+#detailSidebar {
+  overflow: hidden;
+  transition: width 180ms ease, min-width 180ms ease, opacity 140ms ease, border-color 140ms ease;
+}
+
+.detail-sidebar-toggle,
+.code-wrap-toggle {
+  gap: 0.38rem !important;
+  white-space: nowrap;
+}
+
+.detail-sidebar-toggle.active,
+.code-wrap-toggle.active {
+  color: var(--accent) !important;
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border)) !important;
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-surface)) !important;
+}
+
+.code-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.38rem;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+  padding: 0.1rem 0.12rem 0.22rem;
+}
+
+.code-toolbar-actions > * {
+  flex: 0 0 auto;
+}
+
+.detail-code-wrap .code-table {
+  display: table;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.detail-code-wrap .line-num {
+  width: 4.25rem;
+}
+
+.detail-code-wrap .line-src {
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (min-width: 861px) {
+  body.detail-sidebar-collapsed #detailSidebar {
+    width: 0 !important;
+    min-width: 0 !important;
+    opacity: 0;
+    border-right-color: transparent !important;
+    pointer-events: none;
+  }
+}
+
+@media (max-width: 1240px) {
+  .detail-sidebar-toggle span,
+  .code-wrap-toggle span {
+    display: none;
+  }
+}
+
 .code-editor-wrap,
 .code-scroll,
 .editor-main {
@@ -1075,6 +1142,8 @@ select:hover {
 }
 
 @media (max-width: 860px) {
+  .detail-sidebar-toggle,
+  .code-wrap-toggle { display: none !important; }
   .stats-bar { padding: 0.75rem !important; gap: 0.55rem !important; }
   .stat-card { min-width: min(145px, calc(50vw - 1.1rem)) !important; padding: 0.65rem 0.75rem !important; }
   .toolbar { gap: 0.55rem !important; }

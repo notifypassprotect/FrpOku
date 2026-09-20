@@ -32,12 +32,6 @@ window.addEventListener('storage', (e) => {
  updateThemeBtn();
  }
 });
-window.addEventListener('frpoku:themeChanged', () => {
- updateThemeBtn();
-});
-
-updateThemeBtn();
-
 // Yazı Boyutu Kontrolleri
 const fontDec = document.getElementById('fontDec');
 const fontInc = document.getElementById('fontInc');
@@ -54,6 +48,74 @@ function updateFontSize(size) {
 
 if (fontDec) fontDec.addEventListener('click', () => updateFontSize(currentFontSize - 1));
 if (fontInc) fontInc.addEventListener('click', () => updateFontSize(currentFontSize + 1));
+
+// Detay çalışma alanı: bilgi paneli ve uzun kod satırları
+function setupDetailWorkspaceControls() {
+ const sidebarBtn = document.getElementById('btnToggleDetailSidebar');
+ const wrapBtn = document.getElementById('btnToggleCodeWrap');
+ const desktopQuery = window.matchMedia('(min-width: 861px)');
+ const readPreference = (key) => {
+ try { return localStorage.getItem(key) === '1'; } catch { return false; }
+ };
+ const savePreference = (key, value) => {
+ try { localStorage.setItem(key, value? '1': '0'); } catch { /* Depolama kapalıysa oturumluk çalışır. */ }
+ };
+
+ let sidebarCollapsed = readPreference('frp_detail_sidebar_collapsed');
+ let codeWrapEnabled = readPreference('frp_detail_code_wrap');
+
+ const renderSidebarState = () => {
+ const isCollapsed = desktopQuery.matches && sidebarCollapsed;
+ document.body.classList.toggle('detail-sidebar-collapsed', isCollapsed);
+ if (!sidebarBtn) return;
+ sidebarBtn.classList.toggle('active', isCollapsed);
+ sidebarBtn.setAttribute('aria-expanded', String(!isCollapsed));
+ sidebarBtn.setAttribute('aria-label', isCollapsed? 'Rapor bilgilerini göster': 'Rapor bilgilerini gizle');
+ sidebarBtn.title = isCollapsed? 'Rapor bilgilerini göster': 'Rapor bilgilerini gizle';
+ };
+
+ const renderWrapState = () => {
+ document.body.classList.toggle('detail-code-wrap', codeWrapEnabled);
+ if (!wrapBtn) return;
+ wrapBtn.classList.toggle('active', codeWrapEnabled);
+ wrapBtn.setAttribute('aria-pressed', String(codeWrapEnabled));
+ wrapBtn.title = codeWrapEnabled? 'Satır sarmayı kapat (Alt+Z)': 'Uzun satırları sar (Alt+Z)';
+ const label = wrapBtn.querySelector('span');
+ if (label) label.textContent = codeWrapEnabled? 'Sarma Açık': 'Satırları Sar';
+ };
+
+ if (sidebarBtn) {
+ sidebarBtn.addEventListener('click', () => {
+ sidebarCollapsed = !sidebarCollapsed;
+ savePreference('frp_detail_sidebar_collapsed', sidebarCollapsed);
+ renderSidebarState();
+ });
+ }
+
+ if (wrapBtn) {
+ wrapBtn.addEventListener('click', () => {
+ codeWrapEnabled = !codeWrapEnabled;
+ savePreference('frp_detail_code_wrap', codeWrapEnabled);
+ renderWrapState();
+ });
+ }
+
+ document.addEventListener('keydown', (event) => {
+ const target = event.target;
+ const isTyping = target && (target.matches?.('input, textarea, select') || target.isContentEditable);
+ if (!isTyping && event.altKey && event.key.toLowerCase() === 'z') {
+ event.preventDefault();
+ codeWrapEnabled = !codeWrapEnabled;
+ savePreference('frp_detail_code_wrap', codeWrapEnabled);
+ renderWrapState();
+ }
+ });
+
+ if (typeof desktopQuery.addEventListener === 'function') desktopQuery.addEventListener('change', renderSidebarState);
+ else if (typeof desktopQuery.addListener === 'function') desktopQuery.addListener(renderSidebarState);
+ renderSidebarState();
+ renderWrapState();
+}
 
 const btnPrint = document.getElementById('btnPrintDoc');
 if (btnPrint) btnPrint.addEventListener('click', () => {
@@ -644,7 +706,7 @@ function addTab(cfg) {
  <span class="lang-badge ${esc(cfg.langClass)}">${esc(cfg.langLabel)}</span>
  <span class="line-count">${esc(cfg.badge)}</span>
  </div>
- <div style="display:flex;gap:.4rem;flex-wrap:wrap;">
+ <div class="code-toolbar-actions">
  ${cfg.type === 'sql'? `
  <div class="topbar-dropdown" style="display:inline-flex;padding-bottom:0;margin-bottom:0;">
  <button class="btn-copy topbar-dropdown-toggle" style="background:linear-gradient(135deg, #3b82f6, #6366f1);color:#fff;border:none;font-weight:700;" title="SQL Biçimlendirme Seçenekleri">Formatla</button>
@@ -661,13 +723,13 @@ function addTab(cfg) {
  </div>
  </div>
  <button class="btn-copy" id="${esc(cfg.id)}_casetogglebtn" data-detail-action="change-case" data-tab="${encodeInlineArg(cfg.id)}" title="SQL Anahtar Kelimelerini BÜYÜK / KÜÇÜK Harfe Dönüştür">BÜYÜK Harf</button>
- <button class="btn-copy" data-detail-action="snippet" data-index="${cfg.queryIndex}">Kütüphaneye Ekle</button>
+ <button class="btn-copy" data-detail-action="snippet" data-index="${cfg.queryIndex}" title="Sorgu kütüphanesine ekle">Kütüphane</button>
  <button class="btn-copy" data-detail-action="param" data-index="${cfg.queryIndex}">SQL Testi</button>
  `: ''}
  ${cfg.type === 'pascal'? `
- <button class="btn-copy" id="btnCheckPascalSyntax" data-detail-action="check-pascal" title="PascalScript Sözdizimi Kontrolü">Sözdizimi Kontrol</button>
+ <button class="btn-copy" id="btnCheckPascalSyntax" data-detail-action="check-pascal" title="PascalScript sözdizimini kontrol et">Sözdizimi</button>
  `: ''}
- <button class="btn-copy" id="${esc(cfg.id)}_lasteditbtn" data-detail-action="last-edit" data-tab="${encodeInlineArg(cfg.id)}" title="Son yapılan değişikliklerin farkını gör">Son Değişiklik</button>
+ <button class="btn-copy" id="${esc(cfg.id)}_lasteditbtn" data-detail-action="last-edit" data-tab="${encodeInlineArg(cfg.id)}" title="Son yapılan değişikliklerin farkını gör">Geçmiş</button>
  <button class="btn-copy btn-edit-toggle" id="${esc(cfg.id)}_editbtn" data-detail-action="toggle-edit" data-tab="${encodeInlineArg(cfg.id)}">Düzenle</button>
  <button class="btn-copy" id="${esc(cfg.id)}_copy" data-detail-action="copy-tab" data-tab="${encodeInlineArg(cfg.id)}">Kopyala</button>
  </div>
@@ -3227,11 +3289,13 @@ function setupDownloadHistoryDetail() {
 
 if (document.readyState === 'loading') {
  document.addEventListener('DOMContentLoaded', () => {
+ setupDetailWorkspaceControls();
  init();
  setupMobileDetailTabs();
  setupDownloadHistoryDetail();
  });
 } else {
+ setupDetailWorkspaceControls();
  init();
  setupMobileDetailTabs();
  setupDownloadHistoryDetail();
