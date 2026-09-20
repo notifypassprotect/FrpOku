@@ -121,6 +121,7 @@
     const isDark = theme === 'dark';
     const targetCodeTheme = isDark ? 'frpoku-dark' : 'frpoku-light';
     applyCodeTheme(targetCodeTheme, false, showToast);
+    if (window.FrpStore?.setPreferences) window.FrpStore.setPreferences({ theme: isDark ? 'dark' : 'light' });
   }
 
   function initCodeTheme() {

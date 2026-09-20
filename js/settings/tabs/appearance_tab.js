@@ -6,6 +6,10 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
 
 window.FrpSettingsTabs.appearance = {
   fontList: [
+    { id: 'manrope', name: 'Manrope', sample: 'Türkçe raporlar · ığüşöç İĞÜŞÖÇ', fontCss: "'Manrope', sans-serif" },
+    { id: 'dmsans', name: 'DM Sans', sample: 'Türkçe raporlar · ığüşöç İĞÜŞÖÇ', fontCss: "'DM Sans', sans-serif" },
+    { id: 'ibmplexsans', name: 'IBM Plex Sans', sample: 'Türkçe raporlar · ığüşöç İĞÜŞÖÇ', fontCss: "'IBM Plex Sans', sans-serif" },
+
     { id: 'inter', name: 'Inter', sample: 'Rapor listesi ve sorgular', fontCss: "'Inter', sans-serif" },
     { id: 'jakarta', name: 'Plus Jakarta Sans', sample: 'Rapor listesi ve sorgular', fontCss: "'Plus Jakarta Sans', sans-serif" },
     { id: 'outfit', name: 'Outfit', sample: 'Rapor listesi ve sorgular', fontCss: "'Outfit', sans-serif" },
@@ -24,6 +28,10 @@ window.FrpSettingsTabs.appearance = {
   ],
 
   codeFonts: [
+    { id: 'ibmplexmono', name: 'IBM Plex Mono', sample: 'SELECT id, adi FROM rapor\nWHERE aktif = 1;' },
+    { id: 'robotomono', name: 'Roboto Mono', sample: 'SELECT id, adi FROM rapor\nWHERE aktif = 1;' },
+    { id: 'firamono', name: 'Fira Mono', sample: 'SELECT id, adi FROM rapor\nWHERE aktif = 1;' },
+
     { id: 'jetbrains', name: 'JetBrains Mono', sample: 'SELECT count(1) FROM rapor\nWHERE aktif = 1' },
     { id: 'fira',      name: 'Fira Code',      sample: 'SELECT * FROM musteri\nWHERE bakiye != 0' },
     { id: 'cascadia',  name: 'Cascadia Code',  sample: 'procedure RaporHazirla;\nbegin Engine.Start; end;' },
@@ -136,10 +144,10 @@ window.FrpSettingsTabs.appearance = {
           <div style="font-weight:700;font-size:.85rem;margin-bottom:.6rem;">Kod & SQL Editör Fontu (Önizlemeli)</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;">
             ${this.codeFonts.map(cf => `
-              <label class="settings-radio-card ${stagedPrefs.codeFont === cf.id ? 'active' : ''}" style="font-family:var(--mono);">
+              <label class="settings-radio-card ${stagedPrefs.codeFont === cf.id ? 'active' : ''}" style="font-family:'${cf.id === 'monaco' ? 'Monaco' : cf.name}', monospace;">
                 <input type="radio" name="stagedCodeFont" value="${cf.id}" ${stagedPrefs.codeFont === cf.id ? 'checked' : ''} style="display:none;" />
                 <div style="font-weight:700;font-size:.84rem;color:var(--accent);">${cf.name}</div>
-                <pre style="margin:.3rem 0 0;font-size:.7rem;color:var(--text-secondary);background:var(--bg-surface);padding:.35rem .5rem;border-radius:6px;border:1px solid var(--border-light);line-height:1.35;">${cf.sample}</pre>
+                <pre style="font-family:inherit;margin:.3rem 0 0;font-size:.7rem;color:var(--text-secondary);background:var(--bg-surface);padding:.35rem .5rem;border-radius:6px;border:1px solid var(--border-light);line-height:1.35;">${cf.sample}</pre>
               </label>
             `).join('')}
           </div>
@@ -287,6 +295,10 @@ window.FrpSettingsTabs.appearance = {
         stagedPrefs.codeFont = e.target.value;
         markDirty();
         const codeMap = {
+          'ibmplexmono': "'IBM Plex Mono', monospace",
+          'robotomono': "'Roboto Mono', monospace",
+          'firamono': "'Fira Mono', monospace",
+
           'jetbrains': "'JetBrains Mono', monospace",
           'fira': "'Fira Code', monospace",
           'cascadia': "'Cascadia Code', monospace",

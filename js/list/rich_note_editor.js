@@ -37,51 +37,40 @@
     return size.toFixed(1) + ' ' + units[i];
   }
 
-  // Güvenli kimlik doğrulamalı medya/dosya URL'i üretici (Blob veya token parametresi)
+  // Ekleri yetkili istekle alır; oturum anahtarı URL'ye, geçmişe veya loglara yazılmaz.
   async function getAuthenticatedMediaUrl(rawUrl) {
-    if (!rawUrl) return '';
+    if (!rawUrl) throw new Error('Dosya adresi bulunamadı.');
     if (rawUrl.startsWith('data:') || rawUrl.startsWith('blob:')) return rawUrl;
-
-    const token = (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function')
-      ? window.FrpAuth.getAuthHeaders()?.Authorization?.replace(/^Bearer\s+/i, '')
-      : (localStorage.getItem('frpoku_auth_token') || sessionStorage.getItem('frpoku_auth_token') || '');
-
-    try {
-      const fetchUrl = token ? (rawUrl + (rawUrl.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token)) : rawUrl;
-      const headers = (window.FrpAuth && typeof window.FrpAuth.getAuthHeaders === 'function') ? window.FrpAuth.getAuthHeaders() : {};
-      const res = await fetch(fetchUrl, { headers });
-      if (res.ok) {
-        const blob = await res.blob();
-        return URL.createObjectURL(blob);
-      }
-    } catch {}
-
-    return token ? (rawUrl + (rawUrl.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token)) : rawUrl;
+    const resolved = new URL(rawUrl, window.location.origin);
+    if (resolved.origin !== window.location.origin) throw new Error('Harici dosya adresine erişim engellendi.');
+    const headers = window.FrpAuth?.getAuthHeaders?.() || {};
+    const res = await fetch(resolved.href, { headers, credentials: 'same-origin' });
+    if (!res.ok) throw new Error('Dosya alınamadı veya erişim yetkiniz yok.');
+    return URL.createObjectURL(await res.blob());
   }
 
-  // Güvenli dosya indirme
   async function downloadAttachment(att) {
+    let blobUrl = '';
     try {
-      if (typeof window.toast === 'function') window.toast(`"${att.name}" indiriliyor...`, 'info');
-      const blobUrl = await getAuthenticatedMediaUrl(att.url);
+      window.toast?.(`"${att.name}" indiriliyor...`, 'info');
+      blobUrl = await getAuthenticatedMediaUrl(att.url);
       const a = document.createElement('a');
       a.href = blobUrl;
       a.download = att.name || 'dosya';
       document.body.appendChild(a);
       a.click();
       a.remove();
-      setTimeout(() => {
-        if (blobUrl.startsWith('blob:')) URL.revokeObjectURL(blobUrl);
-      }, 30000);
-    } catch {
-      window.open(att.url, '_blank');
+    } catch (error) {
+      window.toast?.(error.message || 'Dosya indirilemedi.', 'error');
+    } finally {
+      if (blobUrl.startsWith('blob:') && blobUrl !== att.url) setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
     }
   }
 
   // Modern Tehlike & Onay Modalı
   function showModernConfirmDialog({ title, message, confirmText = 'Evet, Sil', cancelText = 'Vazgeç', isDanger = true, onConfirm }) {
     const existing = document.getElementById('frpModernConfirmOverlay');
-    if (existing) existing.remove();
+    if (existing) { existing.querySelector('#btnRichNoteClose')?.click(); if (existing.isConnected) return; }
 
     const overlay = document.createElement('div');
     overlay.id = 'frpModernConfirmOverlay';
@@ -124,7 +113,7 @@
   // Modern Dosya Önizleme Modalı (Resim, PDF, Word & Excel için)
   async function openAttachmentPreview(att) {
     const existing = document.getElementById('frpAttPreviewOverlay');
-    if (existing) existing.remove();
+    if (existing) { existing.querySelector('#btnRichNoteClose')?.click(); if (existing.isConnected) return; }
 
     const fileName = (att.name || '').toLowerCase();
     const ext = fileName.split('.').pop();
@@ -191,7 +180,11 @@
 
     document.body.appendChild(overlay);
 
-    const close = () => overlay.remove();
+    let previewMediaUrl = '';
+    const close = () => {
+      if (previewMediaUrl.startsWith('blob:') && previewMediaUrl !== att.url) URL.revokeObjectURL(previewMediaUrl);
+      overlay.remove();
+    };
     overlay.querySelector('#btnAttPreviewClose').addEventListener('click', close);
     overlay.querySelector('#btnAttDownloadAction').addEventListener('click', () => downloadAttachment(att));
 
@@ -207,7 +200,9 @@
     });
 
     const previewBody = overlay.querySelector('#attPreviewBody');
-    const mediaUrl = await getAuthenticatedMediaUrl(att.url);
+    let mediaUrl = '';
+    try { mediaUrl = previewMediaUrl = await getAuthenticatedMediaUrl(att.url); }
+    catch (error) { previewBody.innerHTML = `<div style="color:#fca5a5;padding:2rem;text-align:center;">${escHtml(error.message)}</div>`; return; }
 
     // Kütüphane Yükleyici Yardımcısı
     function loadScript(src) {
@@ -566,7 +561,7 @@
   // Modern Link Ekleme / Düzenleme Modalı
   function showModernLinkModal({ initialUrl = '', initialText = '', onSave }) {
     const existing = document.getElementById('frpModernLinkOverlay');
-    if (existing) existing.remove();
+    if (existing) { existing.querySelector('#btnRichNoteClose')?.click(); if (existing.isConnected) return; }
 
     const overlay = document.createElement('div');
     overlay.id = 'frpModernLinkOverlay';
@@ -656,8 +651,12 @@
 
   async function openRichNoteModal(fileId) {
     if (!fileId) return;
-    const file = (window.FrpStore && window.FrpStore.getById ? window.FrpStore.getById(fileId) : null);
+    let file = (window.FrpStore && window.FrpStore.getById ? window.FrpStore.getById(fileId) : null);
     if (!file) return;
+    if (window.FrpStore.ensureFullReport) {
+      try { file = await window.FrpStore.ensureFullReport(fileId) || file; }
+      catch { window.toast?.('Not içeriği alınamadı. Tekrar deneyin.', 'error'); return; }
+    }
 
     const reportName = file.meta?.reportName || file.name || 'Rapor';
     let currentNoteHtml = sanitizeRichHtml(file.noteHtml || file.note_html || '');
@@ -671,7 +670,7 @@
       (Array.isArray(file.note_attachments) ? [...file.note_attachments] : []));
 
     const existing = document.getElementById('frpRichNoteModalOverlay');
-    if (existing) existing.remove();
+    if (existing) { existing.querySelector('#btnRichNoteClose')?.click(); if (existing.isConnected) return; }
 
     const overlay = document.createElement('div');
     overlay.id = 'frpRichNoteModalOverlay';
@@ -682,7 +681,7 @@
     `;
 
     overlay.innerHTML = `
-      <div class="modal" style="width: 95vw; max-width: 1240px; height: 90vh; max-height: 980px; background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); border-radius: 20px; box-shadow: 0 25px 60px rgba(0,0,0,0.35); display: flex; flex-direction: column; overflow: hidden;">
+      <div class="modal rich-note-dialog" role="dialog" aria-modal="true" aria-label="Rapor notu" style="width: 95vw; max-width: 1240px; height: 90vh; max-height: 980px; background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); border-radius: 20px; box-shadow: 0 25px 60px rgba(0,0,0,0.35); display: flex; flex-direction: column; overflow: hidden;">
         
         <!-- MODAL BAŞLIĞI -->
         <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.95rem 1.6rem; border-bottom: 1px solid var(--border-light, #e2e8f0); background: var(--bg-card, #f8fafc);">
@@ -692,8 +691,8 @@
             </div>
             <div>
               <div style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary, #0f172a); display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                <span>Rapor Zengin Notu & Belgeler</span>
-                <span style="font-size: 0.72rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 9999px; background: rgba(37,99,235,0.12); color: var(--accent, #2563eb);">Word Modu & Ekler</span>
+                <span>Rapor notları</span>
+                <span style="font-size: 0.72rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 9999px; background: rgba(37,99,235,0.12); color: var(--accent, #2563eb);">Notlar & Belgeler</span>
               </div>
               <div style="font-size: 0.82rem; color: var(--text-muted, #64748b); max-width: 600px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;">
                 ${escHtml(reportName)}
@@ -882,13 +881,11 @@
         </div>
 
         <!-- ORTA ALAN: BELGE DÜZENLEYİCİ CANVAS & EKLER ÇEKMECESİ -->
-        <div style="flex: 1; display: flex; overflow: hidden; position: relative;">
+        <div class="rich-note-workspace" style="flex: 1; display: flex; overflow: hidden; position: relative;">
           
           <!-- EDİTÖR ÇALIŞMA ALANI -->
-          <div style="flex: 1; overflow-y: auto; padding: 2rem 3rem; background: var(--bg-card, #f8fafc); display: flex; justify-content: center;">
-            <div id="richNoteContent" contenteditable="true" style="width: 100%; max-width: 850px; min-height: 500px; background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); border-radius: 12px; padding: 2rem 2.5rem; outline: none; font-family: inherit; font-size: 0.95rem; line-height: 1.75; color: var(--text-primary, #0f172a); box-shadow: 0 4px 20px rgba(0,0,0,0.06);">
-              ${currentNoteHtml || '<p>Bu rapora ait detaylı notları, açıklamaları ve belgeleri buraya ekleyebilirsiniz...</p>'}
-            </div>
+          <div class="rich-note-page" style="flex: 1; overflow-y: auto; padding: 2rem 3rem; background: var(--bg-card, #f8fafc); display: flex; justify-content: center;">
+            <div id="richNoteContent" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Not içeriği" data-placeholder="Bu rapor için bir not yazın…" style="width: 100%; max-width: 850px; min-height: 500px; background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); border-radius: 12px; padding: 2rem 2.5rem; outline: none; font-family: inherit; font-size: 0.95rem; line-height: 1.75; color: var(--text-primary, #0f172a); box-shadow: 0 4px 20px rgba(0,0,0,0.06);">${currentNoteHtml}</div>
           </div>
 
           <!-- SAĞ EKLER BÖLÜMÜ (ATTACHMENT TRAY) -->
@@ -915,7 +912,7 @@
         <!-- 3. ALT EYLEM ÇUBUĞU (FOOTER ACTIONS) -->
         <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1.6rem; border-top: 1px solid var(--border-light, #e2e8f0); background: var(--bg-card, #f8fafc); flex-wrap: wrap; gap: 0.5rem;">
           <div style="display: flex; align-items: center; gap: 0.6rem; font-size: 0.8rem; color: var(--text-muted, #64748b); flex-wrap: wrap;">
-            <span id="richNoteSaveStatus">Tüm değişiklikler otomatik taslağa alınır.</span>
+            <span id="richNoteSaveStatus" role="status" aria-live="polite">Değişiklikler bu tarayıcıda taslak olarak saklanır.</span>
             <span style="display: inline-block; width: 1px; height: 14px; background: var(--border, #cbd5e1); margin: 0 0.2rem;"></span>
             <span id="richNoteStatsBar" style="font-weight: 700; color: var(--text-secondary, #475569); font-size: 0.76rem; background: var(--bg-surface, #ffffff); padding: 0.2rem 0.65rem; border-radius: 6px; border: 1px solid var(--border-light, #e2e8f0);">0 Kelime · 0 Karakter · 0 Cümle · ~1 dk Okuma</span>
           </div>
@@ -926,7 +923,7 @@
             </button>
             <button type="button" id="btnRichNoteCancel" class="btn btn-sm btn-secondary">Kapat</button>
             <button type="button" id="btnRichNoteSave" class="btn btn-sm btn-primary" style="font-weight: 800; padding: 0.5rem 1.5rem;">
-              Kaydet & Eşitle
+              Kaydet · Ctrl+S
             </button>
           </div>
         </div>
@@ -941,6 +938,53 @@
     const fileInput = overlay.querySelector('#inputAttachFile');
     const saveStatus = overlay.querySelector('#richNoteSaveStatus');
     const statsBar = overlay.querySelector('#richNoteStatsBar');
+    const opener = document.activeElement;
+    const lifecycle = new AbortController();
+    const editorUserId = String(window.FrpAuth?.getUser()?.id || 'anonymous');
+    const draftKey = `frp_note_draft:${encodeURIComponent(editorUserId)}:${encodeURIComponent(fileId)}`;
+    let saveBusy = false, uploadsPending = 0, draftTimer = null;
+    const snapshot = () => JSON.stringify({ noteHtml: editor.innerHTML, attachments });
+    let savedSnapshot = snapshot();
+    function persistDraft() {
+      clearTimeout(draftTimer);
+      if (snapshot() === savedSnapshot) return true;
+      try {
+        localStorage.setItem(draftKey, JSON.stringify({ noteHtml: editor.innerHTML, attachments, savedAt: Date.now() }));
+        if (!saveBusy && !uploadsPending) saveStatus.textContent = 'Taslak bu tarayıcıda saklandı · Buluta kaydetmek için Ctrl+S';
+        return true;
+      } catch {
+        saveStatus.textContent = 'Taslak saklanamadı. Pencereyi kapatmadan Kaydet düğmesini kullanın.';
+        return false;
+      }
+    }
+    function scheduleDraft() {
+      clearTimeout(draftTimer);
+      draftTimer = setTimeout(persistDraft, 400);
+    }
+    const draftObserver = new MutationObserver(scheduleDraft);
+    draftObserver.observe(editor, { childList: true, subtree: true, characterData: true, attributes: true });
+    editor.addEventListener('input', scheduleDraft);
+    const draftBanner = document.createElement('div');
+    draftBanner.className = 'rich-note-draft-banner';
+    try {
+      const draft = JSON.parse(localStorage.getItem(draftKey) || 'null');
+      if (draft && typeof draft.noteHtml === 'string') {
+        draftBanner.innerHTML = '<span>Kaydedilmemiş bir taslak bulundu.</span><button type="button" class="btn btn-sm">Taslağı getir</button><button type="button" class="btn btn-sm">Taslağı sil</button>';
+        const [restore, discard] = draftBanner.querySelectorAll('button');
+        restore.onclick = () => {
+          editor.innerHTML = sanitizeRichHtml(draft.noteHtml);
+          if (Array.isArray(draft.attachments)) attachments = draft.attachments;
+          renderAttachments(); updateNoteStatistics(); draftBanner.remove(); scheduleDraft();
+        };
+        discard.onclick = () => { localStorage.removeItem(draftKey); draftBanner.remove(); };
+        overlay.querySelector('.rich-note-workspace').before(draftBanner);
+      }
+    } catch {}
+    function guardUnload(event) {
+      if (snapshot() !== savedSnapshot && !persistDraft()) { event.preventDefault(); event.returnValue = ''; }
+    }
+    window.addEventListener('beforeunload', guardUnload);
+
 
     function updateNoteStatistics() {
       if (!editor || !statsBar) return;
@@ -957,7 +1001,13 @@
 
     // ── GÜVENLİ PENCERE KAPATMA (MOUSE SÜRÜKLEME KORUMASI) ──
     // Metin seçimi sırasında farenin dışarı kayması pencereyi ASLA kapatmaz!
-    const close = () => overlay.remove();
+    const close = (discard = false) => {
+      if (saveBusy || uploadsPending) { saveStatus.textContent = 'İşlemin tamamlanması bekleniyor…'; return; }
+      if (discard !== true && !persistDraft()) return;
+      clearTimeout(draftTimer); draftObserver.disconnect(); lifecycle.abort();
+      window.removeEventListener('beforeunload', guardUnload);
+      overlay.remove(); opener?.focus();
+    };
     overlay.querySelector('#btnRichNoteClose').addEventListener('click', close);
     overlay.querySelector('#btnRichNoteCancel').addEventListener('click', close);
 
@@ -973,6 +1023,7 @@
     });
 
     function renderAttachments() {
+      scheduleDraft();
       attCountBadge.textContent = attachments.length;
       if (attachments.length === 0) {
         attachmentsList.innerHTML = `
@@ -988,11 +1039,6 @@
       attachments.forEach((att, idx) => {
         const isImage = (att.type || '').startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(att.name || '');
         const isPdf = (att.type === 'application/pdf') || /\.pdf$/i.test(att.name || '');
-        const token = (window.FrpAuth && typeof window.FrpAuth.getToken === 'function') ? window.FrpAuth.getToken() : '';
-        const authUrl = (att.url.startsWith('data:') || att.url.startsWith('blob:') || !token)
-          ? att.url
-          : `${att.url}${att.url.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`;
-
         const card = document.createElement('div');
         card.style.cssText = `
           background: var(--bg-card, #f8fafc); border: 1px solid var(--border, #cbd5e1); border-radius: 10px;
@@ -1004,7 +1050,12 @@
 
         if (isImage) {
           const img = document.createElement('img');
-          img.src = authUrl;
+          img.alt = att.name;
+          getAuthenticatedMediaUrl(att.url).then(url => {
+            if (!card.isConnected) { if (url.startsWith('blob:') && url !== att.url) URL.revokeObjectURL(url); return; }
+            img.src = url;
+            if (url.startsWith('blob:') && url !== att.url) img.addEventListener('load', () => URL.revokeObjectURL(url), { once: true });
+          }).catch(() => { badgeWrap.innerHTML = '<span style="font-size:1.2rem;">🖼️</span>'; });
           img.alt = att.name;
           img.style.cssText = 'width: 100%; height: 100%; object-fit: cover;';
           img.addEventListener('error', () => {
@@ -1460,7 +1511,7 @@
       if (!sel || !sel.anchorNode || !editor.contains(sel.anchorNode)) {
         removeLinkTooltip();
       }
-    });
+    }, { signal: lifecycle.signal });
 
     overlay.addEventListener('mousedown', (e) => {
       if (activeLinkTooltip && !activeLinkTooltip.contains(e.target) && !e.target.closest('a')) {
@@ -1486,49 +1537,30 @@
         return;
       }
 
-      saveStatus.textContent = 'Dosya yükleniyor...';
-
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        const base64Data = ev.target.result;
-        try {
-          const authHeaders = window.FrpAuth && window.FrpAuth.getAuthHeaders ? window.FrpAuth.getAuthHeaders() : { 'Content-Type': 'application/json' };
-          const res = await fetch(`/api/reports/${encodeURIComponent(fileId)}/attachments`, {
-            method: 'POST',
-            headers: authHeaders,
-            body: JSON.stringify({
-              filename: fileObj.name,
-              mimeType: fileObj.type,
-              base64Data
-            })
-          });
-          const data = await res.json();
-          if (data && data.success && data.attachment) {
-            attachments.push(data.attachment);
-          } else {
-            attachments.push({
-              id: 'att_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
-              name: fileObj.name,
-              size: fileObj.size,
-              type: fileObj.type,
-              url: base64Data,
-              uploadedAt: new Date().toISOString()
-            });
-          }
-        } catch {
-          attachments.push({
-            id: 'att_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
-            name: fileObj.name,
-            size: fileObj.size,
-            type: fileObj.type,
-            url: base64Data,
-            uploadedAt: new Date().toISOString()
-          });
-        }
+      uploadsPending++;
+      saveStatus.textContent = 'Dosya yükleniyor…';
+      try {
+        const base64Data = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(new Error('Dosya okunamadı.'));
+          reader.readAsDataURL(fileObj);
+        });
+        const res = await fetch(`/api/reports/${encodeURIComponent(fileId)}/attachments`, {
+          method: 'POST', headers: window.FrpAuth.getAuthHeaders(),
+          body: JSON.stringify({ filename: fileObj.name, mimeType: fileObj.type, base64Data })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success || !data.attachment) throw new Error(data.reason || 'Dosya yüklenemedi.');
+        attachments.push(data.attachment);
         renderAttachments();
-        saveStatus.textContent = '';
-      };
-      reader.readAsDataURL(fileObj);
+      } catch (error) {
+        saveStatus.textContent = error.message;
+        window.toast?.(error.message, 'error');
+      } finally {
+        uploadsPending--;
+        if (!uploadsPending) persistDraft();
+      }
     }
 
     // Pano Görsel Yapıştırma (Ctrl+V)
@@ -1546,73 +1578,63 @@
       }
     });
 
-    // Modern "Tüm Notu Sil" Butonu
-    const btnDelete = overlay.querySelector('#btnRichNoteDelete');
-    if (btnDelete) {
-      btnDelete.addEventListener('click', () => {
-        showModernConfirmDialog({
-          title: 'Tüm Notu ve Belgeleri Sil',
-          message: 'Bu rapora ait tüm zengin metin notları ve ekli belgeler <strong>kalıcı olarak silinecektir</strong>. Bu işlem geri alınamaz.',
-          confirmText: 'Evet, Kalıcı Olarak Sil',
-          isDanger: true,
-          onConfirm: async () => {
-            saveStatus.textContent = 'Siliniyor...';
-            try {
-              await fetch(`/api/reports/${encodeURIComponent(fileId)}/note`, {
-                method: 'PATCH',
-                headers: window.FrpAuth ? window.FrpAuth.getAuthHeaders() : { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userNote: '', noteHtml: '', attachments: [] })
-              });
-            } catch {}
-
-            if (window.FrpStore && typeof window.FrpStore.updateNote === 'function') {
-              await window.FrpStore.updateNote(fileId, '', { noteHtml: '', attachments: [] });
-            }
-
-            if (typeof window.toast === 'function') window.toast('Rapor notları ve ekleri silindi.', 'info');
-            if (typeof window.refreshAll === 'function') window.refreshAll();
-            close();
-          }
-        });
-      });
-    }
-
-    // Kaydet ve Eşitle
-    const btnSave = overlay.querySelector('#btnRichNoteSave');
-    btnSave.addEventListener('click', async () => {
+    async function saveNote(remove = false) {
+      if (saveBusy) return;
+      if (uploadsPending) { saveStatus.textContent = 'Dosya yüklemesi tamamlanınca tekrar kaydedin.'; return; }
+      if (String(window.FrpAuth?.getUser()?.id || 'anonymous') !== editorUserId) {
+        saveStatus.textContent = 'Oturum değişti. Notu kendi hesabınızla tekrar açın.'; return;
+      }
+      saveBusy = true;
+      const btnSave = overlay.querySelector('#btnRichNoteSave');
       btnSave.disabled = true;
-      btnSave.textContent = 'Kaydediliyor...';
-      saveStatus.textContent = 'Buluta kaydediliyor...';
-
-      const noteHtml = editor.innerHTML;
-      const plainText = editor.innerText.trim();
-
+      saveStatus.textContent = remove ? 'Siliniyor…' : 'Buluta kaydediliyor…';
+      const sentSnapshot = snapshot();
+      const payload = remove ? { userNote: '', noteHtml: '', attachments: [] } : {
+        userNote: editor.innerText.trim(), noteHtml: sanitizeRichHtml(editor.innerHTML), attachments: [...attachments]
+      };
       try {
-        const authHeaders = window.FrpAuth && window.FrpAuth.getAuthHeaders ? window.FrpAuth.getAuthHeaders() : { 'Content-Type': 'application/json' };
-        await fetch(`/api/reports/${encodeURIComponent(fileId)}/note`, {
-          method: 'PATCH',
-          headers: authHeaders,
-          body: JSON.stringify({
-            userNote: plainText,
-            noteHtml,
-            attachments
-          })
+        const res = await fetch(`/api/reports/${encodeURIComponent(fileId)}/note`, {
+          method: 'PATCH', headers: window.FrpAuth.getAuthHeaders(), body: JSON.stringify(payload)
         });
-      } catch (err) {
-        console.warn('Sunucu not güncelleme hatası:', err);
-      }
-
-      if (window.FrpStore && typeof window.FrpStore.updateNote === 'function') {
-        await window.FrpStore.updateNote(fileId, plainText, { noteHtml, attachments });
-      }
-
-      if (typeof window.toast === 'function') {
-        window.toast('Rapor zengin notu ve belgeleri başarıyla kaydedildi.', 'success');
-      }
-      if (typeof window.refreshAll === 'function') window.refreshAll();
-
-      close();
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.reason || 'Not kaydedilemedi.');
+        if (String(window.FrpAuth?.getUser()?.id || 'anonymous') !== editorUserId) return;
+        window.FrpStore?.updateNote(fileId, payload.userNote, payload, { syncCloud: false });
+        window.refreshAll?.();
+        saveBusy = false;
+        if (snapshot() === sentSnapshot) {
+          savedSnapshot = sentSnapshot;
+          try { localStorage.removeItem(draftKey); } catch {}
+          window.toast?.(remove ? 'Not silindi.' : 'Not ve belgeler kaydedildi.', 'success');
+          close(true);
+        } else {
+          persistDraft();
+          saveStatus.textContent = 'Önceki değişiklikler kaydedildi. Yeni düzenlemelerinizi de kaydedin.';
+        }
+      } catch (error) {
+        persistDraft();
+        saveStatus.textContent = `Kaydedilemedi: ${error.message} Tekrar deneyebilirsiniz.`;
+        window.toast?.('Not kaydedilemedi; düzenleyici açık tutuldu.', 'error');
+      } finally { saveBusy = false; btnSave.disabled = false; }
+    }
+    overlay.querySelector('#btnRichNoteSave').addEventListener('click', () => saveNote());
+    overlay.querySelector('#btnRichNoteDelete')?.addEventListener('click', () => {
+      showModernConfirmDialog({ title: 'Notu sil', message: 'Bu raporun notu ve ekleri kaldırılacak.',
+        confirmText: 'Notu sil', isDanger: true, onConfirm: () => saveNote(true) });
     });
+    overlay.addEventListener('keydown', event => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault(); event.stopPropagation(); saveNote();
+      } else if (event.key === 'Escape') { event.stopPropagation(); close(); }
+      else if (event.key === 'Tab') {
+        const focusable = Array.from(overlay.querySelectorAll('button:not(:disabled), input:not(:disabled), select, [contenteditable="true"], a[href]')).filter(el => el.getClientRects().length);
+        const first = focusable[0], last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
+    });
+    editor.focus();
+
   }
 
   window.FrpRichNoteEditor = {

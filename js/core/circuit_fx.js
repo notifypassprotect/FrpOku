@@ -5,7 +5,7 @@
   'use strict';
 
   const BOOT_START_TIME = Date.now();
-  const MIN_BOOT_DURATION = 1200; // Zarif kurumsal geçiş için 1.2 sn
+  const MIN_BOOT_DURATION = 250; // Zarif kurumsal geçiş için 1.2 sn
   let isDismissed = false;
 
   function dismissBoot() {
@@ -29,7 +29,8 @@
   if (document.readyState === 'complete') {
     dismissBoot();
   } else {
-    window.addEventListener('load', dismissBoot);
+    document.addEventListener('DOMContentLoaded', dismissBoot, { once: true });
+    window.addEventListener('load', dismissBoot, { once: true });
   }
   // Fail-safe (ağ gecikse de en geç 2.2 sn içinde aç)
   setTimeout(dismissBoot, 2200);

@@ -424,14 +424,7 @@
           if (settingsSettled.status === 'fulfilled' && settingsSettled.value) {
             const cloudSettings = settingsSettled.value;
             if (cloudSettings.preferences && typeof cloudSettings.preferences === 'object') {
-              setPreferences(cloudSettings.preferences);
-            }
-            if (cloudSettings.theme) {
-              if (window.FrpThemes && typeof window.FrpThemes.setTheme === 'function') {
-                window.FrpThemes.setTheme(cloudSettings.theme);
-              } else {
-                setTheme(cloudSettings.theme);
-              }
+              setPreferences({ ...cloudSettings.preferences, theme: getTheme() }, { syncCloud: false });
             }
             const cloudTags = cloudSettings?.custom_tags ?? cloudSettings?.customTags;
             if (Array.isArray(cloudTags)) {
@@ -1106,7 +1099,7 @@
   }
 
   // ── 6. Not, Meta, Kod Güncelleme ────────────────────────────
-  function updateNote(id, note, extra = {}) {
+  function updateNote(id, note, extra = {}, { syncCloud = true } = {}) {
     const files = _read();
     const strId = String(id);
     const idx = files.findIndex(f => String(f.id) === strId);
@@ -1127,7 +1120,7 @@
         }
       }
       files[idx].updated_at = new Date().toISOString();
-      _write(files);
+      _write(files, { syncCloud });
       _audit('NOTE_UPDATE', files[idx].name || id, 'Rapor kullanıcı notu güncellendi.');
       return true;
     }
@@ -1729,7 +1722,7 @@
 
   // ── 10. Tercihler, Tema, Son Açılanlar ─────────────────────────
   function getTheme() { 
-    const saved = localStorage.getItem(THEME_KEY);
+    const saved = localStorage.getItem(_scopedStorageKey(THEME_KEY)) || localStorage.getItem(THEME_KEY);
     if (saved) return saved === 'dark' ? 'dark' : 'light';
     try {
       const p = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
@@ -1756,7 +1749,8 @@
   }
 
   function initTheme() { 
-    setTheme(getTheme()); 
+    if (window.FrpThemes) window.FrpThemes.initCodeTheme();
+    else setTheme(getTheme());
   }
   initTheme();
 
@@ -1804,7 +1798,7 @@
     }
   }
 
-  function setPreferences(patch) {
+  function setPreferences(patch, { syncCloud = true } = {}) {
     const cur = getPreferences();
     const updated = { ...cur, ...patch };
     if (updated.theme) {
@@ -1816,8 +1810,8 @@
       localStorage.setItem(_scopedStorageKey(PREFS_KEY), JSON.stringify(updated));
       localStorage.setItem(PREFS_KEY, JSON.stringify(updated));
     } catch {}
-    if (window.FrpCloud && typeof window.FrpCloud.saveSettings === 'function') {
-      window.FrpCloud.saveSettings({ preferences: updated, theme: updated.theme });
+    if (syncCloud && window.FrpCloud && typeof window.FrpCloud.saveSettings === 'function') {
+      Promise.resolve(window.FrpCloud.saveSettings({ preferences: updated, theme: updated.theme })).catch(() => {});
     }
     return updated;
   }
@@ -1829,7 +1823,7 @@
     // 1. Tema
     const themeToApply = prefs.theme || getTheme() || 'light';
     if (window.FrpThemes && typeof window.FrpThemes.setTheme === 'function') {
-      window.FrpThemes.setTheme(themeToApply);
+      window.FrpThemes.initCodeTheme();
     } else {
       setTheme(themeToApply);
     }
@@ -1839,6 +1833,10 @@
 
     // 2. Genel Font Ailesi (Genişletilmiş Popüler Fontlar)
     const fontMap = {
+      'manrope': "'Manrope', sans-serif",
+      'dmsans': "'DM Sans', sans-serif",
+      'ibmplexsans': "'IBM Plex Sans', sans-serif",
+
       'inter': "'Inter', sans-serif",
       'jakarta': "'Plus Jakarta Sans', sans-serif",
       'outfit': "'Outfit', sans-serif",
@@ -1876,6 +1874,10 @@
 
     // 3. Kod Editörü Fontu (Genişletilmiş Geliştirici Fontları)
     const codeFontMap = {
+      'ibmplexmono': "'IBM Plex Mono', monospace",
+      'robotomono': "'Roboto Mono', monospace",
+      'firamono': "'Fira Mono', monospace",
+
       'jetbrains': "'JetBrains Mono', monospace",
       'fira': "'Fira Code', monospace",
       'cascadia': "'Cascadia Code', monospace",
@@ -2212,14 +2214,11 @@
       if (snippetSettled.status === 'fulfilled' && Array.isArray(snippetSettled.value)) localStorage.setItem(SNIPPET_KEY, JSON.stringify(snippetSettled.value));
       if (settingsSettled.status === 'fulfilled' && settingsSettled.value) {
         const settings = settingsSettled.value;
-        if (settings.preferences && typeof settings.preferences === 'object') setPreferences(settings.preferences);
-        if (settings.theme) setTheme(settings.theme);
         const customTags = settings.custom_tags ?? settings.customTags;
         if (Array.isArray(customTags)) {
           localStorage.setItem(_scopedStorageKey(CUSTOM_TAGS_KEY), JSON.stringify(customTags));
           localStorage.setItem(CUSTOM_TAGS_KEY, JSON.stringify(customTags));
         }
-        applyPreferences();
       }
 
       if (activeSettled.status === 'fulfilled' && Array.isArray(activeSettled.value)) {

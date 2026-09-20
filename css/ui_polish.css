@@ -418,3 +418,44 @@ html[data-ui-scale="micro"][data-density="minimal"] :is(.badge, .tag-pill, .pool
     overflow-wrap: anywhere;
   }
 }
+
+/* Karşılama: seçilen temaya uyumlu, kısa ve hafif bir geçiş. */
+#circuitAppBoot {
+  background: radial-gradient(ellipse at 30% 35%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 55%), var(--bg-app);
+  color: var(--text-primary);
+  gap: 0.5rem;
+}
+#circuitAppBoot .boot-eyebrow { font-size: 0.65rem; letter-spacing: 0.22em; color: var(--text-muted); margin-bottom: 1.6rem; }
+#circuitAppBoot .circuit-boot-core { width: 76px; height: 76px; margin-bottom: 0.75rem; }
+#circuitAppBoot .circuit-boot-core svg { width: 64px; height: 64px; }
+#circuitAppBoot .circuit-boot-title { font-family: var(--font); color: var(--text-primary); font-size: clamp(2rem, 5vw, 3rem); letter-spacing: -0.06em; font-weight: 800; margin: 0; }
+#circuitAppBoot .boot-title-dot { color: var(--accent); }
+#circuitAppBoot .boot-welcome { font-size: 1rem; color: var(--text-secondary); margin-bottom: 1.25rem; }
+#circuitAppBoot .circuit-boot-status { color: var(--text-muted); margin-bottom: 0.6rem; }
+#circuitAppBoot .circuit-boot-track { width: 180px; height: 3px; background: var(--border); }
+
+/* Not alanı: okunabilir sayfa, gerçek boş durum ve dar ekran ekleri. */
+#frpRichNoteModalOverlay .rich-note-workspace { min-height: 0; }
+#frpRichNoteModalOverlay .rich-note-page { min-width: 0; align-items: flex-start; }
+#richNoteContent { box-sizing: border-box; overflow-wrap: anywhere; }
+#richNoteContent:empty::before { content: attr(data-placeholder); color: var(--text-muted); pointer-events: none; }
+#richNoteContent img { max-width: 100%; height: auto; }
+#richNoteContent pre { white-space: pre-wrap; font-family: var(--mono); }
+#richNoteContent:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.rich-note-draft-banner { display: flex; align-items: center; flex-wrap: wrap; gap: 0.6rem; padding: 0.65rem 1.2rem; background: var(--accent-light); color: var(--text-primary); border-bottom: 1px solid var(--border); }
+#frpRichNoteModalOverlay .rich-editor-toolbar { max-height: 24vh; overflow-y: auto; flex-shrink: 0; }
+@media (max-width: 768px) {
+  #frpRichNoteModalOverlay { padding: 0.5rem !important; }
+  #frpRichNoteModalOverlay .rich-note-dialog { height: calc(100dvh - 1rem) !important; }
+  #frpRichNoteModalOverlay .rich-note-workspace { flex-direction: column; overflow-y: auto !important; }
+  #frpRichNoteModalOverlay .rich-note-page { padding: 0.75rem !important; flex: 1 0 auto !important; overflow: visible !important; }
+  #richNoteContent { padding: 1rem !important; min-height: 240px !important; }
+  #richNoteAttachmentsSidebar { width: 100% !important; max-height: 220px; flex-shrink: 0; border-left: 0 !important; border-top: 1px solid var(--border); }
+  #frpRichNoteModalOverlay .rich-editor-toolbar { padding: 0.5rem !important; gap: 0.25rem !important; }
+}
+#frpRichNoteModalOverlay .rich-note-dialog > div:first-child > div { min-width: 0; }
+#frpRichNoteModalOverlay .rich-note-dialog > div:first-child > div:first-child { flex: 1; overflow: hidden; }
+@media (max-width: 768px) {
+  #frpRichNoteModalOverlay .rich-note-dialog > div:first-child { padding: 0.7rem !important; }
+  #frpRichNoteModalOverlay .rich-note-dialog > div:first-child > div:first-child > div:last-child { min-width: 0; }
+}
