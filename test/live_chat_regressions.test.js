@@ -76,5 +76,17 @@ test('chat UI keeps read-only reconnect safe and reaction pills interactive', ()
   assert.match(source,/if \(btnSend\) btnSend\.disabled = true/);
   assert.ok(source.includes('class="frp-chat-reaction-pill'));
   assert.match(source,/pendingNewCount \+= newIncomingCount/);
-  assert.match(source,/msgStream\.scrollTo\(\{ top: msgStream\.scrollHeight, behavior: 'smooth' \}\)/);
+  assert.match(source,/behavior: reducedMotion \? 'auto' : 'smooth'/);
+});
+
+test('chat reconnect, deletion and mobile viewport flows fail safely', () => {
+  const fs=require('node:fs'), path=require('node:path');
+  const source=fs.readFileSync(path.join(__dirname,'../js/core/online_presence.js'),'utf8');
+  const css=fs.readFileSync(path.join(__dirname,'../css/online_presence.css'),'utf8');
+  assert.match(source,/window\.addEventListener\('offline', onNetworkOffline\)/);
+  assert.match(source,/Date\.now\(\) - failedText\.failedAt > 10 \* 60 \* 1000/);
+  assert.match(source,/autoRetryAttempts >= 1/);
+  assert.match(source,/if \(!response\.ok \|\| !data\.success\) throw new Error/);
+  assert.match(source,/window\.visualViewport\?\.addEventListener\('resize', syncMobileViewport\)/);
+  assert.match(css,/@media \(prefers-reduced-motion: reduce\)/);
 });

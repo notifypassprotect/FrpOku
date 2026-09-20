@@ -1904,8 +1904,8 @@
   .frp-chat-window {
     inset: 0 !important;
     width: 100dvw !important;
-    height: 100dvh !important;
-    max-height: 100dvh !important;
+    height: var(--frp-chat-viewport-height, 100dvh) !important;
+    max-height: var(--frp-chat-viewport-height, 100dvh) !important;
     max-width: 100dvw !important;
     border-radius: 0 !important;
     box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.35) !important;
@@ -2446,5 +2446,15 @@
 .frp-chat-empty { margin: auto; padding: 2rem 1rem; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
 .frp-chat-send-error button { border: 0; background: transparent; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; }
 .frp-chat-msg { flex-shrink: 0; }
+.frp-chat-msg.deleting { opacity: 0.45; transform: scale(0.96); pointer-events: none; transition: opacity 0.18s ease, transform 0.18s ease; }
 .frp-chat-bubble { overflow-wrap: anywhere; }
 .frp-typing-indicator { flex-shrink: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .frp-chat-window, .frp-chat-msg, .frp-chat-jump, .frp-chat-hover-bar,
+  .frp-chat-reaction-pill, .typing-dot, .frp-online-pulse::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1560,6 +1560,10 @@
     const draftKey = `frp_chat_draft_${myId}_${isGroup ? 'group' : (isRoom ? 'room' : 'user')}_${chatId}`;
     const retryKey = `${draftKey}_failed`;
     let failedText = null;
+    let autoRetryCandidate = false;
+    let autoRetryInFlight = false;
+    let autoRetryAttempts = 0;
+    let autoRetryTimer = null;
     try { failedText = JSON.parse(localStorage.getItem(retryKey) || 'null'); } catch {}
 
     function updateComposerState() {
@@ -1921,12 +1925,39 @@
       if (canListen()) loadMessages();
       else { ++requestSerial; liveController?.abort(); clearTimeout(pollTimer); stopTyping(); }
     }
+    async function retryRecentFailedMessage() {
+      if (!autoRetryCandidate || autoRetryInFlight || autoRetryAttempts >= 1 || !failedText || navigator.onLine === false || closed) return;
+      if (!failedText.failedAt || Date.now() - failedText.failedAt > 10 * 60 * 1000) { autoRetryCandidate = false; return; }
+      autoRetryCandidate = false; autoRetryInFlight = true; autoRetryAttempts++;
+      msgStream.querySelector(`[data-msg-id="temp_${failedText.id}"]`)?.remove();
+      const retry = { ...failedText };
+      try {
+        const sent = await sendMessage({ text: retry.text }, retry.id);
+        if (sent) window.toast?.('Bağlantı geri geldi; mesajınız gönderildi.', 'success');
+      } finally { autoRetryInFlight = false; }
+    }
+    function onNetworkOnline() {
+      setConnection('Yeniden bağlanıyor…', 'reconnecting');
+      resumeLive();
+      setTimeout(retryRecentFailedMessage, 250);
+    }
+    function onNetworkOffline() {
+      setConnection('Çevrimdışı · Mesajınız taslakta korunur', 'reconnecting');
+      ++requestSerial; liveController?.abort(); clearTimeout(pollTimer); stopTyping();
+    }
+    function syncMobileViewport() {
+      if (window.visualViewport && window.innerWidth <= 640) {
+        chatEl.style.setProperty('--frp-chat-viewport-height', `${Math.round(window.visualViewport.height)}px`);
+      }
+    }
     function closeChat() {
       closed = true; ++requestSerial;
-      clearTimeout(pollTimer); liveController?.abort(); stopTyping();
+      clearTimeout(pollTimer); clearTimeout(autoRetryTimer); liveController?.abort(); stopTyping();
       document.removeEventListener('visibilitychange', resumeLive);
-      window.removeEventListener('online', resumeLive);
+      window.removeEventListener('online', onNetworkOnline);
+      window.removeEventListener('offline', onNetworkOffline);
       window.removeEventListener('focus', onChatFocus);
+      window.visualViewport?.removeEventListener('resize', syncMobileViewport);
       if (recordingTimer) clearInterval(recordingTimer);
       if (nudgeCooldownTimer) clearInterval(nudgeCooldownTimer);
       if (mediaRecorder && mediaRecorder.state !== 'inactive') { mediaRecorder.onstop = null; mediaRecorder.stop(); }
@@ -1939,8 +1970,11 @@
     }
     function onChatFocus() { markVisibleMessagesRead(); }
     document.addEventListener('visibilitychange', resumeLive);
-    window.addEventListener('online', resumeLive);
+    window.addEventListener('online', onNetworkOnline);
+    window.addEventListener('offline', onNetworkOffline);
     window.addEventListener('focus', onChatFocus);
+    window.visualViewport?.addEventListener('resize', syncMobileViewport);
+    syncMobileViewport();
     msgStream.addEventListener('scroll', () => {
       if (msgStream.scrollHeight - msgStream.scrollTop - msgStream.clientHeight < 100) {
         updateJumpButton(true);
@@ -1948,7 +1982,8 @@
       markVisibleMessagesRead();
     }, { passive: true });
     jumpButton.addEventListener('click', () => {
-      msgStream.scrollTo({ top: msgStream.scrollHeight, behavior: 'smooth' });
+      const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      msgStream.scrollTo({ top: msgStream.scrollHeight, behavior: reducedMotion ? 'auto' : 'smooth' });
       updateJumpButton(true); markVisibleMessagesRead();
     });
     function updatePeer() {
@@ -2359,12 +2394,15 @@
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.success || !data.message) {
-          throw new Error(data.reason || 'Mesaj sunucuya iletilemedi.');
+          const sendError = new Error(data.reason || 'Mesaj sunucuya iletilemedi.');
+          sendError.retryable = res.status === 429 || res.status >= 500;
+          throw sendError;
         }
         if (closed || String(window.FrpAuth?.getUser()?.id || '') !== myId) return false;
         ++requestSerial; liveController?.abort(); clearTimeout(pollTimer);
         optimisticDiv.remove();
         if (failedText?.id === clientMessageId) { failedText = null; try { localStorage.removeItem(retryKey); } catch {} }
+        autoRetryAttempts = 0;
         localLastInteractions[chatId] = Date.now();
         currentMessages = currentMessages.filter(m => String(m.id) !== String(data.message.id));
         currentMessages.push(data.message);
@@ -2375,8 +2413,12 @@
       } catch (err) {
         console.warn('Mesaj gönderilemedi:', err);
         if (payload.text && !payload.attachment && !payload.voice) {
-          failedText = { id: clientMessageId, text: payload.text };
+          failedText = { id: clientMessageId, text: payload.text, failedAt: Date.now() };
+          autoRetryCandidate = navigator.onLine === false || err.name === 'AbortError' || err.retryable === true;
           try { localStorage.setItem(retryKey, JSON.stringify(failedText)); } catch {}
+          if (autoRetryCandidate && navigator.onLine !== false && autoRetryAttempts === 0) {
+            clearTimeout(autoRetryTimer); autoRetryTimer = setTimeout(retryRecentFailedMessage, 3000);
+          }
         }
         optimisticDiv.classList.remove('optimistic-pending');
         optimisticDiv.classList.add('send-failed');
@@ -2819,18 +2861,28 @@
       if (btnDel) {
         btnDel.addEventListener('click', (ev) => {
           ev.stopPropagation();
-          // Anında iyimser silme (gecikmesiz DOM kaldırımı)
-          msgDiv.style.transition = 'all 0.22s cubic-bezier(0.4, 0, 0.2, 1)';
-          msgDiv.style.opacity = '0';
-          msgDiv.style.transform = 'scale(0.85)';
-          setTimeout(() => {
-            if (msgDiv.parentNode) msgDiv.remove();
-          }, 220);
-
-          fetch(`/api/chat/messages/${encodeURIComponent(m.id)}`, {
-            method: 'DELETE',
-            headers: window.FrpAuth.getAuthHeaders ? window.FrpAuth.getAuthHeaders() : {}
-          }).then(() => loadMessages()).catch(() => loadMessages());
+          const deleteMessage = async () => {
+            btnDel.disabled = true;
+            msgDiv.classList.add('deleting');
+            try {
+              const response = await fetch(`/api/chat/messages/${encodeURIComponent(m.id)}`, {
+                method: 'DELETE', headers: window.FrpAuth.getAuthHeaders ? window.FrpAuth.getAuthHeaders() : {}
+              });
+              const data = await response.json().catch(() => ({}));
+              if (!response.ok || !data.success) throw new Error(data.reason || 'Mesaj silinemedi.');
+              currentMessages = currentMessages.filter(message => String(message.id) !== String(m.id));
+              msgDiv.remove();
+              window.toast?.('Mesaj silindi.', 'success');
+            } catch (error) {
+              msgDiv.classList.remove('deleting'); btnDel.disabled = false;
+              window.toast?.(error.message || 'Mesaj silinemedi.', 'error');
+              loadMessages();
+            }
+          };
+          if (typeof window.showConfirmDialog === 'function') {
+            window.showConfirmDialog({ title: 'Mesajı sil', message: 'Bu mesaj sohbetten kalıcı olarak kaldırılacak.',
+              confirmText: 'Mesajı Sil', cancelText: 'Vazgeç', isDanger: true, onConfirm: deleteMessage });
+          } else deleteMessage();
         });
       }
 
