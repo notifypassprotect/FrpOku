@@ -106,6 +106,9 @@
 /* ── AÇILIR PANEL ── */
 .frp-presence-panel {
   display: none;
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 12px);
   width: 400px;
   max-width: calc(100vw - 32px);
   height: min(760px, calc(100vh - 40px));
@@ -820,16 +823,14 @@
 
 .frp-chat-window {
   position: fixed;
-  bottom: 0;
-  width: 410px;
-  height: 680px;
-  max-height: 90vh;
+  bottom: 14px;
+  width: min(410px, calc(100vw - 32px));
+  height: min(700px, calc(100vh - 28px));
+  max-height: calc(100vh - 28px);
   background: var(--bg-surface, #ffffff);
-  border-top-left-radius: 24px;
-  border-top-right-radius: 24px;
+  border-radius: 24px;
   border: 1px solid color-mix(in srgb, var(--border, #cbd5e1) 78%, transparent);
-  border-bottom: none;
-  box-shadow: 0 -18px 54px -20px rgba(15, 23, 42, 0.5), 0 0 0 1px rgba(15, 23, 42, 0.03);
+  box-shadow: 0 24px 70px -24px rgba(15, 23, 42, 0.58), 0 0 0 1px rgba(15, 23, 42, 0.03);
   display: flex;
   flex-direction: column;
   z-index: 100001;
@@ -841,10 +842,10 @@
 
 .frp-chat-window.maximized {
   width: 600px !important;
-  height: 720px !important;
+  height: min(760px, calc(100vh - 28px)) !important;
   max-width: 95vw;
-  max-height: 90vh;
-  box-shadow: 0 -15px 50px rgba(0, 0, 0, 0.3);
+  max-height: calc(100vh - 28px);
+  box-shadow: 0 28px 80px -22px rgba(15, 23, 42, 0.62);
 }
 
 @keyframes chatPopUp {
@@ -2038,6 +2039,10 @@
 
 /* ── MOBİL UYARLAMA (BOTTOM SHEET) ── */
 @media (max-width: 640px) {
+  body.frp-mobile-chat-open {
+    overflow: hidden !important;
+    overscroll-behavior: none;
+  }
   body.frp-mobile-chat-open .frp-presence-dock {
     visibility: hidden;
     pointer-events: none;
@@ -2051,25 +2056,38 @@
     bottom: 12px;
   }
   .frp-presence-panel {
-    width: calc(100vw - 24px);
-    height: calc(100vh - 24px);
-    max-height: calc(100vh - 24px);
-    height: calc(100dvh - 24px);
-    max-height: calc(100dvh - 24px);
+    position: fixed;
+    inset: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    width: auto;
+    max-width: none;
+    height: auto;
+    max-height: none;
+    border-radius: 20px;
   }
   .frp-chat-window {
-    inset: 0 !important;
-    width: 100dvw !important;
+    inset: auto !important;
+    top: var(--frp-chat-viewport-top, 0) !important;
+    left: var(--frp-chat-viewport-left, 0) !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: var(--frp-chat-viewport-width, 100dvw) !important;
     height: var(--frp-chat-viewport-height, 100dvh) !important;
     max-height: var(--frp-chat-viewport-height, 100dvh) !important;
-    max-width: 100dvw !important;
+    max-width: none !important;
     border-radius: 0 !important;
+    border: 0 !important;
     box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.35) !important;
     z-index: 1000001 !important;
+    animation: mobileChatEnter 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
-  .frp-chat-window.minimized {
-    height: 52px !important;
+  .frp-chat-window.minimized,
+  .frp-chat-window.maximized {
+    width: var(--frp-chat-viewport-width, 100dvw) !important;
+    height: var(--frp-chat-viewport-height, 100dvh) !important;
   }
+  .frp-chat-btn-ctrl.btn-minimize,
+  .frp-chat-btn-ctrl.btn-maximize { display: none !important; }
+  .frp-chat-header { padding-top: max(0.75rem, env(safe-area-inset-top)); }
   .frp-chat-header-controls {
     max-width: 56vw;
     overflow-x: auto;
@@ -2084,6 +2102,11 @@
   .frp-chat-btn-action { width: 27px; height: 27px; }
   .frp-chat-msg.actions-open { z-index: 80 !important; }
   .frp-chat-msg.actions-open .frp-chat-hover-bar { top: -36px; }
+}
+
+@keyframes mobileChatEnter {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ── GÖNDEREN KİŞİ ETİKETİ ── */

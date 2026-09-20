@@ -715,6 +715,7 @@
       isPanelOpen = true;
       panel.classList.add('open');
       pill.style.display = 'none';
+      realignChatWindows();
       if (currentTab === 'users') renderUsers();
       else if (currentTab === 'groups') renderGroups();
       else if (currentTab === 'rooms') renderRooms();
@@ -726,6 +727,7 @@
       isPanelOpen = false;
       panel.classList.remove('open');
       pill.style.display = 'inline-flex';
+      realignChatWindows();
       updateDockBadges();
     });
 
@@ -1273,15 +1275,31 @@
     return Math.ceil(panelWidth) + 36;
   }
 
+  function isMobileChatLayout() {
+    return Boolean(window.matchMedia && window.matchMedia('(max-width: 640px)').matches);
+  }
+
   // ── DİNAMİK PENCERE HİZALAMA (BOŞLUKSUZ & TAŞMAYI ÖNLEYEN YERLEŞİM) ──
   function realignChatWindows() {
+    const windowsArr = Array.from(activeChatWindows.values());
+
+    if (isMobileChatLayout()) {
+      document.body.classList.toggle('frp-mobile-chat-open', windowsArr.length > 0);
+      windowsArr.forEach((winObj) => {
+        winObj.el.classList.remove('minimized', 'maximized');
+        winObj.el.style.removeProperty('right');
+        winObj.syncViewport?.();
+      });
+      return;
+    }
+
+    document.body.classList.remove('frp-mobile-chat-open');
     const baseOffset = getChatBaseOffset();
     const vpWidth = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 1920;
 
     // Ekrana sığabilecek maksimum açık (genişletilmiş) pencere sayısı
     const maxExpanded = Math.max(1, Math.min(3, Math.floor((vpWidth - baseOffset - 60) / 425)));
 
-    const windowsArr = Array.from(activeChatWindows.values());
     const expandedWins = windowsArr.filter(w => !w.el.classList.contains('minimized'));
 
     // Çok fazla pencere varsa en eskileri otomatik minimize et
@@ -1295,7 +1313,8 @@
     let currentRight = baseOffset;
     windowsArr.forEach((winObj) => {
       const isMin = winObj.el.classList.contains('minimized');
-      const winWidth = isMin ? 220 : 410;
+      const measuredWidth = Math.ceil(winObj.el.getBoundingClientRect().width || 0);
+      const winWidth = measuredWidth || (isMin ? 220 : 410);
 
       // Sol kenardan taşmayı önle
       if (currentRight + winWidth > vpWidth - 16) {
@@ -1307,7 +1326,7 @@
       winObj.el.style.right = `${currentRight}px`;
       winObj.el.style.transition = 'right 0.25s cubic-bezier(0.16, 1, 0.3, 1), height 0.2s ease, width 0.2s ease';
 
-      const step = winObj.el.classList.contains('minimized') ? 228 : 418;
+      const step = Math.ceil(winObj.el.getBoundingClientRect().width || winWidth) + 8;
       currentRight += step;
     });
   }
@@ -1327,8 +1346,9 @@
     // Zaten açıksa öne al
     if (activeChatWindows.has(chatKey)) {
       const activeObj = activeChatWindows.get(chatKey);
-      activeObj.el.classList.remove('minimized');
+      activeObj.el.classList.remove('minimized', 'maximized');
       activeObj.resume?.();
+      activeObj.syncViewport?.();
       realignChatWindows();
       const inp = activeObj.el.querySelector('.frp-chat-input');
       if (inp) inp.focus();
@@ -1336,7 +1356,7 @@
     }
 
     // Telefonda üst üste görünmeyen pencereler bırakma: yalnızca seçilen sohbet açık kalır.
-    if (window.matchMedia('(max-width: 640px)').matches) {
+    if (isMobileChatLayout()) {
       activeChatWindows.forEach((windowObj, key) => {
         if (key === chatKey) return;
         windowObj.close();
@@ -1518,7 +1538,7 @@
     `;
 
     document.body.appendChild(chatEl);
-    document.body.classList.add('frp-mobile-chat-open');
+    if (isMobileChatLayout()) document.body.classList.add('frp-mobile-chat-open');
 
     // Kontroller
     const btnClose = chatEl.querySelector('.btn-close');
@@ -1976,9 +1996,20 @@
       ++requestSerial; liveController?.abort(); clearTimeout(pollTimer); stopTyping();
     }
     function syncMobileViewport() {
-      if (window.visualViewport && window.innerWidth <= 640) {
-        chatEl.style.setProperty('--frp-chat-viewport-height', `${Math.round(window.visualViewport.height)}px`);
+      if (!isMobileChatLayout()) {
+        ['--frp-chat-viewport-top', '--frp-chat-viewport-left', '--frp-chat-viewport-width', '--frp-chat-viewport-height']
+          .forEach(property => chatEl.style.removeProperty(property));
+        return;
       }
+      const viewport = window.visualViewport;
+      const top = Math.max(0, Math.round(viewport?.offsetTop || 0));
+      const left = Math.max(0, Math.round(viewport?.offsetLeft || 0));
+      const width = Math.max(1, Math.round(viewport?.width || window.innerWidth));
+      const height = Math.max(1, Math.round(viewport?.height || window.innerHeight));
+      chatEl.style.setProperty('--frp-chat-viewport-top', `${top}px`);
+      chatEl.style.setProperty('--frp-chat-viewport-left', `${left}px`);
+      chatEl.style.setProperty('--frp-chat-viewport-width', `${width}px`);
+      chatEl.style.setProperty('--frp-chat-viewport-height', `${height}px`);
     }
     function closeChat() {
       closed = true; ++requestSerial;
@@ -1988,6 +2019,7 @@
       window.removeEventListener('offline', onNetworkOffline);
       window.removeEventListener('focus', onChatFocus);
       window.visualViewport?.removeEventListener('resize', syncMobileViewport);
+      window.visualViewport?.removeEventListener('scroll', syncMobileViewport);
       if (recordingTimer) clearInterval(recordingTimer);
       if (nudgeCooldownTimer) clearInterval(nudgeCooldownTimer);
       if (mediaRecorder && mediaRecorder.state !== 'inactive') { mediaRecorder.onstop = null; mediaRecorder.stop(); }
@@ -2005,6 +2037,7 @@
     window.addEventListener('offline', onNetworkOffline);
     window.addEventListener('focus', onChatFocus);
     window.visualViewport?.addEventListener('resize', syncMobileViewport);
+    window.visualViewport?.addEventListener('scroll', syncMobileViewport);
     syncMobileViewport();
     msgStream.addEventListener('scroll', () => {
       if (msgStream.scrollHeight - msgStream.scrollTop - msgStream.clientHeight < 100) {
@@ -2029,7 +2062,7 @@
       const badge = chatEl.querySelector('.frp-chat-live-badge');
       if (badge) badge.hidden = status !== 'online';
     }
-    activeChatWindows.set(chatKey, { el: chatEl, close: closeChat, resume: resumeLive, updatePeer });
+    activeChatWindows.set(chatKey, { el: chatEl, close: closeChat, resume: resumeLive, updatePeer, syncViewport: syncMobileViewport });
     syncOpenConversationRows();
     chatEl.addEventListener('keydown', event => {
       if (event.key !== 'Escape') return;
@@ -2046,14 +2079,18 @@
 
     btnMinimize.addEventListener('click', (e) => {
       e.stopPropagation();
+      if (isMobileChatLayout()) return;
       chatEl.classList.toggle('minimized');
+      realignChatWindows();
       resumeLive();
     });
 
     btnMaximize.addEventListener('click', (e) => {
       e.stopPropagation();
+      if (isMobileChatLayout()) return;
       chatEl.classList.remove('minimized');
       chatEl.classList.toggle('maximized');
+      realignChatWindows();
       resumeLive();
     });
 
@@ -2099,6 +2136,7 @@
     chatHeader.addEventListener('click', () => {
       if (chatEl.classList.contains('minimized')) {
         chatEl.classList.remove('minimized');
+        realignChatWindows();
         markVisibleMessagesRead();
         if (input) input.focus();
       }

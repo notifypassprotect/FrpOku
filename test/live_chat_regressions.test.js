@@ -94,7 +94,24 @@ test('chat reconnect, deletion and mobile viewport flows fail safely', () => {
   assert.match(source,/autoRetryAttempts >= 1/);
   assert.match(source,/if \(!response\.ok \|\| !data\.success\) throw new Error/);
   assert.match(source,/window\.visualViewport\?\.addEventListener\('resize', syncMobileViewport\)/);
+  assert.match(source,/window\.visualViewport\?\.addEventListener\('scroll', syncMobileViewport\)/);
+  assert.match(source,/winObj\.el\.classList\.remove\('minimized', 'maximized'\)/);
+  assert.match(source,/winObj\.el\.style\.removeProperty\('right'\)/);
+  assert.match(css,/top:\s*var\(--frp-chat-viewport-top, 0\) !important/);
+  assert.match(css,/left:\s*var\(--frp-chat-viewport-left, 0\) !important/);
+  assert.match(css,/\.frp-chat-btn-ctrl\.btn-minimize,[\s\S]*\.frp-chat-btn-ctrl\.btn-maximize\s*\{ display: none !important; \}/);
   assert.match(css,/@media \(prefers-reduced-motion: reduce\)/);
+});
+
+test('presence list and desktop chat windows use stable independent docking', () => {
+  const fs=require('node:fs'), path=require('node:path');
+  const source=fs.readFileSync(path.join(__dirname,'../js/core/online_presence.js'),'utf8');
+  const css=fs.readFileSync(path.join(__dirname,'../css/online_presence.css'),'utf8');
+  assert.match(css,/\.frp-presence-panel\s*\{[\s\S]*position:\s*absolute;[\s\S]*bottom:\s*calc\(100% \+ 12px\)/);
+  assert.match(css,/\.frp-chat-window\s*\{[\s\S]*bottom:\s*14px;[\s\S]*border-radius:\s*24px/);
+  assert.match(css,/@media \(max-width: 640px\)[\s\S]*\.frp-presence-panel\s*\{[\s\S]*position:\s*fixed;[\s\S]*inset:\s*max\(8px, env\(safe-area-inset-top\)\)/);
+  assert.match(source,/const measuredWidth = Math\.ceil\(winObj\.el\.getBoundingClientRect\(\)\.width \|\| 0\)/);
+  assert.match(source,/panel\.classList\.add\('open'\);\s*pill\.style\.display = 'none';\s*realignChatWindows\(\)/);
 });
 
 test('chat removes canned replies and groups nearby messages from the same sender', () => {
