@@ -36,5 +36,5 @@ test('shared visual stylesheet cache version is aligned across pages', () => {
     const pageHtml = fs.readFileSync(path.join(root, page), 'utf8');
     assert.match(pageHtml, /css\/ui_polish\.css\?v=5\.9\.0/);
   }
-  assert.match(html, /js\/detail\/app\.js\?v=5\.7\.2/);
+  assert.match(html, /js\/detail\/app\.js\?v=5\.10\.0/);
 });

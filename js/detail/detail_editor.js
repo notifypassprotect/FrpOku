@@ -47,7 +47,7 @@ window.FrpDetailEditor = window.FrpDetailEditor || {};
  ta.focus();
  ta.setSelectionRange(targetPos, targetPos + (token? token.length: 0));
 
- const lineHeight = 22.1;
+ const lineHeight = parseFloat(getComputedStyle(ta).lineHeight) || 22.1;
  const targetScroll = Math.max(0, (targetLine - 6) * lineHeight);
  ta.scrollTop = targetScroll;
  if (bd) bd.scrollTop = targetScroll;

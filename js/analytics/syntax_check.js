@@ -411,20 +411,7 @@
  });
  }
 
- // ── PASCAL SCRIPT SONLANDIRMA (end. Nokta Kontrolü) ──
- const nonCommentLines = rawLines.map(l => l.replace(/\/\/.*$/, '').replace(/\{[^}]*\}/g, '').trim()).filter(Boolean);
- if (nonCommentLines.length > 0) {
- const lastLine = nonCommentLines[nonCommentLines.length - 1];
- const lastClean = lastLine.replace(/\s+/g, '').toUpperCase();
- if (lastClean === 'END' || lastClean === 'END;') {
- errors.push({
- text: `Satır ${rawLines.length}: PascalScript ana kod bloğu 'end.' (nokta) ile sonlandırılmalıdır. (Mevcut: '${lastLine}')`,
- line: rawLines.length,
- token: 'end.',
- suggestion: "Programın en sonundaki 'end' ifadesini 'end.' olarak tamamlayın."
- });
- }
- }
+ // FastReport olay betikleri ve prosedürler 'end;' ile bitebilir.
 
  // Yarım bırakılmış FastReport Pascal ifadeleri
  rawLines.forEach((rawLine, index) => {

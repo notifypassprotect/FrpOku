@@ -150,31 +150,8 @@ function findFuzzyTypoMatch(word, lang = 'pascal') {
     const sFix = staticMap.get(up);
     if (sFix.toUpperCase() !== up) return sFix;
   }
-
-  // 4 harf ve daha kısa kelimelerde rastgele kolon/tablo isimlerinin yanlış eşleşmesini engelle
-  if (up.length <= 4) return null;
-
-  // Sayı, hex, DialogPage1 gibi bileşen kontrolü
-  if (/^\d+$/.test(up) || /^0X[0-9A-F]+$/.test(up) || /\d$/.test(up)) return null;
-
-  const targetList = lang === 'pascal' ? PAS_KEYWORD_LIST : SQL_KEYWORD_LIST;
-  let bestMatch = null;
-  let minDistance = 999;
-
-  for (const kw of targetList) {
-    if (kw.length <= 4) continue;
-    if (Math.abs(kw.length - up.length) > 2) continue;
-
-    const dist = levenshteinDist(up, kw);
-    const maxAllowed = kw.length <= 6 ? 1 : 2;
-
-    if (dist <= maxAllowed && dist < minDistance) {
-      minDistance = dist;
-      bestMatch = kw;
-    }
-  }
-
-  return bestMatch;
+  // Kullanıcı tanımlı Oracle/Pascal fonksiyonlarını sözlük benzerliğine göre hata sayma.
+  return null;
 }
 
 const FRX_EVENTS = [
@@ -203,17 +180,7 @@ function findFastReportEventTypo(procName) {
 
   // Zaten tam ve geçerli bir FastReport Event'i ise ve sıfır (0n) ile yazılmamışsa hata yok
   const exact = FRX_EVENTS.find(e => e.toUpperCase() === rawUpper);
-  if (exact) {
-    if (m[2] === '0n' || m[2] === '0N') {
-      return {
-        original: procName,
-        suggested: prefix + exact,
-        eventName: exact,
-        reason: `'0' (sıfır) yerine 'O' harfi yazılmalı`
-      };
-    }
-    return null; // Tam geçerli event
-  }
+  if (exact) return null; // Bileşen adı 0 ile bitip 'n...' ile devam edebilir.
 
   // FastReport Event sözlüğünde Levenshtein mesafesine göre en yakın olayı bul
   let bestEvent = null;
@@ -892,7 +859,7 @@ function findSyntaxErrors(code, lang = 'sql') {
           addDiagnostic(lineNo, clean.toUpperCase().indexOf(kw) + 1, kw, `${kw} sonrasına tablo adı yazın`, `'${kw}' ifadesinde tablo adı eksik.`);
         }
       } else {
-        const inlineMissingSource = /\b(FROM|INTO|UPDATE)\s*(?:WHERE|SET|GROUP\s+BY|ORDER\s+BY|HAVING|\)|$)/i.exec(trim);
+        const inlineMissingSource = /\b(FROM|INTO|UPDATE)\s+(?:WHERE|SET|GROUP\s+BY|ORDER\s+BY|HAVING|\))/i.exec(trim);
         if (inlineMissingSource && !/\b(?:FROM|INTO|UPDATE)\s+[a-zA-Z0-9_$.]+/i.test(trim)) {
           const kw = inlineMissingSource[1].toUpperCase();
           addDiagnostic(lineNo, clean.toUpperCase().indexOf(kw) + 1, kw, `${kw} sonrasına tablo adı yazın`, `'${kw}' ifadesinde tablo adı eksik.`);
@@ -970,7 +937,7 @@ function findSyntaxErrors(code, lang = 'sql') {
       }
 
       // Boş IN () kontrolü
-      const emptyInMatch = /\bIN\s*\(\s*\)/i.exec(clean);
+      const emptyInMatch = /\bIN\s*\(\s*\)/i.exec(rawWithoutComments);
       if (emptyInMatch) {
         addDiagnostic(lineNo, emptyInMatch.index + 1, 'IN ()', 'IN (değer1, değer2)', "'IN ()' parantez içi boş bırakılamaz.");
       }
@@ -978,7 +945,7 @@ function findSyntaxErrors(code, lang = 'sql') {
       // Zorunlu parametreli fonksiyonların boş parantezle çağrılması
       const emptyFuncMatch = /\b(COUNT|SUM|AVG|MIN|MAX|ROUND|TRUNC|COALESCE|NVL|NVL2|UPPER|LOWER|LENGTH|SUBSTR|REPLACE|TO_CHAR|TO_DATE|TO_NUMBER)\s*\(\s*\)/gi;
       let efm;
-      while ((efm = emptyFuncMatch.exec(clean)) !== null) {
+      while ((efm = emptyFuncMatch.exec(rawWithoutComments)) !== null) {
         const fnName = efm[1].toUpperCase();
         addDiagnostic(lineNo, efm.index + 1, `${fnName}()`, `${fnName}(parametre)`, `'${fnName}' fonksiyonu parametresiz kullanılamaz.`);
       }
@@ -1053,7 +1020,7 @@ function findSyntaxErrors(code, lang = 'sql') {
       const trim = clean.trim();
       if (!trim) return;
       const lineNo = index + 1;
-      const emptyAssignment = /:=\s*;?\s*$/i.exec(trim);
+      const emptyAssignment = /:=\s*;?\s*$/i.exec(rawLine.replace(/\/\/.*$/, '').trim());
       if (emptyAssignment) addDiagnostic(lineNo, clean.lastIndexOf(':=') + 1, ':=', 'Atamanın sağına değer veya ifade yazın', "Pascal atama operatörü ':=' sonrasında değer eksik.");
       if (/^\s*IF\b/i.test(trim) && !/\bTHEN\b/i.test(trim)) addDiagnostic(lineNo, clean.toUpperCase().indexOf('IF') + 1, 'if', 'Koşulu THEN ile tamamlayın', "IF koşulunda 'then' eksik.");
       if (/^\s*(?:WHILE|FOR)\b/i.test(trim) && !/\bDO\b/i.test(trim)) addDiagnostic(lineNo, 1, trim.split(/\s+/)[0], 'Döngü koşulunu DO ile tamamlayın', "Pascal döngüsünde 'do' eksik.");

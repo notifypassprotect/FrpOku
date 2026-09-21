@@ -40,6 +40,7 @@ const fontSizeVal = document.getElementById('fontSizeVal');
 function updateFontSize(size) {
  currentFontSize = Math.min(FONT_MAX, Math.max(FONT_MIN, size));
  document.documentElement.style.setProperty('--code-size', currentFontSize + 'px');
+ document.documentElement.style.setProperty('--code-editor-line-height', (currentFontSize * 1.7) + 'px');
  if (fontSizeVal) fontSizeVal.textContent = currentFontSize + 'px';
  if (Array.isArray(activeTabs)) {
  activeTabs.forEach(t => syncEditorBackdrop(t.id));
@@ -676,20 +677,9 @@ function addTab(cfg) {
  </div>
  <div class="code-toolbar-actions">
  ${cfg.type === 'sql'? `
- <div class="topbar-dropdown" style="display:inline-flex;padding-bottom:0;margin-bottom:0;">
- <button class="btn-copy topbar-dropdown-toggle" style="background:linear-gradient(135deg, #3b82f6, #6366f1);color:#fff;border:none;font-weight:700;" title="SQL Biçimlendirme Seçenekleri">Formatla</button>
- <div class="topbar-dropdown-menu" style="left:0;right:auto;min-width:220px;z-index:9999;">
- <button class="topbar-dropdown-item" data-detail-action="format-sql" data-tab="${encodeInlineArg(cfg.id)}" data-mode="expanded">
- <span>Standart Format (Geniş)</span>
- </button>
- <button class="topbar-dropdown-item" data-detail-action="format-sql" data-tab="${encodeInlineArg(cfg.id)}" data-mode="compact">
- <span>Kompakt Format</span>
- </button>
- <button class="topbar-dropdown-item" data-detail-action="minify-sql" data-tab="${encodeInlineArg(cfg.id)}">
- <span>Tek Satır (Minify)</span>
- </button>
- </div>
- </div>
+ <button class="btn-copy" data-detail-action="format-sql" data-tab="${encodeInlineArg(cfg.id)}" data-mode="expanded" title="SQL sorgusunu satırlara ayır">Formatla</button>
+ <button class="btn-copy" data-detail-action="format-sql" data-tab="${encodeInlineArg(cfg.id)}" data-mode="compact" title="SQL sorgusunu az satırla biçimlendir">Kompakt</button>
+ <button class="btn-copy" data-detail-action="minify-sql" data-tab="${encodeInlineArg(cfg.id)}" title="SQL sorgusunu tek satıra indir">Tek Satır</button>
  <button class="btn-copy" id="${esc(cfg.id)}_casetogglebtn" data-detail-action="change-case" data-tab="${encodeInlineArg(cfg.id)}" title="SQL Anahtar Kelimelerini BÜYÜK / KÜÇÜK Harfe Dönüştür">BÜYÜK Harf</button>
  <button class="btn-copy" data-detail-action="snippet" data-index="${cfg.queryIndex}" title="Sorgu kütüphanesine ekle">Kütüphane</button>
  <button class="btn-copy" data-detail-action="param" data-index="${cfg.queryIndex}">SQL Testi</button>
@@ -786,7 +776,7 @@ function jumpToEditorLine(tabId, targetLine, token) {
  ta.setSelectionRange(targetPos, targetPos + (token? token.length: 0));
 
  // Satırı ekranda ortala
- const lineHeight = 22.1;
+ const lineHeight = parseFloat(getComputedStyle(ta).lineHeight) || 22.1;
  const targetScroll = Math.max(0, (targetLine - 6) * lineHeight);
  ta.scrollTop = targetScroll;
  if (bd) bd.scrollTop = targetScroll;

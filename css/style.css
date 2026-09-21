@@ -1277,14 +1277,14 @@ mark.code-match.current {
 }
 
 .editor-gutter-line {
- height: 22.1px; /* matches font-size 13px * line-height 1.7 */
- line-height: 22.1px;
+ height: var(--code-editor-line-height, 22.1px);
+ line-height: var(--code-editor-line-height, 22.1px);
  display: flex;
  align-items: center;
  justify-content: flex-end;
  padding-right: 12px;
  color: var(--text-muted, #94a3b8);
- font-size: 13px;
+ font-size: var(--code-size);
  font-weight: 500;
  box-sizing: border-box;
  position: relative;
@@ -1329,8 +1329,8 @@ mark.code-match.current {
  overflow: hidden;
  pointer-events: none;
  font-family: var(--mono)!important;
- font-size: 13px!important;
- line-height: 22.1px!important;
+ font-size: var(--code-size)!important;
+ line-height: var(--code-editor-line-height, 22.1px)!important;
  letter-spacing: 0!important;
  tab-size: 2!important;
  -moz-tab-size: 2!important;
@@ -1341,8 +1341,8 @@ mark.code-match.current {
 }
 
 .code-editor-backdrop .code-line-raw {
- height: 22.1px;
- line-height: 22.1px;
+ height: var(--code-editor-line-height, 22.1px);
+ line-height: var(--code-editor-line-height, 22.1px);
  white-space: pre!important;
  padding: 0!important;
  margin: 0!important;
@@ -1377,8 +1377,8 @@ mark.code-match.current {
  -webkit-text-fill-color: transparent!important;
  caret-color: var(--accent, #3b82f6)!important;
  font-family: var(--mono)!important;
- font-size: 13px!important;
- line-height: 22.1px!important;
+ font-size: var(--code-size)!important;
+ line-height: var(--code-editor-line-height, 22.1px)!important;
  letter-spacing: 0!important;
  tab-size: 2!important;
  -moz-tab-size: 2!important;
