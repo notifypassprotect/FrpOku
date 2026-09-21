@@ -118,9 +118,8 @@ window.showPromptDialog = function({
 
 // ── AYARLAR ANA MODALI ──────────────────────────────────────
 window.openSettingsModal = function(initialTab = 'appearance') {
-  let activeTab = initialTab;
-
   const authUser = window.FrpAuth?.getUser();
+  let activeTab = initialTab === 'audit' && authUser?.role !== 'admin' ? 'appearance' : initialTab;
   const authNameParts = (authUser?.name || '').trim().split(' ');
   const authFirstName = authNameParts[0] || '';
   const authLastName = authNameParts.slice(1).join(' ') || '';
@@ -192,7 +191,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
         { id: 'rooms',    label: '🏢 Sohbet Odaları & Kanallar' },
         { id: 'mail',     label: '✉️ E-posta & SMTP Sağlığı' }
       ] : []),
-      { id: 'audit',      label: 'Denetim Günlüğü' }
+      ...(isAdmin ? [{ id: 'audit', label: 'Denetim Günlüğü' }] : [])
     ];
 
     const tabButtonsHtml = tabs.map(t => {
@@ -237,9 +236,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
 
           <!-- Alt İşlem ve Kaydetme Kontrol Barı -->
           <div style="background:var(--bg-raised);border-top:1px solid var(--border-light);padding:.85rem 1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;">
-            <button type="button" class="btn btn-sm btn-ghost" id="btnResetToFactoryPrefs" style="color:var(--text-muted);font-weight:700;font-size:.8rem;">
-              Fabrika Ayarlarına Sıfırla
-            </button>
+            <span></span>
             <div style="display:flex;align-items:center;gap:.6rem;">
               <button type="button" class="btn btn-sm btn-ghost" id="btnCancelSettingsModal" style="font-weight:700;">
                 İptal
@@ -274,31 +271,6 @@ window.openSettingsModal = function(initialTab = 'appearance') {
     });
 
     overlay.querySelector('#btnCancelSettingsModal')?.addEventListener('click', () => overlay.remove());
-
-    overlay.querySelector('#btnResetToFactoryPrefs')?.addEventListener('click', () => {
-      window.showConfirmDialog({
-        title: 'Fabrika Ayarlarına Dön',
-        message: 'Tüm kişisel görünüm, sütun sırası ve sayfalama ayarlarınız varsayılana döndürülecektir.',
-        confirmText: 'Sıfırla',
-        isDanger: true,
-        onConfirm: () => {
-          FrpStore.setPreferences({
-            fontFamily: 'Inter',
-            codeFontFamily: 'Consolas',
-            codeFontSize: 13,
-            pageSize: 50,
-            visibleColumns: {
-              reportName: true, fileName: true, fileSize: true, category: true,
-              guid: true, tags: true, queries: false, date: true, lastModified: true
-            },
-            columnOrder: ['reportName', 'fileName', 'fileSize', 'category', 'guid', 'tags', 'queries', 'date', 'lastModified']
-          });
-          safeToast('Ayarlar fabrika ayarlarına sıfırlandı.', 'success');
-          overlay.remove();
-          if (typeof refreshAll === 'function') refreshAll();
-        }
-      });
-    });
 
     overlay.querySelector('#btnSaveAllSettingsChanges')?.addEventListener('click', async (e) => {
       const btn = e.currentTarget;

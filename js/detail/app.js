@@ -1826,15 +1826,29 @@ function formatSqlInTab(tabId, mode = 'expanded') {
  showToast('Biçimlendirilecek SQL kodu bulunamadı.', 'warning');
  return;
  }
-
- const formatted = window.formatSQL? window.formatSQL(currentCode, { mode }): currentCode;
+ if (cfg._formatApplied && currentCode !== cfg._lastFormattedCode) {
+   cfg._formatApplied = false;
+   cfg._formatOriginalCode = null;
+ }
+ if (cfg._formatApplied && cfg._currentFormatMode === mode) {
+   applyCodeUpdateInTab(tabId, cfg._formatOriginalCode ?? currentCode);
+   cfg._formatApplied = false;
+   cfg._currentFormatMode = null;
+   cfg._formatOriginalCode = null;
+   cfg._lastFormattedCode = null;
+   showToast('Önceki SQL metni geri yüklendi.', 'info');
+   return;
+ }
+ if (!cfg._formatApplied) cfg._formatOriginalCode = cfg._isMinified ? (cfg._originalCode ?? currentCode) : currentCode;
+ const formatted = window.formatSQL? window.formatSQL(cfg._formatOriginalCode ?? currentCode, { mode }): currentCode;
  applyCodeUpdateInTab(tabId, formatted);
  cfg._isMinified = false;
  cfg._formatApplied = true;
  cfg._currentFormatMode = mode;
+ cfg._lastFormattedCode = formatted;
 
  const modeLabel = mode === 'compact'? 'Kompakt Formatlandı (Az Satır) ': 'Standart Formatlandı (Geniş) ';
- showToast(modeLabel, 'success');
+ showToast(modeLabel + 'Tekrar basarak geri alabilirsiniz.', 'success');
 }
 
 // ── SQL MINIFIER (TEK SATIRA İNDİRME - TOGGLE DESTEKLİ) ───
@@ -1848,15 +1862,18 @@ function minifySqlInTab(tabId) {
  const isEditing = editWrap? (editWrap.style.display!== 'none'): (editArea && editArea.style.display!== 'none');
  const currentCode = isEditing? editArea.value: cfg.rawCode;
 
+ if (cfg._formatApplied && currentCode !== cfg._lastFormattedCode) cfg._formatApplied = false;
+ if (cfg._isMinified && currentCode !== cfg._lastMinifiedCode) cfg._isMinified = false;
  if (cfg._isMinified) {
  applyCodeUpdateInTab(tabId, cfg._originalCode || currentCode);
  cfg._isMinified = false;
  cfg._formatApplied = false;
  cfg._formatOriginalCode = null;
+ cfg._lastMinifiedCode = null;
  showToast('SQL varsayılan görünümüne geri döndürüldü ↩️', 'info');
  } else {
- cfg._originalCode = currentCode;
- const minified = (currentCode || '')
+ cfg._originalCode = cfg._formatApplied ? (cfg._formatOriginalCode ?? currentCode) : currentCode;
+ const minified = (cfg._originalCode || '')
 .replace(/--[^\n]*/g, '')
 .replace(/\/\*[\s\S]*?\*\//g, '')
 .replace(/\s+/g, ' ')
@@ -1867,6 +1884,7 @@ function minifySqlInTab(tabId) {
  cfg._isUpper = false;
  cfg._formatApplied = false;
  cfg._formatOriginalCode = null;
+ cfg._lastMinifiedCode = minified;
  showToast('SQL tek satıra indirildi (Tekrar basarak geri alabilirsiniz)', 'success');
  }
 }

@@ -757,6 +757,7 @@
   }
 
   async function resetAllUserData() {
+    if (window.FrpAuth?.getUser()?.role !== 'admin') throw new Error('Bu işlem yalnızca yöneticiye açıktır.');
     const files = _read();
     const owned = _reportsOwnedBySession(files);
     if (window.FrpCloud) {
@@ -843,6 +844,11 @@
     const files = _read();
     const idx = files.findIndex(f => f.id === id || String(f.id) === rawId || String(f.id) === decId);
     if (idx < 0) return false;
+    const currentUser = window.FrpAuth?.getUser();
+    const ownerId = files[idx].userId || files[idx].user_id || files[idx].data?.userId || files[idx].data?.user_id;
+    if (!currentUser || (currentUser.role !== 'admin' && (!ownerId || String(ownerId) !== String(currentUser.id)))) {
+      throw new Error('Yalnızca kendi raporlarınızı silebilirsiniz.');
+    }
 
     const originalFiles = [...files];
     const originalTrash = [..._readTrash()];
@@ -892,6 +898,7 @@
 
     const toTrash = files.filter(f => idSet.has(String(f.id))).map(f => ({ ...f }));
     if (toTrash.length === 0) return false;
+    if (toTrash.some(f => !canManagePoolReport(f))) throw new Error('Yalnızca kendi raporlarınızı silebilirsiniz.');
     const remaining = files.filter(f => !idSet.has(String(f.id)));
 
     const now = new Date().toISOString();
@@ -1382,10 +1389,17 @@
     return poolList;
   }
 
+  function canManagePoolReport(file) {
+    const user = window.FrpAuth?.getUser();
+    const owner = file?.userId || file?.user_id || file?.data?.userId || file?.data?.user_id;
+    return !!(user && file && (user.role === 'admin' || (owner && String(owner) === String(user.id))));
+  }
+
   function toggleReportPool(id, makePublic) {
     const files = _read();
     const idx = files.findIndex(f => f.id === id);
     if (idx < 0) return false;
+    if (!canManagePoolReport(files[idx])) return false;
 
     const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
     const nowIso = new Date().toISOString();
@@ -1431,6 +1445,7 @@
     if (!Array.isArray(ids) || ids.length === 0) return 0;
     const files = _read();
     const idSet = new Set(ids);
+    if (files.some(f => idSet.has(f.id) && !canManagePoolReport(f))) return 0;
     const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
     const nowIso = new Date().toISOString();
     let count = 0;
@@ -2176,12 +2191,12 @@
     exportAllSqls, exportAllSqlsCsv, search, getStats, isStorageNearFull,
 
     // Ortak Havuz & Çalışma Alanı
-    getActiveWorkspace, setActiveWorkspace, getMyReports, getPoolReports,
+    getActiveWorkspace, setActiveWorkspace, getMyReports, getPoolReports, canManagePoolReport,
     toggleReportPool, bulkToggleReportPool, cloneReportToPersonal,
     // Aliaslar (Geriye Dönük Uyumluluk ve UI Bağlantıları)
     addManyToPool: (ids) => bulkToggleReportPool(ids, true),
     removeManyFromPool: (ids) => bulkToggleReportPool(ids, false),
-    togglePublicPool: (id, makePub) => toggleReportPool(id, makePub),
+    togglePublicPool: (id, makePub) => toggleReportPool(id, makePub === undefined ? !(getById(id)?.isPublic || getById(id)?.is_public) : makePub),
     cloneToPersonal: (id) => cloneReportToPersonal(id),
 
     // Analytics delegasyonları

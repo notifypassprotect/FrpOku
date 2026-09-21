@@ -863,6 +863,10 @@ function hideContextMenu() {
   contextTargetId = null;
 }
 
+function canManagePoolItem(file) {
+  return !!FrpStore.canManagePoolReport?.(file);
+}
+
 function setupContextMenu() {
   if (!ctxMenu) return;
 
@@ -884,6 +888,11 @@ function setupContextMenu() {
     if (titleEl) titleEl.textContent = file.meta?.reportName || file.name;
 
     const isPublic = !!(file.isPublic || file.is_public);
+    const canManage = canManagePoolItem(file);
+    const poolAction = document.getElementById('ctxBtnTogglePool');
+    const deleteAction = document.getElementById('ctxBtnDelete');
+    if (poolAction) poolAction.style.display = canManage ? '' : 'none';
+    if (deleteAction) deleteAction.style.display = canManage ? '' : 'none';
     const textTogglePool = document.getElementById('ctxTextTogglePool');
     if (textTogglePool) textTogglePool.textContent = isPublic ? 'Havuzdan Kaldır' : 'Ortak Havuzda Paylaş';
 
@@ -933,10 +942,20 @@ function setupContextMenu() {
           }
           break;
         case 'toggle-pool':
-          if (FrpStore.togglePublicPool) {
-            const isPub = FrpStore.togglePublicPool(id);
-            toast(isPub ? 'Rapor ortak havuza eklendi.' : 'Rapor ortak havuzdan kaldırıldı.', 'info');
-            refreshAll();
+          if (!canManagePoolItem(file)) { toast('Yalnızca kendi raporlarınızı havuzda değiştirebilirsiniz.', 'error'); break; }
+          {
+            const remove = !!(file.isPublic || file.is_public);
+            const changePool = () => {
+              const result = FrpStore.toggleReportPool(id, !remove);
+              toast(result === !remove ? (remove ? 'Rapor ortak havuzdan kaldırıldı.' : 'Rapor ortak havuzda paylaşıldı.') : 'Havuz durumu güncellenemedi.', result === !remove ? 'success' : 'error');
+              refreshAll();
+            };
+            if (remove && window.showConfirmDialog) window.showConfirmDialog({
+              title: 'Ortak Havuzdan Kaldır',
+              message: `"${escHtml(file.meta?.reportName || file.name)}" ortak havuzdan kaldırılacak. Diğer kullanıcılar artık raporu göremeyecek.`,
+              confirmText: 'Havuzdan Kaldır', isDanger: true, onConfirm: changePool
+            });
+            else if (!remove || confirm('Rapor ortak havuzdan kaldırılacak. Onaylıyor musunuz?')) changePool();
           }
           break;
         case 'clone-to-personal':
@@ -962,6 +981,7 @@ function setupContextMenu() {
           openCategoryModalFor(id);
           break;
         case 'delete':
+          if (!canManagePoolItem(file)) { toast('Yalnızca kendi raporlarınızı silebilirsiniz.', 'error'); break; }
           const doSingleDelete = async () => {
             try {
               const res = await FrpStore.moveToTrash(id);
@@ -981,7 +1001,7 @@ function setupContextMenu() {
           if (window.showConfirmDialog) {
             window.showConfirmDialog({
               title: 'Raporu Sil',
-              message: `"${file.meta?.reportName || file.name}" adlı rapor çöp kutusuna taşınacaktır.`,
+              message: `"${escHtml(file.meta?.reportName || file.name)}" adlı rapor${file.isPublic || file.is_public ? ' ortak havuzdan kaldırılıp' : ''} çöp kutusuna taşınacaktır.`,
               confirmText: 'Çöp Kutusuna Taşı',
               isDanger: true,
               onConfirm: doSingleDelete
@@ -1352,6 +1372,10 @@ function initListPage() {
 
   document.getElementById('btnDeleteBulk')?.addEventListener('click', () => {
     if (selectedIds.size === 0) return;
+    if ([...selectedIds].some(id => !canManagePoolItem(FrpStore.getById(id)))) {
+      toast('Yalnızca kendi raporlarınızı silebilirsiniz. Seçimi kontrol edin.', 'error');
+      return;
+    }
     const n = selectedIds.size;
     const idsToDelete = [...selectedIds];
     const performBulkDelete = async () => {
@@ -1395,7 +1419,7 @@ function initListPage() {
     if (window.showConfirmDialog) {
       window.showConfirmDialog({
         title: 'Toplu Silme',
-        message: `${n} adet rapor çöp kutusuna taşınacaktır. İstediğiniz zaman kurtarabilirsiniz.`,
+        message: `${n} adet rapor${idsToDelete.some(id => FrpStore.getById(id)?.isPublic) ? ' ortak havuzdan kaldırılıp' : ''} çöp kutusuna taşınacaktır. İstediğiniz zaman kurtarabilirsiniz.`,
         confirmText: 'Çöp Kutusuna Taşı',
         isDanger: true,
         onConfirm: performBulkDelete
@@ -1408,6 +1432,7 @@ function initListPage() {
   document.getElementById('btnBulkSharePool')?.addEventListener('click', () => {
     if (selectedIds.size === 0) return;
     const selectedFiles = [...selectedIds].map(id => FrpStore.getById(id)).filter(Boolean);
+    if (selectedFiles.some(f => !canManagePoolItem(f))) { toast('Yalnızca kendi raporlarınızı paylaşabilirsiniz.', 'error'); return; }
     const unpooledIds = selectedFiles.filter(f => !(f.isPublic || f.is_public || f.inPool)).map(f => f.id);
     
     if (unpooledIds.length === 0) {
@@ -1442,33 +1467,39 @@ function initListPage() {
     if (selectedIds.size === 0) return;
     const selectedFiles = [...selectedIds].map(id => FrpStore.getById(id)).filter(Boolean);
     const pooledIds = selectedFiles.filter(f => !!(f.isPublic || f.is_public || f.inPool)).map(f => f.id);
+    if (selectedFiles.some(f => !canManagePoolItem(f))) { toast('Yalnızca kendi raporlarınızı ortak havuzdan kaldırabilirsiniz.', 'error'); return; }
     
     if (pooledIds.length === 0) {
       toast('Seçilen raporlar arasında ortak havuzda bulunan kayıt yok.', 'info');
       return;
     }
 
-    if (FrpStore.bulkToggleReportPool) {
-      FrpStore.bulkToggleReportPool(pooledIds, false);
-    } else if (FrpStore.removeManyFromPool) {
-      FrpStore.removeManyFromPool(pooledIds);
-    }
+    const removeFromPool = () => {
+      const changed = FrpStore.bulkToggleReportPool?.(pooledIds, false);
+      if (!changed) { toast('Raporlar havuzdan kaldırılamadı.', 'error'); return; }
 
-    if (window.FrpAudit) {
-      const remReports = pooledIds.map(id => {
-        const f = FrpStore.getById(id);
-        return f ? { id: f.id, name: f.name, title: f.meta?.reportName || f.name } : { id };
-      });
-      window.FrpAudit.logAction({
-        action: 'POOL_REMOVE_BULK',
-        target: `${pooledIds.length} Rapor`,
-        details: `${pooledIds.length} adet rapor Ortak Havuzdan kaldırıldı.`,
-        reports: remReports
-      });
-    }
+      if (window.FrpAudit) {
+        const remReports = pooledIds.map(id => {
+          const f = FrpStore.getById(id);
+          return f ? { id: f.id, name: f.name, title: f.meta?.reportName || f.name } : { id };
+        });
+        window.FrpAudit.logAction({
+          action: 'POOL_REMOVE_BULK',
+          target: `${pooledIds.length} Rapor`,
+          details: `${pooledIds.length} adet rapor Ortak Havuzdan kaldırıldı.`,
+          reports: remReports
+        });
+      }
 
-    toast(`${pooledIds.length} rapor ortak havuzdan kaldırıldı.`, 'info');
-    refreshAll();
+      toast(`${pooledIds.length} rapor ortak havuzdan kaldırıldı.`, 'info');
+      refreshAll();
+    };
+    if (window.showConfirmDialog) window.showConfirmDialog({
+      title: 'Ortak Havuzdan Kaldır',
+      message: `${pooledIds.length} rapor ortak havuzdan kaldırılacak ve diğer kullanıcıların erişimine kapanacak.`,
+      confirmText: 'Havuzdan Kaldır', isDanger: true, onConfirm: removeFromPool
+    });
+    else if (confirm(`${pooledIds.length} rapor ortak havuzdan kaldırılacak. Onaylıyor musunuz?`)) removeFromPool();
   });
 
   // Sürükle-Bırak Olayları

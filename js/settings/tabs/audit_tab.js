@@ -446,6 +446,7 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
 
   // ── DEDICATED FULLSCREEN / WIDE AUDIT MODAL ──────────────────
   window.openAuditLogModal = async function () {
+    if (window.FrpAuth?.getUser()?.role !== 'admin') return;
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.style.zIndex = '999999';
@@ -748,6 +749,7 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
   // Standart Sekme Modülü Arayüzü (Geriye Dönük Uyumluluk)
   window.FrpSettingsTabs.audit = {
     render() {
+      if (window.FrpAuth?.getUser()?.role !== 'admin') return '';
       return `
         <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3rem 1.5rem;text-align:center;gap:1.25rem;">
           <div style="width:64px;height:64px;border-radius:20px;background:var(--accent-light);color:var(--accent);display:flex;align-items:center;justify-content:center;">

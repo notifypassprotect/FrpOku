@@ -8,13 +8,14 @@ window.FrpSettingsTabs.storage = {
   render({ stagedPrefs }) {
     const files = FrpStore.getAll() || [];
     const stats = FrpStore.getStats() || { total: files.length, queries: 0, storageFormatted: '0 MB' };
+    const isAdmin = window.FrpAuth?.getUser()?.role === 'admin';
 
     return `
       <div style="display:flex;flex-direction:column;gap:1.25rem;">
         <div>
           <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">Yedekleme & Depolama Yönetimi</div>
           <div style="font-size:.78rem;color:var(--text-muted);margin-top:.2rem;">
-            Raporlarınızın snapshot yedeğini alın, otomatik yedekleme zamanlayın veya verileri sıfırlayın.
+            Raporlarınızın snapshot yedeğini alın ve otomatik yedekleme zamanlayın.
           </div>
         </div>
 
@@ -95,7 +96,7 @@ window.FrpSettingsTabs.storage = {
           </div>
         </div>
 
-        <!-- Tümünü Sıfırlama -->
+        ${isAdmin ? `<!-- Tümünü Sıfırlama -->
         <div class="settings-card" style="border:1px solid rgba(239,68,68,0.3);background:rgba(239,68,68,0.03);display:flex;align-items:center;justify-content:space-between;gap:1rem;">
           <div>
             <div style="font-weight:800;font-size:.85rem;color:var(--red);">Fabrika Ayarlarına Sıfırla</div>
@@ -104,7 +105,7 @@ window.FrpSettingsTabs.storage = {
           <button type="button" class="btn btn-sm btn-danger" id="btnActionResetAll" style="font-weight:800;padding:.5rem 1.1rem;">
             Verileri Sıfırla
           </button>
-        </div>
+        </div>` : ''}
       </div>
     `;
   },
@@ -164,6 +165,7 @@ window.FrpSettingsTabs.storage = {
     });
 
     overlay.querySelector('#btnActionResetAll')?.addEventListener('click', () => {
+      if (window.FrpAuth?.getUser()?.role !== 'admin') return;
       const askPass = () => {
         if (typeof window.showPromptDialog === 'function') {
           window.showPromptDialog({
@@ -198,21 +200,21 @@ window.FrpSettingsTabs.storage = {
           confirmText: 'Evet, Hepsini Sil',
           isDanger: true,
           onConfirm: async () => {
-            if (typeof FrpStore.resetAllUserData === 'function') {
+            try {
               await FrpStore.resetAllUserData();
-            } else {
-              FrpStore.deleteAll();
+              if (window.FrpAudit) {
+                window.FrpAudit.logAction({
+                  action: 'DATA_RESET',
+                  target: 'Tüm Veritabanı',
+                  details: 'Kullanıcı onayı ile tüm raporlar ve veritabanı sıfırlandı.'
+                });
+              }
+              safeToast('Tüm veriler sıfırlandı.', 'info');
+              if (typeof window.refreshAll === 'function') window.refreshAll();
+              renderModal();
+            } catch (error) {
+              safeToast(error.message || 'Veriler sıfırlanamadı.', 'error');
             }
-            if (window.FrpAudit) {
-              window.FrpAudit.logAction({
-                action: 'DATA_RESET',
-                target: 'Tüm Veritabanı',
-                details: 'Kullanıcı onayı ile tüm raporlar ve veritabanı sıfırlandı.'
-              });
-            }
-            safeToast('Tüm veriler sıfırlandı.', 'info');
-            if (typeof window.refreshAll === 'function') window.refreshAll();
-            renderModal();
           }
         });
       }).catch(() => {
