@@ -60,19 +60,12 @@
  `;
 
  splash.innerHTML = `
- <div style="display:flex;flex-direction:column;align-items:center;gap:1.2rem;max-width:380px;padding:2rem;">
- <div style="animation:pulse 2s infinite ease-in-out;">
- ${getFrpLogoSvg(72)}
- </div>
- <div>
- <div style="font-size:1.4rem;font-weight:900;margin-bottom:.3rem;color:#f8fafc;">Hoş Geldiniz, ${escHtml(user.full_name || user.username)}</div>
- <div style="font-size:.85rem;color:#94a3b8;">Kurumsal Rapor Çalışma Alanınız Hazırlanıyor...</div>
- </div>
- <div style="width:240px;height:6px;background:rgba(255,255,255,0.1);border-radius:6px;overflow:hidden;position:relative;">
- <div style="position:absolute;top:0;left:0;bottom:0;width:60%;background:linear-gradient(90deg, #38bdf8, #8b5cf6);box-shadow:0 0 12px #38bdf8;border-radius:6px;animation:splashProgress 1.1s infinite ease-in-out;"></div>
- </div>
- </div>
- `;
+ <div class="frp-login-transition-content">
+ ${getFrpLogoSvg(64)}
+ <div class="frp-login-transition-title">Hoş geldiniz, ${escHtml(user.full_name || user.username)}</div>
+ <div class="frp-login-transition-subtitle">Çalışma alanınız açılıyor</div>
+ <div class="frp-login-transition-progress" role="progressbar" aria-label="Çalışma alanı yükleniyor"><span></span></div>
+ </div>`;
 
  document.body.appendChild(splash);
 
@@ -103,7 +96,7 @@
 
  const portal = document.createElement('div');
  portal.id = 'authFullScreenPortal';
- portal.style.cssText = `
+  portal.style.cssText = `
     position: fixed; inset: 0;
     background: radial-gradient(ellipse at 50% 30%, #1e293b 0%, #0f172a 75%, #020617 100%);
     z-index: 1000000;
@@ -148,13 +141,17 @@
         <div style="position:absolute;top:-60px;left:-60px;width:220px;height:220px;background:rgba(37,99,235,0.25);border-radius:50%;filter:blur(60px);pointer-events:none;"></div>
         <div style="position:absolute;bottom:-80px;right:-60px;width:260px;height:260px;background:rgba(99,102,241,0.22);border-radius:50%;filter:blur(70px);pointer-events:none;"></div>
 
-        <div style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;text-align:center;justify-content:center;flex:1;padding:2rem 1rem;">
-          <div style="margin-bottom:1.5rem;filter:drop-shadow(0 16px 36px rgba(37,99,235,0.5));">
-            ${getFrpLogoSvg(88)}
+        <div class="auth-brand-content">
+          <div class="auth-brand-eyebrow">${getFrpLogoSvg(42)}<span>FrpOku Enterprise</span></div>
+          <div class="auth-brand-main">
+            <span class="auth-brand-kicker">Kurumsal Rapor Yönetimi</span>
+            <h1>Raporlarınız,<br><span>tek çalışma alanında.</span></h1>
+            <p>Raporları inceleyin, sorguları düzenleyin ve ekibinizle aynı yerde çalışın.</p>
           </div>
-          <h1 style="font-size:1.75rem;font-weight:900;letter-spacing:-.03em;margin:0 0 .5rem;color:#ffffff;text-shadow:0 2px 14px rgba(0,0,0,0.4);">FrpOku Enterprise</h1>
-          <div style="display:inline-flex;align-items:center;gap:.4rem;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);padding:.35rem .85rem;border-radius:20px;font-size:.76rem;color:#93c5fd;font-weight:600;letter-spacing:0.3px;">
-            Kurumsal Rapor Yönetimi
+          <div class="auth-brand-preview" aria-hidden="true">
+            <div class="auth-brand-preview-top"><span class="auth-brand-preview-mark"></span><span>Çalışma alanı</span><span class="auth-brand-preview-dots">•••</span></div>
+            <div class="auth-brand-preview-row"><span class="auth-brand-preview-icon">▤</span><span><strong>Raporlarım</strong><small>Raporları görüntüle ve düzenle</small></span><span class="auth-brand-preview-arrow">↗</span></div>
+            <div class="auth-brand-preview-row"><span class="auth-brand-preview-icon">⌘</span><span><strong>Sorgu editörü</strong><small>SQL ve rapor tasarımı</small></span><span class="auth-brand-preview-arrow">↗</span></div>
           </div>
         </div>
 
@@ -169,6 +166,7 @@
         flex: 1; padding: 2.2rem 2.2rem 1.8rem; display: flex; flex-direction: column; justify-content: center;
         background: #ffffff; color: #0f172a; overflow-y: auto; max-height: 90vh;
       ">
+        <div class="auth-mobile-brand">${getFrpLogoSvg(38)}<span>FrpOku</span></div>
         <div style="text-align:center;margin-bottom:1.15rem;">
           <h2 style="font-size:1.35rem;font-weight:900;letter-spacing:-.02em;margin:0 0 .25rem;color:#0f172a;">Hoş Geldiniz</h2>
           <p id="authSubtitle" style="font-size:.82rem;color:#64748b;margin:0;">Lütfen kurumsal hesabınıza giriş yapın</p>
@@ -179,18 +177,18 @@
           font-size:.82rem; font-weight: 600; line-height: 1.45; animation: shake .3s ease-in-out;
         "></div>
 
-        <div id="authTabSwitcher" style="
+        <div id="authTabSwitcher" role="tablist" aria-label="Hesap işlemleri" style="
           display: flex; background: #f1f5f9;
           border-radius: 10px; padding: 3px; margin-bottom: 1.15rem;
         ">
-          <button type="button" id="tabLoginBtn" style="
+          <button type="button" id="tabLoginBtn" role="tab" aria-controls="authLoginForm" aria-selected="${initialTab === 'login'}" style="
             flex: 1; padding:.55rem; border: none; border-radius: 8px;
             font-weight: 700; font-size:.86rem; cursor: pointer; transition: all .15s;
             background: ${initialTab === 'login' ? '#ffffff' : 'transparent'};
             color: ${initialTab === 'login' ? '#2563eb' : '#64748b'};
             box-shadow: ${initialTab === 'login' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none'};
           ">Giriş Yap</button>
-          <button type="button" id="tabRegisterBtn" style="
+          <button type="button" id="tabRegisterBtn" role="tab" aria-controls="authRegisterForm" aria-selected="${initialTab === 'register'}" style="
             flex: 1; padding:.55rem; border: none; border-radius: 8px;
             font-weight: 700; font-size:.86rem; cursor: pointer; transition: all .15s;
             background: ${initialTab === 'register' ? '#ffffff' : 'transparent'};
@@ -202,10 +200,10 @@
         <!-- 1. GİRİŞ FORMU -->
         <form id="authLoginForm" style="display: ${initialTab === 'login' ? 'block' : 'none'};">
           <div style="margin-bottom:.85rem;">
-            <label style="display:block;font-size:.76rem;font-weight:700;color:#334155;margin-bottom:.3rem;">
+            <label for="loginIdentifier" style="display:block;font-size:.76rem;font-weight:700;color:#334155;margin-bottom:.3rem;">
               Kullanıcı Adı veya E-Posta
             </label>
-            <input type="text" id="loginIdentifier" required value="${escHtml(savedIdentifier)}" placeholder="ör: admin veya ilker" style="
+            <input type="text" id="loginIdentifier" required autocomplete="username" value="${escHtml(savedIdentifier)}" placeholder="Kullanıcı adı veya e-posta" style="
               width: 100%; padding:.65rem .85rem; border-radius: 10px;
               background: #f8fafc; border: 1.5px solid #cbd5e1;
               color: #0f172a; font-size:.88rem; outline: none; transition: all .15s; box-sizing: border-box;
@@ -214,16 +212,16 @@
 
           <div style="margin-bottom:.85rem;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem;">
-              <label style="font-size:.76rem;font-weight:700;color:#334155;">Şifre</label>
+              <label for="loginPassword" style="font-size:.76rem;font-weight:700;color:#334155;">Şifre</label>
               <a href="#" id="linkForgotPassword" style="font-size:.74rem;color:#2563eb;text-decoration:none;font-weight:600;">Şifremi Unuttum?</a>
             </div>
             <div style="position:relative;">
-              <input type="password" id="loginPassword" required placeholder="Şifrenizi girin" style="
+              <input type="password" id="loginPassword" required autocomplete="current-password" placeholder="Şifrenizi girin" style="
                 width: 100%; padding:.65rem 2.4rem .65rem .85rem; border-radius: 10px;
                 background: #f8fafc; border: 1.5px solid #cbd5e1;
                 color: #0f172a; font-size:.88rem; outline: none; transition: all .15s; box-sizing: border-box;
               " />
-              <button type="button" id="toggleLoginPass" style="
+              <button type="button" id="toggleLoginPass" aria-label="Şifreyi göster" style="
                 position:absolute;right:.65rem;top:50%;transform:translateY(-50%);
                 background:none;border:none;color:#64748b;cursor:pointer;font-size:.74rem;font-weight:700;
               ">Göster</button>
@@ -516,6 +514,16 @@
     const regNotice = portal.querySelector('#regSuccessNotice');
     const regKeysNotice = portal.querySelector('#regKeysNotice');
 
+    tabLogin.setAttribute('aria-selected', String(tab === 'login'));
+    tabReg.setAttribute('aria-selected', String(tab === 'register'));
+    const subtitle = portal.querySelector('#authSubtitle');
+    if (subtitle) subtitle.textContent = ({
+      login: 'Lütfen kurumsal hesabınıza giriş yapın',
+      register: 'Ekibinizle çalışmaya başlamak için başvurun',
+      forgot: 'E-posta koduyla şifrenizi yenileyin',
+      recovery: 'Kurtarma anahtarınızla hesabınıza dönün'
+    })[tab] || '';
+
     forgotPanel.style.display = 'none';
     if (recPanel) recPanel.style.display = 'none';
 
@@ -683,9 +691,11 @@
       if (passInput.type === 'password') {
         passInput.type = 'text';
         togglePass.textContent = 'Gizle';
+        togglePass.setAttribute('aria-label', 'Şifreyi gizle');
       } else {
         passInput.type = 'password';
         togglePass.textContent = 'Göster';
+        togglePass.setAttribute('aria-label', 'Şifreyi göster');
       }
     };
   }

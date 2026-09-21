@@ -34,7 +34,7 @@ test('detail theme synchronization uses a single custom-event listener', () => {
 test('shared visual stylesheet cache version is aligned across pages', () => {
   for (const page of ['index.html', 'detail.html', 'compare.html', 'dashboard.html']) {
     const pageHtml = fs.readFileSync(path.join(root, page), 'utf8');
-    assert.match(pageHtml, /css\/ui_polish\.css\?v=5\.7\.2/);
+    assert.match(pageHtml, /css\/ui_polish\.css\?v=5\.8\.0/);
   }
   assert.match(html, /js\/detail\/app\.js\?v=5\.7\.2/);
 });
