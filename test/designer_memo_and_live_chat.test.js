@@ -35,10 +35,12 @@ test('server.js and online_presence.js provide live typing and chat modernizatio
   assert.ok(cssContent.includes('@keyframes livePulse'), 'CSS must animate live pulse');
 });
 
-test('auth_portal.js left banner is clean and does not contain old feature pills', () => {
+test('auth portal presents one restrained login form without a decorative banner', () => {
   const authContent = fs.readFileSync(path.join(ROOT, 'js/core/auth/auth_portal.js'), 'utf8');
   assert.ok(!authContent.includes('Çift Katmanlı Veri Güvenliği'), 'Old feature pill must be removed');
   assert.ok(!authContent.includes('Canlı Ekip İletişimi & Notlar'), 'Old feature pill must be removed');
-  assert.ok(authContent.includes('FrpOku Enterprise'), 'Must keep FrpOku Enterprise title');
-  assert.ok(authContent.includes('Kurumsal Rapor Yönetimi'), 'Must have clean minimal tag');
+  assert.ok(authContent.includes('auth-wordmark-icon'), 'Login form has a compact wordmark');
+  assert.ok(authContent.includes('Hesabınıza giriş yapın'), 'Login form has a clear heading');
+  assert.ok(!authContent.includes('auth-brand-pane'), 'Decorative banner is removed');
+  assert.ok(!authContent.includes('auth-brand-preview'), 'Fake product preview is removed');
 });

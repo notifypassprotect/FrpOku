@@ -98,7 +98,7 @@
  portal.id = 'authFullScreenPortal';
   portal.style.cssText = `
     position: fixed; inset: 0;
-    background: radial-gradient(ellipse at 50% 30%, #1e293b 0%, #0f172a 75%, #020617 100%);
+    background: #f5f6f8;
     z-index: 1000000;
     display: flex; align-items: center; justify-content: center;
     padding: 1.25rem; overflow-y: auto; font-family: inherit;
@@ -106,10 +106,6 @@
 
   portal.innerHTML = `
     <style>
-      @media (max-width: 860px) {
-        .auth-brand-pane { display: none !important; }
-        .auth-split-wrapper { max-width: 440px !important; }
-      }
       .auth-recovery-key-pill {
         background: #f1f5f9;
         border: 1.5px solid #cbd5e1;
@@ -128,48 +124,19 @@
     </style>
 
     <div class="auth-split-wrapper" style="
-      display: flex; width: 100%; max-width: 960px; min-height: 570px;
-      background: #ffffff; border-radius: 24px; box-shadow: 0 25px 70px rgba(0, 0, 0, 0.45);
-      overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.15);
+      display: flex; width: 100%; max-width: 440px;
+      background: #ffffff; border-radius: 14px;
+      overflow: hidden; border: 1px solid #e2e5ea;
     ">
-      <!-- SOL MARKA & GÜVENLİK PANELİ -->
-      <div class="auth-brand-pane" style="
-        flex: 1.15; background: linear-gradient(145deg, #090d16 0%, #172554 50%, #0f172a 100%);
-        color: #ffffff; padding: 2.5rem 2.2rem; display: flex; flex-direction: column; justify-content: space-between;
-        position: relative; overflow: hidden;
-      ">
-        <div style="position:absolute;top:-60px;left:-60px;width:220px;height:220px;background:rgba(37,99,235,0.25);border-radius:50%;filter:blur(60px);pointer-events:none;"></div>
-        <div style="position:absolute;bottom:-80px;right:-60px;width:260px;height:260px;background:rgba(99,102,241,0.22);border-radius:50%;filter:blur(70px);pointer-events:none;"></div>
-
-        <div class="auth-brand-content">
-          <div class="auth-brand-eyebrow">${getFrpLogoSvg(42)}<span>FrpOku Enterprise</span></div>
-          <div class="auth-brand-main">
-            <span class="auth-brand-kicker">Kurumsal Rapor Yönetimi</span>
-            <h1>Raporlarınız,<br><span>tek çalışma alanında.</span></h1>
-            <p>Raporları inceleyin, sorguları düzenleyin ve ekibinizle aynı yerde çalışın.</p>
-          </div>
-          <div class="auth-brand-preview" aria-hidden="true">
-            <div class="auth-brand-preview-top"><span class="auth-brand-preview-mark"></span><span>Çalışma alanı</span><span class="auth-brand-preview-dots">•••</span></div>
-            <div class="auth-brand-preview-row"><span class="auth-brand-preview-icon">▤</span><span><strong>Raporlarım</strong><small>Raporları görüntüle ve düzenle</small></span><span class="auth-brand-preview-arrow">↗</span></div>
-            <div class="auth-brand-preview-row"><span class="auth-brand-preview-icon">⌘</span><span><strong>Sorgu editörü</strong><small>SQL ve rapor tasarımı</small></span><span class="auth-brand-preview-arrow">↗</span></div>
-          </div>
-        </div>
-
-        <div style="position:relative;z-index:2;display:flex;align-items:center;justify-content:center;gap:.55rem;padding-top:1.2rem;border-top:1px solid rgba(255,255,255,0.08);">
-          <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 8px #10b981;"></span>
-          <span style="font-size:.74rem;color:#94a3b8;font-weight:600;">Güvenli Kurumsal Oturum</span>
-        </div>
-      </div>
-
-      <!-- SAĞ FORM BÖLÜMÜ -->
+      <!-- HESAP FORMU -->
       <div class="auth-card-side" style="
-        flex: 1; padding: 2.2rem 2.2rem 1.8rem; display: flex; flex-direction: column; justify-content: center;
+        flex: 1; padding: 2rem; display: flex; flex-direction: column; justify-content: center;
         background: #ffffff; color: #0f172a; overflow-y: auto; max-height: 90vh;
       ">
-        <div class="auth-mobile-brand">${getFrpLogoSvg(38)}<span>FrpOku</span></div>
-        <div style="text-align:center;margin-bottom:1.15rem;">
-          <h2 style="font-size:1.35rem;font-weight:900;letter-spacing:-.02em;margin:0 0 .25rem;color:#0f172a;">Hoş Geldiniz</h2>
-          <p id="authSubtitle" style="font-size:.82rem;color:#64748b;margin:0;">Lütfen kurumsal hesabınıza giriş yapın</p>
+        <div class="auth-mobile-brand"><span class="auth-wordmark-icon" aria-hidden="true">F</span><span>FrpOku</span></div>
+        <div class="auth-intro" style="text-align:center;margin-bottom:1.15rem;">
+          <h2 style="font-size:1.35rem;font-weight:800;letter-spacing:-.02em;margin:0 0 .25rem;color:#0f172a;">${initialTab === 'register' ? 'Hesap oluşturun' : 'Hesabınıza giriş yapın'}</h2>
+          <p id="authSubtitle" style="font-size:.82rem;color:#64748b;margin:0;">${initialTab === 'register' ? 'Ekibinizle çalışmaya başlamak için başvurun' : 'Lütfen kurumsal hesabınıza giriş yapın'}</p>
         </div>
 
         <div id="authAlertBox" style="
@@ -517,6 +484,13 @@
     tabLogin.setAttribute('aria-selected', String(tab === 'login'));
     tabReg.setAttribute('aria-selected', String(tab === 'register'));
     const subtitle = portal.querySelector('#authSubtitle');
+    const heading = portal.querySelector('.auth-intro h2');
+    if (heading) heading.textContent = ({
+      login: 'Hesabınıza giriş yapın',
+      register: 'Hesap oluşturun',
+      forgot: 'Şifrenizi yenileyin',
+      recovery: 'Hesabınızı kurtarın'
+    })[tab] || '';
     if (subtitle) subtitle.textContent = ({
       login: 'Lütfen kurumsal hesabınıza giriş yapın',
       register: 'Ekibinizle çalışmaya başlamak için başvurun',
