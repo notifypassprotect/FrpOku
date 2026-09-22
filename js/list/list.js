@@ -687,7 +687,11 @@ function renderCards(container) {
   const sorted = sortFiles(allFiles);
   if (resultCount) resultCount.textContent = sorted.length + ' sonuç';
   const target = container || document.getElementById('cardsView');
-  if (window.FrpListRenderers?.renderCards) window.FrpListRenderers.renderCards(sorted, target);
+  const pageSize = FrpStore.getPreferences().pageSize || 50;
+  renderPaginationControls(sorted.length, pageSize);
+  const start = (currentPage - 1) * pageSize;
+  const visible = pageSize >= 9999 ? sorted : sorted.slice(start, start + pageSize);
+  if (window.FrpListRenderers?.renderCards) window.FrpListRenderers.renderCards(visible, target);
 }
 window.renderCards = renderCards;
 
@@ -695,7 +699,11 @@ function renderTimeline(container) {
   const sorted = sortFiles(allFiles);
   if (resultCount) resultCount.textContent = sorted.length + ' sonuç';
   const target = container || document.getElementById('timelineView');
-  if (window.FrpListRenderers?.renderTimeline) window.FrpListRenderers.renderTimeline(sorted, target);
+  const pageSize = FrpStore.getPreferences().pageSize || 50;
+  renderPaginationControls(sorted.length, pageSize);
+  const start = (currentPage - 1) * pageSize;
+  const visible = pageSize >= 9999 ? sorted : sorted.slice(start, start + pageSize);
+  if (window.FrpListRenderers?.renderTimeline) window.FrpListRenderers.renderTimeline(visible, target);
 }
 window.renderTimeline = renderTimeline;
 
@@ -745,10 +753,12 @@ function renderPaginationControls(totalItems, pageSize) {
 function bindTableSortHeaders() {
   document.querySelectorAll('#tableHeaderRow th.sortable').forEach(th => {
     th.onclick = () => {
+      const restoreFocus = th.contains(document.activeElement);
       const field = th.dataset.sort;
       if (sortField === field) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
       else { sortField = field; sortDir = 'asc'; }
       renderTable();
+      if (restoreFocus) document.querySelector(`#tableHeaderRow th[data-sort="${field}"] .table-sort-button`)?.focus();
     };
   });
 }
@@ -1260,7 +1270,40 @@ function initListPage() {
   const btnSyncCloud = document.getElementById('btnSyncCloudReports');
   const syncIcon = document.getElementById('syncIconSvg');
   const syncText = document.getElementById('syncBtnText');
+  const syncStatus = document.getElementById('reportSyncStatus');
+  const conflictDraftButton = document.getElementById('btnDownloadConflictDrafts');
   let _isSyncing = false;
+
+  function updateReportSyncStatus() {
+    if (!syncStatus || !FrpStore.getSyncStatus) return;
+    const { pending, conflicts, errors, draftCount, lastSyncedAt } = FrpStore.getSyncStatus();
+    if (conflictDraftButton) conflictDraftButton.hidden = !draftCount;
+    const offline = navigator.onLine === false;
+    syncStatus.dataset.state = conflicts || draftCount ? 'conflict' : errors ? 'error' : offline ? 'offline' : pending ? 'pending' : 'saved';
+    syncStatus.textContent = conflicts ? `${conflicts} raporda kayıt çakışması` :
+      errors ? `${errors} rapor kaydedilemedi` : offline ? (pending ? `Çevrimdışı · ${pending} kayıt bekliyor` : 'Çevrimdışı') :
+      pending ? `${pending} rapor buluta kaydediliyor` :
+      draftCount ? `${draftCount} yerel çakışma kopyası` :
+      lastSyncedAt ? 'Buluta kaydedildi' : 'Bekleyen kayıt yok';
+    syncStatus.title = conflicts ? 'Sunucudaki sürüm daha yeni. Raporu yeniden açıp değişiklikleri kontrol edin.' :
+      errors ? 'Kayıt hatası oluştu. Raporu kontrol edin.' : syncStatus.textContent;
+  }
+  window.addEventListener('frp:sync-status', updateReportSyncStatus);
+  window.addEventListener('online', updateReportSyncStatus);
+  window.addEventListener('offline', updateReportSyncStatus);
+  updateReportSyncStatus();
+
+  conflictDraftButton?.addEventListener('click', () => {
+    const drafts = FrpStore.getSyncConflictDrafts?.();
+    if (!drafts || !Object.keys(drafts).length) return;
+    const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), drafts }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'frpoku-cakisan-yerel-kopyalar.json';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  });
 
   btnSyncCloud?.addEventListener('click', async () => {
     if (_isSyncing) return;
@@ -1581,6 +1624,122 @@ function initListPage() {
     regexBtn?.classList.remove('active');
     if (regexErrMsg) regexErrMsg.style.display = 'none';
     applySearch();
+  });
+
+  // Kayıtlı görünümler bu tarayıcıda ve oturum açan kullanıcıya özel tutulur.
+  const savedViewSelect = document.getElementById('savedViewSelect');
+  const deleteViewButton = document.getElementById('btnDeleteView');
+  const savedViewKey = `frpoku_saved_views:${encodeURIComponent(String(window.FrpAuth?.getUser()?.id || 'anonymous'))}`;
+  const readSavedViews = () => {
+    try {
+      const views = JSON.parse(localStorage.getItem(savedViewKey) || '[]');
+      return Array.isArray(views) ? views : [];
+    } catch { return []; }
+  };
+  const renderSavedViews = (selectedId = '') => {
+    if (!savedViewSelect) return;
+    savedViewSelect.replaceChildren(new Option('Kayıtlı Görünümler', ''));
+    readSavedViews().forEach(view => savedViewSelect.add(new Option(view.name, view.id)));
+    savedViewSelect.value = selectedId;
+    if (deleteViewButton) deleteViewButton.disabled = !savedViewSelect.value;
+  };
+  const clearSavedViewSelection = () => {
+    if (savedViewSelect) savedViewSelect.value = '';
+    if (deleteViewButton) deleteViewButton.disabled = true;
+  };
+  renderSavedViews();
+
+  document.getElementById('btnSaveView')?.addEventListener('click', () => {
+    window.showPromptDialog?.({
+      title: 'Görünümü kaydet', message: 'Arama, filtreler ve liste görünümü bu tarayıcıda saklanır.',
+      placeholder: 'Örn. Sık kullandığım SQL raporları', confirmText: 'Kaydet',
+      onConfirm: name => {
+        name = name.trim().slice(0, 50);
+        if (!name) return;
+        const views = readSavedViews();
+        const existing = views.find(view => view.name.toLocaleLowerCase('tr') === name.toLocaleLowerCase('tr'));
+        if (!existing && views.length >= 20) { toast('En fazla 20 görünüm kaydedebilirsiniz.', 'warning'); return; }
+        const id = existing?.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const filters = { workspace: FrpStore.getActiveWorkspace?.() || 'personal', query: searchQuery,
+          field: searchField, tag: selectedTag, category: selectedCategory, user: selectedUser,
+          favorites: onlyFavorites, pinned: onlyPinned, notes: onlyNotes, regex: isRegexMode,
+          mode: currentViewMode, sortField, sortDir };
+        const save = () => {
+          const updated = [...views.filter(view => view.id !== id), { id, name, filters }];
+          try { localStorage.setItem(savedViewKey, JSON.stringify(updated)); }
+          catch { toast('Görünüm bu tarayıcıda kaydedilemedi.', 'error'); return; }
+          renderSavedViews(id);
+          toast('Görünüm kaydedildi.', 'success');
+        };
+        if (existing) window.showConfirmDialog?.({
+          title: 'Görünümü güncelle', message: `“${escHtml(name)}” adlı kayıtlı görünümün üzerine yazılsın mı?`,
+          confirmText: 'Güncelle', onConfirm: save
+        });
+        else save();
+      }
+    });
+  });
+
+  savedViewSelect?.addEventListener('change', () => {
+    if (deleteViewButton) deleteViewButton.disabled = !savedViewSelect.value;
+    const view = readSavedViews().find(item => item.id === savedViewSelect.value);
+    if (!view) return;
+    const f = view.filters || {};
+    const workspace = f.workspace === 'pool' ? 'pool' : 'personal';
+    FrpStore.setActiveWorkspace?.(workspace);
+    document.getElementById('tabWsPersonal')?.classList.toggle('active', workspace === 'personal');
+    document.getElementById('tabWsPool')?.classList.toggle('active', workspace === 'pool');
+    const poolNotice = document.getElementById('poolNotice');
+    if (poolNotice) poolNotice.style.display = workspace === 'pool' ? 'block' : 'none';
+    updateAnalyticsVisibility();
+    updateTagList(); updateCatList(); updateUserList();
+    searchQuery = String(f.query || '');
+    if (searchInput) searchInput.value = searchQuery;
+    searchField = String(f.field || 'all');
+    if (fieldSelect) { fieldSelect.value = searchField; searchField = fieldSelect.value || 'all'; fieldSelect.value = searchField; }
+    if (tagSelect) tagSelect.value = String(f.tag || '');
+    selectedTag = tagSelect?.value || '';
+    if (catSelect) catSelect.value = String(f.category || '');
+    selectedCategory = catSelect?.value || '';
+    if (userSelect) userSelect.value = workspace === 'pool' ? String(f.user || '') : '';
+    selectedUser = userSelect?.value || '';
+    onlyFavorites = !!f.favorites; btnFavOnly?.classList.toggle('active', onlyFavorites);
+    onlyPinned = !!f.pinned; document.getElementById('btnPinnedOnly')?.classList.toggle('active', onlyPinned);
+    onlyNotes = !!f.notes; document.getElementById('btnNotesOnly')?.classList.toggle('active', onlyNotes);
+    isRegexMode = !!f.regex; regexBtn?.classList.toggle('active', isRegexMode);
+    currentViewMode = ['table', 'cards', 'timeline'].includes(f.mode) ? f.mode : currentViewMode;
+    sortField = String(f.sortField || 'loadedAt'); sortDir = f.sortDir === 'asc' ? 'asc' : 'desc';
+    applySearch();
+  });
+
+  deleteViewButton?.addEventListener('click', () => {
+    const id = savedViewSelect?.value;
+    if (!id) return;
+    window.showConfirmDialog?.({
+      title: 'Görünümü sil', message: 'Bu tarayıcıdaki kayıtlı görünüm silinecek.',
+      confirmText: 'Sil', isDanger: true, onConfirm: () => {
+        try { localStorage.setItem(savedViewKey, JSON.stringify(readSavedViews().filter(view => view.id !== id))); }
+        catch { toast('Görünüm silinemedi.', 'error'); return; }
+        renderSavedViews();
+        toast('Kayıtlı görünüm silindi.', 'success');
+      }
+    });
+  });
+
+  document.querySelector('.toolbar-left')?.addEventListener('input', event => {
+    if (event.target === searchInput) clearSavedViewSelection();
+  });
+  document.querySelector('.toolbar-left')?.addEventListener('change', event => {
+    if (event.target !== savedViewSelect) clearSavedViewSelection();
+  });
+  document.querySelector('.toolbar-left')?.addEventListener('click', event => {
+    if (!event.target.closest('#btnFavOnly, #btnPinnedOnly, #btnNotesOnly, #regexBtn, #btnResetFilters')) return;
+    clearSavedViewSelection();
+  });
+  document.querySelectorAll('#tabWsPersonal, #tabWsPool, #btnViewTable, #btnViewCards, #btnViewTimeline')
+    .forEach(button => button.addEventListener('click', clearSavedViewSelection));
+  document.getElementById('tableHeaderRow')?.addEventListener('click', event => {
+    if (event.target.closest('th.sortable')) clearSavedViewSelection();
   });
 
   // Görünüm butonları (Table / Cards / Timeline)

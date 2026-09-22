@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="css/list.css?v=5.1" />
   <link rel="stylesheet" href="css/themes.css?v=5.0" />
   <link rel="stylesheet" href="css/online_presence.css?v=5.7.0" />
-  <link rel="stylesheet" href="css/ui_polish.css?v=5.13.0" />
+  <link rel="stylesheet" href="css/ui_polish.css?v=5.20.0" />
   <script src="js/core/theme_bootstrap.js?v=5.0"></script>
   <script src="js/core/circuit_fx.js?v=5.6.1"></script>
 </head>
@@ -268,7 +268,9 @@
         </button>
       </div>
 
-      <div style="display:flex;align-items:center;gap:.5rem;">
+      <div class="workspace-sync-controls">
+        <span id="reportSyncStatus" class="report-sync-status" role="status" aria-live="polite">Kayıt durumu kontrol ediliyor</span>
+        <button type="button" id="btnDownloadConflictDrafts" class="btn btn-sm" hidden>Çakışan yerel kopyaları indir</button>
         <button type="button" class="btn btn-sm btn-ghost" id="btnSyncCloudReports" title="Buluttaki ortak havuz ve raporları anlık yenile" style="display:inline-flex;align-items:center;gap:.35rem;font-size:.78rem;font-weight:700;padding:.3rem .65rem;border-radius:8px;border:1px solid var(--border);background:var(--bg-surface);">
           <svg id="syncIconSvg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .4s ease;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
           <span id="syncBtnText">Havuzu & Listeyi Yenile</span>
@@ -324,6 +326,14 @@
         <button class="filter-chip" id="btnFavOnly" title="Sadece favorileri göster">Favoriler</button>
         <button class="filter-chip" id="btnPinnedOnly" title="Sadece sabitlenmişleri göster">Sabitlenmişler</button>
         <button class="filter-chip" id="btnNotesOnly" title="Sadece not girilen raporları göster">Notlular</button>
+
+        <div class="saved-view-controls" aria-label="Kayıtlı filtreler">
+          <select class="select-field" id="savedViewSelect" aria-label="Kayıtlı görünüm seç">
+            <option value="">Kayıtlı Görünümler</option>
+          </select>
+          <button type="button" class="btn btn-sm btn-ghost" id="btnSaveView" title="Geçerli arama ve filtreleri bu tarayıcıda kaydet">Görünümü Kaydet</button>
+          <button type="button" class="btn btn-sm btn-ghost" id="btnDeleteView" title="Seçili kayıtlı görünümü sil" disabled aria-label="Seçili görünümü sil">Sil</button>
+        </div>
 
         <!-- Filtreleri Temizle Butonu -->
         <button class="btn btn-sm btn-ghost" id="btnResetFilters" style="display:none;color:var(--text-muted);font-size:.78rem;" title="Tüm filtreleri ve aramayı sıfırla">
@@ -463,7 +473,7 @@
 
 <!-- 3. Veri Katmanı & Depolama -->
 <script src="js/store/store_tags.js?v=5.0"></script>
-<script src="js/store/store_main.js?v=5.11.0"></script>
+<script src="js/store/store_main.js?v=5.14.0"></script>
 
 <!-- 4. Sorgu Kütüphanesi & Ayarlar (Modüler) -->
 <script src="js/core/snippet_tools.js?v=5.0"></script>
@@ -478,7 +488,7 @@
 <script src="js/settings/tabs/rooms_tab.js?v=5.0"></script>
 <script src="js/settings/tabs/mail_tab.js?v=5.0"></script>
 <script src="js/settings/tabs/audit_tab.js?v=5.11.0"></script>
-<script src="js/settings/settings_modal.js?v=5.11.0"></script>
+<script src="js/settings/settings_modal.js?v=5.15.0"></script>
 
 <!-- 5. Liste Sayfası Modülleri (Modüler) -->
 <script src="js/list/code_search_tools.js?v=5.0"></script>
@@ -487,11 +497,11 @@
 <script src="js/list/list_modals.js?v=5.3"></script>
 <script src="js/list/image_annotator.js?v=5.0"></script>
 <script src="js/list/rich_note_editor.js?v=5.6.1"></script>
-<script src="js/list/renderers/table_renderer.js?v=5.0"></script>
-<script src="js/list/renderers/cards_renderer.js?v=5.12.0"></script>
-<script src="js/list/renderers/timeline_renderer.js?v=5.0"></script>
+<script src="js/list/renderers/table_renderer.js?v=5.18.0"></script>
+<script src="js/list/renderers/cards_renderer.js?v=5.17.0"></script>
+<script src="js/list/renderers/timeline_renderer.js?v=5.17.0"></script>
 <script src="js/list/list_events.js?v=5.12.0"></script>
-<script src="js/list/list.js?v=5.12.0"></script>
+<script src="js/list/list.js?v=5.20.0"></script>
 
 </body>
 </html>

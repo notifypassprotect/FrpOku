@@ -305,7 +305,7 @@ function renderDashboard() {
  ${topTables.map(([name, count], i) => `
  <tr style="cursor:pointer;" data-dashboard-action="filter-table" data-table="${encodeInlineArg(name)}" title="${name} tablosunu index.html'de filtrele">
  <td style="color:var(--text-muted);font-size:.78rem;">${i+1}</td>
- <td>️ <strong>${name}</strong></td>
+ <td><button type="button" class="dash-table-filter" data-dashboard-action="filter-table" data-table="${encodeInlineArg(name)}" aria-label="${encodeInlineArg(name)} tablosuna göre filtrele">${esc(name)}</button></td>
  <td>${count} sorgu</td>
  <td>
  <div class="pbar-wrap">

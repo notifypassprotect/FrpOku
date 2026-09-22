@@ -1373,3 +1373,27 @@ select:hover {
   .topbar .code-search-box { margin-right: auto; }
   .designer-root .designer-page-tabs { max-width: 36vw; }
 }
+.workspace-sync-controls { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.report-sync-status { font-size: .76rem; color: var(--text-muted); white-space: nowrap; }
+.report-sync-status::before { content: ''; display: inline-block; width: .45rem; height: .45rem; margin-right: .4rem; border-radius: 50%; background: currentColor; vertical-align: .08rem; }
+.report-sync-status[data-state="saved"] { color: #047857; }
+.report-sync-status[data-state="pending"] { color: #a16207; }
+.report-sync-status[data-state="offline"] { color: #a16207; }
+.report-sync-status[data-state="conflict"], .report-sync-status[data-state="error"] { color: #b91c1c; }
+.workspace-sync-controls #btnDownloadConflictDrafts:not([hidden]) { display: inline-flex; font-size: .74rem; color: #b91c1c; border-color: currentColor; }
+.workspace-sync-controls #btnDownloadConflictDrafts[hidden] { display: none !important; }
+.dash-table-filter { color: inherit; font: inherit; font-weight: 700; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.dash-table-filter:hover { color: var(--accent); text-decoration: underline; }
+.dash-table-filter:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+.saved-view-controls { display: inline-flex; align-items: center; gap: .35rem; min-width: 0; }
+.saved-view-controls .select-field { min-width: 145px; max-width: 200px; }
+.saved-view-controls .btn { white-space: nowrap; }
+.report-title-action { padding: 0; border: 0; background: transparent; color: var(--text-primary); font: inherit; font-weight: 750; text-align: left; cursor: pointer; }
+.report-title-action:hover { color: var(--accent); text-decoration: underline; }
+.report-title-action:focus-visible, .report-card :is(.pin-btn, .star-btn):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.report-table .table-sort-button { display: inline-flex; align-items: center; gap: .3rem; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; font-weight: inherit; text-align: left; cursor: pointer; }
+.report-table :is(.table-sort-button, .report-title-action):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+@media (max-width: 768px) {
+  .toolbar-left .saved-view-controls { grid-column: 1 / -1; display: flex; flex-wrap: wrap; }
+  .saved-view-controls .select-field { flex: 1 1 150px; max-width: none; }
+}

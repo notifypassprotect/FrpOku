@@ -42,7 +42,7 @@ window.FrpListRenderers.renderTimeline = function(files, container) {
             <div class="timeline-item" data-list-action="open-detail" data-id="${encodedId}" style="cursor:pointer;">
               <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;">
                 <div style="display:flex;align-items:center;gap:.4rem;">
-                  <strong style="font-size:.9rem;color:var(--text-primary);">${escHtml(reportName)}</strong>
+                  <button type="button" class="report-title-action" data-list-action="open-detail" data-id="${encodedId}" aria-label="${escHtml(reportName)} raporunu aç">${escHtml(reportName)}</button>
                   ${poolBadge}
                 </div>
                 <span style="font-size:.75rem;color:var(--text-muted);">${timeStr}</span>

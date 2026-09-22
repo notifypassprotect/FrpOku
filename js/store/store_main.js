@@ -153,6 +153,9 @@
   const _reportSyncChains = new Map();
   const PENDING_SYNC_KEY = 'frpoku_pending_sync';
   const _pendingSyncIds = new Set();
+  const _syncIssues = new Map();
+  const CONFLICT_DRAFT_KEY = 'frpoku_sync_conflict_drafts';
+  let _lastSyncedAt = null;
   try {
     const raw = localStorage.getItem(PENDING_SYNC_KEY);
     if (raw) JSON.parse(raw).forEach(id => _pendingSyncIds.add(String(id)));
@@ -162,6 +165,20 @@
   function _scopedStorageKey(baseKey) {
     const user = window.FrpAuth && typeof window.FrpAuth.getUser === 'function' ? window.FrpAuth.getUser() : null;
     return `${baseKey}:${encodeURIComponent(String(user?.id || 'anonymous'))}`;
+  }
+
+  function getSyncConflictDrafts() {
+    try { return JSON.parse(localStorage.getItem(_scopedStorageKey(CONFLICT_DRAFT_KEY)) || '{}'); }
+    catch { return {}; }
+  }
+
+  function _preserveConflictDraft(report) {
+    try {
+      const drafts = getSyncConflictDrafts();
+      drafts[String(report.id)] = { savedAt: new Date().toISOString(), report };
+      localStorage.setItem(_scopedStorageKey(CONFLICT_DRAFT_KEY), JSON.stringify(drafts));
+      return true;
+    } catch { return false; }
   }
 
   function _sessionIdentity() {
@@ -206,6 +223,16 @@
     try {
       localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify([..._pendingSyncIds]));
     } catch (e) {}
+    window.dispatchEvent(new Event('frp:sync-status'));
+  }
+
+  function getSyncStatus() {
+    const ownedIds = new Set(_reportsOwnedBySession(_read()).map(report => String(report.id)));
+    const pending = [..._pendingSyncIds].filter(id => ownedIds.has(id)).length;
+    const issues = [..._syncIssues.entries()].filter(([id]) => ownedIds.has(id));
+    return { pending, conflicts: issues.filter(([, kind]) => kind === 'conflict').length,
+      errors: issues.filter(([, kind]) => kind === 'error').length,
+      draftCount: Object.keys(getSyncConflictDrafts()).length, lastSyncedAt: _lastSyncedAt };
   }
 
   function _flushPendingSync() {
@@ -271,17 +298,22 @@
         if (!saved) throw new Error('Bulut kaydı doğrulanamadı.');
         _applySavedVersion(key, saved.version);
         _pendingSyncIds.delete(key);
+        _syncIssues.delete(key);
+        _lastSyncedAt = Date.now();
         _savePendingSyncIds();
       } catch (error) {
         console.warn('Rapor senkronizasyonu başarısız:', error);
         if (error?.status === 409) {
+          _syncIssues.set(key, 'conflict');
+          const draftSaved = _preserveConflictDraft(latest);
+          if (!draftSaved) _notifySyncIssue('Çakışan rapor için yerel kopya saklanamadı. Sayfayı yenilemeden raporu dışa aktarın.');
           // Çakışma: Sunucudaki sürüm yerelden daha yeni. Stale raporu kuyruktan kaldır, döngüyü sonlandır:
-          _pendingSyncIds.delete(key);
+          if (draftSaved) _pendingSyncIds.delete(key);
           _savePendingSyncIds();
-          if (error.currentVersion) {
+          if (draftSaved && error.currentVersion) {
             _applySavedVersion(key, error.currentVersion);
           }
-          if (window.FrpCloud && typeof window.FrpCloud.getReport === 'function') {
+          if (draftSaved && window.FrpCloud && typeof window.FrpCloud.getReport === 'function') {
             window.FrpCloud.getReport(key).then(fresh => {
               if (fresh) {
                 const idx = _memoryStore.findIndex(r => String(r.id) === key);
@@ -294,6 +326,7 @@
             }).catch(() => {});
           }
         } else if (error?.status === 400 || error?.status === 401 || error?.status === 403 || error?.status === 404) {
+          _syncIssues.set(key, 'error');
           // Kalıcı istemci / yetki hatası: Raporu sonsuz döngüye sokmamak için kuyruktan temizle
           _pendingSyncIds.delete(key);
           _savePendingSyncIds();
@@ -320,6 +353,7 @@
       .map(report => String(report.id)) : [];
     _persistLocal(files);
     changedIds.forEach(id => _pendingSyncIds.add(id));
+    changedIds.forEach(id => _syncIssues.delete(id));
     if (changedIds.length > 0) _savePendingSyncIds();
     changedIds.forEach(_queueReportSync);
     return true;
@@ -366,7 +400,7 @@
                 let item = cf;
 
                 if (_pendingSyncIds.has(cfId) && local) {
-                  if ((Number(local?.version) || 0) >= (Number(cf?.version) || 0)) {
+                  if (_syncIssues.get(cfId) === 'conflict' || (Number(local?.version) || 0) >= (Number(cf?.version) || 0)) {
                     item = local;
                   } else {
                     _pendingSyncIds.delete(cfId);
@@ -2177,6 +2211,7 @@
 
   // ── Public Store API (Köprü ve Delegasyon) ─────────────────────
   const FrpStore = {
+    getSyncStatus, getSyncConflictDrafts,
     getAll, getById, ensureFullReport, add, addMany, deleteOne, deleteMany, deleteAll, resetAllUserData, clearSessionCache,
     updateNote, updateMeta, updateCode, updateReport, saveFile, updateFileName, restoreFromIndexedDB, hydrateFromIndexedDB,
     exportBackup, importBackup,
@@ -2245,7 +2280,7 @@
           const local = localMap.get(id);
           let report = cloudReport;
           if (_pendingSyncIds.has(id) && local) {
-            if ((Number(local.version) || 0) >= (Number(cloudReport.version) || 0)) report = local;
+            if (_syncIssues.get(id) === 'conflict' || (Number(local.version) || 0) >= (Number(cloudReport.version) || 0)) report = local;
             else {
               _pendingSyncIds.delete(id);
               _savePendingSyncIds();

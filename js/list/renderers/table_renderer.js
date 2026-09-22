@@ -67,7 +67,7 @@ window.FrpListRenderers = window.FrpListRenderers || {};
         return `
           <td class="col-reportName" style="cursor:pointer;max-width:320px;">
             <div class="file-name" style="display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;">
-              <span class="report-name-title" style="font-weight:var(--report-title-weight, 700);font-size:.88rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(reportName)}">${escHtml(reportName)}</span>
+              <button type="button" class="report-name-title report-title-action" data-list-action="open-detail" data-id="${encodeURIComponent(String(file.id))}" style="font-weight:var(--report-title-weight, 700);font-size:.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(reportName)}" aria-label="${escHtml(reportName)} raporunu aç">${escHtml(reportName)}</button>
               ${poolBadge}
               ${riskBadge}
               ${ownerChip}
@@ -204,13 +204,13 @@ window.FrpListRenderers = window.FrpListRenderers || {};
       const isSorted = def.sortField && sortField === def.sortField;
       const arrow = isSorted ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
       const sortAttr = def.sortField ? `data-sort="${def.sortField}" class="sortable draggable-col ${isSorted ? 'sorted' : ''}"` : 'class="draggable-col"';
+      const sortContent = def.sortField
+        ? `<button type="button" class="table-sort-button" aria-label="${def.title} sütununu sırala"><span>${def.title}</span><span class="sort-arrow" style="font-size:.7rem;color:var(--accent);">${arrow}</span></button>`
+        : `<div>${def.title}</div>`;
 
       thsHtml += `
         <th ${sortAttr} data-col="${colKey}" draggable="true" title="Sıralamak için tıklayın, yer değiştirmek için sürükleyin">
-          <div style="display:flex;align-items:center;gap:.3rem;">
-            <span>${def.title}</span>
-            <span class="sort-arrow" style="font-size:.7rem;color:var(--accent);">${arrow}</span>
-          </div>
+          ${sortContent}
         </th>
       `;
     });

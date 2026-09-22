@@ -45,7 +45,7 @@ window.FrpListRenderers.renderCards = function(files, container) {
         <div class="card-top" style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;">
           <div style="min-width:0;flex:1;overflow:hidden;">
             <div class="card-title" style="font-weight:var(--heading-weight, 800);font-size:.92rem;color:var(--text-primary);line-height:1.35;word-break:break-word;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;">
-              <span>${escHtml(reportName)}</span>
+              <button type="button" class="report-title-action" data-list-action="open-detail" data-id="${encodedId}" aria-label="${escHtml(reportName)} raporunu aç">${escHtml(reportName)}</button>
               ${poolBadge}
             </div>
             <div style="font-size:.74rem;color:var(--text-muted);font-family:var(--font);margin-top:.25rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;" title="${escHtml(file.name)} · ${size}">
@@ -53,10 +53,10 @@ window.FrpListRenderers.renderCards = function(files, container) {
             </div>
           </div>
           <div class="card-actions" data-list-action="stop" style="display:flex;align-items:center;gap:.25rem;flex-shrink:0;">
-            <button class="pin-btn ${file.isPinned ? 'active' : ''}" data-list-action="toggle-pin" data-id="${encodedId}" title="Üste Sabitle" style="background:none;border:none;cursor:pointer;display:flex;align-items:center;padding:3px;opacity:${file.isPinned ? '1' : '0.35'};color:${file.isPinned ? 'var(--accent)' : 'inherit'};">
+            <button class="pin-btn ${file.isPinned ? 'active' : ''}" data-list-action="toggle-pin" data-id="${encodedId}" title="Üste Sabitle" aria-label="${escHtml(reportName)} raporunu sabitle" style="background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;min-width:32px;min-height:32px;opacity:${file.isPinned ? '1' : '0.35'};color:${file.isPinned ? 'var(--accent)' : 'inherit'};">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="${file.isPinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 2h6l1 7h-8z"/></svg>
             </button>
-            <button class="star-btn ${file.isFavorite ? 'active' : ''}" data-list-action="toggle-fav" data-id="${encodedId}" title="Favori" style="background:none;border:none;cursor:pointer;display:flex;align-items:center;padding:3px;color:${file.isFavorite ? '#f59e0b' : 'inherit'};opacity:${file.isFavorite ? '1' : '0.4'};">
+            <button class="star-btn ${file.isFavorite ? 'active' : ''}" data-list-action="toggle-fav" data-id="${encodedId}" title="Favori" aria-label="${escHtml(reportName)} favorisini değiştir" style="background:none;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;min-width:32px;min-height:32px;color:${file.isFavorite ? '#f59e0b' : 'inherit'};opacity:${file.isFavorite ? '1' : '0.4'};">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="${file.isFavorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
             </button>
           </div>

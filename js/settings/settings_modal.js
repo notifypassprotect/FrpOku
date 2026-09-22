@@ -18,6 +18,35 @@ function safeToast(msg, type = 'info') {
 window.safeToast = safeToast;
 
 // ── MODERN DİYALOG MOTORLARI ─────────────────────────────────
+function attachDialogKeyboard(overlay, initialFocus, onEscape) {
+  const previousFocus = document.activeElement;
+  const dialog = overlay.querySelector('.modal');
+  dialog?.setAttribute('role', 'dialog');
+  dialog?.setAttribute('aria-modal', 'true');
+  dialog?.setAttribute('aria-label', dialog.firstElementChild?.textContent?.trim() || 'İşlem penceresi');
+  overlay.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      onEscape();
+    } else if (event.key === 'Tab') {
+      const focusable = [...overlay.querySelectorAll('button:not([disabled]), input:not([disabled])')];
+      if (!focusable.length) return;
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (event.shiftKey && (document.activeElement === first || !overlay.contains(document.activeElement))) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !overlay.contains(document.activeElement))) {
+        event.preventDefault(); first.focus();
+      }
+    }
+  });
+  document.body.appendChild(overlay);
+  initialFocus?.focus();
+  return () => {
+    overlay.remove();
+    if (previousFocus?.isConnected) previousFocus.focus();
+  };
+}
+
 window.showConfirmDialog = function({
   title = 'İşlemi Onaylayın',
   message = '',
@@ -46,24 +75,23 @@ window.showConfirmDialog = function({
     </div>
   `;
 
-  overlay.querySelector('.btn-cancel-confirm').addEventListener('click', () => {
-    overlay.remove();
+  let closeDialog;
+  const cancel = () => {
+    closeDialog();
     if (typeof onCancel === 'function') onCancel();
-  });
+  };
+  overlay.querySelector('.btn-cancel-confirm').addEventListener('click', cancel);
 
   overlay.querySelector('.btn-ok-confirm').addEventListener('click', () => {
-    overlay.remove();
+    closeDialog();
     if (typeof onConfirm === 'function') onConfirm();
   });
 
   overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) {
-      overlay.remove();
-      if (typeof onCancel === 'function') onCancel();
-    }
+    if (e.target === overlay) cancel();
   });
 
-  document.body.appendChild(overlay);
+  closeDialog = attachDialogKeyboard(overlay, overlay.querySelector('.btn-cancel-confirm'), cancel);
 };
 
 window.showPromptDialog = function({
@@ -101,19 +129,20 @@ window.showPromptDialog = function({
   const btnOk = overlay.querySelector('.btn-ok-prompt');
   const btnCancel = overlay.querySelector('.btn-cancel-prompt');
 
+  let closeDialog;
+  const cancel = () => closeDialog();
   const doSubmit = () => {
     const val = input ? input.value.trim() : '';
-    overlay.remove();
+    closeDialog();
     if (typeof onConfirm === 'function') onConfirm(val);
   };
 
   btnOk.addEventListener('click', doSubmit);
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSubmit(); });
-  btnCancel.addEventListener('click', () => overlay.remove());
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  btnCancel.addEventListener('click', cancel);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) cancel(); });
 
-  document.body.appendChild(overlay);
-  setTimeout(() => input?.focus(), 80);
+  closeDialog = attachDialogKeyboard(overlay, input, cancel);
 };
 
 // ── AYARLAR ANA MODALI ──────────────────────────────────────
