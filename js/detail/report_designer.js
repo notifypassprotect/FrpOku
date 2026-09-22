@@ -238,7 +238,7 @@ function esc(str) {
  let currentZoom = 1.0;
  let currentMode = 'designer'; // 'designer' | 'preview'
  let selectedItem = null;
- let showInspector = true;
+ let showInspector = !window.matchMedia('(max-width: 768px)').matches;
  let rightTab = 'inspector'; // 'inspector' | 'datatree'
  let inspectorSearchQuery = '';
  let inspectorTab = 'properties'; // 'properties' | 'events' | 'favorites'
@@ -2317,6 +2317,8 @@ function esc(str) {
  containerEl.querySelector('#btnCollapseInspector')?.addEventListener('click', () => {
  showInspector = false;
  if (insp) insp.classList.add('collapsed');
+ containerEl.querySelector('#btnTabInspector')?.classList.remove('btn-primary');
+ containerEl.querySelector('#btnTabDataTree')?.classList.remove('btn-primary');
  });
 
  // 7. Object Inspector Sekmeleri (Properties / Events / Favorites)

@@ -54,6 +54,7 @@
     else if (action === 'open-detail') window.openDetail?.(id);
     else if (action === 'category') { event.stopPropagation(); window.openCategoryModalFor?.(id); }
     else if (action === 'copy-guid') { event.stopPropagation(); window.copyGuidText?.(decoded(target.dataset.value)); }
+    else if (action === 'open-actions') { event.stopPropagation(); window.openReportActions?.(id); }
     else if (action === 'toggle-pin') window.togglePin?.(event, id);
     else if (action === 'toggle-fav') window.toggleFav?.(event, id);
     else if (action === 'row') window.handleItemClick?.(event, id);

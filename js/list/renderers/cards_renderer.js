@@ -37,7 +37,11 @@ window.FrpListRenderers.renderCards = function(files, container) {
     const poolBadge = isPublic ? `<span class="badge badge-pool" style="font-size:.7rem;padding:.12rem .4rem;" title="Ortak Havuzda Paylaşıldı">Havuzda</span>` : '';
 
     return `
-      <div class="report-card ${file.isPinned ? 'pinned' : ''}" data-list-action="open-detail" data-id="${encodedId}" style="background:var(--bg-surface);border:1.5px solid var(--border-light);border-radius:14px;padding:1.1rem;display:flex;flex-direction:column;gap:.75rem;cursor:pointer;transition:transform .18s ease, box-shadow .18s ease;box-shadow:0 4px 14px rgba(0,0,0,.04);box-sizing:border-box;max-width:100%;overflow:hidden;">
+      <div class="report-card ${file.isPinned ? 'pinned' : ''} ${window.selectedIds?.has(file.id) ? 'selected' : ''}" data-list-action="open-detail" data-id="${encodedId}" style="background:var(--bg-surface);border:1.5px solid var(--border-light);border-radius:14px;padding:1.1rem;display:flex;flex-direction:column;gap:.75rem;cursor:pointer;transition:transform .18s ease, box-shadow .18s ease;box-shadow:0 4px 14px rgba(0,0,0,.04);box-sizing:border-box;max-width:100%;overflow:hidden;">
+        <div class="card-mobile-actions" data-list-action="stop">
+          <label class="card-select-label"><input type="checkbox" class="row-checkbox" data-list-change="select" data-id="${encodedId}" ${window.selectedIds?.has(file.id) ? 'checked' : ''} /> Seç</label>
+          <button type="button" class="btn btn-sm" data-list-action="open-actions" data-id="${encodedId}" aria-label="${escHtml(reportName)} işlemleri">İşlemler ···</button>
+        </div>
         <div class="card-top" style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;">
           <div style="min-width:0;flex:1;overflow:hidden;">
             <div class="card-title" style="font-weight:var(--heading-weight, 800);font-size:.92rem;color:var(--text-primary);line-height:1.35;word-break:break-word;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;">

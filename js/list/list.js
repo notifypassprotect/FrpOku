@@ -670,6 +670,7 @@ function renderTable() {
           <button class="pin-btn ${file.isPinned ? 'active' : ''}" data-list-action="toggle-pin" data-id="${encodedId}" title="Üste Sabitle" style="background:none;border:none;cursor:pointer;padding:2px;display:inline-flex;align-items:center;opacity:${file.isPinned ? '1' : '0.35'};color:${file.isPinned ? 'var(--accent)' : 'inherit'};">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="${file.isPinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 2h6l1 7h-8z"/></svg>
           </button>
+          <button type="button" class="table-mobile-actions" data-list-action="open-actions" data-id="${encodedId}" aria-label="${escHtml(reportName)} işlemleri">···</button>
         </td>
         ${colsHtml}
       </tr>
@@ -870,18 +871,9 @@ function canManagePoolItem(file) {
 function setupContextMenu() {
   if (!ctxMenu) return;
 
-  const handleContextMenu = e => {
-    const item = e.target.closest('[data-id]');
-    if (!item) return;
-    const rawId = item.dataset.id;
-    if (!rawId) return;
-    let decodedId = rawId;
-    try { decodedId = decodeURIComponent(rawId); } catch {}
-    const file = FrpStore.getById(decodedId) || FrpStore.getById(rawId);
+  const openMenu = (rawId, x, y) => {
+    const file = FrpStore.getById(rawId);
     if (!file) return;
-
-    e.preventDefault();
-    e.stopPropagation();
 
     contextTargetId = file.id;
     const titleEl = document.getElementById('ctxMenuReportTitle');
@@ -902,10 +894,19 @@ function setupContextMenu() {
 
     // Konumlandırma
     ctxMenu.style.display = 'flex';
-    const x = Math.min(e.clientX, window.innerWidth - 220);
-    const y = Math.min(e.clientY, window.innerHeight - 280);
-    ctxMenu.style.left = `${x}px`;
-    ctxMenu.style.top = `${y}px`;
+    ctxMenu.style.left = `${Math.max(8, Math.min(x, window.innerWidth - 220))}px`;
+    ctxMenu.style.top = `${Math.max(8, Math.min(y, window.innerHeight - 280))}px`;
+  };
+  window.openReportActions = id => openMenu(id, 12, window.innerHeight - 320);
+
+  const handleContextMenu = e => {
+    const item = e.target.closest('[data-id]');
+    if (!item) return;
+    e.preventDefault();
+    e.stopPropagation();
+    let decodedId = item.dataset.id;
+    try { decodedId = decodeURIComponent(decodedId); } catch {}
+    openMenu(decodedId, e.clientX, e.clientY);
   };
 
   const tableArea = document.querySelector('.table-area') || tableBody;
