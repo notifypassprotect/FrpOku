@@ -1292,3 +1292,84 @@ select:hover {
   #viewModeToggle .view-btn { font-size: .69rem; padding-inline: .22rem; }
   .designer-toolbar-group { width: 100%; }
 }
+
+/* Masaüstü: liste, kod çalışma alanı ve tasarımcı aynı görsel ritmi paylaşır. */
+@media (min-width: 861px) {
+  .topbar { gap: 1.25rem; }
+  .topbar-right { min-width: 0; gap: .45rem; }
+  .topbar .brand { flex: 0 0 auto; }
+
+  .workspace-bar { gap: 1.25rem; padding-block: .7rem !important; }
+  #workspaceSwitcher { flex: 0 1 auto; }
+  #workspaceSwitcher .workspace-tab-btn { min-height: 38px; padding-inline: 1rem; }
+  #btnSyncCloudReports { white-space: nowrap; }
+  .toolbar { gap: .9rem; padding-block: .72rem !important; }
+  .toolbar-left { min-width: 0; gap: .5rem; }
+  .toolbar-right { margin-left: auto; }
+  #searchWrap { flex: 1 1 255px; min-width: 220px; max-width: 400px; }
+  .toolbar .select-field { min-width: 138px; max-width: 190px; }
+  #viewModeToggle { height: auto; }
+  #viewModeToggle .view-btn { min-height: 32px; }
+
+  .bulk-bar.show { margin-block: .65rem; background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface)); border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border)); box-shadow: none; }
+  .bulk-count { flex: 0 0 auto; font-weight: 750; font-variant-numeric: tabular-nums; }
+  .bulk-actions { display: flex; flex-wrap: wrap; min-width: 0; gap: .4rem; }
+  .bulk-actions .btn { white-space: nowrap; }
+  .table-area { padding-top: .8rem; }
+  .report-table { border: 1px solid var(--ui-border-subtle) !important; box-shadow: none !important; }
+  .report-table thead th { border-bottom-width: 1px; }
+  .report-table tbody td { vertical-align: middle; }
+  .report-table tbody tr.selected td { background: color-mix(in srgb, var(--accent) 10%, var(--bg-surface)) !important; }
+  .report-table tbody tr.selected td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+  .report-table tbody tr:focus-within td { background: color-mix(in srgb, var(--accent) 7%, var(--bg-surface)) !important; }
+  #cardsView { align-content: start; gap: .9rem; }
+  #cardsView .report-card { min-height: 190px; box-shadow: var(--ui-shadow-soft) !important; }
+  #cardsView .card-footer { margin-top: auto; }
+
+  #detailSidebar { background: var(--bg-surface); }
+  #detailSidebar .sidebar-body { padding: .85rem; word-break: normal; overflow-wrap: anywhere; }
+  #detailSidebar :is(.meta-card, .meta-row, .meta-value, .meta-desc-display) { word-break: normal; overflow-wrap: anywhere; }
+  #detailSidebar .meta-card { margin-bottom: .6rem; box-shadow: none !important; }
+  #detailSidebar .meta-label { letter-spacing: .055em; }
+  .tab-bar { padding: .32rem .6rem !important; gap: .25rem; }
+  .tab { min-height: 36px; padding-inline: .75rem !important; }
+  .code-toolbar { gap: .6rem; padding: .55rem 1rem !important; }
+  .code-toolbar-left { min-width: 0; flex-wrap: wrap; row-gap: .35rem; }
+  .code-toolbar-actions { max-width: 100%; }
+  .code-scroll .line-num { color: var(--text-muted); background: color-mix(in srgb, var(--bg-raised) 55%, var(--bg-code)); border-right: 1px solid var(--ui-border-subtle); }
+
+  .designer-root .designer-toolbar { justify-content: flex-start; gap: .45rem 1rem; padding: .6rem .8rem; }
+  .designer-root .designer-toolbar-group { min-width: 0; }
+  .designer-root .designer-toolbar-group:last-child { margin-left: auto; }
+  .designer-root .designer-page-tabs { max-width: min(46vw, 720px); overflow-x: auto; scrollbar-width: thin; }
+  .designer-root .designer-page-tab { white-space: nowrap; }
+  .designer-root .designer-comp-palette { flex: 1 1 100%; min-width: 0; max-width: 100%; overflow-x: auto; }
+  .designer-root .designer-inspector { min-width: 260px; max-width: min(40vw, 560px); box-shadow: -2px 0 12px rgba(15, 23, 42, .06); }
+  .designer-root .designer-canvas-viewport { min-width: 0; }
+}
+
+/* Denetçi: koyu ve açık temalarda aynı uygulama yüzeyleri ve okunur satırlar. */
+.designer-root .designer-inspector { background: var(--bg-surface) !important; color: var(--text-primary) !important; border-left-color: var(--ui-border-subtle) !important; }
+.designer-root .designer-inspector-header,
+.designer-root .designer-inspector-subtabs { background: var(--bg-raised) !important; border-bottom-color: var(--ui-border-subtle) !important; }
+.designer-root .designer-inspector-title { color: var(--text-primary) !important; }
+.designer-root .designer-inspector-close-btn { color: var(--text-secondary); }
+.designer-root .designer-inspector-close-btn:hover { color: var(--text-primary); background: color-mix(in srgb, var(--accent) 10%, var(--bg-surface)); }
+.designer-root .designer-subtab { color: var(--text-secondary) !important; }
+.designer-root .designer-subtab.active { color: var(--accent) !important; background: var(--bg-surface) !important; }
+.designer-root .designer-prop-search,
+.designer-root .designer-prop-table { background: var(--bg-surface) !important; border-color: var(--ui-border-subtle) !important; }
+.designer-root .designer-prop-search input { background: var(--bg-raised) !important; color: var(--text-primary) !important; border-color: var(--ui-border-subtle) !important; }
+.designer-root .designer-prop-row { border-bottom-color: var(--ui-border-subtle) !important; }
+.designer-root .designer-prop-row:nth-child(even) { background: color-mix(in srgb, var(--bg-raised) 56%, var(--bg-surface)) !important; }
+.designer-root .designer-prop-row:hover { background: color-mix(in srgb, var(--accent) 7%, var(--bg-surface)) !important; }
+.designer-root .designer-prop-name { color: var(--text-secondary) !important; border-right-color: var(--ui-border-subtle) !important; }
+.designer-root .designer-prop-val { color: var(--text-primary) !important; }
+
+@media (min-width: 861px) and (max-width: 1280px) {
+  .topbar:has(.detail-topbar-left) { height: auto; min-height: 58px; padding-block: .5rem; flex-wrap: wrap; row-gap: .45rem; }
+  .topbar .detail-topbar-left { flex: 1 1 100%; }
+  .topbar:has(.detail-topbar-left) .topbar-right { min-width: 0; flex: 1 1 100%; justify-content: flex-end; }
+  .topbar .code-search-box { margin-right: auto; }
+  .designer-root .designer-page-tabs { max-width: 36vw; }
+}
