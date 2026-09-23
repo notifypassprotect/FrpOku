@@ -1,5 +1,15 @@
 const crypto = require('crypto');
 
+function isAllowedChatMediaUrl(value, kind) {
+  if (typeof value !== 'string' || !value) return false;
+  if (/^https?:\/\/[^\s"'<>]+$/i.test(value)) return true;
+  const separator = value.indexOf(',');
+  if (separator < 0 || !/^[a-zA-Z0-9+/=]+$/.test(value.slice(separator + 1))) return false;
+  const header = value.slice(0, separator + 1);
+  if (kind === 'audio') return /^data:audio\/[a-zA-Z0-9.+-]+;base64,$/i.test(header);
+  return /^data:(image\/(png|jpeg|jpg|webp|gif)|application\/pdf);base64,$/i.test(header);
+}
+
 function registerChatSendRoute(app, deps) {
   const { canAccessChatGroup, canAccessChatRoom, chatPayloadSize, ensureChatMessagesHydrated, getChatMessages, persistChatMessage, requireAuth, saveChatMessages, scheduleChatEmailDigest } = deps;
 
@@ -16,6 +26,12 @@ function registerChatSendRoute(app, deps) {
       if (cleanText.length > 1000) return res.status(400).json({ success: false, reason: 'Mesaj 1000 karakterden uzun olamaz.' });
       if (chatPayloadSize(attachment) > 6 * 1024 * 1024 || chatPayloadSize(voice) > 6 * 1024 * 1024) {
         return res.status(413).json({ success: false, reason: 'Sohbet eki 6 MB sınırını aşamaz.' });
+      }
+      if (attachment && !isAllowedChatMediaUrl(attachment.dataUrl, 'attachment')) {
+        return res.status(400).json({ success: false, reason: 'Desteklenmeyen veya geçersiz dosya biçimi.' });
+      }
+      if (voice && !isAllowedChatMediaUrl(voice.dataUrl, 'audio')) {
+        return res.status(400).json({ success: false, reason: 'Desteklenmeyen veya geçersiz ses biçimi.' });
       }
       if (groupId && !canAccessChatGroup(req.authUser, groupId)) return res.status(403).json({ success: false, reason: 'Bu gruba mesaj gönderme yetkiniz yok.' });
       if (roomId && !canAccessChatRoom(req.authUser, roomId)) return res.status(403).json({ success: false, reason: 'Bu kanala erişim yetkiniz yok.' });

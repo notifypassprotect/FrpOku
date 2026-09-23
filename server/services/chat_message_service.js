@@ -30,6 +30,7 @@ function createChatMessageService({ safeLogStr, store, supabase }) {
       attachment: row.attachment?.dataUrl ? row.attachment : null, voice: row.voice || null,
       replyTo: row.reply_to || row.attachment?.replyTo || null, isNudge: Boolean(row.is_nudge),
       reactions: row.reactions || {}, isRead: Boolean(row.is_read), readAt: row.read_at || null,
+      editedAt: row.edited_at || row.attachment?.editedAt || null,
       createdAt: row.created_at || new Date().toISOString()
     };
   }
@@ -82,7 +83,7 @@ function createChatMessageService({ safeLogStr, store, supabase }) {
   }
 
   function getUnreadCountsForUser(userId) {
-    const counts = {}, lastInteraction = {};
+    const counts = {}, lastInteraction = {}, lastMessage = {};
     let total = 0;
     const currentUserId = String(userId);
     for (const message of getChatMessages()) {
@@ -96,13 +97,22 @@ function createChatMessageService({ safeLogStr, store, supabase }) {
       }
       if (incoming || outgoing) {
         const peerId = incoming ? String(message.senderId) : String(message.receiverId);
-        if (peerId && (!lastInteraction[peerId] || time > lastInteraction[peerId])) lastInteraction[peerId] = time;
+        if (peerId && (!lastInteraction[peerId] || time > lastInteraction[peerId])) {
+          lastInteraction[peerId] = time;
+          const fallback = message.voice ? 'Sesli mesaj' : (message.attachment ? (message.attachment.name || 'Dosya') : (message.isNudge ? 'Titreşim' : 'Mesaj'));
+          lastMessage[peerId] = {
+            text: String(message.text || fallback).replace(/\s+/g, ' ').trim().slice(0, 120),
+            senderId: message.senderId == null ? null : String(message.senderId),
+            createdAt: message.createdAt || null,
+            kind: message.voice ? 'voice' : (message.attachment ? 'attachment' : (message.isNudge ? 'nudge' : 'text'))
+          };
+        }
       }
       for (const id of [message.roomId, message.groupId].filter(Boolean).map(String)) {
         if (!lastInteraction[id] || time > lastInteraction[id]) lastInteraction[id] = time;
       }
     }
-    return { bySender: counts, total, lastInteraction };
+    return { bySender: counts, total, lastInteraction, lastMessage };
   }
 
   return { chatPayloadSize, ensureChatMessagesHydrated, getChatMessages, getUnreadCountsForUser, persistChatMessage, replaceChatMessages, saveChatMessages };

@@ -55,6 +55,32 @@ function registerChatMutationRoutes(app, deps) {
     }
   });
 
+  app.patch('/api/chat/messages/:id', requireAuth, async (req, res) => {
+    try {
+      await ensureChatMessagesHydrated();
+      const text = String(req.body?.text || '').trim();
+      if (!text) return res.status(400).json({ success: false, reason: 'Mesaj metni boş olamaz.' });
+      if (text.length > 1000) return res.status(400).json({ success: false, reason: 'Mesaj 1000 karakterden uzun olamaz.' });
+      const message = getChatMessages().find(item => String(item.id) === String(req.params.id));
+      if (!message) return res.status(404).json({ success: false, reason: 'Mesaj bulunamadı.' });
+      if (!canAccessChatMessage(req.authUser, message)) return res.status(403).json({ success: false, reason: 'Bu mesaja erişim yetkiniz yok.' });
+      if (String(message.senderId) !== String(req.authUser.id)) {
+        return res.status(403).json({ success: false, reason: 'Yalnızca kendi mesajınızı düzenleyebilirsiniz.' });
+      }
+      if (message.isNudge) return res.status(400).json({ success: false, reason: 'Titreşim mesajları düzenlenemez.' });
+      message.text = text;
+      message.editedAt = new Date().toISOString();
+      saveChatMessages();
+      if (supabase) {
+        const attachment = { ...(message.attachment || {}), editedAt: message.editedAt };
+        supabase.from('chat_messages').update({ text, attachment }).eq('id', message.id).then(() => {}).catch(() => {});
+      }
+      res.json({ success: true, message });
+    } catch (error) {
+      res.status(500).json({ success: false, reason: 'Mesaj düzenlenemedi.' });
+    }
+  });
+
   app.delete('/api/chat/conversations/:id', requireAuth, async (req, res) => {
     try {
       await ensureChatMessagesHydrated();

@@ -11,7 +11,7 @@
   let dockEl = null;
   let activeChatWindows = new Map(); // namespaced chat key -> { el, timer, lastMsgCount }
   let currentTab = 'users'; // 'users' | 'groups' | 'rooms'
-  let unreadData = { bySender: {}, total: 0, lastInteraction: {} };
+  let unreadData = { bySender: {}, total: 0, lastInteraction: {}, lastMessage: {} };
   let lastTotalUnread = 0;
   let cachedGroups = [];
   let userListFilter = 'all';
@@ -131,7 +131,12 @@
     mic: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"></rect><path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8"></path></svg>',
     play: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7z"></path></svg>',
     pause: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14"></path></svg>',
-    reply: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7 4 12l5 5"></path><path d="M5 12h8a7 7 0 0 1 7 7"></path></svg>'
+    reply: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7 4 12l5 5"></path><path d="M5 12h8a7 7 0 0 1 7 7"></path></svg>',
+    copy: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg>',
+    edit: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z"></path></svg>',
+    bell: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"></path></svg>',
+    pin: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m14 4 6 6-3 1-4 4-1 5-3-6-5-5 5-1 4-4z"></path><path d="m5 19 4-4"></path></svg>',
+    more: '<svg class="frp-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle></svg>'
   };
 
   function chatIcon(name) {
@@ -202,6 +207,14 @@
     const trimmed = url.trim();
     return /^data:image\/(png|jpeg|jpg|webp|gif);base64,[a-zA-Z0-9+/=]+$/i.test(trimmed) ||
            /^https?:\/\/[^\s"'<>]+$/i.test(trimmed);
+  }
+
+  function isSafeChatMediaUrl(url, kind = 'file') {
+    if (!url || typeof url !== 'string') return false;
+    if (/^https?:\/\/[^\s"'<>]+$/i.test(url)) return true;
+    if (kind === 'image') return /^data:image\/(png|jpeg|jpg|webp|gif);base64,[a-zA-Z0-9+/=]+$/i.test(url);
+    if (kind === 'audio') return /^data:audio\/[a-zA-Z0-9.+-]+;base64,[a-zA-Z0-9+/=]+$/i.test(url);
+    return /^data:application\/pdf;base64,[a-zA-Z0-9+/=]+$/i.test(url);
   }
 
   function renderAvatarContent(avatar, initials, isSmall = false) {
@@ -359,6 +372,44 @@
     try { localStorage.setItem(notificationPreferenceKey(), enabled ? 'on' : 'off'); } catch {}
   }
 
+  function conversationMuteKey(type, id) {
+    const user = window.FrpAuth?.getUser?.();
+    return `frp_chat_muted_${String(user?.id || 'guest')}_${type}_${String(id)}`;
+  }
+
+  function isConversationMuted(type, id) {
+    try { return localStorage.getItem(conversationMuteKey(type, id)) === '1'; } catch { return false; }
+  }
+
+  function setConversationMuted(type, id, muted) {
+    try {
+      if (muted) localStorage.setItem(conversationMuteKey(type, id), '1');
+      else localStorage.removeItem(conversationMuteKey(type, id));
+    } catch {}
+  }
+
+  function conversationPinKey(type, id) {
+    const user = window.FrpAuth?.getUser?.();
+    return `frp_chat_pinned_${String(user?.id || 'guest')}_${type}_${String(id)}`;
+  }
+
+  function isConversationPinned(type, id) {
+    try { return localStorage.getItem(conversationPinKey(type, id)) === '1'; } catch { return false; }
+  }
+
+  function setConversationPinned(type, id, pinned) {
+    try {
+      if (pinned) localStorage.setItem(conversationPinKey(type, id), '1');
+      else localStorage.removeItem(conversationPinKey(type, id));
+    } catch {}
+  }
+
+  function isConversationActivelyVisible(type, id) {
+    const chat = activeChatWindows.get(`${type}:${String(id)}`);
+    return Boolean(chat?.el?.isConnected && !chat.el.classList.contains('minimized') &&
+      document.visibilityState === 'visible' && document.hasFocus());
+  }
+
   function showDesktopNotification(title, body) {
     if (areChatNotificationsEnabled() && 'Notification' in window && Notification.permission === 'granted') {
       try {
@@ -398,9 +449,69 @@
     return `${Math.floor(diffDays / 30)} ay önce`;
   }
 
+  function formatConversationTime(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return '';
+    const now = new Date();
+    if (date.toDateString() === now.toDateString()) {
+      return date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    }
+    const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) return 'Dün';
+    if (now.getTime() - date.getTime() < 6 * 24 * 60 * 60 * 1000) {
+      return date.toLocaleDateString('tr-TR', { weekday: 'short' });
+    }
+    return date.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' });
+  }
+
+  function isUserCurrentlyOnline(user) {
+    const status = String(user?.status || '').toLowerCase();
+    return Boolean(user?.isOnline || status === 'online' || status === 'busy' || status === 'dnd');
+  }
+
+  function presenceEmptyState(title, detail, icon = '💬') {
+    return `<li class="frp-presence-empty"><span class="frp-presence-empty-icon" aria-hidden="true">${icon}</span><strong>${escHtml(title)}</strong>${detail ? `<small>${escHtml(detail)}</small>` : ''}</li>`;
+  }
+
+  function conversationPreview(message, myId) {
+    if (!message) return '';
+    const prefix = String(message.senderId || '') === String(myId) ? 'Siz: ' : '';
+    const icon = message.kind === 'voice' ? '🎙️ ' : (message.kind === 'attachment' ? '📎 ' : (message.kind === 'nudge' ? '📳 ' : ''));
+    return `${prefix}${icon}${message.text || 'Mesaj'}`;
+  }
+
+  function getConversationDraft(userId, type, id) {
+    try {
+      return String(localStorage.getItem(`frp_chat_draft_${userId}_${type}_${id}`) || '').trim();
+    } catch { return ''; }
+  }
+
+  function cacheConversationMessage(peerId, message) {
+    if (!peerId || !message) return;
+    const fallback = message.voice ? 'Sesli mesaj' : (message.attachment ? (message.attachment.name || 'Dosya') : (message.isNudge ? 'Titreşim' : 'Mesaj'));
+    unreadData.lastMessage = unreadData.lastMessage || {};
+    unreadData.lastMessage[String(peerId)] = {
+      text: String(message.text || fallback).replace(/\s+/g, ' ').trim().slice(0, 120),
+      senderId: message.senderId == null ? null : String(message.senderId),
+      createdAt: message.createdAt || new Date().toISOString(),
+      kind: message.voice ? 'voice' : (message.attachment ? 'attachment' : (message.isNudge ? 'nudge' : 'text'))
+    };
+  }
+
   function escHtml(str) {
     if (typeof str !== 'string') return '';
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function formatChatText(value) {
+    const escaped = escHtml(String(value || ''));
+    return escaped.replace(/((?:https?:\/\/|www\.)[^\s<]+)/gi, match => {
+      const trailing = match.match(/[.,!?;:)]+$/)?.[0] || '';
+      const label = trailing ? match.slice(0, -trailing.length) : match;
+      const href = label.startsWith('www.') ? `https://${label}` : label;
+      return `<a class="frp-chat-link" href="${href}" target="_blank" rel="noopener noreferrer">${label}</a>${trailing}`;
+    }).replace(/\r?\n/g, '<br>');
   }
 
   // ── HEARTBEAT & KULLANICI / OKUNMAMIŞ VERİLERİ ──
@@ -464,6 +575,9 @@
         if (newCounts.lastInteraction && typeof newCounts.lastInteraction === 'object') {
           unreadData.lastInteraction = { ...unreadData.lastInteraction, ...newCounts.lastInteraction };
         }
+        if (newCounts.lastMessage && typeof newCounts.lastMessage === 'object') {
+          unreadData.lastMessage = { ...unreadData.lastMessage, ...newCounts.lastMessage };
+        }
       } else {
         Object.entries(newCounts).forEach(([senderId, count]) => {
           const c = Number(count) || 0;
@@ -479,21 +593,31 @@
       }
     }
 
-    unreadData = { bySender, total, lastInteraction: unreadData.lastInteraction || {} };
+    unreadData = {
+      bySender,
+      total,
+      lastInteraction: unreadData.lastInteraction || {},
+      lastMessage: unreadData.lastMessage || {}
+    };
 
-    if (newSenders.length > 0 && total > lastTotalUnread && areChatNotificationsEnabled()) {
+    const notifySenders = newSenders.filter(({ senderId }) =>
+      !isConversationMuted('peer', senderId) && !isConversationActivelyVisible('peer', senderId));
+    if (notifySenders.length > 0 && total > lastTotalUnread && areChatNotificationsEnabled()) {
       playNotificationChime();
-      newSenders.forEach(({ senderId, count }) => {
+      notifySenders.forEach(({ senderId, count }) => {
         const senderUser = cachedUsers.find(u => String(u.id) === String(senderId));
         const senderName = senderUser ? (senderUser.fullName || senderUser.username) : 'Ekip Arkadaşı';
         const senderInitials = getCleanInitials(senderUser?.fullName, senderUser?.username);
         const senderGradient = getAvatarGradient(senderName);
+        const latestMessage = newCounts?.lastMessage?.[senderId];
 
         showInAppChatNotification({
           senderName,
           senderInitials,
           senderGradient,
-          messageText: count > 1 ? `${count} yeni okunmamış mesajınız var.` : 'Size yeni bir mesaj gönderdi.',
+          messageText: count > 1
+            ? `${count} yeni mesaj${latestMessage ? ` · ${conversationPreview(latestMessage, '')}` : ''}`
+            : (conversationPreview(latestMessage, '') || 'Size yeni bir mesaj gönderdi.'),
           onOpen: () => {
             if (senderUser) {
               openChatWindow({ targetUser: senderUser });
@@ -525,6 +649,8 @@
     } else {
       if (existingPillBadge) existingPillBadge.remove();
     }
+    const cleanTitle = document.title.replace(/^\(\d+\+?\)\s*/, '');
+    document.title = unreadData.total > 0 ? `(${unreadData.total > 99 ? '99+' : unreadData.total}) ${cleanTitle}` : cleanTitle;
   }
 
   async function sendOffline() {
@@ -651,7 +777,8 @@
         <!-- LİSTE -->
         <div class="frp-presence-list-wrap">
           <ul id="frpPresenceList" class="frp-presence-list">
-            <li class="frp-presence-empty">Kullanıcılar yükleniyor...</li>
+            <li class="frp-presence-skeleton" aria-label="Kullanıcılar yükleniyor"><span></span><div><i></i><i></i></div></li>
+            <li class="frp-presence-skeleton" aria-hidden="true"><span></span><div><i></i><i></i></div></li>
           </ul>
         </div>
 
@@ -857,13 +984,20 @@
     });
   }
 
+  function renderCurrentConversationList() {
+    const query = dockEl?.querySelector('#frpPresenceSearchInput')?.value?.trim() || '';
+    if (currentTab === 'users') renderUsers(query);
+    else if (currentTab === 'groups') renderGroups(query);
+    else renderRooms(query);
+  }
+
   function renderUsers(query = '') {
     if (!dockEl || currentTab !== 'users') return;
     const listEl = dockEl.querySelector('#frpPresenceList');
     const pillCount = dockEl.querySelector('#frpPresencePillCount');
     const headerCount = dockEl.querySelector('#frpPresenceHeaderCount');
 
-    const onlineUsers = cachedUsers.filter(u => u.isOnline || u.status === 'online' || u.status === 'busy');
+    const onlineUsers = cachedUsers.filter(isUserCurrentlyOnline);
     const count = onlineUsers.length;
     if (pillCount) pillCount.textContent = count;
     if (headerCount) headerCount.textContent = `${count} Çevrimiçi`;
@@ -882,7 +1016,7 @@
     const filtered = cachedUsers.filter(u => {
       if (!q && String(u.id) === myId) return false; // Kendisi aşağıda ayrı listelenmesin, yukarıda sabit not kartı olacak
       if (String(u.id) === myId) return false;
-      const isOnline = u.isOnline || u.status === 'online' || u.status === 'busy';
+      const isOnline = isUserCurrentlyOnline(u);
       const hasUnread = ((unreadData.bySender && unreadData.bySender[String(u.id)]) || 0) > 0;
       if (userListFilter === 'online' && !isOnline) return false;
       if (userListFilter === 'unread' && !hasUnread) return false;
@@ -890,19 +1024,26 @@
       const fn = (u.fullName || '').toLowerCase();
       const un = (u.username || '').toLowerCase();
       const dp = (u.department || '').toLowerCase();
-      return fn.includes(q) || un.includes(q) || dp.includes(q);
+      const lastMessage = String(unreadData.lastMessage?.[String(u.id)]?.text || '').toLowerCase();
+      const draft = getConversationDraft(myId, 'user', u.id).toLowerCase();
+      return fn.includes(q) || un.includes(q) || dp.includes(q) || lastMessage.includes(q) || draft.includes(q);
     });
 
     // OKUNMAMIŞ MESAJI OLAN KULLANICILARI VE EN SON MESAJLAŞILAN KİŞİLERİ EN ÜSTE SIRALA
     filtered.sort((a, b) => {
-      // 1. Okunmamış mesajı olanlar en başta
+      // 1. Sabitlenen konuşmalar en başta
+      const pinnedA = isConversationPinned('peer', a.id);
+      const pinnedB = isConversationPinned('peer', b.id);
+      if (pinnedA !== pinnedB) return pinnedA ? -1 : 1;
+
+      // 2. Okunmamış mesajı olanlar
       const unreadA = (unreadData.bySender && unreadData.bySender[String(a.id)]) || 0;
       const unreadB = (unreadData.bySender && unreadData.bySender[String(b.id)]) || 0;
       if (unreadA > 0 && unreadB === 0) return -1;
       if (unreadB > 0 && unreadA === 0) return 1;
       if (unreadA !== unreadB) return unreadB - unreadA;
 
-      // 2. En son mesajlaşılan kişi (son etkileşim zamanı azalan sırada)
+      // 3. En son mesajlaşılan kişi (son etkileşim zamanı azalan sırada)
       const lastA = Math.max(
         (unreadData.lastInteraction && unreadData.lastInteraction[String(a.id)]) || 0,
         localLastInteractions[String(a.id)] || 0
@@ -915,13 +1056,13 @@
         if (lastA !== lastB) return lastB - lastA;
       }
 
-      // 3. Çevrimiçi olanlar
-      const isOnlineA = a.isOnline || a.status === 'online' || a.status === 'busy';
-      const isOnlineB = b.isOnline || b.status === 'online' || b.status === 'busy';
+      // 4. Çevrimiçi olanlar
+      const isOnlineA = isUserCurrentlyOnline(a);
+      const isOnlineB = isUserCurrentlyOnline(b);
       if (isOnlineA && !isOnlineB) return -1;
       if (!isOnlineA && isOnlineB) return 1;
 
-      // 4. Alfabetik isim
+      // 5. Alfabetik isim
       return (a.fullName || a.username || '').localeCompare(b.fullName || b.username || '', 'tr');
     });
 
@@ -932,6 +1073,8 @@
     if (showSelfNote) {
       const selfLi = document.createElement('li');
       selfLi.className = 'frp-presence-item personal-notes';
+      const selfDraft = getConversationDraft(myId, 'user', currentAuthUser.id);
+      if (selfDraft) selfLi.classList.add('has-draft');
       markConversationRow(selfLi, `peer:${String(currentAuthUser.id)}`);
       selfLi.innerHTML = `
         <div class="frp-presence-avatar-wrap">
@@ -944,7 +1087,7 @@
             <span class="frp-presence-dept-badge" style="background: rgba(37,99,235,0.15); color: #2563eb;">Kişisel</span>
           </div>
           <div class="frp-presence-sub">
-            <span>Kişisel mesajlar, hatırlatıcılar & belgeler</span>
+            <span class="frp-presence-preview">${selfDraft ? `<strong>Taslak:</strong> ${escHtml(selfDraft)}` : 'Kişisel mesajlar, hatırlatıcılar & belgeler'}</span>
           </div>
         </div>
       `;
@@ -968,7 +1111,11 @@
         : (userListFilter === 'online'
             ? 'Şu anda başka çevrimiçi kullanıcı yok.'
             : (userListFilter === 'unread' ? 'Okunmamış mesajınız yok.' : 'Henüz kayıtlı kullanıcı bulunmuyor.'));
-      listEl.innerHTML = `<li class="frp-presence-empty">${emptyLabel}</li>`;
+      listEl.innerHTML = presenceEmptyState(
+        emptyLabel,
+        q ? 'Farklı bir ad, kullanıcı adı veya departman deneyin.' : '',
+        q ? '⌕' : (userListFilter === 'unread' ? '✓' : '👤')
+      );
       return;
     }
 
@@ -978,8 +1125,16 @@
       markConversationRow(li, `peer:${String(u.id)}`);
 
       const unreadCount = (unreadData.bySender && unreadData.bySender[String(u.id)]) || 0;
+      const latestMessage = unreadData.lastMessage && unreadData.lastMessage[String(u.id)];
+      const draft = getConversationDraft(myId, 'user', u.id);
+      const muted = isConversationMuted('peer', u.id);
+      const pinned = isConversationPinned('peer', u.id);
+      if (draft) li.classList.add('has-draft');
+      if (muted) li.classList.add('is-muted');
+      if (pinned) li.classList.add('is-pinned');
       if (unreadCount > 0) {
         li.classList.add('unread');
+        li.setAttribute('aria-label', `${u.fullName || u.username || 'Kullanıcı'}, ${unreadCount} okunmamış mesaj`);
       }
 
       const userStatus = u.status || (u.isOnline ? 'online' : 'offline');
@@ -1001,6 +1156,8 @@
       const initials = getCleanInitials(u.fullName, u.username);
       const gradient = getAvatarGradient(name);
       const userAvatarInner = renderAvatarContent(u.avatar, initials);
+      const preview = draft ? `Taslak: ${draft}` : conversationPreview(latestMessage, myId);
+      const rowTime = draft ? 'Taslak' : (latestMessage?.createdAt ? formatConversationTime(latestMessage.createdAt) : statusLabel);
 
       li.innerHTML = `
         <div class="frp-presence-avatar-wrap">
@@ -1010,13 +1167,15 @@
         <div class="frp-presence-info">
           <div class="frp-presence-name-row">
             <span class="frp-presence-name">${escHtml(name)}</span>
-            <div style="display:flex;align-items:center;gap:0.35rem;">
-              ${unreadCount > 0 ? `<span class="frp-presence-unread-badge">${unreadCount}</span>` : ''}
-              <span class="frp-presence-time ${statusClass}">${escHtml(statusLabel)}</span>
+            <div class="frp-presence-row-badges">
+              ${pinned ? '<span class="frp-presence-pinned" title="Sabitlenmiş sohbet">📌</span>' : ''}
+              ${muted ? '<span class="frp-presence-muted" title="Bildirimleri sessizde">🔕</span>' : ''}
+              ${unreadCount > 0 ? `<span class="frp-presence-unread-badge" title="${unreadCount} okunmamış mesaj">${unreadCount > 99 ? '99+' : unreadCount}</span>` : ''}
+              <span class="frp-presence-time ${draft ? 'draft-time' : (latestMessage ? 'message-time' : statusClass)}">${escHtml(rowTime)}</span>
             </div>
           </div>
           <div class="frp-presence-sub">
-            <span>@${escHtml(u.username)}</span>
+            <span class="frp-presence-preview" title="${escHtml(preview || `@${u.username}`)}">${escHtml(preview || `@${u.username}`)}</span>
             ${u.department ? `<span class="frp-presence-dept-badge">${escHtml(u.department)}</span>` : ''}
           </div>
         </div>
@@ -1034,14 +1193,26 @@
     if (!dockEl || currentTab !== 'rooms') return;
     const listEl = dockEl.querySelector('#frpPresenceList');
     const q = (query || '').toLowerCase().trim();
+    const currentAuthUser = window.FrpAuth?.getUser?.();
+    const myId = String(currentAuthUser?.id || '');
 
     const filtered = ROOMS.filter(r => {
       if (!q) return true;
-      return r.name.toLowerCase().includes(q) || r.desc.toLowerCase().includes(q);
+      const draft = getConversationDraft(myId, 'room', r.id).toLowerCase();
+      return String(r.name || '').toLowerCase().includes(q) || String(r.desc || '').toLowerCase().includes(q) || draft.includes(q);
+    }).sort((a, b) => {
+      const pinnedA = isConversationPinned('room', a.id);
+      const pinnedB = isConversationPinned('room', b.id);
+      if (pinnedA !== pinnedB) return pinnedA ? -1 : 1;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'tr');
     });
 
     if (filtered.length === 0) {
-      listEl.innerHTML = `<li class="frp-presence-empty">Oda bulunamadı.</li>`;
+      listEl.innerHTML = presenceEmptyState(
+        q ? 'Oda bulunamadı' : 'Henüz sohbet odası yok',
+        q ? 'Arama ifadenizi değiştirip tekrar deneyin.' : 'Yeni odalar oluşturulduğunda burada görünecek.',
+        q ? '⌕' : '📣'
+      );
       return;
     }
 
@@ -1050,25 +1221,27 @@
       const li = document.createElement('li');
       li.className = 'frp-presence-item';
       markConversationRow(li, `room:${String(room.id)}`);
+      const draft = getConversationDraft(myId, 'room', room.id);
+      const pinned = isConversationPinned('room', room.id);
+      if (draft) li.classList.add('has-draft');
+      if (pinned) li.classList.add('is-pinned');
 
       li.innerHTML = `
         <div class="frp-presence-avatar-wrap">
-          <div class="frp-presence-avatar" style="background: linear-gradient(135deg, #059669, #10b981); font-size: 1.1rem;">${room.icon}</div>
+          <div class="frp-presence-avatar" style="background: linear-gradient(135deg, #059669, #10b981); font-size: 1.1rem;">${escHtml(String(room.icon || '💬'))}</div>
         </div>
         <div class="frp-presence-info">
           <div class="frp-presence-name-row">
             <span class="frp-presence-name">${escHtml(room.name)}</span>
-            <span class="frp-presence-dept-badge" style="background: rgba(16,185,129,0.15); color: #059669;">Kanal</span>
+            <div class="frp-presence-row-badges">${pinned ? '<span class="frp-presence-pinned" title="Sabitlenmiş kanal">📌</span>' : ''}<span class="frp-presence-dept-badge" style="background: rgba(16,185,129,0.15); color: #059669;">Kanal</span></div>
           </div>
           <div class="frp-presence-sub">
-            <span>${escHtml(room.desc)}</span>
+            <span class="frp-presence-preview">${draft ? `<strong>Taslak:</strong> ${escHtml(draft)}` : escHtml(room.desc)}</span>
           </div>
         </div>
       `;
 
-      li.addEventListener('click', () => {
-        openChatWindow({ room });
-      });
+      bindChatRowActivation(li, () => openChatWindow({ room }));
 
       listEl.appendChild(li);
     });
@@ -1079,10 +1252,18 @@
     if (!dockEl || currentTab !== 'groups') return;
     const listEl = dockEl.querySelector('#frpPresenceList');
     const q = (query || '').toLowerCase().trim();
+    const currentAuthUser = window.FrpAuth?.getUser?.();
+    const myId = String(currentAuthUser?.id || '');
 
     const filtered = cachedGroups.filter(g => {
       if (!q) return true;
-      return (g.name || '').toLowerCase().includes(q);
+      const draft = getConversationDraft(myId, 'group', g.id).toLowerCase();
+      return (g.name || '').toLowerCase().includes(q) || (g.createdByName || '').toLowerCase().includes(q) || draft.includes(q);
+    }).sort((a, b) => {
+      const pinnedA = isConversationPinned('group', a.id);
+      const pinnedB = isConversationPinned('group', b.id);
+      if (pinnedA !== pinnedB) return pinnedA ? -1 : 1;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'tr');
     });
 
     listEl.innerHTML = '';
@@ -1100,16 +1281,15 @@
       </div>
       <span class="frp-group-badge">Oluştur</span>
     `;
-    createBanner.addEventListener('click', () => {
-      openCreateGroupModal();
-    });
+    bindChatRowActivation(createBanner, openCreateGroupModal);
     listEl.appendChild(createBanner);
 
     if (filtered.length === 0) {
-      const emptyLi = document.createElement('li');
-      emptyLi.className = 'frp-presence-empty';
-      emptyLi.textContent = q ? 'Aramaya uygun grup bulunamadı.' : 'Henüz bir gruba dahil değilsiniz. Yukarıdaki butona tıklayarak yeni bir grup oluşturabilirsiniz!';
-      listEl.appendChild(emptyLi);
+      listEl.insertAdjacentHTML('beforeend', presenceEmptyState(
+        q ? 'Grup bulunamadı' : 'Henüz bir grubunuz yok',
+        q ? 'Arama ifadenizi değiştirip tekrar deneyin.' : 'Yeni bir ekip sohbeti oluşturmak için yukarıdaki alanı kullanın.',
+        q ? '⌕' : '👥'
+      ));
       return;
     }
 
@@ -1120,25 +1300,27 @@
 
       const memberCount = Array.isArray(group.memberUserIds) ? group.memberUserIds.length : 2;
       const groupIcon = group.icon || '👥';
+      const draft = getConversationDraft(myId, 'group', group.id);
+      const pinned = isConversationPinned('group', group.id);
+      if (draft) li.classList.add('has-draft');
+      if (pinned) li.classList.add('is-pinned');
 
       li.innerHTML = `
         <div class="frp-presence-avatar-wrap">
-          <div class="frp-presence-avatar" style="background: linear-gradient(135deg, #4f46e5, #7c3aed); font-size: 1.05rem; color: #ffffff;">${groupIcon}</div>
+          <div class="frp-presence-avatar" style="background: linear-gradient(135deg, #4f46e5, #7c3aed); font-size: 1.05rem; color: #ffffff;">${escHtml(String(groupIcon))}</div>
         </div>
         <div class="frp-presence-info">
           <div class="frp-presence-name-row">
             <span class="frp-presence-name">${escHtml(group.name)}</span>
-            <span class="frp-presence-dept-badge" style="background: rgba(99, 102, 241, 0.12); color: #4f46e5;">${memberCount} Üye</span>
+            <div class="frp-presence-row-badges">${pinned ? '<span class="frp-presence-pinned" title="Sabitlenmiş grup">📌</span>' : ''}<span class="frp-presence-dept-badge" style="background: rgba(99, 102, 241, 0.12); color: #4f46e5;">${memberCount} Üye</span></div>
           </div>
           <div class="frp-presence-sub">
-            <span>Grup Sohbeti · ${escHtml(group.createdByName || 'Ekip')}</span>
+            <span class="frp-presence-preview">${draft ? `<strong>Taslak:</strong> ${escHtml(draft)}` : `Grup Sohbeti · ${escHtml(group.createdByName || 'Ekip')}`}</span>
           </div>
         </div>
       `;
 
-      li.addEventListener('click', () => {
-        openChatWindow({ group });
-      });
+      bindChatRowActivation(li, () => openChatWindow({ group }));
 
       listEl.appendChild(li);
     });
@@ -1150,27 +1332,36 @@
     const myId = currentAuthUser ? String(currentAuthUser.id) : '';
 
     const existingModal = document.getElementById('frpGroupModalOverlay');
-    if (existingModal) existingModal.remove();
+    if (existingModal) {
+      existingModal.querySelector('#frpGroupNameInput')?.focus();
+      return;
+    }
 
     const overlay = document.createElement('div');
     overlay.id = 'frpGroupModalOverlay';
     overlay.className = 'frp-group-modal-overlay';
 
-    const otherUsers = cachedUsers.filter(u => String(u.id) !== myId);
+    const otherUsers = cachedUsers
+      .filter(u => String(u.id) !== myId)
+      .sort((a, b) => {
+        const onlineDifference = Number(isUserCurrentlyOnline(b)) - Number(isUserCurrentlyOnline(a));
+        if (onlineDifference) return onlineDifference;
+        return String(a.fullName || a.username || '').localeCompare(String(b.fullName || b.username || ''), 'tr');
+      });
 
     let membersHtml = '';
     if (otherUsers.length === 0) {
-      membersHtml = '<div style="padding: 1rem; text-align: center; color: var(--text-muted); font-size: 0.8rem;">Eklenebilecek başka kayıtlı kullanıcı bulunamadı.</div>';
+      membersHtml = '';
     } else {
       otherUsers.forEach(u => {
         const uName = u.fullName || u.username || 'Kullanıcı';
         const uInitials = getCleanInitials(u.fullName, u.username);
         const gradient = getAvatarGradient(uName);
         membersHtml += `
-          <label class="frp-group-member-item">
+          <label class="frp-group-member-item" data-search="${escHtml(`${uName} ${u.username || ''} ${u.department || ''}`.toLocaleLowerCase('tr-TR'))}">
             <div class="frp-group-member-left">
               <input type="checkbox" class="frp-group-member-chk" value="${escHtml(String(u.id))}" />
-              <div class="frp-presence-avatar" style="width: 26px; height: 26px; font-size: 0.72rem; background: ${gradient}; color: #ffffff; font-weight: 800; border-radius: 50%; display: flex; align-items: center; justify-content: center;">${escHtml(uInitials)}</div>
+              <div class="frp-presence-avatar frp-group-member-avatar" style="background: ${gradient};">${renderAvatarContent(u.avatar, uInitials)}</div>
               <div>
                 <div class="frp-group-member-name">${escHtml(uName)}</div>
                 <div style="font-size: 0.65rem; color: var(--text-muted);">@${escHtml(u.username || '')} ${u.department ? '· ' + escHtml(u.department) : ''}</div>
@@ -1182,33 +1373,48 @@
     }
 
     overlay.innerHTML = `
-      <div class="frp-group-modal-card">
+      <div class="frp-group-modal-card" role="dialog" aria-modal="true" aria-labelledby="frpGroupModalTitle">
         <div class="frp-group-modal-header">
-          <span class="frp-group-modal-title">👥 Yeni Grup Sohbeti Başlat</span>
-          <button type="button" class="frp-group-modal-close" id="btnGroupModalClose">✕</button>
+          <div class="frp-group-modal-heading">
+            <span class="frp-group-modal-icon">${chatIcon('users')}</span>
+            <div><span class="frp-group-modal-title" id="frpGroupModalTitle">Yeni grup sohbeti</span><small>Ekip üyelerini seçip konuşmayı başlatın</small></div>
+          </div>
+          <button type="button" class="frp-group-modal-close" id="btnGroupModalClose" aria-label="Pencereyi kapat">${chatIcon('close')}</button>
         </div>
         <div class="frp-group-modal-body">
           <div>
             <label class="frp-group-field-label">Grup Adı</label>
-            <input type="text" id="frpGroupNameInput" class="frp-group-input" placeholder="Örn: Pazarlama & Satış Ekibi" maxlength="60" />
+            <input type="text" id="frpGroupNameInput" class="frp-group-input" placeholder="Örn. Raporlama Ekibi" maxlength="60" autocomplete="off" />
+            <div class="frp-group-field-meta"><span>Net ve kısa bir ad kullanın</span><span id="frpGroupNameCount">0/60</span></div>
           </div>
           <div>
-            <label class="frp-group-field-label">Grup Üyelerini Seçin (En az 1 kişi daha seçin)</label>
+            <div class="frp-group-member-heading"><label class="frp-group-field-label" for="frpGroupMemberSearch">Üyeler</label><span id="frpGroupSelectedCount" aria-live="polite">0 seçildi</span></div>
+            <div class="frp-group-member-search">${chatIcon('search')}<input type="search" id="frpGroupMemberSearch" placeholder="Kişi veya departman ara" autocomplete="off" ${otherUsers.length ? '' : 'disabled'} /></div>
             <div class="frp-group-members-list">
               ${membersHtml}
+              <div class="frp-group-member-empty" id="frpGroupMemberEmpty" ${otherUsers.length ? 'hidden' : ''}>${otherUsers.length ? 'Aramanızla eşleşen ekip üyesi yok.' : 'Eklenebilecek başka kayıtlı kullanıcı bulunamadı.'}</div>
             </div>
           </div>
         </div>
         <div class="frp-group-modal-footer">
+          <span class="frp-group-modal-hint" id="frpGroupModalHint" aria-live="polite">Grup adı ve en az bir üye gerekli</span>
           <button type="button" class="frp-group-btn-cancel" id="btnGroupModalCancel">İptal</button>
-          <button type="button" class="frp-group-btn-submit" id="btnGroupModalSubmit">Grup Oluştur 🚀</button>
+          <button type="button" class="frp-group-btn-submit" id="btnGroupModalSubmit" disabled>Grubu oluştur</button>
         </div>
       </div>
     `;
 
     document.body.appendChild(overlay);
+    document.body.classList.add('frp-chat-modal-open');
 
-    const closeFn = () => overlay.remove();
+    const previousFocus = document.activeElement;
+    const closeFn = () => {
+      if (!overlay.isConnected) return;
+      overlay.remove();
+      document.body.classList.remove('frp-chat-modal-open');
+      document.removeEventListener('keydown', onModalKeydown);
+      if (previousFocus instanceof HTMLElement) previousFocus.focus();
+    };
     overlay.querySelector('#btnGroupModalClose').addEventListener('click', closeFn);
     overlay.querySelector('#btnGroupModalCancel').addEventListener('click', closeFn);
     overlay.addEventListener('click', (e) => {
@@ -1216,9 +1422,56 @@
     });
 
     const nameInput = overlay.querySelector('#frpGroupNameInput');
+    const memberSearch = overlay.querySelector('#frpGroupMemberSearch');
+    const memberItems = Array.from(overlay.querySelectorAll('.frp-group-member-item'));
+    const memberEmpty = overlay.querySelector('#frpGroupMemberEmpty');
+    const selectedCount = overlay.querySelector('#frpGroupSelectedCount');
+    const nameCount = overlay.querySelector('#frpGroupNameCount');
+    const modalHint = overlay.querySelector('#frpGroupModalHint');
+    const btnSubmit = overlay.querySelector('#btnGroupModalSubmit');
+
+    function syncGroupForm() {
+      const selected = overlay.querySelectorAll('.frp-group-member-chk:checked').length;
+      const hasName = Boolean(nameInput.value.trim());
+      if (selectedCount) selectedCount.textContent = `${selected} seçildi`;
+      if (nameCount) nameCount.textContent = `${nameInput.value.length}/60`;
+      memberItems.forEach(item => item.classList.toggle('selected', Boolean(item.querySelector('.frp-group-member-chk:checked'))));
+      btnSubmit.disabled = !hasName || selected === 0;
+      if (modalHint) modalHint.textContent = !hasName ? 'Grup adı gerekli' : (selected === 0 ? 'En az bir üye seçin' : `${selected + 1} kişilik grup hazır`);
+    }
+
+    function filterGroupMembers() {
+      const term = memberSearch.value.trim().toLocaleLowerCase('tr-TR');
+      let visibleCount = 0;
+      memberItems.forEach(item => {
+        const visible = !term || String(item.dataset.search || '').includes(term);
+        item.hidden = !visible;
+        if (visible) visibleCount += 1;
+      });
+      if (memberEmpty) memberEmpty.hidden = visibleCount > 0;
+    }
+
+    function onModalKeydown(event) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeFn();
+      }
+    }
+    document.addEventListener('keydown', onModalKeydown);
+    nameInput.addEventListener('input', syncGroupForm);
+    nameInput.addEventListener('keydown', event => {
+      if (event.key === 'Enter' && !btnSubmit.disabled) {
+        event.preventDefault();
+        btnSubmit.click();
+      }
+    });
+    memberSearch.addEventListener('input', filterGroupMembers);
+    overlay.querySelectorAll('.frp-group-member-chk').forEach(checkbox => checkbox.addEventListener('change', syncGroupForm));
+    syncGroupForm();
     setTimeout(() => nameInput.focus(), 60);
 
-    overlay.querySelector('#btnGroupModalSubmit').addEventListener('click', async () => {
+    btnSubmit.addEventListener('click', async () => {
+      if (btnSubmit.disabled) return;
       const name = nameInput.value.trim();
       if (!name) {
         if (typeof window.toast === 'function') window.toast('Lütfen grup adını belirtin.', 'warning');
@@ -1234,9 +1487,9 @@
         return;
       }
 
-      const btnSubmit = overlay.querySelector('#btnGroupModalSubmit');
       btnSubmit.disabled = true;
-      btnSubmit.textContent = 'Oluşturuluyor...';
+      btnSubmit.classList.add('loading');
+      btnSubmit.textContent = 'Oluşturuluyor…';
 
       try {
         const res = await fetch('/api/chat/groups', {
@@ -1253,12 +1506,16 @@
         } else {
           if (typeof window.toast === 'function') window.toast(data.reason || 'Grup oluşturulamadı.', 'error');
           btnSubmit.disabled = false;
-          btnSubmit.textContent = 'Grup Oluştur 🚀';
+          btnSubmit.classList.remove('loading');
+          btnSubmit.textContent = 'Grubu oluştur';
+          syncGroupForm();
         }
       } catch (err) {
         if (typeof window.toast === 'function') window.toast('Bağlantı hatası: ' + err.message, 'error');
         btnSubmit.disabled = false;
-        btnSubmit.textContent = 'Grup Oluştur 🚀';
+        btnSubmit.classList.remove('loading');
+        btnSubmit.textContent = 'Grubu oluştur';
+        syncGroupForm();
       }
     });
   }
@@ -1335,8 +1592,9 @@
   function openChatWindow({ targetUser, room, group }) {
     const isRoom = Boolean(room);
     const isGroup = Boolean(group);
+    const chatType = isGroup ? 'group' : (isRoom ? 'room' : 'peer');
     const chatId = isGroup ? group.id : (isRoom ? room.id : String(targetUser.id));
-    const chatKey = `${isGroup ? 'group' : (isRoom ? 'room' : 'peer')}:${String(chatId)}`;
+    const chatKey = `${chatType}:${String(chatId)}`;
     const chatTitle = isGroup ? group.name : (isRoom ? room.name : (targetUser.fullName || targetUser.username));
 
     const currentAuthUser = window.FrpAuth && window.FrpAuth.getUser ? window.FrpAuth.getUser() : null;
@@ -1423,15 +1681,21 @@
           </div>
         </div>
         <div class="frp-chat-header-controls">
-          ${isGroup ? `<button type="button" class="frp-chat-btn-ctrl btn-group-info" title="Grup Bilgisi & Katılımcılar" aria-label="Grup bilgisi">${chatIcon('users')}</button>` : ''}
-          ${!isRoom ? `<button type="button" class="frp-chat-btn-ctrl btn-nudge" title="Titreşim Gönder" aria-label="Titreşim gönder">${chatIcon('nudge')}</button>` : ''}
-          <button type="button" class="frp-chat-btn-ctrl btn-media-gallery" title="Paylaşılan Medya ve Belgeler" aria-label="Paylaşılan medya">${chatIcon('folder')}</button>
           <button type="button" class="frp-chat-btn-ctrl btn-search" title="Sohbette Ara" aria-label="Sohbette ara">${chatIcon('search')}</button>
-          ${(!isRoom && !isGroup) || isAdmin ? `<button type="button" class="frp-chat-btn-ctrl btn-clear-chat" title="Sohbeti Sil / Temizle" aria-label="Sohbeti temizle" style="color:#ef4444;">${chatIcon('trash')}</button>` : ''}
+          <button type="button" class="frp-chat-btn-ctrl btn-more" title="Sohbet işlemleri" aria-label="Sohbet işlemleri" aria-expanded="false">${chatIcon('more')}</button>
           <button type="button" class="frp-chat-btn-ctrl btn-maximize" title="Ekranı Büyüt / Eski Boyut" aria-label="Büyüt">${chatIcon('maximize')}</button>
           <button type="button" class="frp-chat-btn-ctrl btn-minimize" title="Simge Durumuna Küçült" aria-label="Küçült">${chatIcon('minimize')}</button>
           <button type="button" class="frp-chat-btn-ctrl btn-close" title="Kapat" aria-label="Kapat">${chatIcon('close')}</button>
         </div>
+      </div>
+
+      <div class="frp-chat-action-menu" hidden>
+        ${isGroup ? `<button type="button" class="frp-chat-menu-item btn-group-info">${chatIcon('users')}<span>Grup bilgisi ve üyeler</span></button>` : ''}
+        ${!isRoom ? `<button type="button" class="frp-chat-menu-item btn-nudge">${chatIcon('nudge')}<span>Titreşim gönder</span></button>` : ''}
+        ${!targetUser?.isSelfNote ? `<button type="button" class="frp-chat-menu-item btn-pin-chat" aria-pressed="false">${chatIcon('pin')}<span>Sohbeti sabitle</span></button>` : ''}
+        ${!targetUser?.isSelfNote ? `<button type="button" class="frp-chat-menu-item btn-mute-chat" aria-pressed="false">${chatIcon('bell')}<span>Bildirimleri sessize al</span></button>` : ''}
+        <button type="button" class="frp-chat-menu-item btn-media-gallery">${chatIcon('folder')}<span>Medya ve belgeler</span></button>
+        ${(!isRoom && !isGroup) || isAdmin ? `<button type="button" class="frp-chat-menu-item danger btn-clear-chat">${chatIcon('trash')}<span>Sohbet geçmişini temizle</span></button>` : ''}
       </div>
 
       <!-- GRUP BİLGİSİ VE ÜYE YÖNETİM ÇEKMECESİ -->
@@ -1471,13 +1735,16 @@
       <!-- SOHBET İÇİ ARAMA ÇUBUĞU -->
       <div class="frp-chat-search-bar" style="display: none;">
         <input type="text" class="frp-chat-search-input" placeholder="Bu sohbette ara..." />
+        <span class="frp-chat-search-count" aria-live="polite"></span>
         <button type="button" class="frp-chat-search-close" aria-label="Aramayı kapat">${chatIcon('close')}</button>
       </div>
 
       <!-- MESAJ AKIŞI -->
       <div class="frp-chat-body">
         <div class="frp-chat-connection" role="status" aria-live="polite">Bağlanıyor…</div>
-        <div class="frp-chat-messages-stream" role="log" aria-label="Sohbet mesajları" aria-relevant="additions"></div>
+        <div class="frp-chat-messages-stream" role="log" aria-label="Sohbet mesajları" aria-relevant="additions">
+          <div class="frp-chat-loading" role="status"><span></span><span></span><span></span><small>Mesajlar yükleniyor</small></div>
+        </div>
         <button type="button" class="frp-chat-jump" aria-live="polite" hidden>Yeni mesajlar ↓</button>
         <!-- CANLI YAZIYOR GÖSTERGESİ -->
         <div class="frp-typing-indicator" style="display: none;">
@@ -1526,7 +1793,7 @@
             </div>
             <button type="button" class="frp-chat-btn-action btn-mic" title="Gerçek Ses Kaydı (Bas Konuş)" aria-label="Ses kaydet">${chatIcon('mic')}</button>
             ${!isRoom ? `<button type="button" class="frp-chat-btn-action btn-nudge-action" title="Titreşim Gönder" aria-label="Titreşim gönder">${chatIcon('nudge')}</button>` : ''}
-            <button type="button" class="frp-chat-send-btn" title="Gönder">
+            <button type="button" class="frp-chat-send-btn" title="Gönder" aria-label="Mesajı gönder">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13"></line>
                 <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
@@ -1535,6 +1802,7 @@
           </div>
         `}
       </div>
+      <div class="frp-chat-drop-overlay" aria-hidden="true"><span>📎</span><strong>Dosyayı sohbete bırakın</strong></div>
     `;
 
     document.body.appendChild(chatEl);
@@ -1551,10 +1819,15 @@
     const btnLeaveGroup = chatEl.querySelector('#btnLeaveGroupAction');
     const groupMembersWrap = chatEl.querySelector('#frpGroupMembersListWrap');
     const btnSearch = chatEl.querySelector('.btn-search');
+    const btnMore = chatEl.querySelector('.btn-more');
+    const actionMenu = chatEl.querySelector('.frp-chat-action-menu');
     const searchBar = chatEl.querySelector('.frp-chat-search-bar');
     const searchInput = chatEl.querySelector('.frp-chat-search-input');
+    const searchCount = chatEl.querySelector('.frp-chat-search-count');
     const searchClose = chatEl.querySelector('.frp-chat-search-close');
     const btnMediaGallery = chatEl.querySelector('.btn-media-gallery');
+    const btnPinChat = chatEl.querySelector('.btn-pin-chat');
+    const btnMuteChat = chatEl.querySelector('.btn-mute-chat');
     const mediaDrawer = chatEl.querySelector('.frp-chat-media-drawer');
     const mediaGrid = chatEl.querySelector('.frp-chat-media-grid');
     const btnMediaClose = chatEl.querySelector('.btn-media-close');
@@ -1582,6 +1855,68 @@
     const replyPreview = chatEl.querySelector('.frp-chat-reply-preview');
     const replyCancel = chatEl.querySelector('.frp-chat-reply-cancel');
 
+    function updatePinButton() {
+      if (!btnPinChat) return;
+      const pinned = isConversationPinned(chatType, chatId);
+      btnPinChat.classList.toggle('active', pinned);
+      btnPinChat.setAttribute('aria-pressed', String(pinned));
+      btnPinChat.title = pinned ? 'Sabitlemeyi kaldır' : 'Sohbeti sabitle';
+      btnPinChat.setAttribute('aria-label', btnPinChat.title);
+      const label = btnPinChat.querySelector('span');
+      if (label) label.textContent = pinned ? 'Sabitlemeyi kaldır' : 'Sohbeti sabitle';
+    }
+    btnPinChat?.addEventListener('click', event => {
+      event.stopPropagation();
+      const pinned = !isConversationPinned(chatType, chatId);
+      setConversationPinned(chatType, chatId, pinned);
+      updatePinButton(); renderCurrentConversationList();
+      window.toast?.(pinned ? 'Sohbet listenin üstüne sabitlendi.' : 'Sohbet sabitlemesi kaldırıldı.', 'info');
+    });
+    updatePinButton();
+
+    function updateMuteButton() {
+      if (!btnMuteChat) return;
+      const muted = isConversationMuted(chatType, chatId);
+      btnMuteChat.classList.toggle('active', muted);
+      btnMuteChat.setAttribute('aria-pressed', String(muted));
+      btnMuteChat.title = muted ? 'Bildirimlerin sesini aç' : 'Bildirimleri sessize al';
+      btnMuteChat.setAttribute('aria-label', btnMuteChat.title);
+      const label = btnMuteChat.querySelector('span');
+      if (label) label.textContent = muted ? 'Bildirimlerin sesini aç' : 'Bildirimleri sessize al';
+    }
+    btnMuteChat?.addEventListener('click', event => {
+      event.stopPropagation();
+      const muted = !isConversationMuted(chatType, chatId);
+      setConversationMuted(chatType, chatId, muted);
+      updateMuteButton(); renderCurrentConversationList();
+      window.toast?.(muted ? 'Bu sohbetin bildirimleri sessize alındı.' : 'Bu sohbetin bildirim sesi açıldı.', 'info');
+    });
+    updateMuteButton();
+
+    function closeActionMenu() {
+      if (!actionMenu || !btnMore) return;
+      actionMenu.hidden = true;
+      btnMore.setAttribute('aria-expanded', 'false');
+      btnMore.classList.remove('active');
+    }
+    btnMore?.addEventListener('click', event => {
+      event.stopPropagation();
+      const willOpen = actionMenu.hidden;
+      closeActionMenu();
+      if (willOpen) {
+        if (searchBar.style.display !== 'none') closeChatSearch();
+        if (emojiPicker) emojiPicker.style.display = 'none';
+        if (mediaDrawer) mediaDrawer.style.display = 'none';
+        groupInfoDrawer?.classList.remove('open');
+        actionMenu.hidden = false;
+        btnMore.setAttribute('aria-expanded', 'true');
+        btnMore.classList.add('active');
+      }
+    });
+    actionMenu?.addEventListener('click', event => {
+      if (event.target.closest('.frp-chat-menu-item')) setTimeout(closeActionMenu, 0);
+    });
+
     let isRecordingVoice = false;
     let mediaRecorder = null;
     let audioChunks = [];
@@ -1592,13 +1927,19 @@
     let isInitialStream = true;
     const draftKey = `frp_chat_draft_${myId}_${isGroup ? 'group' : (isRoom ? 'room' : 'user')}_${chatId}`;
     const retryKey = `${draftKey}_failed`;
-    let failedText = null;
+    let failedQueue = [];
+    let textSendPending = false;
     let autoRetryCandidate = false;
     let autoRetryInFlight = false;
-    let autoRetryAttempts = 0;
+    const autoRetryAttempts = new Set();
     let autoRetryTimer = null;
-    try { failedText = JSON.parse(localStorage.getItem(retryKey) || 'null'); } catch {}
-    let replyingTo = failedText?.replyTo || null;
+    try {
+      const savedFailures = JSON.parse(localStorage.getItem(retryKey) || '[]');
+      failedQueue = Array.isArray(savedFailures) ? savedFailures : (savedFailures?.id ? [savedFailures] : []);
+    } catch {}
+    let replyingTo = null;
+    let editingMessage = null;
+    let editDraftBackup = '';
 
     function replySummary(reply) {
       if (!reply) return '';
@@ -1606,13 +1947,28 @@
     }
     function renderReplyComposer() {
       if (!replyComposer) return;
-      replyComposer.hidden = !replyingTo;
+      replyComposer.hidden = !replyingTo && !editingMessage;
+      replyComposer.classList.toggle('editing', Boolean(editingMessage));
+      if (editingMessage) {
+        replyName.textContent = 'Mesajı düzenliyorsunuz';
+        replyPreview.textContent = String(editingMessage.text || '').slice(0, 180);
+        return;
+      }
       if (!replyingTo) return;
       replyName.textContent = `${replyingTo.senderName || 'Kullanıcı'} kişisine yanıt`;
       replyPreview.textContent = replySummary(replyingTo);
     }
     function clearReply() { replyingTo = null; renderReplyComposer(); }
-    replyCancel?.addEventListener('click', () => { clearReply(); input?.focus(); });
+    function cancelComposerContext() {
+      if (editingMessage && input) {
+        input.value = editDraftBackup;
+        editingMessage = null; editDraftBackup = '';
+        try { if (input.value) localStorage.setItem(draftKey, input.value); else localStorage.removeItem(draftKey); } catch {}
+        updateComposerState();
+      } else replyingTo = null;
+      renderReplyComposer(); input?.focus();
+    }
+    replyCancel?.addEventListener('click', cancelComposerContext);
     renderReplyComposer();
 
     function updateComposerState() {
@@ -1625,10 +1981,15 @@
         charCount.hidden = length < 800;
         charCount.classList.toggle('near-limit', length >= 900);
       }
+      if (btnSend) {
+        btnSend.disabled = textSendPending || !input.value.trim();
+        btnSend.title = editingMessage ? 'Değişiklikleri kaydet' : 'Gönder';
+        btnSend.setAttribute('aria-label', editingMessage ? 'Değişiklikleri kaydet' : 'Mesajı gönder');
+      }
     }
 
     if (input) {
-      try { input.value = localStorage.getItem(draftKey) || failedText?.text || ''; } catch {}
+      try { input.value = localStorage.getItem(draftKey) || ''; } catch {}
       updateComposerState();
     }
 
@@ -1865,6 +2226,7 @@
     let currentMessages = [];
     let readMarkPending = false;
     let pendingNewCount = 0;
+    let unreadBoundaryId = null;
 
     function updateJumpButton(reset = false) {
       if (reset) pendingNewCount = 0;
@@ -1948,15 +2310,24 @@
         if (!data.success || !Array.isArray(data.messages)) throw new Error('Mesajlar alınamadı.');
         liveRevision = data.revision || '';
         currentMessages = data.messages;
+        if (isInitialStream && !isRoom && !isGroup && !targetUser?.isSelfNote) {
+          const firstUnread = currentMessages.find(message =>
+            String(message.senderId) === String(chatId) && String(message.receiverId) === myId && !message.isRead);
+          unreadBoundaryId = firstUnread ? String(firstUnread.id) : null;
+        }
         const last = currentMessages[currentMessages.length - 1];
         if (last) {
           const time = new Date(last.createdAt).getTime();
+          if (!isRoom && !isGroup) cacheConversationMessage(chatId, last);
           if (time > (localLastInteractions[chatId] || 0)) {
             localLastInteractions[chatId] = time;
             if (currentTab === 'users') renderUsers();
           }
+        } else if (!isRoom && !isGroup && unreadData.lastMessage) {
+          delete unreadData.lastMessage[String(chatId)];
+          if (currentTab === 'users') renderUsers();
         }
-        renderMessageStream(currentMessages); markVisibleMessagesRead();
+        renderMessageStream(currentMessages); renderFailedQueue(); markVisibleMessagesRead();
         const typers = Array.isArray(data.typingUsers) ? data.typingUsers : [];
         typingIndicator.style.display = typers.length ? 'flex' : 'none';
         typingIndicator.querySelector('.typing-text').textContent = typers.length ? `${typers.join(', ')} yazıyor…` : '';
@@ -1965,6 +2336,8 @@
       } catch (error) {
         if (serial !== requestSerial || !canListen()) return;
         setConnection(navigator.onLine === false ? 'Çevrimdışı · Mesajınız taslakta korunur' : 'Yeniden bağlanıyor…', 'reconnecting');
+        const loading = msgStream.querySelector('.frp-chat-loading');
+        if (loading && isInitialStream) loading.innerHTML = '<strong>Mesajlar henüz yüklenemedi</strong><small>Bağlantı yeniden kuruluyor…</small>';
         nextDelay = reconnectDelay; reconnectDelay = Math.min(15000, reconnectDelay * 2);
       } finally {
         clearTimeout(timeout);
@@ -1975,21 +2348,82 @@
       if (canListen()) loadMessages();
       else { ++requestSerial; liveController?.abort(); clearTimeout(pollTimer); stopTyping(); }
     }
-    async function retryRecentFailedMessage() {
-      if (!autoRetryCandidate || autoRetryInFlight || autoRetryAttempts >= 1 || !failedText || navigator.onLine === false || closed) return;
-      if (!failedText.failedAt || Date.now() - failedText.failedAt > 10 * 60 * 1000) { autoRetryCandidate = false; return; }
-      autoRetryCandidate = false; autoRetryInFlight = true; autoRetryAttempts++;
-      msgStream.querySelector(`[data-msg-id="temp_${failedText.id}"]`)?.remove();
-      const retry = { ...failedText };
+    function persistFailedQueue() {
       try {
-        const sent = await sendMessage({ text: retry.text, replyTo: retry.replyTo || null }, retry.id);
-        if (sent) window.toast?.('Bağlantı geri geldi; mesajınız gönderildi.', 'success');
+        if (failedQueue.length) localStorage.setItem(retryKey, JSON.stringify(failedQueue.slice(-20)));
+        else localStorage.removeItem(retryKey);
+      } catch {}
+    }
+    function upsertFailedMessage(item) {
+      const index = failedQueue.findIndex(entry => entry.id === item.id);
+      if (index >= 0) failedQueue[index] = item;
+      else failedQueue.push(item);
+      persistFailedQueue();
+    }
+    function removeFailedMessage(id) {
+      failedQueue = failedQueue.filter(item => item.id !== id);
+      persistFailedQueue();
+      msgStream.querySelector(`[data-msg-id="temp_${id}"]`)?.remove();
+    }
+    function renderFailedQueue() {
+      if (!failedQueue.length) return;
+      msgStream.querySelector('.frp-chat-empty')?.remove();
+      failedQueue.forEach(item => {
+        if (msgStream.querySelector(`[data-msg-id="temp_${item.id}"]`)) return;
+        const currentAuth = window.FrpAuth?.getUser?.();
+        const failedDiv = createMessageDiv({
+          id: `temp_${item.id}`,
+          senderId: currentAuth?.id,
+          senderName: currentAuth?.full_name || currentAuth?.username || 'Siz',
+          text: item.text,
+          replyTo: item.replyTo || null,
+          reactions: {}, isRead: false, isOptimistic: true,
+          createdAt: item.createdAt || new Date(item.failedAt || Date.now()).toISOString()
+        }, true, myId);
+        failedDiv.classList.add('send-failed');
+        const tick = failedDiv.querySelector('.frp-chat-tick');
+        if (tick) { tick.textContent = '!'; tick.title = 'Gönderilemedi'; }
+        const errorLabel = document.createElement('div');
+        errorLabel.className = 'frp-chat-send-error';
+        errorLabel.innerHTML = '<span>Gönderilemedi</span>';
+        const retryButton = document.createElement('button');
+        retryButton.type = 'button'; retryButton.textContent = 'Tekrar dene';
+        retryButton.addEventListener('click', async () => {
+          retryButton.disabled = true;
+          failedDiv.remove();
+          await sendMessage({ text: item.text, replyTo: item.replyTo || null }, item.id);
+        });
+        const dismissButton = document.createElement('button');
+        dismissButton.type = 'button'; dismissButton.textContent = 'Kaldır';
+        dismissButton.addEventListener('click', () => {
+          removeFailedMessage(item.id);
+          if (!currentMessages.length && !failedQueue.length) renderMessageStream(currentMessages);
+        });
+        errorLabel.append(retryButton, dismissButton);
+        failedDiv.appendChild(errorLabel);
+        msgStream.appendChild(failedDiv);
+      });
+    }
+    async function retryRecentFailedMessages() {
+      if (!autoRetryCandidate || autoRetryInFlight || navigator.onLine === false || closed) return;
+      const retries = failedQueue.filter(item => item.failedAt && Date.now() - item.failedAt <= 10 * 60 * 1000 && !autoRetryAttempts.has(item.id));
+      if (!retries.length) { autoRetryCandidate = false; return; }
+      autoRetryCandidate = false; autoRetryInFlight = true;
+      try {
+        let sentCount = 0;
+        for (const item of retries) {
+          if (closed || navigator.onLine === false) break;
+          autoRetryAttempts.add(item.id);
+          msgStream.querySelector(`[data-msg-id="temp_${item.id}"]`)?.remove();
+          if (await sendMessage({ text: item.text, replyTo: item.replyTo || null }, item.id)) sentCount++;
+        }
+        if (sentCount) window.toast?.(`${sentCount} bekleyen mesaj gönderildi.`, 'success');
       } finally { autoRetryInFlight = false; }
     }
     function onNetworkOnline() {
       setConnection('Yeniden bağlanıyor…', 'reconnecting');
       resumeLive();
-      setTimeout(retryRecentFailedMessage, 250);
+      setTimeout(retryRecentFailedMessages, 250);
     }
     function onNetworkOffline() {
       setConnection('Çevrimdışı · Mesajınız taslakta korunur', 'reconnecting');
@@ -2010,6 +2444,9 @@
       chatEl.style.setProperty('--frp-chat-viewport-left', `${left}px`);
       chatEl.style.setProperty('--frp-chat-viewport-width', `${width}px`);
       chatEl.style.setProperty('--frp-chat-viewport-height', `${height}px`);
+      if (document.activeElement === input) {
+        requestAnimationFrame(() => { msgStream.scrollTop = msgStream.scrollHeight; });
+      }
     }
     function closeChat() {
       closed = true; ++requestSerial;
@@ -2018,6 +2455,7 @@
       window.removeEventListener('online', onNetworkOnline);
       window.removeEventListener('offline', onNetworkOffline);
       window.removeEventListener('focus', onChatFocus);
+      document.removeEventListener('pointerdown', onDocumentPointerDown);
       window.visualViewport?.removeEventListener('resize', syncMobileViewport);
       window.visualViewport?.removeEventListener('scroll', syncMobileViewport);
       if (recordingTimer) clearInterval(recordingTimer);
@@ -2027,15 +2465,27 @@
       chatEl.querySelectorAll('audio').forEach(audio => { audio.pause(); audio.removeAttribute('src'); audio.load(); });
       chatEl.remove(); activeChatWindows.delete(chatKey);
       syncOpenConversationRows();
+      renderCurrentConversationList();
       if (!activeChatWindows.size) document.body.classList.remove('frp-mobile-chat-open');
       realignChatWindows();
       if (previousFocus?.isConnected && typeof previousFocus.focus === 'function') previousFocus.focus();
     }
     function onChatFocus() { markVisibleMessagesRead(); }
+    function onDocumentPointerDown(event) {
+      if (actionMenu && !actionMenu.hidden && !event.target.closest('.frp-chat-action-menu, .btn-more')) closeActionMenu();
+      if (!chatEl.contains(event.target)) return;
+      if (!event.target.closest('.frp-chat-msg')) {
+        msgStream.querySelectorAll('.frp-chat-msg.actions-open').forEach(node => node.classList.remove('actions-open'));
+      }
+      if (emojiPicker && emojiPicker.style.display !== 'none' && !event.target.closest('.frp-chat-emoji-picker, .btn-emoji-toggle')) {
+        emojiPicker.style.display = 'none';
+      }
+    }
     document.addEventListener('visibilitychange', resumeLive);
     window.addEventListener('online', onNetworkOnline);
     window.addEventListener('offline', onNetworkOffline);
     window.addEventListener('focus', onChatFocus);
+    document.addEventListener('pointerdown', onDocumentPointerDown);
     window.visualViewport?.addEventListener('resize', syncMobileViewport);
     window.visualViewport?.addEventListener('scroll', syncMobileViewport);
     syncMobileViewport();
@@ -2065,11 +2515,19 @@
     activeChatWindows.set(chatKey, { el: chatEl, close: closeChat, resume: resumeLive, updatePeer, syncViewport: syncMobileViewport });
     syncOpenConversationRows();
     chatEl.addEventListener('keydown', event => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
+        event.preventDefault();
+        closeActionMenu();
+        searchBar.style.display = 'flex';
+        searchInput.focus(); searchInput.select();
+        return;
+      }
       if (event.key !== 'Escape') return;
+      if (actionMenu && !actionMenu.hidden) { closeActionMenu(); event.stopPropagation(); return; }
       if (emojiPicker && emojiPicker.style.display !== 'none') { emojiPicker.style.display = 'none'; event.stopPropagation(); return; }
       if (mediaDrawer && mediaDrawer.style.display !== 'none') { mediaDrawer.style.display = 'none'; event.stopPropagation(); return; }
       if (groupInfoDrawer?.classList.contains('open')) { groupInfoDrawer.classList.remove('open'); event.stopPropagation(); return; }
-      if (searchBar && searchBar.style.display !== 'none') { searchBar.style.display = 'none'; event.stopPropagation(); return; }
+      if (searchBar && searchBar.style.display !== 'none') { closeChatSearch(); event.stopPropagation(); return; }
       event.stopPropagation(); closeChat();
     });
     // Start after the composer and typing state have been initialized.
@@ -2080,6 +2538,7 @@
     btnMinimize.addEventListener('click', (e) => {
       e.stopPropagation();
       if (isMobileChatLayout()) return;
+      closeActionMenu();
       chatEl.classList.toggle('minimized');
       realignChatWindows();
       resumeLive();
@@ -2088,6 +2547,7 @@
     btnMaximize.addEventListener('click', (e) => {
       e.stopPropagation();
       if (isMobileChatLayout()) return;
+      closeActionMenu();
       chatEl.classList.remove('minimized');
       chatEl.classList.toggle('maximized');
       realignChatWindows();
@@ -2108,7 +2568,15 @@
             const data = await res.json().catch(() => ({}));
             if (res.ok && data.success) {
               if (typeof window.toast === 'function') window.toast('Sohbet geçmişi temizlendi.', 'success');
+              if (!isRoom && !isGroup) {
+                if (unreadData.lastMessage) delete unreadData.lastMessage[String(chatId)];
+                if (unreadData.lastInteraction) delete unreadData.lastInteraction[String(chatId)];
+                delete localLastInteractions[String(chatId)];
+                if (currentTab === 'users') renderUsers();
+              }
               msgStream.innerHTML = '';
+              if (editingMessage) cancelComposerContext();
+              else clearReply();
               loadMessages();
             } else {
               if (typeof window.toast === 'function') window.toast(data.reason || 'Sohbet temizlenemedi.', 'error');
@@ -2167,11 +2635,16 @@
 
             if (m.attachment?.dataUrl) {
               const isImg = (m.attachment.type || '').startsWith('image/');
+              const safeMediaUrl = isSafeChatMediaUrl(m.attachment.dataUrl, isImg ? 'image' : 'file') ? m.attachment.dataUrl : '';
+              if (!safeMediaUrl) {
+                item.innerHTML = '<div style="font-size:0.7rem;color:var(--text-muted);padding:0.5rem;">Geçersiz ek</div>';
+                mediaGrid.appendChild(item);
+                return;
+              }
               if (isImg) {
-                const safeImgUrl = (m.attachment.dataUrl && (m.attachment.dataUrl.startsWith('data:image/') || /^https?:\/\//i.test(m.attachment.dataUrl))) ? escHtml(m.attachment.dataUrl) : '';
-                item.innerHTML = `<img src="${safeImgUrl}" alt="${escHtml(m.attachment.name)}" />`;
+                item.innerHTML = `<img src="${escHtml(safeMediaUrl)}" alt="${escHtml(m.attachment.name)}" />`;
                 item.addEventListener('click', () => {
-                  openImageLightbox({ src: m.attachment.dataUrl, name: m.attachment.name });
+                  openImageLightbox({ src: safeMediaUrl, name: m.attachment.name });
                 });
               } else {
                 item.innerHTML = `
@@ -2180,7 +2653,7 @@
                 `;
                 item.addEventListener('click', () => {
                   const a = document.createElement('a');
-                  a.href = m.attachment.dataUrl;
+                  a.href = safeMediaUrl;
                   a.download = m.attachment.name || 'belge.pdf';
                   a.click();
                 });
@@ -2191,6 +2664,7 @@
                 <div style="font-size: 0.65rem; margin-top: 3px;">Ses (${m.voice.duration || 0}sn)</div>
               `;
               item.addEventListener('click', () => {
+                if (!isSafeChatMediaUrl(m.voice.dataUrl, 'audio')) return;
                 const aud = new Audio(m.voice.dataUrl);
                 aud.play().catch(() => {});
               });
@@ -2206,6 +2680,7 @@
 
     btnMediaGallery.addEventListener('click', (e) => {
       e.stopPropagation();
+      closeActionMenu();
       const isOpen = mediaDrawer.style.display === 'flex';
       mediaDrawer.style.display = isOpen ? 'none' : 'flex';
       if (!isOpen) loadSharedMediaGallery();
@@ -2216,19 +2691,21 @@
     });
 
     // Sohbet İçi Arama
-    btnSearch.addEventListener('click', (e) => {
-      e.stopPropagation();
-      searchBar.style.display = searchBar.style.display === 'none' ? 'flex' : 'none';
-      if (searchBar.style.display === 'flex') {
-        searchInput.focus();
-      }
-    });
-
-    searchClose.addEventListener('click', () => {
+    function closeChatSearch() {
       searchBar.style.display = 'none';
       searchInput.value = '';
       filterStreamMessages('');
+    }
+
+    btnSearch.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeActionMenu();
+      if (searchBar.style.display !== 'none') { closeChatSearch(); return; }
+      searchBar.style.display = 'flex';
+      searchInput.focus();
     });
+
+    searchClose.addEventListener('click', closeChatSearch);
 
     searchInput.addEventListener('input', () => {
       filterStreamMessages(searchInput.value);
@@ -2237,14 +2714,23 @@
     function filterStreamMessages(q) {
       const term = (q || '').toLowerCase().trim();
       const bubbles = msgStream.querySelectorAll('.frp-chat-msg');
+      let matches = 0;
       bubbles.forEach(b => {
         if (!term) {
           b.style.display = 'flex';
+          matches++;
           return;
         }
         const text = b.textContent.toLowerCase();
-        b.style.display = text.includes(term) ? 'flex' : 'none';
+        const matched = text.includes(term);
+        b.style.display = matched ? 'flex' : 'none';
+        if (matched) matches++;
       });
+      msgStream.querySelectorAll('.frp-chat-day-label').forEach(label => { label.style.display = term ? 'none' : ''; });
+      const emptyState = msgStream.querySelector('.frp-chat-empty');
+      if (emptyState) emptyState.hidden = Boolean(term);
+      if (searchCount) searchCount.textContent = term ? `${matches} sonuç` : '';
+      chatEl.classList.toggle('search-empty', Boolean(term) && matches === 0);
     }
 
     // Emoji Paneli
@@ -2286,30 +2772,53 @@
       });
     });
 
-    // Dosya Ekleme
+    function sendAttachmentFile(file) {
+      if (!file) return;
+      const isSupported = file.type.startsWith('image/') || file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
+      if (!isSupported) { window.toast?.('Yalnızca görsel veya PDF dosyası paylaşabilirsiniz.', 'warning'); return; }
+      if (file.size > 4 * 1024 * 1024) { window.toast?.('Sohbet dosyası en fazla 4 MB olabilir.', 'warning'); return; }
+      const reader = new FileReader();
+      reader.onerror = () => window.toast?.('Dosya okunamadı.', 'error');
+      reader.onload = () => {
+        const replyTo = replyingTo; clearReply();
+        let dataUrl = String(reader.result || '');
+        if (/\.pdf$/i.test(file.name || '') && !dataUrl.startsWith('data:application/pdf;')) {
+          dataUrl = dataUrl.replace(/^data:[^;]+;/i, 'data:application/pdf;');
+        }
+        sendMessage({
+          text: `[Ek: ${file.name}]`,
+          attachment: { name: file.name, size: file.size, type: file.type || (/\.pdf$/i.test(file.name || '') ? 'application/pdf' : ''), dataUrl },
+          replyTo
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Dosya Ekleme, sürükle-bırak ve panodan görsel yapıştırma
     if (btnAttach && fileInput) {
       btnAttach.addEventListener('click', () => fileInput.click());
       fileInput.addEventListener('change', () => {
         const file = fileInput.files[0];
-        if (!file) return;
-        if (file.size > 4 * 1024 * 1024) { window.toast?.('Sohbet dosyası en fazla 4 MB olabilir.', 'warning'); return; }
-        const reader = new FileReader();
-        reader.onload = () => {
-          const replyTo = replyingTo; clearReply();
-          sendMessage({
-            text: `[Ek: ${file.name}]`,
-            attachment: {
-              name: file.name,
-              size: file.size,
-              type: file.type,
-              dataUrl: reader.result
-            }, replyTo
-          });
-        };
-        reader.readAsDataURL(file);
+        sendAttachmentFile(file);
         fileInput.value = '';
       });
     }
+    let dragDepth = 0;
+    chatEl.addEventListener('dragenter', event => {
+      if (!event.dataTransfer?.types?.includes('Files')) return;
+      event.preventDefault(); dragDepth++; chatEl.classList.add('drag-active');
+    });
+    chatEl.addEventListener('dragover', event => {
+      if (event.dataTransfer?.types?.includes('Files')) event.preventDefault();
+    });
+    chatEl.addEventListener('dragleave', () => {
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (!dragDepth) chatEl.classList.remove('drag-active');
+    });
+    chatEl.addEventListener('drop', event => {
+      event.preventDefault(); dragDepth = 0; chatEl.classList.remove('drag-active');
+      sendAttachmentFile(event.dataTransfer?.files?.[0]);
+    });
 
     // Doğrudan Ses Dosyası Yükleme (.mp3, .wav, .m4a vb.)
     if (btnAudioFallback && audioFallbackInput) {
@@ -2321,10 +2830,15 @@
         const reader = new FileReader();
         reader.onload = () => {
           const replyTo = replyingTo; clearReply();
+          let dataUrl = String(reader.result || '');
+          if (!dataUrl.startsWith('data:audio/')) {
+            const fallbackMime = /\.m4a$/i.test(file.name || '') ? 'audio/mp4' : (/\.wav$/i.test(file.name || '') ? 'audio/wav' : 'audio/mpeg');
+            dataUrl = dataUrl.replace(/^data:[^;]+;/i, `data:${fallbackMime};`);
+          }
           sendMessage({
             text: `🎙️ Ses Kaydı (${file.name})`,
             voice: {
-              dataUrl: reader.result,
+              dataUrl,
               duration: 10
             }, replyTo
           });
@@ -2417,9 +2931,6 @@
       const currentAuth = window.FrpAuth && window.FrpAuth.getUser ? window.FrpAuth.getUser() : null;
       if (!currentAuth || String(currentAuth.id) !== myId || closed) return false;
 
-      if (failedText?.id === clientMessageId && input.value === payload.text) {
-        input.value = ''; updateComposerState(); try { localStorage.removeItem(draftKey); } catch {}
-      }
       const bodyData = {
         clientMessageId,
         receiverId: (!isRoom && !isGroup) ? chatId : null,
@@ -2432,7 +2943,7 @@
       };
 
       localLastInteractions[chatId] = Date.now();
-      if (currentTab === 'users') renderUsers();
+      renderCurrentConversationList();
 
       // İyimser UI
       const tempId = 'temp_' + clientMessageId;
@@ -2478,23 +2989,30 @@
         if (closed || String(window.FrpAuth?.getUser()?.id || '') !== myId) return false;
         ++requestSerial; liveController?.abort(); clearTimeout(pollTimer);
         optimisticDiv.remove();
-        if (failedText?.id === clientMessageId) { failedText = null; try { localStorage.removeItem(retryKey); } catch {} }
-        autoRetryAttempts = 0;
+        removeFailedMessage(clientMessageId);
+        autoRetryAttempts.delete(clientMessageId);
         localLastInteractions[chatId] = Date.now();
+        if (!isRoom && !isGroup) cacheConversationMessage(chatId, data.message);
         currentMessages = currentMessages.filter(m => String(m.id) !== String(data.message.id));
         currentMessages.push(data.message);
         renderMessageStream(currentMessages);
         loadMessages();
-        if (currentTab === 'users') renderUsers();
+        renderCurrentConversationList();
         return true;
       } catch (err) {
         console.warn('Mesaj gönderilemedi:', err);
         if (payload.text && !payload.attachment && !payload.voice) {
-          failedText = { id: clientMessageId, text: payload.text, replyTo: payload.replyTo || null, failedAt: Date.now() };
+          const failedMessage = {
+            id: clientMessageId,
+            text: payload.text,
+            replyTo: payload.replyTo || null,
+            failedAt: Date.now(),
+            createdAt: optimisticMsg.createdAt
+          };
+          upsertFailedMessage(failedMessage);
           autoRetryCandidate = navigator.onLine === false || err.name === 'AbortError' || err.retryable === true;
-          try { localStorage.setItem(retryKey, JSON.stringify(failedText)); } catch {}
-          if (autoRetryCandidate && navigator.onLine !== false && autoRetryAttempts === 0) {
-            clearTimeout(autoRetryTimer); autoRetryTimer = setTimeout(retryRecentFailedMessage, 3000);
+          if (autoRetryCandidate && navigator.onLine !== false && !autoRetryAttempts.has(clientMessageId)) {
+            clearTimeout(autoRetryTimer); autoRetryTimer = setTimeout(retryRecentFailedMessages, 3000);
           }
           if (payload.replyTo && !replyingTo && !(input?.value || '').trim()) { replyingTo = payload.replyTo; renderReplyComposer(); }
         }
@@ -2502,11 +3020,17 @@
         optimisticDiv.classList.add('send-failed');
         const errorLabel = document.createElement('div');
         errorLabel.className = 'frp-chat-send-error';
-        errorLabel.textContent = 'Gönderilemedi · ';
+        errorLabel.innerHTML = '<span>Gönderilemedi</span>';
         const retry = document.createElement('button');
         retry.type = 'button'; retry.textContent = 'Tekrar dene';
         retry.addEventListener('click', () => { optimisticDiv.remove(); sendMessage(payload, clientMessageId); }, { once: true });
         errorLabel.appendChild(retry);
+        if (payload.text && !payload.attachment && !payload.voice) {
+          const dismiss = document.createElement('button');
+          dismiss.type = 'button'; dismiss.textContent = 'Kaldır';
+          dismiss.addEventListener('click', () => removeFailedMessage(clientMessageId));
+          errorLabel.appendChild(dismiss);
+        }
         const tick = optimisticDiv.querySelector('.frp-chat-tick');
         if (tick) { tick.textContent = '!'; tick.title = 'Gönderilemedi'; }
         optimisticDiv.appendChild(errorLabel);
@@ -2535,11 +3059,42 @@
       } catch {}
     }
 
-    let textSendPending = false;
+    async function saveEditedMessage(text) {
+      if (!editingMessage || textSendPending) return false;
+      textSendPending = true; updateComposerState();
+      try {
+        const response = await fetch(`/api/chat/messages/${encodeURIComponent(editingMessage.id)}`, {
+          method: 'PATCH',
+          headers: window.FrpAuth.getAuthHeaders ? window.FrpAuth.getAuthHeaders() : { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success || !data.message) throw new Error(data.reason || 'Mesaj düzenlenemedi.');
+        const index = currentMessages.findIndex(item => String(item.id) === String(data.message.id));
+        if (index >= 0) currentMessages[index] = data.message;
+        msgStream.querySelector(`[data-msg-id="${data.message.id}"]`)?.remove();
+        if (!isRoom && !isGroup && index === currentMessages.length - 1) cacheConversationMessage(chatId, data.message);
+        editingMessage = null;
+        input.value = editDraftBackup;
+        editDraftBackup = '';
+        try { if (input.value) localStorage.setItem(draftKey, input.value); else localStorage.removeItem(draftKey); } catch {}
+        renderReplyComposer(); renderMessageStream(currentMessages);
+        renderCurrentConversationList();
+        window.toast?.('Mesaj güncellendi.', 'success');
+        return true;
+      } catch (error) {
+        window.toast?.(error.message || 'Mesaj düzenlenemedi.', 'error');
+        return false;
+      } finally {
+        textSendPending = false; updateComposerState(); input?.focus();
+      }
+    }
+
     async function handleSend() {
       if (!input || textSendPending) return;
       const text = (input.value || '').trim();
       if (!text) return;
+      if (editingMessage) { await saveEditedMessage(text); return; }
       textSendPending = true;
       const replyTo = replyingTo;
       clearReply();
@@ -2548,13 +3103,11 @@
       if (emojiPicker) emojiPicker.style.display = 'none';
       if (btnSend) btnSend.disabled = true;
       try {
-        const retryId = failedText?.text === text ? failedText.id : crypto.randomUUID();
-        msgStream.querySelectorAll('.send-failed').forEach(node => { if (node.dataset.msgId === 'temp_' + retryId) node.remove(); });
-        const sent = await sendMessage({ text, replyTo }, retryId);
+        const sent = await sendMessage({ text, replyTo }, crypto.randomUUID());
         if (sent && areChatNotificationsEnabled()) playMessageSentSound();
         // A failed bubble retains the text and its retry identity. Never overwrite
         // a new draft typed while the previous message was being submitted.
-      } finally { textSendPending = false; if (btnSend) btnSend.disabled = false; }
+      } finally { textSendPending = false; updateComposerState(); }
     }
     if (btnSend) btnSend.addEventListener('click', handleSend);
     let lastTypingSent = 0, typingStopTimer = null, typingActive = false;
@@ -2572,6 +3125,15 @@
       typingActive = false; lastTypingSent = 0;
     }
     if (input) {
+      input.addEventListener('focus', () => {
+        syncMobileViewport();
+        requestAnimationFrame(() => { msgStream.scrollTop = msgStream.scrollHeight; });
+      });
+      input.addEventListener('paste', event => {
+        const file = Array.from(event.clipboardData?.files || []).find(item => item.type.startsWith('image/'));
+        if (!file) return;
+        event.preventDefault(); sendAttachmentFile(file);
+      });
       input.addEventListener('input', () => {
         updateComposerState();
         try { if (input.value) localStorage.setItem(draftKey, input.value); else localStorage.removeItem(draftKey); } catch {}
@@ -2594,7 +3156,8 @@
       const timeSpan = audioPlayer.querySelector('.frp-audio-time');
       const track = audioPlayer.querySelector('.frp-audio-track');
       const fallbackDuration = (m.voice && m.voice.duration > 0) ? m.voice.duration : 10;
-      const audioSource = (m.voice && m.voice.dataUrl) || (m.attachment && m.attachment.dataUrl) || '';
+      const candidateSource = (m.voice && m.voice.dataUrl) || (m.attachment && m.attachment.dataUrl) || '';
+      const audioSource = isSafeChatMediaUrl(candidateSource, 'audio') ? candidateSource : '';
       if (!audioSource) {
         btnPlay.disabled = true;
         btnPlay.title = 'Ses kaynağı bulunamadı';
@@ -2738,6 +3301,7 @@
       msgDiv.dataset.msgId = m.id;
       msgDiv.dataset.createdAt = m.createdAt || new Date().toISOString();
       msgDiv.dataset.senderId = String(m.senderId || '');
+      msgDiv.dataset.editedAt = String(m.editedAt || '');
       msgDiv.tabIndex = 0;
       msgDiv.setAttribute('aria-label', `${isSelf ? 'Sizin' : (m.senderName || 'Gelen')} mesajınız: ${String(m.text || 'medya').slice(0, 120)}`);
 
@@ -2758,18 +3322,20 @@
       const time = new Date(m.createdAt || Date.now());
       const timeStr = `${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`;
 
-      let contentHtml = escHtml(m.text || '');
+      let contentHtml = formatChatText(m.text || '');
 
       const isAudioAttachment = m.attachment && m.attachment.dataUrl && (
         (m.attachment.type || '').startsWith('audio/') ||
         /\.(mp3|wav|m4a|ogg|aac|flac|opus|webm)$/i.test(m.attachment.name || '')
       );
+      const attachmentKind = (m.attachment?.type || '').startsWith('image/') ? 'image' : 'file';
+      const safeAttachmentUrl = isSafeChatMediaUrl(m.attachment?.dataUrl, attachmentKind) ? m.attachment.dataUrl : '';
 
-      if (m.attachment && m.attachment.dataUrl && !isAudioAttachment) {
+      if (m.attachment && safeAttachmentUrl && !isAudioAttachment) {
         if ((m.attachment.type || '').startsWith('image/')) {
           contentHtml += `
             <div class="frp-chat-img-thumb-wrap" title="Büyütmek için tıklayın">
-              <img src="${m.attachment.dataUrl}" alt="${escHtml(m.attachment.name || 'Görsel')}" />
+              <img src="${escHtml(safeAttachmentUrl)}" alt="${escHtml(m.attachment.name || 'Görsel')}" />
               <div class="frp-chat-img-overlay">
                 <button type="button" class="frp-chat-img-action-btn btn-open-img-lightbox" title="Büyüt ve Önizle">🔍 Önizle</button>
                 <button type="button" class="frp-chat-img-action-btn btn-download-img" title="Görseli İndir">⬇️ İndir</button>
@@ -2778,7 +3344,7 @@
           `;
         } else {
           contentHtml += `
-            <a href="${m.attachment.dataUrl}" download="${escHtml(m.attachment.name || 'dosya')}" target="_blank" style="text-decoration:none;color:inherit;display:block;">
+            <a href="${escHtml(safeAttachmentUrl)}" download="${escHtml(m.attachment.name || 'dosya')}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;display:block;">
               <div style="margin-top: 6px; padding: 6px 10px; background: rgba(0,0,0,0.08); border-radius: 8px; font-size: 0.74rem; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: background 0.15s;">
                 <span>📄</span> <span style="text-decoration:underline;">${escHtml(m.attachment.name || 'Belge')}</span> <span>⬇️</span>
               </div>
@@ -2834,9 +3400,12 @@
 
       const currentAuthUser = window.FrpAuth && window.FrpAuth.getUser ? window.FrpAuth.getUser() : null;
       const canDelete = isSelf || (currentAuthUser && currentAuthUser.role === 'admin');
+      const canEdit = isSelf && Boolean(m.text) && !m.isNudge;
       const hoverReactionHtml = `
         <div class="frp-chat-hover-bar" role="toolbar" aria-label="Mesaj işlemleri">
           <button type="button" class="frp-chat-action-btn btn-reply-msg" aria-label="Mesajı yanıtla" title="Yanıtla">${chatIcon('reply')}</button>
+          ${m.text ? `<button type="button" class="frp-chat-action-btn btn-copy-msg" aria-label="Mesaj metnini kopyala" title="Kopyala">${chatIcon('copy')}</button>` : ''}
+          ${canEdit ? `<button type="button" class="frp-chat-action-btn btn-edit-msg" aria-label="Mesajı düzenle" title="Düzenle">${chatIcon('edit')}</button>` : ''}
           <span class="frp-chat-action-divider" aria-hidden="true"></span>
           <div class="frp-chat-quick-reactions" aria-label="Hızlı tepkiler">
             <button type="button" class="btn-react" data-emoji="👍" aria-label="Beğen">👍</button>
@@ -2862,6 +3431,7 @@
         ${reactionsHtml}
         <div class="frp-chat-msg-time">
           <span>${timeStr}</span>
+          ${m.editedAt ? '<span class="frp-chat-edited" title="Mesaj düzenlendi">düzenlendi</span>' : ''}
           ${isSelf ? `<span class="frp-chat-tick ${m.isRead ? 'read' : ''}" title="${m.isRead ? 'Okundu' : 'Sunucuya ulaştı'}">${m.isRead ? '✓✓' : '✓'}</span>` : ''}
         </div>
       `;
@@ -2897,6 +3467,24 @@
       }
 
       // Event binding
+      msgDiv.querySelector('.btn-edit-msg')?.addEventListener('click', event => {
+        event.stopPropagation(); msgDiv.classList.remove('actions-open');
+        if (editingMessage && String(editingMessage.id) === String(m.id)) { input?.focus(); return; }
+        if (!editingMessage) editDraftBackup = input?.value || '';
+        editingMessage = { id: String(m.id), text: String(m.text || '') };
+        replyingTo = null;
+        if (input) { input.value = editingMessage.text; updateComposerState(); input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+        renderReplyComposer();
+      });
+      msgDiv.querySelector('.btn-copy-msg')?.addEventListener('click', async event => {
+        event.stopPropagation(); msgDiv.classList.remove('actions-open');
+        try {
+          await navigator.clipboard.writeText(String(m.text || ''));
+          window.toast?.('Mesaj kopyalandı.', 'success');
+        } catch {
+          window.toast?.('Mesaj kopyalanamadı.', 'error');
+        }
+      });
       msgDiv.querySelector('.btn-reply-msg')?.addEventListener('click', event => {
         event.stopPropagation();
         msgDiv.classList.remove('actions-open');
@@ -2990,6 +3578,7 @@
               const data = await response.json().catch(() => ({}));
               if (!response.ok || !data.success) throw new Error(data.reason || 'Mesaj silinemedi.');
               currentMessages = currentMessages.filter(message => String(message.id) !== String(m.id));
+              if (editingMessage && String(editingMessage.id) === String(m.id)) cancelComposerContext();
               msgDiv.remove();
               window.toast?.('Mesaj silindi.', 'success');
             } catch (error) {
@@ -3050,6 +3639,11 @@
         let existingDiv = Array.from(msgStream.querySelectorAll('.frp-chat-msg')).find(node => node.dataset.msgId === String(m.id));
 
         if (existingDiv) {
+          if (existingDiv.dataset.editedAt !== String(m.editedAt || '')) {
+            const updatedDiv = createMessageDiv(m, isSelf, myId);
+            existingDiv.replaceWith(updatedDiv);
+            existingDiv = updatedDiv;
+          }
           // Mevcut öğeyi yerinde güncelle (isRead ve reaksiyonlar)
           const tickEl = existingDiv.querySelector('.frp-chat-tick');
           if (tickEl && isSelf) {
@@ -3089,7 +3683,7 @@
       });
 
       // Keep acknowledged messages chronological without recreating media players.
-      msgStream.querySelectorAll('.frp-chat-day-label, .frp-chat-empty').forEach(node => node.remove());
+      msgStream.querySelectorAll('.frp-chat-day-label, .frp-chat-unread-label, .frp-chat-empty, .frp-chat-loading').forEach(node => node.remove());
       const nodes = Array.from(msgStream.querySelectorAll('.frp-chat-msg')).sort((a, b) =>
         new Date(a.dataset.createdAt) - new Date(b.dataset.createdAt));
       let previous = null;
@@ -3109,6 +3703,12 @@
           label.textContent = date.toDateString() === new Date().toDateString() ? 'Bugün' : day;
           node.before(label); lastDay = day;
         }
+        if (unreadBoundaryId && node.dataset.msgId === unreadBoundaryId) {
+          const unreadLabel = document.createElement('div');
+          unreadLabel.className = 'frp-chat-unread-label';
+          unreadLabel.textContent = 'Okunmamış mesajlar';
+          node.before(unreadLabel);
+        }
         if (previousMessage) {
           const previousDate = new Date(previousMessage.dataset.createdAt);
           const elapsed = date.getTime() - previousDate.getTime();
@@ -3123,7 +3723,8 @@
       });
       if (!nodes.length) {
         const empty = document.createElement('div'); empty.className = 'frp-chat-empty';
-        empty.textContent = 'Henüz mesaj yok. İlk mesajı siz yazın.'; msgStream.appendChild(empty);
+        empty.innerHTML = '<span class="frp-chat-empty-icon">💬</span><strong>Yeni bir konuşma</strong><small>İlk mesajı yazarak sohbeti başlatın.</small>';
+        msgStream.appendChild(empty);
       }
       if (hasNewMessage && !isInitialStream && !isNearBottom && newIncomingCount) {
         pendingNewCount += newIncomingCount;
@@ -3169,7 +3770,8 @@
 
     window.addEventListener('frp:session-changed', () => {
       activeChatWindows.forEach(chat => chat.close());
-      cachedUsers = []; unreadData = { bySender: {}, total: 0, lastInteraction: {} };
+      cachedUsers = []; unreadData = { bySender: {}, total: 0, lastInteraction: {}, lastMessage: {} };
+      lastTotalUnread = 0; updateDockBadges();
       updateSelfStatusUI();
       updateSelfAvatarUI();
       sendHeartbeat();
