@@ -207,7 +207,7 @@
 
           <div id="loginCaptchaContainer" style="display:none;margin-bottom:.85rem;background:#fffbeb;border:1.5px solid #f59e0b;border-radius:10px;padding:.75rem .9rem;box-shadow:0 2px 8px rgba(245,158,11,0.12);">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
-              <label style="font-size:.76rem;font-weight:800;color:#92400e;display:flex;align-items:center;gap:.35rem;">
+              <label for="loginCaptchaAnswer" style="font-size:.76rem;font-weight:800;color:#92400e;display:flex;align-items:center;gap:.35rem;">
                 <span>🛡️ Güvenlik Doğrulaması (Captcha)</span>
               </label>
               <button type="button" id="btnRefreshCaptcha" title="Soruyu Yenile" style="background:none;border:none;cursor:pointer;font-size:.74rem;font-weight:700;color:#2563eb;">🔄 Yenile</button>
@@ -236,7 +236,7 @@
           <div id="regFormBody">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:.65rem;">
               <div>
-                <label style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">Ad Soyad *</label>
+                <label for="regFullName" style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">Ad Soyad *</label>
                 <input type="text" id="regFullName" required placeholder="Ad Soyad" style="
                   width: 100%; padding:.55rem .75rem; border-radius: 8px;
                   background: #f8fafc; border: 1.5px solid #cbd5e1;
@@ -244,7 +244,7 @@
                 " />
               </div>
               <div>
-                <label style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">Kullanıcı Adı *</label>
+                <label for="regUsername" style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">Kullanıcı Adı *</label>
                 <input type="text" id="regUsername" required placeholder="kullanici_adi" style="
                   width: 100%; padding:.55rem .75rem; border-radius: 8px;
                   background: #f8fafc; border: 1.5px solid #cbd5e1;
@@ -255,7 +255,7 @@
 
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:.65rem;">
               <div>
-                <label style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">E-Posta *</label>
+                <label for="regEmail" style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">E-Posta *</label>
                 <input type="email" id="regEmail" required placeholder="ornek@kurum.com" style="
                   width: 100%; padding:.55rem .75rem; border-radius: 8px;
                   background: #f8fafc; border: 1.5px solid #cbd5e1;
@@ -263,7 +263,7 @@
                 " />
               </div>
               <div>
-                <label style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">Telefon No</label>
+                <label for="regPhone" style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">Telefon No</label>
                 <input type="tel" id="regPhone" placeholder="05XX..." style="
                   width: 100%; padding:.55rem .75rem; border-radius: 8px;
                   background: #f8fafc; border: 1.5px solid #cbd5e1;
@@ -273,7 +273,7 @@
             </div>
 
             <div style="margin-bottom:.65rem;">
-              <label style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">Kurum / Departman</label>
+              <label for="regDepartment" style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">Kurum / Departman</label>
               <input type="text" id="regDepartment" placeholder="ör: Bilgi İşlem" style="
                 width: 100%; padding:.55rem .75rem; border-radius: 8px;
                 background: #f8fafc; border: 1.5px solid #cbd5e1;
@@ -283,7 +283,7 @@
 
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:.85rem;">
               <div>
-                <label style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">Şifre (Min 6 Karakter) *</label>
+                <label for="regPassword" style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">Şifre (Min 6 Karakter) *</label>
                 <input type="password" id="regPassword" required placeholder="En az 6 karakter" style="
                   width: 100%; padding:.55rem .75rem; border-radius: 8px;
                   background: #f8fafc; border: 1.5px solid #cbd5e1;
@@ -291,7 +291,7 @@
                 " />
               </div>
               <div>
-                <label style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">Şifre Tekrar *</label>
+                <label for="regPasswordConfirm" style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">Şifre Tekrar *</label>
                 <input type="password" id="regPasswordConfirm" required placeholder="Tekrar girin" style="
                   width: 100%; padding:.55rem .75rem; border-radius: 8px;
                   background: #f8fafc; border: 1.5px solid #cbd5e1;
@@ -358,7 +358,7 @@
             <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:.85rem;margin-bottom:.75rem;">
               <div style="font-weight:800;font-size:.82rem;color:#1e40af;margin-bottom:.45rem;">📧 E-Posta ile Kod Alarak Sıfırla</div>
               <div style="display:flex;gap:.5rem;align-items:center;">
-                <input type="text" id="forgotIdentifier" placeholder="Kullanıcı adı veya e-posta" style="flex:1;padding:.55rem .75rem;border-radius:8px;background:#ffffff;border:1.5px solid #bfdbfe;color:#0f172a;font-size:.83rem;outline:none;box-sizing:border-box;" />
+                <input type="text" id="forgotIdentifier" aria-label="Şifre sıfırlama kullanıcı adı veya e-posta" placeholder="Kullanıcı adı veya e-posta" style="flex:1;padding:.55rem .75rem;border-radius:8px;background:#ffffff;border:1.5px solid #bfdbfe;color:#0f172a;font-size:.83rem;outline:none;box-sizing:border-box;" />
                 <button type="button" id="btnSendForgotCode" style="padding:.55rem .85rem;border:none;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;font-size:.78rem;cursor:pointer;white-space:nowrap;flex-shrink:0;">Kod Gönder</button>
               </div>
               <div id="forgotCodeMsg" style="display:none;font-size:.72rem;color:#15803d;margin-top:.4rem;"></div>
@@ -368,11 +368,11 @@
             <div id="forgotStep2" style="display:none;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:.85rem;margin-bottom:.75rem;">
               <div style="font-weight:800;font-size:.82rem;color:#0f172a;margin-bottom:.45rem;">🔢 Doğrulama Kodunu Girin</div>
               <div style="margin-bottom:.5rem;">
-                <input type="text" id="forgotCode" maxlength="6" placeholder="6 haneli kod" style="width:100%;padding:.55rem .75rem;border-radius:8px;background:#ffffff;border:1.5px solid #cbd5e1;color:#0f172a;font-size:1.1rem;font-family:monospace;font-weight:800;letter-spacing:6px;text-align:center;outline:none;box-sizing:border-box;" />
+                <input type="text" id="forgotCode" maxlength="6" aria-label="Altı haneli doğrulama kodu" placeholder="6 haneli kod" style="width:100%;padding:.55rem .75rem;border-radius:8px;background:#ffffff;border:1.5px solid #cbd5e1;color:#0f172a;font-size:1.1rem;font-family:monospace;font-weight:800;letter-spacing:6px;text-align:center;outline:none;box-sizing:border-box;" />
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.5rem;">
-                <input type="password" id="forgotNewPass" placeholder="Yeni şifre (min 6)" style="padding:.5rem .65rem;border-radius:8px;background:#fff;border:1.5px solid #cbd5e1;color:#0f172a;font-size:.83rem;outline:none;box-sizing:border-box;" />
-                <input type="password" id="forgotNewPassConf" placeholder="Tekrar girin" style="padding:.5rem .65rem;border-radius:8px;background:#fff;border:1.5px solid #cbd5e1;color:#0f172a;font-size:.83rem;outline:none;box-sizing:border-box;" />
+                <input type="password" id="forgotNewPass" aria-label="Yeni şifre" placeholder="Yeni şifre (min 6)" style="padding:.5rem .65rem;border-radius:8px;background:#fff;border:1.5px solid #cbd5e1;color:#0f172a;font-size:.83rem;outline:none;box-sizing:border-box;" />
+                <input type="password" id="forgotNewPassConf" aria-label="Yeni şifre tekrarı" placeholder="Tekrar girin" style="padding:.5rem .65rem;border-radius:8px;background:#fff;border:1.5px solid #cbd5e1;color:#0f172a;font-size:.83rem;outline:none;box-sizing:border-box;" />
               </div>
               <button type="button" id="btnApplyForgotCode" style="width:100%;padding:.65rem;border:none;border-radius:8px;background:#10b981;color:#fff;font-weight:700;font-size:.85rem;cursor:pointer;">✅ Şifreyi Sıfırla</button>
               <div id="forgotCodeError" style="display:none;font-size:.72rem;color:#b91c1c;margin-top:.4rem;"></div>
@@ -406,22 +406,22 @@
           </div>
 
           <div style="margin-bottom:.75rem;">
-            <label style="display:block;font-size:.76rem;font-weight:700;color:#334155;margin-bottom:.25rem;">Kullanıcı Adı veya E-Posta *</label>
+            <label for="recIdentifier" style="display:block;font-size:.76rem;font-weight:700;color:#334155;margin-bottom:.25rem;">Kullanıcı Adı veya E-Posta *</label>
             <input type="text" id="recIdentifier" required placeholder="ör: admin veya ilker" style="width:100%;padding:.6rem .85rem;border-radius:10px;background:#f8fafc;border:1.5px solid #cbd5e1;color:#0f172a;font-size:.86rem;outline:none;box-sizing:border-box;" />
           </div>
 
           <div style="margin-bottom:.75rem;">
-            <label style="display:block;font-size:.76rem;font-weight:700;color:#334155;margin-bottom:.25rem;">Acil Erişim Anahtarı (FRP-RECOVER-...) *</label>
+            <label for="recKey" style="display:block;font-size:.76rem;font-weight:700;color:#334155;margin-bottom:.25rem;">Acil Erişim Anahtarı (FRP-RECOVER-...) *</label>
             <input type="text" id="recKey" required placeholder="FRP-RECOVER-XXXX-XXXX" style="width:100%;padding:.6rem .85rem;border-radius:10px;background:#f8fafc;border:1.5px solid #cbd5e1;color:#0f172a;font-size:.86rem;font-family:monospace;font-weight:700;letter-spacing:.8px;outline:none;box-sizing:border-box;" />
           </div>
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-bottom:.85rem;">
             <div>
-              <label style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">Yeni Şifre (Min 6 Karakter) *</label>
+              <label for="recNewPassword" style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">Yeni Şifre (Min 6 Karakter) *</label>
               <input type="password" id="recNewPassword" required placeholder="Yeni şifreniz" style="width:100%;padding:.55rem .75rem;border-radius:8px;background:#f8fafc;border:1.5px solid #cbd5e1;color:#0f172a;font-size:.84rem;outline:none;box-sizing:border-box;" />
             </div>
             <div>
-              <label style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">Yeni Şifre Tekrar *</label>
+              <label for="recNewPasswordConfirm" style="display:block;font-size:.74rem;font-weight:700;color:#334155;margin-bottom:.2rem;">Yeni Şifre Tekrar *</label>
               <input type="password" id="recNewPasswordConfirm" required placeholder="Tekrar girin" style="width:100%;padding:.55rem .75rem;border-radius:8px;background:#f8fafc;border:1.5px solid #cbd5e1;color:#0f172a;font-size:.84rem;outline:none;box-sizing:border-box;" />
             </div>
           </div>
