@@ -192,6 +192,9 @@
  TfrxPageFooter: { label: 'PageFooter', icon: '', class: 'fr-band-pagefooter' },
  TfrxReportSummary: { label: 'ReportSummary', icon: '', class: 'fr-band-reportsummary' },
  TfrxColumnHeader: { label: 'ColumnHeader', icon: '', class: 'fr-band-header-type' },
+ TfrxColumnFooter: { label: 'ColumnFooter', icon: '', class: 'fr-band-footer' },
+ TfrxChild: { label: 'Child', icon: '↳', class: 'fr-band-overlay' },
+ TfrxData: { label: 'Data', icon: '▶', class: 'fr-band-masterdata' },
  TfrxOverlay: { label: 'Overlay', icon: '', class: 'fr-band-overlay' },
  TfrxPageContent: { label: 'Sayfa İçeriği', icon: '', class: 'fr-band-overlay' },
  DMPHeader: { label: 'DMPHeader', icon: '', class: 'fr-band-header-type' },
@@ -866,25 +869,167 @@ function esc(str) {
  `;
  }
 
- // 6. Şekil Bileşeni (TfrxShapeView)
+ // 6. Şekil Bileşeni (TfrxShapeView - Tüm FastReport VCL Şekilleri)
  if (comp.type === 'TfrxShapeView') {
- const isRound = (comp.shape || '').includes('Round');
- const isCircle = (comp.shape || '').includes('Circle') || (comp.shape || '').includes('Ellipse');
+ const shapeType = String(comp.shape || 'skRectangle').toLowerCase();
+ const isRound = shapeType.includes('round');
+ const isCircle = shapeType.includes('circle') || shapeType.includes('ellipse');
+ const isTriangle = shapeType.includes('triangle');
+ const isDiamond = shapeType.includes('diamond');
+ const isDiag1 = shapeType.includes('diagonal1');
+ const isDiag2 = shapeType.includes('diagonal2');
+ const fWidth = Math.max(1, comp.frameWidth || 1);
+ const w = comp.width || 60;
+ const h = comp.height || 60;
+
+ let shapeInnerHtml = '';
+ let shapeInlineStyle = `left:${comp.left}px; top:${comp.top}px; width:${w}px; height:${h}px; box-sizing:border-box;`;
+
+ if (isTriangle) {
+ shapeInnerHtml = `
+ <svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" style="display:block;overflow:visible;">
+ <polygon points="${w/2},${fWidth/2} ${w - fWidth/2},${h - fWidth/2} ${fWidth/2},${h - fWidth/2}" fill="${fillBg}" stroke="${textColor}" stroke-width="${fWidth}" />
+ </svg>
+ `;
+ } else if (isDiamond) {
+ shapeInnerHtml = `
+ <svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" style="display:block;overflow:visible;">
+ <polygon points="${w/2},${fWidth/2} ${w - fWidth/2},${h/2} ${w/2},${h - fWidth/2} ${fWidth/2},${h/2}" fill="${fillBg}" stroke="${textColor}" stroke-width="${fWidth}" />
+ </svg>
+ `;
+ } else if (isDiag1) {
+ shapeInnerHtml = `
+ <svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" style="display:block;">
+ <line x1="0" y1="0" x2="${w}" y2="${h}" stroke="${textColor}" stroke-width="${fWidth}" />
+ </svg>
+ `;
+ } else if (isDiag2) {
+ shapeInnerHtml = `
+ <svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" style="display:block;">
+ <line x1="0" y1="${h}" x2="${w}" y2="0" stroke="${textColor}" stroke-width="${fWidth}" />
+ </svg>
+ `;
+ } else {
  const borderRadius = isCircle? '50%': (isRound? '8px': '0px');
+ shapeInlineStyle += ` background-color:${fillBg}; border:${fWidth}px solid ${textColor}; border-radius:${borderRadius};`;
+ }
+
  return `
  <div class="fr-view-item ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
  data-band-idx="${bIdx}" data-comp-idx="${cIdx}" data-comp-name="${esc(comp.name || '')}"
+ style="${shapeInlineStyle}"
+ title="${esc(comp.name)} [${esc(comp.shape || 'Şekil')}]${eventTitle}">
+ ${shapeInnerHtml}
+ ${renderResizeHandles(isSelected)}
+ </div>
+ `;
+ }
+
+ // 7. Onay Kutusu (TfrxCheckBoxView - FastReport VCL)
+ if (comp.type === 'TfrxCheckBoxView') {
+ const isChecked = comp.checked === true || comp.checked === 'true' || comp.checked === '1';
+ const checkStyle = String(comp.checkStyle || 'csCheck');
+ const symbol = isChecked? (checkStyle === 'csCross'? '✕': (checkStyle === 'csPlus'? '+': '✓')): '';
+ const checkColor = decodeDelphiColor(comp.checkColor || 'clBlack', false);
+ return `
+ <div class="fr-view-item fr-checkbox-view ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
+ data-band-idx="${bIdx}" data-comp-idx="${cIdx}" data-comp-name="${esc(comp.name || '')}"
  style="
- left:${comp.left}px;
- top:${comp.top}px;
- width:${comp.width}px;
- height:${comp.height}px;
- background-color:${fillBg};
- border:${comp.frameWidth || 1}px solid ${textColor};
- border-radius:${borderRadius};
+ left:${comp.left}px; top:${comp.top}px; width:${comp.width}px; height:${comp.height}px;
+ background-color:${fillBg}; border:${comp.frameWidth || 1}px solid ${textColor}; border-radius:3px;
+ display:flex; align-items:center; justify-content:center; box-sizing:border-box;
+ font-weight:900; font-size:${Math.max(10, Math.min(comp.width, comp.height) * 0.7)}px; color:${checkColor};
+ "
+ title="${esc(comp.name)} [TfrxCheckBoxView: ${isChecked? 'İşaretli': 'Boş'}]${eventTitle}">
+ <span>${symbol}</span>
+ ${renderResizeHandles(isSelected)}
+ </div>
+ `;
+ }
+
+ // 8. Gradyan Dolgu Nesnesi (TfrxGradientView - FastReport VCL)
+ if (comp.type === 'TfrxGradientView') {
+ const beginColor = decodeDelphiColor(comp.beginColor || 'clWhite', true);
+ const endColor = decodeDelphiColor(comp.endColor || 'clSkyBlue', true);
+ const style = String(comp.style || 'gsVertical');
+ const gradDirection = style.includes('Horizontal')? 'to right': 'to bottom';
+ return `
+ <div class="fr-view-item fr-gradient-view ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
+ data-band-idx="${bIdx}" data-comp-idx="${cIdx}" data-comp-name="${esc(comp.name || '')}"
+ style="
+ left:${comp.left}px; top:${comp.top}px; width:${comp.width}px; height:${comp.height}px;
+ background: linear-gradient(${gradDirection}, ${beginColor}, ${endColor});
+ border:${comp.frameWidth || 1}px solid ${textColor}; box-sizing:border-box;
+ "
+ title="${esc(comp.name)} [TfrxGradientView: ${esc(style)}]${eventTitle}">
+ ${renderResizeHandles(isSelected)}
+ </div>
+ `;
+ }
+
+ // 9. Alt Rapor Bileşeni (TfrxSubreport - FastReport VCL)
+ if (comp.type === 'TfrxSubreport') {
+ return `
+ <div class="fr-view-item fr-subreport-view ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
+ data-band-idx="${bIdx}" data-comp-idx="${cIdx}" data-comp-name="${esc(comp.name || '')}"
+ style="
+ left:${comp.left}px; top:${comp.top}px; width:${comp.width}px; height:${comp.height}px;
+ background: rgba(37,99,235,0.06); border: 1.5px dashed var(--accent, #2563eb); border-radius: 4px;
+ display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 10px; font-weight: 700; color: var(--accent, #2563eb);
+ box-sizing: border-box;
+ "
+ title="${esc(comp.name)} [Alt Rapor: ${esc(comp.subreportPage || 'Sayfa')}]${eventTitle}">
+ <span>📑</span> <span>[Subreport: ${esc(comp.subreportPage || comp.name)}]</span>
+ ${renderResizeHandles(isSelected)}
+ </div>
+ `;
+ }
+
+ // 10. Çapraz Tablo (TfrxCrossView / TfrxDBCrossView - FastReport VCL)
+ if (comp.type === 'TfrxCrossView' || comp.type === 'TfrxDBCrossView') {
+ return `
+ <div class="fr-view-item fr-cross-view ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
+ data-band-idx="${bIdx}" data-comp-idx="${cIdx}" data-comp-name="${esc(comp.name || '')}"
+ style="
+ left:${comp.left}px; top:${comp.top}px; width:${comp.width}px; height:${comp.height}px;
+ background:#ffffff; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box; overflow:hidden;
+ display:flex; flex-direction:column;
+ "
+ title="${esc(comp.name)} [Çapraz Tablo: ${esc(comp.type)}]${eventTitle}">
+ <div style="background:#f1f5f9; padding:2px 6px; font-size:9px; font-weight:700; color:#475569; border-bottom:1px solid #cbd5e1; display:flex; align-items:center; gap:4px;">
+ <span>▦</span> <span>${esc(comp.name)} [Cross-Tab]</span>
+ </div>
+ <div style="flex:1; display:grid; grid-template-columns:1fr 1fr 1fr; grid-template-rows:1fr 1fr; gap:1px; background:#e2e8f0; padding:1px; font-size:8.5px; text-align:center;">
+ <div style="background:#f8fafc; font-weight:700; display:flex; align-items:center; justify-content:center;">Başlık</div>
+ <div style="background:#f8fafc; font-weight:700; display:flex; align-items:center; justify-content:center;">Kolon 1</div>
+ <div style="background:#f8fafc; font-weight:700; display:flex; align-items:center; justify-content:center;">Toplam</div>
+ <div style="background:#ffffff; display:flex; align-items:center; justify-content:center;">Satır 1</div>
+ <div style="background:#ffffff; display:flex; align-items:center; justify-content:center;">[Veri]</div>
+ <div style="background:#f8fafc; font-weight:700; display:flex; align-items:center; justify-content:center;">[∑]</div>
+ </div>
+ ${renderResizeHandles(isSelected)}
+ </div>
+ `;
+ }
+
+ // 11. Sistem Metni (TfrxSysMemoView - FastReport VCL)
+ if (comp.type === 'TfrxSysMemoView') {
+ const sysText = comp.text || comp.dataField || '[PAGE#]';
+ return `
+ <div class="fr-view-item fr-sysmemo-view ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
+ data-band-idx="${bIdx}" data-comp-idx="${cIdx}" data-comp-name="${esc(comp.name || '')}"
+ style="
+ left:${comp.left}px; top:${comp.top}px; width:${comp.width}px; height:${comp.height}px;
+ background-color:${fillBg}; border-left:${frameCss.borderLeft}; border-right:${frameCss.borderRight};
+ border-top:${frameCss.borderTop}; border-bottom:${frameCss.borderBottom};
+ font-family:${safeFontFamily(comp.fontName)}, sans-serif; font-size:${comp.fontSize || 10}px;
+ font-weight:${isBold? '700': '400'}; color:${textColor}; text-align:${textAlign};
  box-sizing:border-box;
  "
- title="${esc(comp.name)} [${esc(comp.shape || 'Şekil')}]${eventTitle}">
+ title="${esc(comp.name)} [TfrxSysMemoView: ${esc(sysText)}]${eventTitle}">
+ <div class="fr-memo-content" style="justify-content:${hAlign}; align-items:${vAlign};">
+ <span style="background:rgba(99,102,241,0.1);color:#4f46e5;padding:0 3px;border-radius:2px;font-weight:700;">⚙️ ${esc(sysText)}</span>
+ </div>
  ${renderResizeHandles(isSelected)}
  </div>
  `;
