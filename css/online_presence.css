@@ -970,7 +970,7 @@
 
 .frp-chat-window.minimized {
   height: 46px !important;
-  width: 220px !important;
+  width: 200px !important;
   cursor: pointer;
   border-bottom: 1px solid var(--border, #cbd5e1);
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
@@ -2999,4 +2999,247 @@ body.frp-chat-modal-open { overflow: hidden; }
     transition: none !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ============================================================
+   KOYU MOD (DARK THEME) ENTEGRASYONU - SOHBET VE ÇEVRİMİÇİ PANELİ
+   ============================================================ */
+
+[data-theme="dark"] .frp-presence-dock,
+[data-theme="dark"] .frp-presence-dock-pill {
+  background: var(--bg-surface, #1e293b) !important;
+  color: #f8fafc !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6) !important;
+}
+
+[data-theme="dark"] .frp-presence-panel {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+  box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.75) !important;
+}
+
+[data-theme="dark"] .frp-presence-header {
+  background: #1e293b !important;
+  border-bottom-color: #334155 !important;
+}
+
+[data-theme="dark"] .frp-presence-search-input {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .frp-presence-search-input::placeholder {
+  color: #64748b !important;
+}
+
+[data-theme="dark"] .frp-presence-tabs {
+  background: #1e293b !important;
+  border-bottom-color: #334155 !important;
+}
+
+[data-theme="dark"] .frp-presence-tab-btn {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .frp-presence-tab-btn.active {
+  color: #38bdf8 !important;
+  border-bottom-color: #38bdf8 !important;
+}
+
+[data-theme="dark"] .frp-presence-tab-btn:hover {
+  color: #f1f5f9 !important;
+}
+
+[data-theme="dark"] .frp-user-row:hover,
+[data-theme="dark"] .frp-group-row:hover,
+[data-theme="dark"] .frp-room-row:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+[data-theme="dark"] .frp-user-name,
+[data-theme="dark"] .frp-group-name,
+[data-theme="dark"] .frp-room-name {
+  color: #f1f5f9 !important;
+}
+
+[data-theme="dark"] .frp-user-status,
+[data-theme="dark"] .frp-group-preview,
+[data-theme="dark"] .frp-room-topic {
+  color: #94a3b8 !important;
+}
+
+/* SOHBET PENCERESİ KOYU MOD */
+[data-theme="dark"] .frp-chat-window {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+  box-shadow: 0 24px 70px -18px rgba(0, 0, 0, 0.8) !important;
+}
+
+[data-theme="dark"] .frp-chat-window.minimized {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+[data-theme="dark"] .frp-chat-header {
+  background: #1e293b !important;
+  border-bottom-color: #334155 !important;
+}
+
+[data-theme="dark"] .frp-chat-header-name {
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .frp-chat-header-status {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .frp-chat-btn-ctrl {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .frp-chat-btn-ctrl:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .frp-chat-messages-stream {
+  background: #090d16 !important;
+}
+
+[data-theme="dark"] .frp-chat-msg.incoming .frp-chat-bubble {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+[data-theme="dark"] .frp-chat-msg.incoming .frp-chat-sender-name {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .frp-chat-msg.outgoing .frp-chat-bubble {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35) !important;
+}
+
+[data-theme="dark"] .frp-chat-msg-time {
+  color: #64748b !important;
+}
+
+[data-theme="dark"] .frp-chat-footer {
+  background: #0f172a !important;
+  border-top-color: #334155 !important;
+}
+
+[data-theme="dark"] .frp-chat-input {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .frp-chat-input:focus {
+  border-color: #38bdf8 !important;
+  background: #1e293b !important;
+}
+
+[data-theme="dark"] .frp-chat-input::placeholder {
+  color: #64748b !important;
+}
+
+[data-theme="dark"] .frp-chat-btn-action {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .frp-chat-btn-action:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .frp-chat-action-menu {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6) !important;
+}
+
+[data-theme="dark"] .frp-chat-menu-item {
+  color: #e2e8f0 !important;
+}
+
+[data-theme="dark"] .frp-chat-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-theme="dark"] .frp-chat-search-bar {
+  background: #1e293b !important;
+  border-bottom-color: #334155 !important;
+}
+
+[data-theme="dark"] .frp-chat-search-input {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .frp-chat-emoji-picker {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6) !important;
+}
+
+[data-theme="dark"] .frp-chat-emoji-item:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+[data-theme="dark"] .frp-group-info-drawer,
+[data-theme="dark"] .frp-chat-media-drawer {
+  background: #0f172a !important;
+  border-top-color: #334155 !important;
+}
+
+[data-theme="dark"] .frp-chat-day-label {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .frp-chat-hover-bar {
+  background: rgba(15, 23, 42, 0.94) !important;
+  border-color: #334155 !important;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5) !important;
+}
+
+[data-theme="dark"] .frp-chat-hover-bar button {
+  color: #cbd5e1 !important;
+}
+
+[data-theme="dark"] .frp-chat-hover-bar button:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .frp-chat-reaction-pill {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+[data-theme="dark"] .frp-chat-reaction-pill.active {
+  background: rgba(37, 99, 235, 0.25) !important;
+  border-color: #3b82f6 !important;
+  color: #93c5fd !important;
+}
+
+[data-theme="dark"] .frp-chat-reply-composer {
+  background: #1e293b !important;
+  border-top-color: #334155 !important;
+}
+
+[data-theme="dark"] .frp-chat-audio-player {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: #334155 !important;
 }

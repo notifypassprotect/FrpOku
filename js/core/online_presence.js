@@ -1580,8 +1580,12 @@
     let currentRight = baseOffset;
     windowsArr.forEach((winObj) => {
       const isMin = winObj.el.classList.contains('minimized');
+      const isMax = winObj.el.classList.contains('maximized');
       const measuredWidth = Math.ceil(winObj.el.getBoundingClientRect().width || 0);
-      const winWidth = measuredWidth || (isMin ? 220 : 410);
+
+      // Kararlı slot genişliği: Animasyon geçişindeki gecikmeleri ve boşlukları önler
+      const targetWidth = isMin ? 200 : (isMax ? Math.min(600, vpWidth - 32) : Math.min(380, vpWidth - 32));
+      const winWidth = targetWidth;
 
       // Sol kenardan taşmayı önle
       if (currentRight + winWidth > vpWidth - 16) {
@@ -1590,10 +1594,13 @@
         }
       }
 
-      winObj.el.style.right = `${currentRight}px`;
-      winObj.el.style.transition = 'right 0.25s cubic-bezier(0.16, 1, 0.3, 1), height 0.2s ease, width 0.2s ease';
+      const finalIsMin = winObj.el.classList.contains('minimized');
+      const finalWidth = finalIsMin ? 200 : (isMax ? Math.min(600, vpWidth - 32) : Math.min(380, vpWidth - 32));
 
-      const step = Math.ceil(winObj.el.getBoundingClientRect().width || winWidth) + 8;
+      winObj.el.style.right = `${currentRight}px`;
+      winObj.el.style.transition = 'right 0.22s cubic-bezier(0.16, 1, 0.3, 1), height 0.2s ease, width 0.2s ease';
+
+      const step = finalWidth + 14;
       currentRight += step;
     });
   }
