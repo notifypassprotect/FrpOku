@@ -439,7 +439,8 @@ function esc(str) {
  let currentZoom = 1.0;
  let currentMode = 'designer'; // 'designer' | 'preview'
  let showRulers = true; // Cetveller Açık / Kapalı
- let gridSnapStep = 4; // 1 (serbest) | 4 | 8 px manyetik ızgara adımı
+ let gridSnapStep = parseInt(localStorage.getItem('frp_designer_grid_step') || '4', 10);
+ if (![0, 4, 8, 12].includes(gridSnapStep)) gridSnapStep = 4;
  let selectedItem = null;
  let selectedItems = [];
  let showInspector = !window.matchMedia('(max-width: 768px)').matches;
@@ -447,6 +448,15 @@ function esc(str) {
  let inspectorSearchQuery = '';
  let inspectorTab = 'properties'; // 'properties' | 'events' | 'favorites'
  let inspectorWidth = parseInt(localStorage.getItem('frp_inspector_width') || '330', 10);
+ let designerKeydownHandler = null;
+
+ const toDesignerNumber = (value, fallback = 0) => {
+   const parsed = Number.parseFloat(String(value ?? '').replace(',', '.'));
+   return Number.isFinite(parsed) ? parsed : fallback;
+ };
+ const snapDesignerValue = value => gridSnapStep > 1 ? Math.round(value / gridSnapStep) * gridSnapStep : Math.round(value);
+ const gridStateClass = () => gridSnapStep > 1 ? 'grid-snap-on' : 'grid-snap-off';
+ const gridStateStyle = () => `--fr-designer-grid:${gridSnapStep > 1 ? gridSnapStep : 8}px;`;
 
  // Canlı Tasarım Düzenleme Modu & Geri Al (Undo/Redo) Durumu (Tasarımcıda daima aktif)
  let isDesignEditing = true;
@@ -665,9 +675,9 @@ function esc(str) {
  <button type="button" class="designer-palette-btn" id="btnToolAddDateEdit" title="Yeni Tarih Seçici Ekle">Tarih</button>
  <button type="button" class="designer-palette-btn" id="btnToolAddCombobox" title="Yeni Açılır Liste Ekle">Combo</button>
  <button type="button" class="designer-palette-btn" id="btnToolAddPanel" title="Yeni Panel Ekle">Panel</button>
- <button type="button" class="designer-palette-btn" id="btnDuplicateSelected" title="Seçili Bileşeni Çoğalt (Ctrl+D)">📋 Çoğalt</button>
- <button type="button" class="designer-palette-btn" id="btnBringToFront" title="En Öne Getir">🔼 Öne</button>
- <button type="button" class="designer-palette-btn" id="btnSendToBack" title="En Arkaya Gönder">🔽 Arkaya</button>
+ <button type="button" class="designer-palette-btn" id="btnDuplicateSelected" title="Seçili bileşenleri çoğalt (Ctrl+D)">Çoğalt</button>
+ <button type="button" class="designer-palette-btn" id="btnBringToFront" title="Seçimi en öne getir">Öne Getir</button>
+ <button type="button" class="designer-palette-btn" id="btnSendToBack" title="Seçimi en arkaya gönder">Arkaya Gönder</button>
  <button type="button" class="designer-palette-btn danger" id="btnToolDeleteSelected" title="Seçili Bileşeni Sil (Delete)">Sil</button>
  </div>
 
@@ -684,9 +694,9 @@ function esc(str) {
  <button type="button" class="fr-align-btn" id="btnDistributeH" title="Yatayda Eşit Dağıt">⬌ Dağıt</button>
  <button type="button" class="fr-align-btn" id="btnDistributeV" title="Dikeyde Eşit Dağıt">⬍ Dağıt</button>
  <div class="fr-align-sep"></div>
- <button type="button" class="fr-align-btn" id="btnMultiDuplicate" title="Seçilileri Çoğalt">📋 Çoğalt</button>
- <button type="button" class="fr-align-btn" id="btnMultiFront" title="Seçilileri En Öne Getir">🔼 Öne</button>
- <button type="button" class="fr-align-btn" id="btnMultiBack" title="Seçilileri En Arkaya Gönder">🔽 Arkaya</button>
+ <button type="button" class="fr-align-btn" id="btnMultiDuplicate" title="Seçilileri çoğalt">Çoğalt</button>
+ <button type="button" class="fr-align-btn" id="btnMultiFront" title="Seçilileri en öne getir">Öne</button>
+ <button type="button" class="fr-align-btn" id="btnMultiBack" title="Seçilileri en arkaya gönder">Arkaya</button>
  <div class="fr-align-sep"></div>
  <button type="button" class="fr-align-btn danger" id="btnDeleteMulti" title="Tüm Seçilileri Sil">🗑️ Sil</button>
  </div>
@@ -699,8 +709,8 @@ function esc(str) {
  <span class="designer-zoom-val" id="zoomValText">${Math.round(currentZoom * 100)}%</span>
  <button type="button" class="designer-zoom-btn" id="btnZoomIn" title="Büyüt">+</button>
  <button type="button" class="designer-zoom-btn" id="btnZoomFit" title="Sayfaya Sığdır" style="margin-left:.25rem;font-size:.75rem;">Sığdır</button>
- <button type="button" class="designer-zoom-btn ${showRulers ? 'active' : ''}" id="btnToggleRulers" title="Cetvelleri Göster / Gizle" style="margin-left:.25rem;font-size:.75rem;padding:0 6px;">📏 Cetvel</button>
- <button type="button" class="designer-zoom-btn ${gridSnapStep > 1 ? 'active' : ''}" id="btnToggleGridSnap" title="Manyetik Izgara Adımı" style="margin-left:.25rem;font-size:.75rem;padding:0 6px;">🧲 Izgara: ${gridSnapStep > 1 ? gridSnapStep + 'px' : 'Kapalı'}</button>
+ <button type="button" class="designer-zoom-btn ${showRulers ? 'active' : ''}" id="btnToggleRulers" title="Cetvelleri göster veya gizle" style="margin-left:.25rem;font-size:.75rem;padding:0 8px;">Cetvel</button>
+ <button type="button" class="designer-zoom-btn ${gridSnapStep > 1 ? 'active' : ''}" id="btnToggleGridSnap" title="Izgaraya yapışma: 4 / 8 / 12 px. Sürüklerken Alt ile geçici olarak kapatın." style="margin-left:.25rem;font-size:.75rem;padding:0 8px;">Izgara · ${gridSnapStep > 1 ? gridSnapStep + ' px' : 'Serbest'}</button>
  </div>
 
  <!-- Sağ Panel Sekmeleri: Inspector vs Data Tree -->
@@ -950,7 +960,8 @@ function esc(str) {
  }
 
  // YALNIZCA Yatay Bantları Yatay Akışta Çiz
- const bandsHtml = horizontalBands.map((band, bIdx) => {
+ const bandsHtml = horizontalBands.map((band) => {
+ const bIdx = (page.bands || []).indexOf(band);
  const meta = BAND_META[band.type] || { label: band.type, icon: '', class: 'fr-band-header-type' };
  let maxCompBottom = band.height > 0? band.height: 25;
  (band.components || []).forEach(c => {
@@ -1508,12 +1519,13 @@ function esc(str) {
  }).join(''): '';
 
  return `
- <div class="fr-report-page ${currentMode === 'designer'? 'designer-mode': 'preview-mode'}"
+ <div class="fr-report-page ${currentMode === 'designer'? `designer-mode ${gridStateClass()}`: 'preview-mode'}"
  id="frReportPage"
  style="
  width:${finalPageWidth}px;
  min-height:${finalPageMinHeight}px;
  transform:scale(${currentZoom});
+ ${gridStateStyle()}
  ">
  <div class="fr-smart-guides-layer" id="frSmartGuidesLayer"></div>
  ${bandsHtml}
@@ -1869,7 +1881,7 @@ function esc(str) {
  const controlsHtml = (dialog.controls || []).map((ctrl, cIdx) => renderDialogControlItem(ctrl, cIdx)).join('');
 
  return `
- <div class="fr-dialog-window"
+ <div class="fr-dialog-window ${currentMode === 'designer' ? gridStateClass() : ''}"
  id="frDialogWindow"
  style="
  width:${dWidth}px;
@@ -1890,7 +1902,7 @@ function esc(str) {
  </div>
  </div>
  <!-- Form Client Canvas (Hassas İnce Noktalı Izgara) -->
- <div class="fr-dialog-client" style="background-color:${dialogBg};">
+ <div class="fr-dialog-client" style="background-color:${dialogBg};${gridStateStyle()}">
  ${controlsHtml}
  </div>
  </div>
@@ -2247,6 +2259,115 @@ function esc(str) {
  }
  }
 
+ function walkDesignerComponents(callback) {
+   allPages.forEach(page => {
+     if (page.type === 'report') {
+       (page.data.bands || []).forEach(band => (band.components || []).forEach(comp => callback(comp, band.components, page)));
+     } else {
+       const visit = controls => (controls || []).forEach(ctrl => {
+         callback(ctrl, controls, page);
+         if (ctrl.children?.length) visit(ctrl.children);
+       });
+       visit(page.data.controls || []);
+     }
+   });
+ }
+
+ function getDesignerObjectNames() {
+   const names = new Set();
+   allPages.forEach(page => {
+     if (page.data?.name) names.add(String(page.data.name).toLowerCase());
+     (page.data?.bands || []).forEach(band => {
+       if (band?.name) names.add(String(band.name).toLowerCase());
+     });
+   });
+   walkDesignerComponents(comp => {
+     if (comp?.name) names.add(String(comp.name).toLowerCase());
+   });
+   return names;
+ }
+
+ function ensureUniqueComponentName(desiredName = 'Component') {
+   const names = getDesignerObjectNames();
+   const desired = String(desiredName || 'Component').trim() || 'Component';
+   if (!names.has(desired.toLowerCase())) return desired;
+   const base = desired.replace(/\d+$/, '') || 'Component';
+   let index = 2;
+   let candidate = `${base}${index}`;
+   while (names.has(candidate.toLowerCase())) candidate = `${base}${++index}`;
+   return candidate;
+ }
+
+ function makeUniqueComponentName(sourceName = 'Component') {
+   const names = getDesignerObjectNames();
+   const cleanBase = String(sourceName || 'Component').replace(/_Copy\d*$/i, '').replace(/\d+$/, '') || 'Component';
+   let index = 1;
+   let candidate = `${cleanBase}_Copy`;
+   while (names.has(candidate.toLowerCase())) candidate = `${cleanBase}_Copy${++index}`;
+   return candidate;
+ }
+
+ function findComponentCollection(target) {
+   const activePage = allPages[activePageIndex];
+   if (!activePage || !target) return null;
+   if (activePage.type === 'report') {
+     for (const band of (activePage.data.bands || [])) {
+       const items = band.components || [];
+       const index = items.indexOf(target);
+       if (index !== -1) return { items, index, band };
+     }
+   } else {
+     const visit = items => {
+       for (let index = 0; index < (items || []).length; index++) {
+         const item = items[index];
+         if (item === target) return { items, index, band: null };
+         const nested = visit(item.children || []);
+         if (nested) return nested;
+       }
+       return null;
+     };
+     return visit(activePage.data.controls || []);
+   }
+   return null;
+ }
+
+ function getElementBounds(el) {
+   const parent = el?.parentElement;
+   if (!parent) return { width: Infinity, height: Infinity };
+   return {
+     width: Math.max(0, parent.clientWidth || parent.offsetWidth || Infinity),
+     height: Math.max(0, parent.clientHeight || parent.offsetHeight || Infinity)
+   };
+ }
+
+ function clampComponentGeometry(comp, bounds, options = {}) {
+   const minWidth = options.minWidth || 12;
+   const minHeight = options.minHeight || 8;
+   comp.width = Math.max(minWidth, toDesignerNumber(comp.width, 100));
+   comp.height = Math.max(minHeight, toDesignerNumber(comp.height, 30));
+   if (Number.isFinite(bounds.width)) comp.width = Math.min(comp.width, Math.max(minWidth, bounds.width));
+   if (Number.isFinite(bounds.height)) comp.height = Math.min(comp.height, Math.max(minHeight, bounds.height));
+   comp.left = Math.max(0, toDesignerNumber(comp.left));
+   comp.top = Math.max(0, toDesignerNumber(comp.top));
+   if (Number.isFinite(bounds.width)) comp.left = Math.min(comp.left, Math.max(0, bounds.width - comp.width));
+   if (Number.isFinite(bounds.height)) comp.top = Math.min(comp.top, Math.max(0, bounds.height - comp.height));
+ }
+
+ function syncComponentElement(el, comp) {
+   if (!el || !comp) return;
+   el.style.left = `${toDesignerNumber(comp.left)}px`;
+   el.style.top = `${toDesignerNumber(comp.top)}px`;
+   el.style.width = `${Math.max(1, toDesignerNumber(comp.width, 100))}px`;
+   el.style.height = `${Math.max(1, toDesignerNumber(comp.height, 30))}px`;
+ }
+
+ function findElementForComponent(comp) {
+   if (!comp) return null;
+   return [...containerEl.querySelectorAll('.fr-view-item,.fr-ctrl-item')].find(el => {
+     if (el.dataset.compName) return el.dataset.compName === comp.name;
+     return getCompFromElement(el) === comp;
+   }) || null;
+ }
  // ── BİLEŞEN EKLEME METODU (Genişletilmiş 18 Nesne Türü) ──
  function addNewComponent(type) {
  if (!isDesignEditing) return;
@@ -2395,7 +2516,7 @@ function esc(str) {
  if (activePage.type === 'report') {
  if (!activePage.data.bands) activePage.data.bands = [];
  const newBand = {
- name: `MasterData${activePage.data.bands.length + 1}`,
+ name: ensureUniqueComponentName(`MasterData${activePage.data.bands.length + 1}`),
  type: 'TfrxMasterData',
  left: 0,
  top: 0,
@@ -2475,6 +2596,7 @@ function esc(str) {
  }
 
  if (!newComp) return;
+ newComp.name = ensureUniqueComponentName(newComp.name);
 
  if (activePage.type === 'report') {
  const bands = activePage.data.bands || [];
@@ -2676,30 +2798,14 @@ function esc(str) {
 
    targets.forEach(orig => {
      if (!orig || !orig.name) return;
+     const location = findComponentCollection(orig);
+     if (!location) return;
      const clone = JSON.parse(JSON.stringify(orig));
-     const randSuffix = Math.floor(100 + Math.random() * 900);
-     const baseName = (orig.name || 'Comp').replace(/\d+$/, '');
-     clone.name = `${baseName}_Copy${randSuffix}`;
+     clone.name = makeUniqueComponentName(orig.name);
      const offset = (gridSnapStep && gridSnapStep > 1) ? Math.max(gridSnapStep, 8) : 10;
-     clone.left = (clone.left || 0) + offset;
-     clone.top = (clone.top || 0) + offset;
-
-     if (activePage.type === 'report') {
-       let placed = false;
-       (activePage.data.bands || []).forEach(b => {
-         if (!placed && (b.components || []).some(c => c.name === orig.name)) {
-           b.components.push(clone);
-           placed = true;
-         }
-       });
-       if (!placed && activePage.data.bands && activePage.data.bands.length > 0) {
-         activePage.data.bands[0].components = activePage.data.bands[0].components || [];
-         activePage.data.bands[0].components.push(clone);
-       }
-     } else {
-       activePage.data.controls = activePage.data.controls || [];
-       activePage.data.controls.push(clone);
-     }
+     clone.left = snapDesignerValue(toDesignerNumber(clone.left) + offset);
+     clone.top = snapDesignerValue(toDesignerNumber(clone.top) + offset);
+     location.items.splice(location.index + 1, 0, clone);
      newItems.push(clone);
    });
 
@@ -2767,6 +2873,26 @@ function esc(str) {
    if (!el) return null;
    const activePage = allPages[activePageIndex];
    if (!activePage) return null;
+   const componentName = el.dataset.compName || '';
+   if (componentName) {
+     if (activePage.type === 'report') {
+       for (const band of (activePage.data.bands || [])) {
+         const found = (band.components || []).find(comp => comp.name === componentName);
+         if (found) return found;
+       }
+     } else {
+       const findNested = controls => {
+         for (const ctrl of (controls || [])) {
+           if (ctrl.name === componentName) return ctrl;
+           const nested = findNested(ctrl.children || []);
+           if (nested) return nested;
+         }
+         return null;
+       };
+       const found = findNested(activePage.data.controls || []);
+       if (found) return found;
+     }
+   }
    const bandIdx = parseInt(el.dataset.bandIdx, 10);
    const compIdx = parseInt(el.dataset.compIdx, 10);
    const rawIdx = el.dataset.ctrlIdx;
@@ -2951,10 +3077,11 @@ function esc(str) {
  }
  });
 
- // Sürükle & Boyutlandır Başlangıcı (MouseDown)
- el.addEventListener('mousedown', (e) => {
+ // Sürükle & Boyutlandır Başlangıcı (mouse, kalem ve dokunma)
+ el.addEventListener('pointerdown', (e) => {
  if (currentMode !== 'designer') return;
  if (e.button !== 0) return;
+ if (e.isPrimary === false) return;
  if (window._isReportLockedByOther) {
    if (window.FrpNotify) window.FrpNotify.warning(`Bu rapor şu anda ${window._reportLockHolderName || 'başka bir kullanıcı'} tarafından düzenleniyor. Salt-okunur moddasınız.`);
    return;
@@ -3010,19 +3137,24 @@ function esc(str) {
  const isMultiDrag = isDragging && selectedItems.length > 1 && selectedItems.includes(selectedItem);
  const multiStartPos = isMultiDrag ? selectedItems.map(c => ({
    comp: c,
-   left: c.left || 0,
-   top: c.top || 0,
-   el: (c.name ? containerEl.querySelector(`[data-comp-name="${c.name}"]`) : null)
+   left: toDesignerNumber(c.left),
+   top: toDesignerNumber(c.top),
+   el: findElementForComponent(c)
  })) : [];
 
  const startX = e.clientX;
  const startY = e.clientY;
- const startLeft = selectedItem.left || 0;
- const startTop = selectedItem.top || 0;
- const startWidth = selectedItem.width || 100;
- const startHeight = selectedItem.height || 30;
+ const startLeft = toDesignerNumber(selectedItem.left);
+ const startTop = toDesignerNumber(selectedItem.top);
+ const startWidth = toDesignerNumber(selectedItem.width, 100);
+ const startHeight = toDesignerNumber(selectedItem.height, 30);
+ const parentBounds = getElementBounds(el);
+ let geometryChanged = false;
 
  if (isDragging) el.classList.add('is-dragging');
+ el.classList.add('is-interacting');
+ document.body.classList.add('fr-designer-interacting');
+ try { el.setPointerCapture?.(e.pointerId); } catch {}
 
  // Canlı Koordinat HUD Göstergesi
  let hud = document.getElementById('frCanvasHudTooltip');
@@ -3051,10 +3183,12 @@ function esc(str) {
  });
  }
 
- const onMouseMove = (moveEvt) => {
+ const onPointerMove = (moveEvt) => {
+ if (moveEvt.pointerId !== e.pointerId) return;
  const dx = Math.round((moveEvt.clientX - startX) / currentZoom);
  const dy = Math.round((moveEvt.clientY - startY) / currentZoom);
- const snapStep = (gridSnapStep && gridSnapStep > 1) ? gridSnapStep : 1;
+ if (dx !== 0 || dy !== 0) geometryChanged = true;
+ const snapStep = moveEvt.altKey ? 1 : ((gridSnapStep && gridSnapStep > 1) ? gridSnapStep : 1);
 
  if (isDragging) {
  if (isMultiDrag) {
@@ -3063,17 +3197,15 @@ function esc(str) {
      const rawT = p.top + dy;
      p.comp.left = Math.max(0, snapStep > 1 ? Math.round(rawL / snapStep) * snapStep : rawL);
      p.comp.top = Math.max(0, snapStep > 1 ? Math.round(rawT / snapStep) * snapStep : rawT);
-     if (p.el) {
-       p.el.style.left = `${p.comp.left}px`;
-       p.el.style.top = `${p.comp.top}px`;
-     }
+     clampComponentGeometry(p.comp, p.el ? getElementBounds(p.el) : parentBounds);
+     if (p.el) syncComponentElement(p.el, p.comp);
    });
    updateRulerTracker(selectedItem.left, selectedItem.width, selectedItem.top, selectedItem.height);
  } else {
  let targetLeft = startLeft + dx;
  let targetTop = startTop + dy;
- const curW = selectedItem.width || 100;
- const curH = selectedItem.height || 30;
+ const curW = toDesignerNumber(selectedItem.width, 100);
+ const curH = toDesignerNumber(selectedItem.height, 30);
 
  let snappedLeft = Math.max(0, snapStep > 1 ? Math.round(targetLeft / snapStep) * snapStep : targetLeft);
  let snappedTop = Math.max(0, snapStep > 1 ? Math.round(targetTop / snapStep) * snapStep : targetTop);
@@ -3083,10 +3215,10 @@ function esc(str) {
 
  if (siblingComps.length > 0) {
  for (const sib of siblingComps) {
- const sLeft = sib.left || 0;
- const sTop = sib.top || 0;
- const sW = sib.width || 100;
- const sH = sib.height || 30;
+ const sLeft = toDesignerNumber(sib.left);
+ const sTop = toDesignerNumber(sib.top);
+ const sW = toDesignerNumber(sib.width, 100);
+ const sH = toDesignerNumber(sib.height, 30);
 
  if (activeGuideX === null) {
  if (Math.abs(targetLeft - sLeft) <= SNAP_THRESH) {
@@ -3130,14 +3262,14 @@ function esc(str) {
 
  selectedItem.left = Math.max(0, snappedLeft);
  selectedItem.top = Math.max(0, snappedTop);
- el.style.left = `${selectedItem.left}px`;
- el.style.top = `${selectedItem.top}px`;
+ clampComponentGeometry(selectedItem, parentBounds);
+ syncComponentElement(el, selectedItem);
 
  renderSmartGuides(activeGuideX, activeGuideY);
  updateRulerTracker(selectedItem.left, selectedItem.width, selectedItem.top, selectedItem.height);
  }
  } else if (isResizing) {
- const rSnap = (gridSnapStep && gridSnapStep > 1) ? gridSnapStep : 2;
+ const rSnap = moveEvt.altKey ? 1 : ((gridSnapStep && gridSnapStep > 1) ? gridSnapStep : 1);
  if (handleType.includes('e')) selectedItem.width = Math.max(12, Math.round((startWidth + dx) / rSnap) * rSnap);
  if (handleType.includes('s')) selectedItem.height = Math.max(8, Math.round((startHeight + dy) / rSnap) * rSnap);
  if (handleType.includes('w')) {
@@ -3152,8 +3284,8 @@ function esc(str) {
  selectedItem.height = newH;
  el.style.top = `${selectedItem.top}px`;
  }
- el.style.width = `${selectedItem.width}px`;
- el.style.height = `${selectedItem.height}px`;
+ clampComponentGeometry(selectedItem, parentBounds);
+ syncComponentElement(el, selectedItem);
  updateRulerTracker(selectedItem.left, selectedItem.width, selectedItem.top, selectedItem.height);
  }
 
@@ -3172,18 +3304,23 @@ function esc(str) {
  if (statusDims) statusDims.innerHTML = `<span>W: ${selectedItem.width}, H: ${selectedItem.height}</span>`;
  };
 
- const onMouseUp = () => {
+ const onPointerUp = (upEvt) => {
+ if (upEvt.pointerId !== e.pointerId) return;
  el.classList.remove('is-dragging');
+ el.classList.remove('is-interacting');
+ document.body.classList.remove('fr-designer-interacting');
  document.body.style.userSelect = '';
  document.body.style.webkitUserSelect = '';
  document.body.style.cursor = '';
  if (hud) hud.style.display = 'none';
  clearSmartGuides();
  updateRulerTracker(selectedItem.left, selectedItem.width, selectedItem.top, selectedItem.height);
- window.removeEventListener('mousemove', onMouseMove);
- window.removeEventListener('mouseup', onMouseUp);
+ window.removeEventListener('pointermove', onPointerMove);
+ window.removeEventListener('pointerup', onPointerUp);
+ window.removeEventListener('pointercancel', onPointerUp);
+ try { el.releasePointerCapture?.(e.pointerId); } catch {}
 
- pushUndoState();
+ if (geometryChanged) pushUndoState();
 
  // Object Inspector'ı Güncelle
  const propTable = containerEl.querySelector('#propTableBody');
@@ -3194,8 +3331,9 @@ function esc(str) {
  }
  };
 
- window.addEventListener('mousemove', onMouseMove);
- window.addEventListener('mouseup', onMouseUp);
+ window.addEventListener('pointermove', onPointerMove);
+ window.addEventListener('pointerup', onPointerUp);
+ window.addEventListener('pointercancel', onPointerUp);
  });
  });
 
@@ -3357,12 +3495,15 @@ function esc(str) {
  containerEl.querySelector('#btnMultiBack')?.addEventListener('click', () => changeZOrder('back'));
  containerEl.querySelector('#btnToggleGridSnap')?.addEventListener('click', () => {
    gridSnapStep = gridSnapStep === 0 ? 4 : (gridSnapStep === 4 ? 8 : (gridSnapStep === 8 ? 12 : 0));
+   localStorage.setItem('frp_designer_grid_step', String(gridSnapStep));
    const btn = containerEl.querySelector('#btnToggleGridSnap');
    if (btn) {
-     btn.textContent = `🧲 Izgara: ${gridSnapStep > 1 ? gridSnapStep + 'px' : 'Kapalı'}`;
+     btn.textContent = `Izgara · ${gridSnapStep > 1 ? gridSnapStep + ' px' : 'Serbest'}`;
      btn.classList.toggle('active', gridSnapStep > 1);
    }
-   if (window.FrpNotify) window.FrpNotify.info(`Manyetik ızgara: ${gridSnapStep > 1 ? gridSnapStep + 'px adımı aktif' : 'Kapalı'}`);
+   renderCanvasOnly();
+   updateSelection();
+   if (window.FrpNotify) window.FrpNotify.info(`Izgaraya yapışma: ${gridSnapStep > 1 ? gridSnapStep + ' px' : 'serbest taşıma'}`);
  });
 
  // Multi-Align Araç Çubuğu Butonları
@@ -3495,7 +3636,8 @@ function esc(str) {
  });
 
  // 11. Klavye Kısayolları (Ctrl+Z, Ctrl+Y, Ctrl+D, Delete, Yön Tuşları ile İnce Kaydırma)
- window.addEventListener('keydown', (e) => {
+ if (designerKeydownHandler) window.removeEventListener('keydown', designerKeydownHandler);
+ designerKeydownHandler = (e) => {
  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
  if (currentMode !== 'designer') return;
  
@@ -3513,19 +3655,20 @@ function esc(str) {
  e.preventDefault();
  deleteSelectedComponent();
  } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-   const targets = (selectedItems && selectedItems.length > 0) ? selectedItems : (selectedItem ? [selectedItem] : []);
+   const candidates = (selectedItems && selectedItems.length > 0) ? selectedItems : (selectedItem ? [selectedItem] : []);
+   const targets = candidates.filter(c => findComponentCollection(c));
    if (targets.length > 0) {
      e.preventDefault();
-     const step = e.shiftKey ? 8 : ((gridSnapStep && gridSnapStep > 1) ? gridSnapStep : 1);
+     const step = e.altKey ? 1 : (e.shiftKey ? 10 : ((gridSnapStep && gridSnapStep > 1) ? gridSnapStep : 1));
      targets.forEach(c => {
-       if (e.key === 'ArrowUp') c.top = Math.max(0, (c.top || 0) - step);
-       if (e.key === 'ArrowDown') c.top = Math.max(0, (c.top || 0) + step);
-       if (e.key === 'ArrowLeft') c.left = Math.max(0, (c.left || 0) - step);
-       if (e.key === 'ArrowRight') c.left = Math.max(0, (c.left || 0) + step);
-       const domEl = (c.name ? containerEl.querySelector(`[data-comp-name="${c.name}"]`) : null);
+       if (e.key === 'ArrowUp') c.top = Math.max(0, toDesignerNumber(c.top) - step);
+       if (e.key === 'ArrowDown') c.top = Math.max(0, toDesignerNumber(c.top) + step);
+       if (e.key === 'ArrowLeft') c.left = Math.max(0, toDesignerNumber(c.left) - step);
+       if (e.key === 'ArrowRight') c.left = Math.max(0, toDesignerNumber(c.left) + step);
+       const domEl = findElementForComponent(c);
        if (domEl) {
-         domEl.style.left = `${c.left}px`;
-         domEl.style.top = `${c.top}px`;
+         clampComponentGeometry(c, getElementBounds(domEl));
+         syncComponentElement(domEl, c);
        }
      });
      if (selectedItem) {
@@ -3539,7 +3682,8 @@ function esc(str) {
    }
  }
  }
- });
+ };
+ window.addEventListener('keydown', designerKeydownHandler);
 
  bindCanvasInteraction();
  bindInspectorInputs();
@@ -3560,16 +3704,14 @@ function esc(str) {
  
  if (selectedItems && selectedItems.length > 0) {
    selectedItems.forEach(item => {
-     const targetEl = (item.name ? containerEl.querySelector(`[data-comp-name="${item.name}"]`) : null) ||
-                      containerEl.querySelector(`[title*="${item.name}"]`);
+     const targetEl = findElementForComponent(item);
      if (targetEl) {
        targetEl.classList.add('selected');
      }
    });
    if (selectedItems.length === 1 && currentMode === 'designer') {
      const item = selectedItems[0];
-     const targetEl = (item.name ? containerEl.querySelector(`[data-comp-name="${item.name}"]`) : null) ||
-                      containerEl.querySelector(`[title*="${item.name}"]`);
+     const targetEl = findElementForComponent(item);
      if (targetEl) {
        ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].forEach(pos => {
          const h = document.createElement('div');
@@ -3596,9 +3738,7 @@ function esc(str) {
  }
  }
  } else if (currentMode === 'designer') {
- const targetEl = (selectedItem.name ? containerEl.querySelector(`[data-comp-name="${selectedItem.name}"]`) : null) ||
- containerEl.querySelector(`[title*="${selectedItem.name}"]`) ||
- containerEl.querySelector(`[data-ctrl-idx]`);
+ const targetEl = findElementForComponent(selectedItem);
  if (targetEl) {
    targetEl.classList.add('selected');
    ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].forEach(pos => {

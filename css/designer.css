@@ -1561,3 +1561,110 @@ body.theme-light .designer-prop-select {
   border-radius: 2px;
   z-index: 99999;
 }
+
+/* ── TASARIM MODU ETKİLEŞİM YENİLEMESİ ───────────────────── */
+.designer-root .designer-toolbar {
+  padding: .55rem .7rem;
+  gap: .45rem .65rem;
+  background: color-mix(in srgb, var(--bg-surface) 96%, transparent);
+  box-shadow: 0 1px 0 var(--border-light), 0 4px 14px rgba(15, 23, 42, .035);
+}
+.designer-root .designer-toolbar-group,
+.designer-root .designer-comp-palette,
+.designer-root .designer-edit-bar,
+.designer-root .designer-zoom-ctrl {
+  min-height: 36px;
+}
+.designer-root .designer-comp-palette {
+  flex: 1 1 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding: .3rem;
+  gap: .2rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-raised) 72%, var(--bg-surface));
+}
+.designer-root .designer-palette-btn {
+  min-height: 30px;
+  padding: .34rem .58rem;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  white-space: nowrap;
+}
+.designer-root .designer-palette-btn:hover {
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--border));
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-surface));
+}
+.designer-root .designer-zoom-btn {
+  min-height: 28px;
+  padding-inline: .48rem;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.designer-root .designer-zoom-btn.active {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.fr-report-page.designer-mode,
+.fr-dialog-client {
+  --fr-designer-grid: 8px;
+}
+.fr-report-page.designer-mode.grid-snap-on,
+.fr-dialog-window.grid-snap-on .fr-dialog-client {
+  background-image: radial-gradient(rgba(37, 99, 235, .28) .7px, transparent .8px) !important;
+  background-size: var(--fr-designer-grid) var(--fr-designer-grid) !important;
+}
+.fr-report-page.designer-mode.grid-snap-off,
+.fr-dialog-window.grid-snap-off .fr-dialog-client {
+  background-image: none !important;
+}
+.fr-report-page.designer-mode .fr-view-item,
+.fr-dialog-window .fr-ctrl-item {
+  touch-action: none;
+  -webkit-user-drag: none;
+}
+.fr-report-page.designer-mode .fr-line-view { pointer-events: auto !important; min-height: 5px; }
+.fr-report-page.designer-mode .fr-view-item:hover,
+.fr-dialog-window .fr-ctrl-item:hover { cursor: grab; }
+.fr-report-page.designer-mode .fr-view-item.is-interacting,
+.fr-dialog-window .fr-ctrl-item.is-interacting { cursor: grabbing !important; }
+body.fr-designer-interacting,
+body.fr-designer-interacting * { user-select: none !important; }
+
+.fr-resize-handle {
+  width: 11px;
+  height: 11px;
+  border-width: 2px;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .9), 0 2px 5px rgba(15, 23, 42, .24);
+  touch-action: none;
+}
+.fr-resize-nw { top: -6px; left: -6px; }
+.fr-resize-n  { top: -6px; left: calc(50% - 5.5px); }
+.fr-resize-ne { top: -6px; right: -6px; }
+.fr-resize-e  { top: calc(50% - 5.5px); right: -6px; }
+.fr-resize-se { bottom: -6px; right: -6px; }
+.fr-resize-s  { bottom: -6px; left: calc(50% - 5.5px); }
+.fr-resize-sw { bottom: -6px; left: -6px; }
+.fr-resize-w  { top: calc(50% - 5.5px); left: -6px; }
+
+.fr-view-item.selected,
+.fr-ctrl-item.selected {
+  outline: 2px solid var(--accent, #2563eb) !important;
+  outline-offset: 2px;
+  overflow: visible !important;
+}
+.fr-smart-guide-line.vertical,
+.fr-smart-guide-line.horizontal {
+  background: #e11d48;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.72), 0 0 5px rgba(225,29,72,.4);
+}
+
+@media (max-width: 900px) {
+  .designer-root .designer-toolbar { align-items: stretch; }
+  .designer-root .designer-toolbar-group { max-width: 100%; overflow-x: auto; }
+  .designer-root .designer-page-tabs { min-width: max-content; }
+  .designer-root .designer-comp-palette { order: 10; }
+}
