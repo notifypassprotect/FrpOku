@@ -854,19 +854,31 @@ function updateBulkBar() {
       btnCompare.textContent = count === 2 ? 'Karşılaştır' : `Seçilen ${count} Raporu Karşılaştır`;
     }
 
-    // Havuz Butonlarının Dinamik Durum Yönetimi
+    // Havuz Butonlarının Dinamik Durum Yönetimi (Asla aynı anda ikisi birden görünmez)
     const btnSharePool = document.getElementById('btnBulkSharePool');
     const btnRemovePool = document.getElementById('btnBulkRemovePool');
     
     const selectedFiles = [...selectedIds].map(id => FrpStore.getById(id)).filter(Boolean);
     const inPoolCount = selectedFiles.filter(f => !!(f.isPublic || f.is_public || f.inPool)).length;
     const notInPoolCount = selectedFiles.length - inPoolCount;
+    const curWs = FrpStore.getActiveWorkspace ? FrpStore.getActiveWorkspace() : 'personal';
 
-    if (btnSharePool) {
-      btnSharePool.style.display = notInPoolCount > 0 ? 'inline-flex' : 'none';
-    }
-    if (btnRemovePool) {
-      btnRemovePool.style.display = inPoolCount > 0 ? 'inline-flex' : 'none';
+    if (curWs === 'pool') {
+      if (btnSharePool) btnSharePool.style.display = 'none';
+      if (btnRemovePool) btnRemovePool.style.display = inPoolCount > 0 ? 'inline-flex' : 'none';
+    } else {
+      // Seçilenlerin tamamı havuzdaysa -> yalnızca "Havuzdan Kaldır" göster
+      // Aralarında havuzda olmayan varsa -> yalnızca "Havuza Ekle" göster
+      if (notInPoolCount > 0) {
+        if (btnSharePool) btnSharePool.style.display = 'inline-flex';
+        if (btnRemovePool) btnRemovePool.style.display = 'none';
+      } else if (inPoolCount > 0) {
+        if (btnSharePool) btnSharePool.style.display = 'none';
+        if (btnRemovePool) btnRemovePool.style.display = 'inline-flex';
+      } else {
+        if (btnSharePool) btnSharePool.style.display = 'none';
+        if (btnRemovePool) btnRemovePool.style.display = 'none';
+      }
     }
   } else {
     bulkBar.classList.remove('show');

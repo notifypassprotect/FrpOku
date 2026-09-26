@@ -120,3 +120,16 @@ test('multiline select * from followed by subquery or derived table does not rep
   const diagErrors = Array.from(ctx.findSyntaxErrors(sql, 'sql')).filter(d => (d.message || '').includes('tablo adı eksik'));
   assert.equal(diagErrors.length, 0, 'Highlight diagnostics must not report missing table');
 });
+
+test('table function with parameter list does not produce Cartesian product warning', () => {
+  const ctx = loadSqlAnalyzers();
+  const sql = `select * from table(p_istatistik2.isci_nobet_gunleri(:t1, :t2))`;
+  const res = ctx.FrpSyntaxCheck.checkSqlStaticSyntax(sql);
+  const cartesianWarnings = res.warnings.filter(w => w.includes('Kartezyen'));
+  assert.equal(cartesianWarnings.length, 0, 'TABLE(pkg.func(:t1, :t2)) must not be flagged as Cartesian product');
+
+  const cartesianSql = `select * from emp e, dept d where e.dept_id = d.id`;
+  const resCartesian = ctx.FrpSyntaxCheck.checkSqlStaticSyntax(cartesianSql);
+  assert.equal(resCartesian.warnings.some(w => w.includes('Kartezyen')), true, 'Comma-separated tables must still be flagged');
+});
+

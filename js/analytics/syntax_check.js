@@ -562,8 +562,49 @@
  }
 
  // 3. Kartezyen Çarpım (Cartesian Product) Uyarısı
- if (hasSelect && upper.includes(' FROM ') &&!upper.includes(' JOIN ') && upper.split(' FROM ')[1]?.split(/\b(WHERE|GROUP|ORDER|HAVING)\b/)[0]?.includes(',')) {
- warnings.push("Birden fazla tablo virgülle birleştirilmiş fakat JOIN sözcüğü kullanılmamış. Kartezyen çarpım (Cross Join) ve performans sorunlarına yol açabilir.");
+ // Parantez içi (TABLE(:t1, :t2) veya alt sorgu) virgülleri tablo ayracı sayılmaz.
+ // Yalnızca FROM maddesinde en üst düzeyde (depth === 0) virgülle ayrılmış tablolar varsa uyar.
+ function hasCartesianComma(source) {
+   const clean = String(source || '')
+     .replace(/--[^\n]*/g, match => ' '.repeat(match.length))
+     .replace(/\/\*[\s\S]*?\*\//g, match => ' '.repeat(match.length))
+     .replace(/'(?:''|[^'])*'/g, match => ' '.repeat(match.length));
+   let depth = 0;
+   let fromIdx = -1;
+   for (let i = 0; i < clean.length; i++) {
+     const ch = clean[i];
+     if (ch === '(') { depth++; continue; }
+     if (ch === ')') { depth = Math.max(0, depth - 1); continue; }
+     if (depth === 0 && fromIdx < 0 && /\bFROM\b/i.test(clean.slice(i, i + 5))) {
+       fromIdx = i + 4;
+       break;
+     }
+   }
+   if (fromIdx < 0) return false;
+   depth = 0;
+   let hasTopLevelComma = false;
+   let hasTopLevelJoin = false;
+   for (let i = fromIdx; i < clean.length; i++) {
+     const ch = clean[i];
+     if (ch === '(') { depth++; continue; }
+     if (ch === ')') { depth = Math.max(0, depth - 1); continue; }
+     if (depth === 0) {
+       if (/^(?:WHERE|GROUP\s+BY|ORDER\s+BY|HAVING|UNION|INTERSECT|MINUS|LIMIT|OFFSET)\b/i.test(clean.slice(i))) {
+         break;
+       }
+       if (/^\b(?:JOIN|LEFT\s+JOIN|RIGHT\s+JOIN|INNER\s+JOIN|OUTER\s+JOIN|FULL\s+JOIN|CROSS\s+JOIN)\b/i.test(clean.slice(i))) {
+         hasTopLevelJoin = true;
+       }
+       if (ch === ',') {
+         hasTopLevelComma = true;
+       }
+     }
+   }
+   return hasTopLevelComma && !hasTopLevelJoin;
+ }
+
+ if (hasSelect && hasCartesianComma(sql)) {
+   warnings.push("Birden fazla tablo virgülle birleştirilmiş fakat JOIN sözcüğü kullanılmamış. Kartezyen çarpım (Cross Join) ve performans sorunlarına yol açabilir.");
  }
 
  // 4. Standart Sözdizimi Kontrolleri

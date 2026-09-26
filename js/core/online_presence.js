@@ -1535,16 +1535,27 @@
     return Boolean(panelEl && panelEl.classList.contains('open'));
   }
 
+  let highestChatZIndex = 100005;
+
   function getChatBaseOffset() {
     if (!isPresencePanelOpen()) return 24;
     const panelEl = dockEl.querySelector('#frpPresencePanel');
-    const panelWidth = panelEl ? panelEl.getBoundingClientRect().width : 380;
-    return Math.ceil(panelWidth) + 36;
+    const panelWidth = (panelEl && panelEl.offsetWidth > 0)
+      ? Math.ceil(panelEl.getBoundingClientRect().width || panelEl.offsetWidth)
+      : 400;
+    // Dock is at right: 24px, panel is at right: 0 inside dock. Total right span is 24 + panelWidth.
+    // 16px clean gap ensures zero overlap with panel.
+    return 24 + panelWidth + 16;
   }
 
   function isMobileChatLayout() {
     return Boolean(window.matchMedia && window.matchMedia('(max-width: 640px)').matches);
   }
+
+  const CHAT_WIN_NORMAL_WIDTH = 380;
+  const CHAT_WIN_MIN_WIDTH = 210;
+  const CHAT_WIN_MAX_WIDTH = 600;
+  const CHAT_WIN_GAP = 16;
 
   // ── DİNAMİK PENCERE HİZALAMA (BOŞLUKSUZ & TAŞMAYI ÖNLEYEN YERLEŞİM) ──
   function realignChatWindows() {
@@ -1565,7 +1576,7 @@
     const vpWidth = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 1920;
 
     // Ekrana sığabilecek maksimum açık (genişletilmiş) pencere sayısı
-    const maxExpanded = Math.max(1, Math.min(3, Math.floor((vpWidth - baseOffset - 60) / 425)));
+    const maxExpanded = Math.max(1, Math.min(3, Math.floor((vpWidth - baseOffset - 60) / (CHAT_WIN_NORMAL_WIDTH + CHAT_WIN_GAP))));
 
     const expandedWins = windowsArr.filter(w => !w.el.classList.contains('minimized'));
 
@@ -1584,24 +1595,22 @@
       const measuredWidth = Math.ceil(winObj.el.getBoundingClientRect().width || 0);
 
       // Kararlı slot genişliği: Animasyon geçişindeki gecikmeleri ve boşlukları önler
-      const targetWidth = isMin ? 200 : (isMax ? Math.min(600, vpWidth - 32) : Math.min(380, vpWidth - 32));
-      const winWidth = targetWidth;
+      const targetWidth = isMin ? CHAT_WIN_MIN_WIDTH : (isMax ? Math.min(CHAT_WIN_MAX_WIDTH, vpWidth - 32) : Math.min(CHAT_WIN_NORMAL_WIDTH, vpWidth - 32));
 
       // Sol kenardan taşmayı önle
-      if (currentRight + winWidth > vpWidth - 16) {
+      if (currentRight + targetWidth > vpWidth - 16) {
         if (!isMin) {
           winObj.el.classList.add('minimized');
         }
       }
 
       const finalIsMin = winObj.el.classList.contains('minimized');
-      const finalWidth = finalIsMin ? 200 : (isMax ? Math.min(600, vpWidth - 32) : Math.min(380, vpWidth - 32));
+      const finalWidth = finalIsMin ? CHAT_WIN_MIN_WIDTH : (isMax ? Math.min(CHAT_WIN_MAX_WIDTH, vpWidth - 32) : Math.min(CHAT_WIN_NORMAL_WIDTH, vpWidth - 32));
 
       winObj.el.style.right = `${currentRight}px`;
       winObj.el.style.transition = 'right 0.22s cubic-bezier(0.16, 1, 0.3, 1), height 0.2s ease, width 0.2s ease';
 
-      const step = finalWidth + 14;
-      currentRight += step;
+      currentRight += finalWidth + CHAT_WIN_GAP;
     });
   }
 
@@ -1622,6 +1631,7 @@
     if (activeChatWindows.has(chatKey)) {
       const activeObj = activeChatWindows.get(chatKey);
       activeObj.el.classList.remove('minimized', 'maximized');
+      activeObj.el.style.zIndex = ++highestChatZIndex;
       activeObj.resume?.();
       activeObj.syncViewport?.();
       realignChatWindows();
@@ -1639,14 +1649,18 @@
     }
 
     const baseOffset = getChatBaseOffset();
-    const rightOffset = baseOffset + (activeChatWindows.size * 418);
+    const rightOffset = baseOffset + (activeChatWindows.size * (CHAT_WIN_NORMAL_WIDTH + CHAT_WIN_GAP));
 
     const previousFocus = document.activeElement;
     const chatEl = document.createElement('div');
     chatEl.className = 'frp-chat-window';
     chatEl.style.right = `${rightOffset}px`;
+    chatEl.style.zIndex = ++highestChatZIndex;
     chatEl.setAttribute('role', 'dialog');
     chatEl.setAttribute('aria-label', `${chatTitle || 'Sohbet'} konuşması`);
+    chatEl.addEventListener('pointerdown', () => {
+      chatEl.style.zIndex = ++highestChatZIndex;
+    }, { passive: true });
 
     const userStatus = (!isRoom && !isGroup) ? (targetUser.status || (targetUser.isOnline ? 'online' : 'offline')) : 'online';
     let statusDotColor = '#10b981';
