@@ -411,7 +411,7 @@ function parseFrp(xmlText) {
     return isNaN(n) ? fallback : n;
   }
 
-  function parseComponentNode(type, attrsChunk) {
+  function parseComponentNode(type, attrsChunk, innerContent = '') {
     const name = getAttr(attrsChunk, 'Name') || type;
     const left = numVal(getAttr(attrsChunk, 'Left'), 0);
     const top = numVal(getAttr(attrsChunk, 'Top'), 0);
@@ -491,6 +491,17 @@ function parseFrp(xmlText) {
 
     // Shape properties
     const shape = getAttr(attrsChunk, 'Shape') || 'skRectangle';
+
+    // Picture / Resim properties
+    let pictureData = getAttr(attrsChunk, 'Picture.Data') || getAttr(attrsChunk, 'Picture') || getAttr(attrsChunk, 'Picture.PropData') || '';
+    if (!pictureData && innerContent) {
+      const picMatch = innerContent.match(/<Picture\b[^>]*>([\s\S]*?)<\/Picture>/i);
+      if (picMatch) pictureData = picMatch[1].trim();
+    }
+    const fileLink = getAttr(attrsChunk, 'FileLink') || '';
+    const keepAspectRatio = getAttr(attrsChunk, 'KeepAspectRatio') !== 'False';
+    const center = getAttr(attrsChunk, 'Center') === 'True';
+    const isStretched = getAttr(attrsChunk, 'Stretched') === 'True';
     
     return {
       type,
@@ -537,6 +548,11 @@ function parseFrp(xmlText) {
       xField,
       yField,
       shape,
+      picture: pictureData,
+      fileLink,
+      keepAspectRatio,
+      center,
+      stretched: isStretched,
       rawAttrs: attrsChunk
     };
   }
@@ -591,7 +607,7 @@ function parseFrp(xmlText) {
       while ((cMatch = compRx.exec(bContent)) !== null) {
         const cType = cMatch[1];
         const cAttrs = cMatch[2];
-        const compObj = parseComponentNode(cType, cAttrs);
+        const compObj = parseComponentNode(cType, cAttrs, cMatch[3]);
         bandObj.components.push(compObj);
       }
 
@@ -606,7 +622,7 @@ function parseFrp(xmlText) {
     while ((dcMatch = directCompRx.exec(directPContent)) !== null) {
       const cType = dcMatch[1];
       const cAttrs = dcMatch[2];
-      const compObj = parseComponentNode(cType, cAttrs);
+      const compObj = parseComponentNode(cType, cAttrs, dcMatch[3]);
       directComponents.push(compObj);
     }
 
@@ -664,7 +680,7 @@ function parseFrp(xmlText) {
     const fallbackCompRx = /<(Tfrx[A-Za-z0-9_]+View|TfrxChartView|TfrxShapeView|TfrxDMPMemoView|TfrxBarCodeView|TfrxPictureView|TfrxLineView|TfrxMemoView|TfrxSubreport)\b([\s\S]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi;
     let fallbackMatch;
     while ((fallbackMatch = fallbackCompRx.exec(xmlText)) !== null) {
-      fallbackComponents.push(parseComponentNode(fallbackMatch[1], fallbackMatch[2]));
+      fallbackComponents.push(parseComponentNode(fallbackMatch[1], fallbackMatch[2], fallbackMatch[3]));
     }
 
     if (fallbackComponents.length > 0) {

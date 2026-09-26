@@ -363,6 +363,59 @@ function esc(str) {
     `;
   }
 
+  // ── FASTREPORT DELPHI HEX RESİM AKIŞI DÖNÜŞTÜRÜCÜ ─────────
+  function decodeDelphiPictureHex(hexStr) {
+    if (!hexStr || typeof hexStr !== 'string') return null;
+    let cleanHex = hexStr.replace(/\s+/g, '');
+    if (cleanHex.length < 16) return null;
+    if (cleanHex.startsWith('data:image/')) return hexStr.trim();
+
+    const upper = cleanHex.toUpperCase();
+    let mimeType = 'image/png';
+    let dataStartIndex = -1;
+
+    const pngIdx = upper.indexOf('89504E47');
+    const jpgIdx = upper.indexOf('FFD8FF');
+    const bmpIdx = upper.indexOf('424D');
+    const gifIdx = upper.indexOf('47494638');
+
+    if (pngIdx !== -1 && (jpgIdx === -1 || pngIdx <= jpgIdx)) {
+      mimeType = 'image/png';
+      dataStartIndex = pngIdx;
+    } else if (jpgIdx !== -1) {
+      mimeType = 'image/jpeg';
+      dataStartIndex = jpgIdx;
+    } else if (bmpIdx !== -1) {
+      mimeType = 'image/bmp';
+      dataStartIndex = bmpIdx;
+    } else if (gifIdx !== -1) {
+      mimeType = 'image/gif';
+      dataStartIndex = gifIdx;
+    } else {
+      dataStartIndex = 0;
+      mimeType = 'image/bmp';
+    }
+
+    try {
+      const payloadHex = cleanHex.slice(dataStartIndex);
+      const byteLen = Math.floor(payloadHex.length / 2);
+      const bytes = new Uint8Array(byteLen);
+      for (let i = 0; i < byteLen; i++) {
+        bytes[i] = parseInt(payloadHex.substr(i * 2, 2), 16);
+      }
+
+      let binary = '';
+      const chunk = 8192;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+      }
+      const base64 = btoa(binary);
+      return `data:${mimeType};base64,${base64}`;
+    } catch {
+      return null;
+    }
+  }
+
  // Delphi Date to formatted string (Delphi float date 45954 -> DD.MM.YYYY)
  function delphiDateToStr(val) {
  if (!val) return '09.02.2024';
@@ -874,12 +927,40 @@ function esc(str) {
 
  // 3. Resim / Logo (TfrxPictureView)
  if (comp.type === 'TfrxPictureView') {
+ const rawPic = comp.picture || comp.pictureData || comp.data || '';
+ const imgUrl = decodeDelphiPictureHex(rawPic);
+ const objectFit = comp.keepAspectRatio !== false && comp.keepAspectRatio !== 'false' ? 'contain' : (comp.stretched ? 'fill' : 'scale-down');
+ const objectPosition = comp.center ? 'center' : 'left top';
+ const label = comp.dataField || comp.fileLink || comp.name || 'Logo';
+ const binding = comp.dataSet ? `${comp.dataSet}.${comp.dataField || ''}` : (comp.fileLink ? comp.fileLink : '');
+
+ let contentHtml = '';
+ if (imgUrl) {
+ contentHtml = `<img class="fr-picture-img" src="${imgUrl}" style="object-fit:${objectFit};object-position:${objectPosition};" alt="${esc(label)}" />`;
+ } else {
+ contentHtml = `
+ <div class="fr-picture-placeholder">
+ <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+ <rect x="3" y="3" width="18" height="18" rx="3"/>
+ <circle cx="8.5" cy="8.5" r="1.5"/>
+ <polyline points="21 15 16 10 5 21"/>
+ </svg>
+ <span class="fr-picture-title">${esc(label)}</span>
+ ${binding ? `<span class="fr-picture-sub">${esc(binding)}</span>` : ''}
+ </div>
+ `;
+ }
+
  return `
- <div class="fr-view-item fr-picture-view ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
+ <div class="fr-view-item fr-picture-view ${hasEvent ? 'fr-has-event' : ''} ${isSelected ? 'selected' : ''}"
  data-band-idx="${bIdx}" data-comp-idx="${cIdx}" data-comp-name="${esc(comp.name || '')}"
- style="left:${comp.left}px; top:${comp.top}px; width:${comp.width}px; height:${comp.height}px;"
- title="${esc(comp.name)} [${esc(comp.dataField || 'Logo')}]${eventTitle}">
- ️ ${esc(comp.dataField || comp.name)}
+ style="
+ left:${comp.left}px; top:${comp.top}px; width:${comp.width}px; height:${comp.height}px;
+ border:${comp.frameWidth || 1}px ${isSelected ? 'solid var(--accent, #2563eb)' : 'dashed #94a3b8'};
+ background-color:${fillBg === 'transparent' ? 'rgba(248, 250, 252, 0.9)' : fillBg};
+ "
+ title="${esc(comp.name)} [Resim: ${esc(label)}]${eventTitle}">
+ ${contentHtml}
  ${renderResizeHandles(isSelected)}
  </div>
  `;
@@ -1772,8 +1853,11 @@ function esc(str) {
 
     if (obj.type === 'TfrxPictureView') {
       propList.push(
-        { name: 'Picture.File', val: obj.picture || obj.file || '', propKey: 'picture', editable: isDesignEditing },
-        { name: 'KeepAspectRatio', val: obj.keepAspectRatio !== false ? 'true' : 'false', propKey: 'keepAspectRatio', isSelect: isDesignEditing, options: ['true', 'false'] }
+        { name: 'Picture.File', val: obj.picture || obj.file || obj.fileLink || '', propKey: 'picture', editable: isDesignEditing },
+        { name: 'FileLink', val: obj.fileLink || '', propKey: 'fileLink', editable: isDesignEditing },
+        { name: 'KeepAspectRatio', val: obj.keepAspectRatio !== false ? 'true' : 'false', propKey: 'keepAspectRatio', isSelect: isDesignEditing, options: ['true', 'false'] },
+        { name: 'Stretched', val: obj.stretched ? 'true' : 'false', propKey: 'stretched', isSelect: isDesignEditing, options: ['true', 'false'] },
+        { name: 'Center', val: obj.center ? 'true' : 'false', propKey: 'center', isSelect: isDesignEditing, options: ['true', 'false'] }
       );
     } else if (obj.type === 'TfrxBarCodeView' || obj.type === 'TfrxQRCodeView' || obj.type === 'TfrxBarcode2DView') {
       propList.push(
