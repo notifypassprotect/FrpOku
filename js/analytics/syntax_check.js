@@ -912,13 +912,19 @@
     const missingSourceMatch = /^(?:FROM|INTO|UPDATE)\s*$/i.exec(trim);
     if (missingSourceMatch) {
       if (!nextTrim || clauseStartRx.test(nextTrim)) {
-        const kw = missingSourceMatch[0].trim().toUpperCase();
         errors.push(`Satır ${lineNo}: FROM/INTO/UPDATE sonrasında tablo adı eksik.`);
       }
     } else {
-      const inlineMissingSource = /\b(FROM|INTO|UPDATE)\s*(?:WHERE|SET|GROUP\s+BY|ORDER\s+BY|HAVING|\)|$)/i.exec(trim);
-      if (inlineMissingSource && !/\b(?:FROM|INTO|UPDATE)\s+[a-zA-Z0-9_$.]+/i.test(trim)) {
-        errors.push(`Satır ${lineNo}: FROM/INTO/UPDATE sonrasında tablo adı eksik.`);
+      const endsWithKw = /\b(FROM|INTO|UPDATE)\s*$/i.exec(trim);
+      if (endsWithKw) {
+        if (!nextTrim || clauseStartRx.test(nextTrim)) {
+          errors.push(`Satır ${lineNo}: FROM/INTO/UPDATE sonrasında tablo adı eksik.`);
+        }
+      } else {
+        const inlineMissingSource = /\b(FROM|INTO|UPDATE)\s+(?:WHERE|SET|GROUP\s+BY|ORDER\s+BY|HAVING|\))/i.exec(trim);
+        if (inlineMissingSource && !/\b(?:FROM|INTO|UPDATE)\s+(?:[a-zA-Z0-9_$.]+|\()/i.test(trim)) {
+          errors.push(`Satır ${lineNo}: FROM/INTO/UPDATE sonrasında tablo adı eksik.`);
+        }
       }
     }
 

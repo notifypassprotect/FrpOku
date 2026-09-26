@@ -859,10 +859,18 @@ function findSyntaxErrors(code, lang = 'sql') {
           addDiagnostic(lineNo, clean.toUpperCase().indexOf(kw) + 1, kw, `${kw} sonrasına tablo adı yazın`, `'${kw}' ifadesinde tablo adı eksik.`);
         }
       } else {
-        const inlineMissingSource = /\b(FROM|INTO|UPDATE)\s+(?:WHERE|SET|GROUP\s+BY|ORDER\s+BY|HAVING|\))/i.exec(trim);
-        if (inlineMissingSource && !/\b(?:FROM|INTO|UPDATE)\s+[a-zA-Z0-9_$.]+/i.test(trim)) {
-          const kw = inlineMissingSource[1].toUpperCase();
-          addDiagnostic(lineNo, clean.toUpperCase().indexOf(kw) + 1, kw, `${kw} sonrasına tablo adı yazın`, `'${kw}' ifadesinde tablo adı eksik.`);
+        const endsWithKw = /\b(FROM|INTO|UPDATE)\s*$/i.exec(trim);
+        if (endsWithKw) {
+          if (!nextTrim || clauseStartRx.test(nextTrim)) {
+            const kw = endsWithKw[1].toUpperCase();
+            addDiagnostic(lineNo, clean.toUpperCase().lastIndexOf(kw) + 1, kw, `${kw} sonrasına tablo adı yazın`, `'${kw}' ifadesinde tablo adı eksik.`);
+          }
+        } else {
+          const inlineMissingSource = /\b(FROM|INTO|UPDATE)\s+(?:WHERE|SET|GROUP\s+BY|ORDER\s+BY|HAVING|\))/i.exec(trim);
+          if (inlineMissingSource && !/\b(?:FROM|INTO|UPDATE)\s+(?:[a-zA-Z0-9_$.]+|\()/i.test(trim)) {
+            const kw = inlineMissingSource[1].toUpperCase();
+            addDiagnostic(lineNo, clean.toUpperCase().indexOf(kw) + 1, kw, `${kw} sonrasına tablo adı yazın`, `'${kw}' ifadesinde tablo adı eksik.`);
+          }
         }
       }
 

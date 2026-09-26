@@ -107,3 +107,16 @@ test('designer resolves encoded Delphi system colors instead of treating their i
   assert.equal(ctx.window.FastReportDesigner.decodeColor('-16777189'), 'rgb(185, 209, 234)');
   assert.equal(ctx.window.FastReportDesigner.decodeColor('27'), 'rgb(185, 209, 234)');
 });
+
+test('multiline select * from followed by subquery or derived table does not report missing table error', () => {
+  const ctx = loadSqlAnalyzers();
+  const sql = `select * from
+(select cc.*,case when (cc.ham_puan-cc.puan_toplam)>0 then (select distinct to_char(list(distinct gp.UYGULANAN_KURAL)) from GIP_KURAL_CARI gp where gp.DONEM_ID=:donem and gp.DOKTOR_ID=cc.id and gp.TETKIK_KODU=cc.kodu) end from dual)`;
+
+  const res = ctx.FrpSyntaxCheck.checkSqlStaticSyntax(sql);
+  const fromErrors = res.errors.filter(e => e.includes('FROM/INTO/UPDATE sonrasında tablo adı eksik'));
+  assert.equal(fromErrors.length, 0, 'Must not report missing table for select * from followed by subquery');
+
+  const diagErrors = Array.from(ctx.findSyntaxErrors(sql, 'sql')).filter(d => (d.message || '').includes('tablo adı eksik'));
+  assert.equal(diagErrors.length, 0, 'Highlight diagnostics must not report missing table');
+});

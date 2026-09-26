@@ -439,6 +439,7 @@ function esc(str) {
  let currentZoom = 1.0;
  let currentMode = 'designer'; // 'designer' | 'preview'
  let showRulers = true; // Cetveller Açık / Kapalı
+ let gridSnapStep = 4; // 1 (serbest) | 4 | 8 px manyetik ızgara adımı
  let selectedItem = null;
  let selectedItems = [];
  let showInspector = !window.matchMedia('(max-width: 768px)').matches;
@@ -447,8 +448,8 @@ function esc(str) {
  let inspectorTab = 'properties'; // 'properties' | 'events' | 'favorites'
  let inspectorWidth = parseInt(localStorage.getItem('frp_inspector_width') || '330', 10);
 
- // Canlı Tasarım Düzenleme Modu & Geri Al (Undo/Redo) Durumu
- let isDesignEditing = false;
+ // Canlı Tasarım Düzenleme Modu & Geri Al (Undo/Redo) Durumu (Tasarımcıda daima aktif)
+ let isDesignEditing = true;
  let undoStack = [];
  let redoStack = [];
  let initialPagesBackup = null;
@@ -461,6 +462,11 @@ function esc(str) {
 ...pages.map((p, i) => ({ type: 'report', data: p, id: 'page_' + i, name: p.name || `Page${i + 1}` })),
 ...dialogPages.map((d, i) => ({ type: 'dialog', data: d, id: 'dialog_' + i, name: d.name || `DialogPage${i + 1}` }))
  ];
+
+ if (allPages.length > 0) {
+   initialPagesBackup = JSON.parse(JSON.stringify(allPages.map(p => p.data)));
+   undoStack = [JSON.stringify(allPages.map(p => p.data))];
+ }
 
  let activePageIndex = 0;
 
@@ -659,6 +665,9 @@ function esc(str) {
  <button type="button" class="designer-palette-btn" id="btnToolAddDateEdit" title="Yeni Tarih Seçici Ekle">Tarih</button>
  <button type="button" class="designer-palette-btn" id="btnToolAddCombobox" title="Yeni Açılır Liste Ekle">Combo</button>
  <button type="button" class="designer-palette-btn" id="btnToolAddPanel" title="Yeni Panel Ekle">Panel</button>
+ <button type="button" class="designer-palette-btn" id="btnDuplicateSelected" title="Seçili Bileşeni Çoğalt (Ctrl+D)">📋 Çoğalt</button>
+ <button type="button" class="designer-palette-btn" id="btnBringToFront" title="En Öne Getir">🔼 Öne</button>
+ <button type="button" class="designer-palette-btn" id="btnSendToBack" title="En Arkaya Gönder">🔽 Arkaya</button>
  <button type="button" class="designer-palette-btn danger" id="btnToolDeleteSelected" title="Seçili Bileşeni Sil (Delete)">Sil</button>
  </div>
 
@@ -675,6 +684,10 @@ function esc(str) {
  <button type="button" class="fr-align-btn" id="btnDistributeH" title="Yatayda Eşit Dağıt">⬌ Dağıt</button>
  <button type="button" class="fr-align-btn" id="btnDistributeV" title="Dikeyde Eşit Dağıt">⬍ Dağıt</button>
  <div class="fr-align-sep"></div>
+ <button type="button" class="fr-align-btn" id="btnMultiDuplicate" title="Seçilileri Çoğalt">📋 Çoğalt</button>
+ <button type="button" class="fr-align-btn" id="btnMultiFront" title="Seçilileri En Öne Getir">🔼 Öne</button>
+ <button type="button" class="fr-align-btn" id="btnMultiBack" title="Seçilileri En Arkaya Gönder">🔽 Arkaya</button>
+ <div class="fr-align-sep"></div>
  <button type="button" class="fr-align-btn danger" id="btnDeleteMulti" title="Tüm Seçilileri Sil">🗑️ Sil</button>
  </div>
  `: ''}
@@ -687,6 +700,7 @@ function esc(str) {
  <button type="button" class="designer-zoom-btn" id="btnZoomIn" title="Büyüt">+</button>
  <button type="button" class="designer-zoom-btn" id="btnZoomFit" title="Sayfaya Sığdır" style="margin-left:.25rem;font-size:.75rem;">Sığdır</button>
  <button type="button" class="designer-zoom-btn ${showRulers ? 'active' : ''}" id="btnToggleRulers" title="Cetvelleri Göster / Gizle" style="margin-left:.25rem;font-size:.75rem;padding:0 6px;">📏 Cetvel</button>
+ <button type="button" class="designer-zoom-btn ${gridSnapStep > 1 ? 'active' : ''}" id="btnToggleGridSnap" title="Manyetik Izgara Adımı" style="margin-left:.25rem;font-size:.75rem;padding:0 6px;">🧲 Izgara: ${gridSnapStep > 1 ? gridSnapStep + 'px' : 'Kapalı'}</button>
  </div>
 
  <!-- Sağ Panel Sekmeleri: Inspector vs Data Tree -->
@@ -922,7 +936,7 @@ function esc(str) {
     const finalPageMinHeight = Math.max(stdPaperHeight, totalBandsHeight + topMarginPx + bottomMarginPx + 60);
 
     function renderResizeHandles(isSelected) {
- if (!isSelected || currentMode!== 'designer' ||!isDesignEditing) return '';
+ if (!isSelected || currentMode !== 'designer') return '';
  return `
  <div class="fr-resize-handle fr-resize-nw" data-handle="nw"></div>
  <div class="fr-resize-handle fr-resize-n" data-handle="n"></div>
@@ -965,7 +979,10 @@ function esc(str) {
 
  const isRotated90 = comp.rotation === 90;
  // SEÇİM DURUMU: YALNIZCA VE YALNIZCA Tasarımcı Modunda Aktif!
- const isSelected = (currentMode === 'designer') && selectedItem && selectedItem.name === comp.name;
+ const isSelected = (currentMode === 'designer') && (
+   (selectedItem && selectedItem.name === comp.name) ||
+   (selectedItems && selectedItems.some(si => si.name === comp.name))
+ );
 
  // Event Durumu (Sol üstte kırmızı ok/üçgen - Image 3)
  const hasEvent = Boolean(comp.onBeforePrint || comp.onClick || comp.onAfterPrint || comp.onPreviewClick || comp.onKeyDown || (comp.rawAttrs && /\bOn[A-Z]\w+=/i.test(comp.rawAttrs)));
@@ -2642,6 +2659,110 @@ function esc(str) {
    else if (typeof toast === 'function') toast('Seçili bileşenler hizalandı', 'info');
  }
 
+ // ── BİLEŞEN ÇOĞALTMA (DUPLICATE) ──
+ function duplicateSelected() {
+   if (!isDesignEditing) isDesignEditing = true;
+   const activePage = allPages[activePageIndex];
+   if (!activePage) return;
+
+   const targets = (selectedItems && selectedItems.length > 0) ? [...selectedItems] : (selectedItem ? [selectedItem] : []);
+   if (targets.length === 0) {
+     if (window.FrpNotify) window.FrpNotify.info('Çoğaltmak için bir veya daha fazla bileşen seçin.');
+     return;
+   }
+
+   pushUndoState();
+   const newItems = [];
+
+   targets.forEach(orig => {
+     if (!orig || !orig.name) return;
+     const clone = JSON.parse(JSON.stringify(orig));
+     const randSuffix = Math.floor(100 + Math.random() * 900);
+     const baseName = (orig.name || 'Comp').replace(/\d+$/, '');
+     clone.name = `${baseName}_Copy${randSuffix}`;
+     const offset = (gridSnapStep && gridSnapStep > 1) ? Math.max(gridSnapStep, 8) : 10;
+     clone.left = (clone.left || 0) + offset;
+     clone.top = (clone.top || 0) + offset;
+
+     if (activePage.type === 'report') {
+       let placed = false;
+       (activePage.data.bands || []).forEach(b => {
+         if (!placed && (b.components || []).some(c => c.name === orig.name)) {
+           b.components.push(clone);
+           placed = true;
+         }
+       });
+       if (!placed && activePage.data.bands && activePage.data.bands.length > 0) {
+         activePage.data.bands[0].components = activePage.data.bands[0].components || [];
+         activePage.data.bands[0].components.push(clone);
+       }
+     } else {
+       activePage.data.controls = activePage.data.controls || [];
+       activePage.data.controls.push(clone);
+     }
+     newItems.push(clone);
+   });
+
+   if (newItems.length > 0) {
+     selectedItems = newItems;
+     selectedItem = newItems[newItems.length - 1];
+     render();
+     updateSelection();
+     pushUndoState();
+     if (window.FrpNotify) window.FrpNotify.success(`${newItems.length} bileşen çoğaltıldı.`);
+     else if (typeof toast === 'function') toast(`${newItems.length} bileşen çoğaltıldı.`, 'success');
+   }
+ }
+
+ // ── Z-ORDER DÜZENLEME (Öne / Arkaya) ──
+ function changeZOrder(direction) {
+   if (!isDesignEditing) isDesignEditing = true;
+   const activePage = allPages[activePageIndex];
+   if (!activePage) return;
+
+   const targets = (selectedItems && selectedItems.length > 0) ? selectedItems : (selectedItem ? [selectedItem] : []);
+   if (targets.length === 0) return;
+
+   pushUndoState();
+
+   if (activePage.type === 'report') {
+     (activePage.data.bands || []).forEach(b => {
+       if (!b.components || b.components.length <= 1) return;
+       targets.forEach(t => {
+         const idx = b.components.findIndex(c => c.name === t.name);
+         if (idx !== -1) {
+           const [item] = b.components.splice(idx, 1);
+           if (direction === 'front') {
+             b.components.push(item);
+           } else {
+             b.components.unshift(item);
+           }
+         }
+       });
+     });
+   } else {
+     if (activePage.data.controls && activePage.data.controls.length > 1) {
+       targets.forEach(t => {
+         const idx = activePage.data.controls.findIndex(c => c.name === t.name);
+         if (idx !== -1) {
+           const [item] = activePage.data.controls.splice(idx, 1);
+           if (direction === 'front') {
+             activePage.data.controls.push(item);
+           } else {
+             activePage.data.controls.unshift(item);
+           }
+         }
+       });
+     }
+   }
+
+   render();
+   updateSelection();
+   pushUndoState();
+   const label = direction === 'front' ? 'öne getirildi' : 'arkaya gönderildi';
+   if (window.FrpNotify) window.FrpNotify.info(`Bileşen(ler) en ${label}.`);
+ }
+
  function getCompFromElement(el) {
    if (!el) return null;
    const activePage = allPages[activePageIndex];
@@ -2833,6 +2954,7 @@ function esc(str) {
  // Sürükle & Boyutlandır Başlangıcı (MouseDown)
  el.addEventListener('mousedown', (e) => {
  if (currentMode !== 'designer') return;
+ if (e.button !== 0) return;
  if (window._isReportLockedByOther) {
    if (window.FrpNotify) window.FrpNotify.warning(`Bu rapor şu anda ${window._reportLockHolderName || 'başka bir kullanıcı'} tarafından düzenleniyor. Salt-okunur moddasınız.`);
    return;
@@ -2853,6 +2975,10 @@ function esc(str) {
 
  if (!selectedItem) return;
 
+ // Tarayıcının varsayılan metin seçimi veya HTML5 sürüklemesini engelle
+ e.preventDefault();
+ e.stopPropagation();
+
  // Tasarım Düzenleme Modunu Otomatik Başlat
  if (!isDesignEditing) {
  isDesignEditing = true;
@@ -2870,6 +2996,16 @@ function esc(str) {
 
  let isDragging = !handleType;
  let isResizing = !!handleType;
+
+ // Cursor & Seçim Kilidi
+ document.body.style.userSelect = 'none';
+ document.body.style.webkitUserSelect = 'none';
+ if (isResizing && resizeHandle) {
+   const cur = window.getComputedStyle(resizeHandle).cursor;
+   document.body.style.cursor = cur || 'se-resize';
+ } else if (isDragging) {
+   document.body.style.cursor = 'move';
+ }
 
  const isMultiDrag = isDragging && selectedItems.length > 1 && selectedItems.includes(selectedItem);
  const multiStartPos = isMultiDrag ? selectedItems.map(c => ({
@@ -2918,12 +3054,15 @@ function esc(str) {
  const onMouseMove = (moveEvt) => {
  const dx = Math.round((moveEvt.clientX - startX) / currentZoom);
  const dy = Math.round((moveEvt.clientY - startY) / currentZoom);
+ const snapStep = (gridSnapStep && gridSnapStep > 1) ? gridSnapStep : 1;
 
  if (isDragging) {
  if (isMultiDrag) {
    multiStartPos.forEach(p => {
-     p.comp.left = Math.max(0, Math.round((p.left + dx) / 2) * 2);
-     p.comp.top = Math.max(0, Math.round((p.top + dy) / 2) * 2);
+     const rawL = p.left + dx;
+     const rawT = p.top + dy;
+     p.comp.left = Math.max(0, snapStep > 1 ? Math.round(rawL / snapStep) * snapStep : rawL);
+     p.comp.top = Math.max(0, snapStep > 1 ? Math.round(rawT / snapStep) * snapStep : rawT);
      if (p.el) {
        p.el.style.left = `${p.comp.left}px`;
        p.el.style.top = `${p.comp.top}px`;
@@ -2936,8 +3075,8 @@ function esc(str) {
  const curW = selectedItem.width || 100;
  const curH = selectedItem.height || 30;
 
- let snappedLeft = Math.max(0, Math.round(targetLeft / 2) * 2);
- let snappedTop = Math.max(0, Math.round(targetTop / 2) * 2);
+ let snappedLeft = Math.max(0, snapStep > 1 ? Math.round(targetLeft / snapStep) * snapStep : targetLeft);
+ let snappedTop = Math.max(0, snapStep > 1 ? Math.round(targetTop / snapStep) * snapStep : targetTop);
  let activeGuideX = null;
  let activeGuideY = null;
  const SNAP_THRESH = 6;
@@ -2998,16 +3137,17 @@ function esc(str) {
  updateRulerTracker(selectedItem.left, selectedItem.width, selectedItem.top, selectedItem.height);
  }
  } else if (isResizing) {
- if (handleType.includes('e')) selectedItem.width = Math.max(12, Math.round((startWidth + dx) / 4) * 4);
- if (handleType.includes('s')) selectedItem.height = Math.max(8, Math.round((startHeight + dy) / 4) * 4);
+ const rSnap = (gridSnapStep && gridSnapStep > 1) ? gridSnapStep : 2;
+ if (handleType.includes('e')) selectedItem.width = Math.max(12, Math.round((startWidth + dx) / rSnap) * rSnap);
+ if (handleType.includes('s')) selectedItem.height = Math.max(8, Math.round((startHeight + dy) / rSnap) * rSnap);
  if (handleType.includes('w')) {
- const newW = Math.max(12, Math.round((startWidth - dx) / 4) * 4);
+ const newW = Math.max(12, Math.round((startWidth - dx) / rSnap) * rSnap);
  selectedItem.left = Math.max(0, startLeft + (startWidth - newW));
  selectedItem.width = newW;
  el.style.left = `${selectedItem.left}px`;
  }
  if (handleType.includes('n')) {
- const newH = Math.max(8, Math.round((startHeight - dy) / 4) * 4);
+ const newH = Math.max(8, Math.round((startHeight - dy) / rSnap) * rSnap);
  selectedItem.top = Math.max(0, startTop + (startHeight - newH));
  selectedItem.height = newH;
  el.style.top = `${selectedItem.top}px`;
@@ -3034,6 +3174,9 @@ function esc(str) {
 
  const onMouseUp = () => {
  el.classList.remove('is-dragging');
+ document.body.style.userSelect = '';
+ document.body.style.webkitUserSelect = '';
+ document.body.style.cursor = '';
  if (hud) hud.style.display = 'none';
  clearSmartGuides();
  updateRulerTracker(selectedItem.left, selectedItem.width, selectedItem.top, selectedItem.height);
@@ -3113,6 +3256,7 @@ function esc(str) {
  if (btnDesigner) {
  btnDesigner.addEventListener('click', () => {
  currentMode = 'designer';
+ isDesignEditing = true;
  render();
  });
  }
@@ -3205,6 +3349,21 @@ function esc(str) {
  containerEl.querySelector('#btnToolAddCombobox')?.addEventListener('click', () => addNewComponent('combobox'));
  containerEl.querySelector('#btnToolAddPanel')?.addEventListener('click', () => addNewComponent('panel'));
  containerEl.querySelector('#btnToolDeleteSelected')?.addEventListener('click', deleteSelectedComponent);
+ containerEl.querySelector('#btnDuplicateSelected')?.addEventListener('click', duplicateSelected);
+ containerEl.querySelector('#btnBringToFront')?.addEventListener('click', () => changeZOrder('front'));
+ containerEl.querySelector('#btnSendToBack')?.addEventListener('click', () => changeZOrder('back'));
+ containerEl.querySelector('#btnMultiDuplicate')?.addEventListener('click', duplicateSelected);
+ containerEl.querySelector('#btnMultiFront')?.addEventListener('click', () => changeZOrder('front'));
+ containerEl.querySelector('#btnMultiBack')?.addEventListener('click', () => changeZOrder('back'));
+ containerEl.querySelector('#btnToggleGridSnap')?.addEventListener('click', () => {
+   gridSnapStep = gridSnapStep === 0 ? 4 : (gridSnapStep === 4 ? 8 : (gridSnapStep === 8 ? 12 : 0));
+   const btn = containerEl.querySelector('#btnToggleGridSnap');
+   if (btn) {
+     btn.textContent = `🧲 Izgara: ${gridSnapStep > 1 ? gridSnapStep + 'px' : 'Kapalı'}`;
+     btn.classList.toggle('active', gridSnapStep > 1);
+   }
+   if (window.FrpNotify) window.FrpNotify.info(`Manyetik ızgara: ${gridSnapStep > 1 ? gridSnapStep + 'px adımı aktif' : 'Kapalı'}`);
+ });
 
  // Multi-Align Araç Çubuğu Butonları
  containerEl.querySelector('#btnAlignLeft')?.addEventListener('click', () => alignSelected('left'));
@@ -3335,20 +3494,49 @@ function esc(str) {
  }
  });
 
- // 11. Klavye Kısayolları (Ctrl+Z: Geri Al, Ctrl+Y: İleri Al, Delete: Sil)
+ // 11. Klavye Kısayolları (Ctrl+Z, Ctrl+Y, Ctrl+D, Delete, Yön Tuşları ile İnce Kaydırma)
  window.addEventListener('keydown', (e) => {
  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+ if (currentMode !== 'designer') return;
  
  if (isDesignEditing) {
- if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' &&!e.shiftKey) {
+ if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
  e.preventDefault();
  undo();
  } else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
  e.preventDefault();
  redo();
+ } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+ e.preventDefault();
+ duplicateSelected();
  } else if ((e.key === 'Delete' || e.key === 'Backspace') && (selectedItem || (selectedItems && selectedItems.length > 0))) {
  e.preventDefault();
  deleteSelectedComponent();
+ } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+   const targets = (selectedItems && selectedItems.length > 0) ? selectedItems : (selectedItem ? [selectedItem] : []);
+   if (targets.length > 0) {
+     e.preventDefault();
+     const step = e.shiftKey ? 8 : ((gridSnapStep && gridSnapStep > 1) ? gridSnapStep : 1);
+     targets.forEach(c => {
+       if (e.key === 'ArrowUp') c.top = Math.max(0, (c.top || 0) - step);
+       if (e.key === 'ArrowDown') c.top = Math.max(0, (c.top || 0) + step);
+       if (e.key === 'ArrowLeft') c.left = Math.max(0, (c.left || 0) - step);
+       if (e.key === 'ArrowRight') c.left = Math.max(0, (c.left || 0) + step);
+       const domEl = (c.name ? containerEl.querySelector(`[data-comp-name="${c.name}"]`) : null);
+       if (domEl) {
+         domEl.style.left = `${c.left}px`;
+         domEl.style.top = `${c.top}px`;
+       }
+     });
+     if (selectedItem) {
+       updateRulerTracker(selectedItem.left, selectedItem.width, selectedItem.top, selectedItem.height);
+     }
+     const statusCoords = containerEl.querySelector('#statusCoords');
+     if (statusCoords && selectedItem) {
+       statusCoords.innerHTML = `<span>X: ${selectedItem.left}, Y: ${selectedItem.top}</span>`;
+     }
+     pushUndoState();
+   }
  }
  }
  });

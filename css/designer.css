@@ -336,6 +336,8 @@
   line-height: 1.25;
   cursor: pointer;
   transition: outline 0.1s;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .fr-report-page.designer-mode .fr-view-item:hover {
@@ -343,27 +345,20 @@
 }
 
 /* Seçim Çerçevesi YALNIZCA Tasarımcı Modunda Görünür! */
-.fr-report-page.designer-mode .fr-view-item.selected {
-  outline: 1.5px solid #000000 !important;
-  z-index: 50 !important;
+.fr-report-page.designer-mode .fr-view-item.selected,
+.fr-view-item.selected,
+.fr-ctrl-item.selected {
+  outline: 2px solid #2563eb !important;
+  outline-offset: 1px;
+  cursor: move !important;
+  overflow: visible !important;
+  z-index: 1000 !important;
 }
 
-/* 8 Seçim Tutamağı (FastReport 8 Selection Handles - Yalnızca Tasarımcı Modu) */
+/* Çakışan eski sözde tutamaçları devre dışı bırak */
 .fr-report-page.designer-mode .fr-view-item.selected::before,
 .fr-report-page.designer-mode .fr-view-item.selected::after {
-  content: '';
-  position: absolute;
-  width: 5px;
-  height: 5px;
-  background: #000000;
-  border: 1px solid #ffffff;
-  z-index: 60;
-}
-.fr-report-page.designer-mode .fr-view-item.selected::before {
-  top: -3px; left: -3px;
-}
-.fr-report-page.designer-mode .fr-view-item.selected::after {
-  bottom: -3px; right: -3px;
+  display: none !important;
 }
 
 /* Baskı Önizleme Modunda Tertemiz Sayfa Çıktısı (Kareler & Tutamaçlar Asla Görünmez) */
@@ -1172,26 +1167,34 @@ body.theme-light .designer-prop-val {
   color: #ef4444;
 }
 
-/* 8 Noktalı Boyutlandırma Tutamaçları (8-point Resize Handles) */
+/* 8 Noktalı Boyutlandırma Tutamaçları (8-point Resize Handles - FastReport VCL / Figma Standardı) */
 .fr-resize-handle {
   position: absolute;
-  width: 7px;
-  height: 7px;
-  background: #2563eb;
-  border: 1px solid #ffffff;
-  border-radius: 1px;
-  z-index: 100;
+  width: 9px;
+  height: 9px;
+  background: #ffffff;
+  border: 2px solid #2563eb;
+  border-radius: 2px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  z-index: 99999 !important;
   box-sizing: border-box;
+  pointer-events: auto !important;
+  transition: transform 0.12s ease, background-color 0.12s ease;
+}
+.fr-resize-handle:hover {
+  background: #2563eb;
+  border-color: #ffffff;
+  transform: scale(1.3);
 }
 
-.fr-resize-nw { top: -4px; left: -4px; cursor: nwse-resize; }
-.fr-resize-n  { top: -4px; left: calc(50% - 3.5px); cursor: ns-resize; }
-.fr-resize-ne { top: -4px; right: -4px; cursor: nesw-resize; }
-.fr-resize-e  { top: calc(50% - 3.5px); right: -4px; cursor: ew-resize; }
-.fr-resize-se { bottom: -4px; right: -4px; cursor: nwse-resize; }
-.fr-resize-s  { bottom: -4px; left: calc(50% - 3.5px); cursor: ns-resize; }
-.fr-resize-sw { bottom: -4px; left: -4px; cursor: nesw-resize; }
-.fr-resize-w  { top: calc(50% - 3.5px); left: -4px; cursor: ew-resize; }
+.fr-resize-nw { top: -5px; left: -5px; cursor: nwse-resize; }
+.fr-resize-n  { top: -5px; left: calc(50% - 4.5px); cursor: ns-resize; }
+.fr-resize-ne { top: -5px; right: -5px; cursor: nesw-resize; }
+.fr-resize-e  { top: calc(50% - 4.5px); right: -5px; cursor: ew-resize; }
+.fr-resize-se { bottom: -5px; right: -5px; cursor: nwse-resize; }
+.fr-resize-s  { bottom: -5px; left: calc(50% - 4.5px); cursor: ns-resize; }
+.fr-resize-sw { bottom: -5px; left: -5px; cursor: nesw-resize; }
+.fr-resize-w  { top: calc(50% - 4.5px); left: -5px; cursor: ew-resize; }
 
 .fr-view-item.selected, .fr-ctrl-item.selected {
   outline: 2px solid #2563eb !important;
