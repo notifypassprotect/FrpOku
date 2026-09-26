@@ -161,7 +161,7 @@ registerReportNoteRoutes(app, { apiWriteRateLimiter, attachmentsDir: path.join(_
 // ── ÇEVRİMİÇİ KULLANICI & VARLIK (PRESENCE) YÖNETİMİ ──────────
 const USER_AVATARS_FILE = path.join(__dirname, 'data', 'user_avatars.json');
 const avatarStore = createJsonStore(USER_AVATARS_FILE, { fallback: {}, label: 'Kullanıcı avatarı' });
-const { getAllUsersWithPresence, getUserAvatars, recordUserPresence, removeUserPresence, saveUserAvatar } = createPresenceService({ avatarStore, getLocalUsers, supabase });
+const { acquireReportLock, getActiveReportLocks, getAllUsersWithPresence, getReportLock, getUserAvatars, recordUserPresence, releaseReportLock, removeUserPresence, renewReportLock, saveUserAvatar } = createPresenceService({ avatarStore, getLocalUsers, supabase });
 
 registerAccountProfileRoute(app, { authRateLimiter, getLocalUsers, isValidText, isValidUsername, normalizeEmail, normalizePhone, normalizeText, normalizeUsername, requireAuth, safeLogStr, saveLocalUsers, saveUserAvatar, supabase });
 
@@ -191,7 +191,7 @@ function canAccessChatMessage(user, message) {
   return String(message.senderId) === userId || String(message.receiverId) === userId;
 }
 
-registerPresenceRoutes(app, { ensureChatMessagesHydrated, getAllUsersWithPresence, getUnreadCountsForUser, recordUserPresence, removeUserPresence, requireAuth, supabase });
+registerPresenceRoutes(app, { acquireReportLock, ensureChatMessagesHydrated, getActiveReportLocks, getAllUsersWithPresence, getReportLock, getUnreadCountsForUser, recordUserPresence, releaseReportLock, removeUserPresence, renewReportLock, requireAuth, supabase });
 
 // ── OKUNMAMIŞ SOHBET MESAJLARI İÇİN E-POSTA BİLDİRİM YÖNETİCİSİ (DEBOUNCED & ANTI-SPAM) ──
 const chatEmailDelay = Number.parseInt(process.env.CHAT_EMAIL_DELAY_MS || '', 10);

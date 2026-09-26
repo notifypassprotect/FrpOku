@@ -36,6 +36,16 @@ window.FrpListRenderers.renderCards = function(files, container) {
     const isPublic = !!(file.isPublic || file.is_public);
     const poolBadge = isPublic ? `<span class="badge badge-pool" style="font-size:.7rem;padding:.12rem .4rem;" title="Ortak Havuzda Paylaşıldı">Havuzda</span>` : '';
 
+    const lockInfo = window.activeReportLocks ? window.activeReportLocks[file.id] : null;
+    const currentUserId = String(window.FrpAuth?.getUser?.()?.id || '');
+    const isLockedByOther = lockInfo && String(lockInfo.userId) !== currentUserId;
+    const lockBadge = isLockedByOther ? `
+      <span class="report-lock-badge" title="${escHtml(lockInfo.userName || 'Kullanıcı')} şu anda bu raporu düzenliyor">
+        <svg class="lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+        ${escHtml(lockInfo.userName || 'Biri')} düzenliyor
+      </span>
+    ` : '';
+
     return `
       <div class="report-card ${file.isPinned ? 'pinned' : ''} ${window.selectedIds?.has(file.id) ? 'selected' : ''}" data-list-action="open-detail" data-id="${encodedId}" style="background:var(--bg-surface);border:1.5px solid var(--border-light);border-radius:14px;padding:1.1rem;display:flex;flex-direction:column;gap:.75rem;cursor:pointer;transition:transform .18s ease, box-shadow .18s ease;box-shadow:0 4px 14px rgba(0,0,0,.04);box-sizing:border-box;max-width:100%;overflow:hidden;">
         <div class="card-mobile-actions" data-list-action="stop">
@@ -47,6 +57,7 @@ window.FrpListRenderers.renderCards = function(files, container) {
             <div class="card-title" style="font-weight:var(--heading-weight, 800);font-size:.92rem;color:var(--text-primary);line-height:1.35;word-break:break-word;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;">
               <button type="button" class="report-title-action" data-list-action="open-detail" data-id="${encodedId}" aria-label="${escHtml(reportName)} raporunu aç">${escHtml(reportName)}</button>
               ${poolBadge}
+              ${lockBadge}
             </div>
             <div style="font-size:.74rem;color:var(--text-muted);font-family:var(--font);margin-top:.25rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;" title="${escHtml(file.name)} · ${size}">
               ${escHtml(file.name)} · <strong>${size}</strong>
@@ -77,3 +88,27 @@ window.FrpListRenderers.renderCards = function(files, container) {
     `;
   }).join('');
 };
+
+window.FrpListRenderers.renderSkeletonCards = function(container, count = 6) {
+  if (!container) return;
+  const items = Array.from({ length: count });
+  container.innerHTML = items.map(() => `
+    <div class="skeleton-card" aria-hidden="true" style="background:var(--bg-surface);border:1.5px solid var(--border-light);border-radius:14px;padding:1.15rem;display:flex;flex-direction:column;gap:.85rem;box-shadow:0 4px 14px rgba(0,0,0,.03);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;">
+        <div class="frp-skeleton-pulse skeleton-line" style="width:58%;height:18px;border-radius:6px;"></div>
+        <div class="frp-skeleton-pulse" style="width:48px;height:18px;border-radius:999px;"></div>
+      </div>
+      <div class="frp-skeleton-pulse skeleton-line" style="width:36%;height:11px;border-radius:5px;"></div>
+      <div style="display:flex;gap:.45rem;align-items:center;margin-top:.2rem;">
+        <div class="frp-skeleton-pulse" style="width:72px;height:24px;border-radius:999px;"></div>
+        <div class="frp-skeleton-pulse" style="width:58px;height:24px;border-radius:999px;"></div>
+        <div class="frp-skeleton-pulse" style="width:64px;height:24px;border-radius:999px;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:.7rem;border-top:1px solid var(--border-light);">
+        <div class="frp-skeleton-pulse skeleton-line" style="width:28%;height:10px;border-radius:4px;"></div>
+        <div class="frp-skeleton-pulse skeleton-line" style="width:52px;height:10px;border-radius:4px;"></div>
+      </div>
+    </div>
+  `).join('');
+};
+

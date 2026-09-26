@@ -501,9 +501,7 @@
           if (settingsSettled.status === 'fulfilled' && settingsSettled.value) {
             const cloudSettings = settingsSettled.value;
             if (cloudSettings.preferences && typeof cloudSettings.preferences === 'object') {
-              const cloudPreferences = { ...cloudSettings.preferences };
-              if (cloudSettings.theme && !cloudPreferences.theme) cloudPreferences.theme = cloudSettings.theme;
-              setPreferences(cloudPreferences, { syncCloud: false });
+              setPreferences({ ...cloudSettings.preferences, theme: getTheme() }, { syncCloud: false });
             }
             const cloudTags = cloudSettings?.custom_tags ?? cloudSettings?.customTags;
             if (Array.isArray(cloudTags)) {
@@ -2396,12 +2394,6 @@
       if (snippetSettled.status === 'fulfilled' && Array.isArray(snippetSettled.value)) localStorage.setItem(SNIPPET_KEY, JSON.stringify(snippetSettled.value));
       if (settingsSettled.status === 'fulfilled' && settingsSettled.value) {
         const settings = settingsSettled.value;
-        if (settings.preferences && typeof settings.preferences === 'object') {
-          const cloudPreferences = { ...settings.preferences };
-          if (settings.theme && !cloudPreferences.theme) cloudPreferences.theme = settings.theme;
-          setPreferences(cloudPreferences, { syncCloud: false });
-          applyPreferences();
-        }
         const customTags = settings.custom_tags ?? settings.customTags;
         if (Array.isArray(customTags)) {
           localStorage.setItem(_scopedStorageKey(CUSTOM_TAGS_KEY), JSON.stringify(customTags));

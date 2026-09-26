@@ -18,7 +18,9 @@ test('report_designer.js renders full Delphi properties for TfrxMemoView and com
 });
 
 test('server.js and online_presence.js provide live typing and chat modernizations', () => {
-  const serverContent = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
+  const serverContent = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8') +
+    fs.readFileSync(path.join(ROOT, 'server/routes/chat_state.js'), 'utf8') +
+    fs.readFileSync(path.join(ROOT, 'server/routes/chat_messages.js'), 'utf8');
   assert.ok(serverContent.includes('/api/chat/typing'), 'Server must have /api/chat/typing endpoint');
   assert.ok(serverContent.includes('typingUsers'), 'Server must return typingUsers in messages');
 

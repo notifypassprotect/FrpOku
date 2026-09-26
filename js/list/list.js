@@ -1290,6 +1290,17 @@ function initListPage() {
     // Ortak havuz sekmesine geçildiğinde havuz raporlarını arka planda buluttan anında tazele:
     if (FrpStore.refreshFromCloud) {
       try {
+        if (currentViewMode === 'cards') {
+          const cardsEl = document.getElementById('cardsView');
+          if (cardsEl && window.FrpListRenderers?.renderSkeletonCards) {
+            window.FrpListRenderers.renderSkeletonCards(cardsEl, 6);
+          }
+        } else if (currentViewMode === 'table') {
+          const tb = document.getElementById('tableBody');
+          if (tb && window.FrpListRenderers?.renderSkeletonTable) {
+            window.FrpListRenderers.renderSkeletonTable(tb, 7);
+          }
+        }
         await FrpStore.refreshFromCloud();
         updateUserList();
         applySearch();
@@ -1348,6 +1359,18 @@ function initListPage() {
     if (syncIcon) syncIcon.style.transform = 'rotate(360deg)';
     if (syncText) syncText.textContent = 'Yenileniyor...';
 
+    if (currentViewMode === 'cards') {
+      const cardsEl = document.getElementById('cardsView');
+      if (cardsEl && window.FrpListRenderers?.renderSkeletonCards) {
+        window.FrpListRenderers.renderSkeletonCards(cardsEl, 6);
+      }
+    } else if (currentViewMode === 'table') {
+      const tb = document.getElementById('tableBody');
+      if (tb && window.FrpListRenderers?.renderSkeletonTable) {
+        window.FrpListRenderers.renderSkeletonTable(tb, 7);
+      }
+    }
+
     try {
       if (FrpStore.refreshFromCloud) {
         await FrpStore.refreshFromCloud();
@@ -1355,6 +1378,7 @@ function initListPage() {
       } else {
         refreshAll();
       }
+      applySearch();
       toast('Raporlar ve ortak havuz güncellendi.', 'success');
     } catch (e) {
       toast('Yenileme sırasında hata oluştu: ' + (e?.message || ''), 'warning');

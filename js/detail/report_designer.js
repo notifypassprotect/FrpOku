@@ -2063,14 +2063,53 @@ function esc(str) {
 
  // Sürükle & Boyutlandır Başlangıcı (MouseDown)
  el.addEventListener('mousedown', (e) => {
- if (!isDesignEditing || currentMode!== 'designer' ||!selectedItem) return;
+ if (currentMode !== 'designer') return;
+ if (window._isReportLockedByOther) {
+   if (window.FrpNotify) window.FrpNotify.warning(`Bu rapor şu anda ${window._reportLockHolderName || 'başka bir kullanıcı'} tarafından düzenleniyor. Salt-okunur moddasınız.`);
+   return;
+ }
  if (e.target.closest('.designer-prop-input') || e.target.closest('.designer-prop-select')) return;
 
- const resizeHandle = e.target.closest('.fr-resize-handle');
- const handleType = resizeHandle? resizeHandle.dataset.handle: null;
+ // Otomatik Seçim Senkronizasyonu
+ const bandIdx = parseInt(el.dataset.bandIdx, 10);
+ const compIdx = parseInt(el.dataset.compIdx, 10);
+ const rawIdx = el.dataset.ctrlIdx;
+ const activePage = allPages[activePageIndex];
+ let targetComp = null;
+ if (activePage?.type === 'report' && activePage.data.bands?.[bandIdx]?.components?.[compIdx]) {
+ targetComp = activePage.data.bands[bandIdx].components[compIdx];
+ } else if (activePage?.type === 'dialog' && rawIdx !== undefined) {
+ if (rawIdx.includes('_')) {
+ const parts = rawIdx.split('_').map(n => parseInt(n, 10));
+ targetComp = activePage.data.controls?.[parts[0]]?.children?.[parts[1]];
+ } else {
+ targetComp = activePage.data.controls?.[parseInt(rawIdx, 10)];
+ }
+ }
+ if (targetComp && selectedItem !== targetComp) {
+ selectedItem = targetComp;
+ updateSelection();
+ }
 
- let isDragging =!handleType;
- let isResizing =!!handleType;
+ if (!selectedItem) return;
+
+ // Tasarım Düzenleme Modunu Otomatik Başlat
+ if (!isDesignEditing) {
+ isDesignEditing = true;
+ initialPagesBackup = JSON.parse(JSON.stringify(allPages.map(p => p.data)));
+ undoStack = [JSON.stringify(allPages.map(p => p.data))];
+ redoStack = [];
+ const btnSave = containerEl.querySelector('#btnSaveDesignEdit');
+ const btnCancel = containerEl.querySelector('#btnCancelDesignEdit');
+ if (btnSave) btnSave.style.display = 'inline-flex';
+ if (btnCancel) btnCancel.style.display = 'inline-flex';
+ }
+
+ const resizeHandle = e.target.closest('.fr-resize-handle');
+ const handleType = resizeHandle ? resizeHandle.dataset.handle : null;
+
+ let isDragging = !handleType;
+ let isResizing = !!handleType;
 
  const startX = e.clientX;
  const startY = e.clientY;
@@ -2081,12 +2120,25 @@ function esc(str) {
 
  if (isDragging) el.classList.add('is-dragging');
 
+ // Canlı Koordinat HUD Göstergesi
+ let hud = document.getElementById('frCanvasHudTooltip');
+ if (!hud) {
+ hud = document.createElement('div');
+ hud.id = 'frCanvasHudTooltip';
+ hud.style.cssText = 'position:fixed;z-index:9999999;pointer-events:none;background:rgba(15,23,42,0.92);color:#38bdf8;padding:4px 8px;border-radius:6px;font-size:11px;font-family:monospace;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,0.3);border:1px solid rgba(56,189,248,0.35);backdrop-filter:blur(6px);transform:translate(14px,14px);display:none;';
+ document.body.appendChild(hud);
+ }
+ hud.style.display = 'block';
+ hud.textContent = `X: ${selectedItem.left} Y: ${selectedItem.top} | ${selectedItem.width}×${selectedItem.height}`;
+ hud.style.left = `${e.clientX}px`;
+ hud.style.top = `${e.clientY}px`;
+
  const onMouseMove = (moveEvt) => {
  const dx = Math.round((moveEvt.clientX - startX) / currentZoom);
  const dy = Math.round((moveEvt.clientY - startY) / currentZoom);
 
  if (isDragging) {
- // 4px Izgara Hizalama (Grid Snapping)
+ // 4px Manyetik Izgara Hizalama (Grid Snapping)
  const snapLeft = Math.round((startLeft + dx) / 4) * 4;
  const snapTop = Math.round((startTop + dy) / 4) * 4;
  selectedItem.left = Math.max(0, snapLeft);
@@ -2094,17 +2146,17 @@ function esc(str) {
  el.style.left = `${selectedItem.left}px`;
  el.style.top = `${selectedItem.top}px`;
  } else if (isResizing) {
- if (handleType.includes('e')) selectedItem.width = Math.max(12, startWidth + dx);
- if (handleType.includes('s')) selectedItem.height = Math.max(8, startHeight + dy);
+ if (handleType.includes('e')) selectedItem.width = Math.max(12, Math.round((startWidth + dx) / 4) * 4);
+ if (handleType.includes('s')) selectedItem.height = Math.max(8, Math.round((startHeight + dy) / 4) * 4);
  if (handleType.includes('w')) {
- const newW = Math.max(12, startWidth - dx);
- selectedItem.left = startLeft + (startWidth - newW);
+ const newW = Math.max(12, Math.round((startWidth - dx) / 4) * 4);
+ selectedItem.left = Math.max(0, startLeft + (startWidth - newW));
  selectedItem.width = newW;
  el.style.left = `${selectedItem.left}px`;
  }
  if (handleType.includes('n')) {
- const newH = Math.max(8, startHeight - dy);
- selectedItem.top = startTop + (startHeight - newH);
+ const newH = Math.max(8, Math.round((startHeight - dy) / 4) * 4);
+ selectedItem.top = Math.max(0, startTop + (startHeight - newH));
  selectedItem.height = newH;
  el.style.top = `${selectedItem.top}px`;
  }
@@ -2112,7 +2164,15 @@ function esc(str) {
  el.style.height = `${selectedItem.height}px`;
  }
 
- // Status Bar Güncelle
+ // Canlı HUD ve Status Bar Güncellemesi
+ if (hud) {
+ hud.style.left = `${moveEvt.clientX}px`;
+ hud.style.top = `${moveEvt.clientY}px`;
+ hud.textContent = isDragging 
+ ? `X: ${selectedItem.left} Y: ${selectedItem.top}` 
+ : `W: ${selectedItem.width} H: ${selectedItem.height} (${selectedItem.left}, ${selectedItem.top})`;
+ }
+
  const statusCoords = containerEl.querySelector('#statusCoords');
  const statusDims = containerEl.querySelector('#statusDims');
  if (statusCoords) statusCoords.innerHTML = `<span>X: ${selectedItem.left}, Y: ${selectedItem.top}</span>`;
@@ -2121,6 +2181,7 @@ function esc(str) {
 
  const onMouseUp = () => {
  el.classList.remove('is-dragging');
+ if (hud) hud.style.display = 'none';
  window.removeEventListener('mousemove', onMouseMove);
  window.removeEventListener('mouseup', onMouseUp);
 
@@ -2209,6 +2270,10 @@ function esc(str) {
 
  // 3. Düzenleme / Kaydetme / İptal Etme Butonları
  containerEl.querySelector('#btnStartDesignEdit')?.addEventListener('click', () => {
+ if (window._isReportLockedByOther) {
+   if (window.FrpNotify) window.FrpNotify.warning(`Bu rapor şu anda ${window._reportLockHolderName || 'başka bir kullanıcı'} tarafından düzenleniyor. Tasarım düzenleme kilitlidir.`);
+   return;
+ }
  isDesignEditing = true;
  initialPagesBackup = JSON.parse(JSON.stringify(allPages.map(p => p.data)));
  undoStack = [JSON.stringify(allPages.map(p => p.data))];
@@ -2219,6 +2284,10 @@ function esc(str) {
 
  containerEl.querySelector('#btnSaveDesignEdit')?.addEventListener('click', () => {
  if (!isDesignEditing) return;
+ if (window._isReportLockedByOther) {
+   if (window.FrpNotify) window.FrpNotify.warning(`Bu rapor şu anda ${window._reportLockHolderName || 'başka bir kullanıcı'} tarafından düzenleniyor. Değişiklikler kaydedilemez.`);
+   return;
+ }
  file.pages = allPages.filter(p => p.type === 'report').map(p => p.data);
  file.dialogPages = allPages.filter(p => p.type === 'dialog').map(p => p.data);
  
@@ -2424,7 +2493,8 @@ function esc(str) {
 
  function updateSelection() {
  containerEl.querySelectorAll('.fr-view-item.selected,.fr-ctrl-item.selected,.fr-band-container.selected-band,.fr-band-header.selected-band,.fr-vertical-band-overlay.selected-band,.fr-vertical-band-header.selected-band,.fr-vband-box.selected-band').forEach(el => {
- el.classList.remove('selected', 'selected-band');
+  containerEl.querySelectorAll('.fr-resize-handle').forEach(h => h.remove());
+  el.classList.remove('selected', 'selected-band');
  });
  
  // YALNIZCA Tasarımcı modundaysa ve seçim varsa sınıf ekle
@@ -2448,7 +2518,15 @@ function esc(str) {
  const targetEl = (selectedItem.name ? containerEl.querySelector(`[data-comp-name="${selectedItem.name}"]`) : null) ||
  containerEl.querySelector(`[title*="${selectedItem.name}"]`) ||
  containerEl.querySelector(`[data-ctrl-idx]`);
- if (targetEl) targetEl.classList.add('selected');
+ if (targetEl) {
+   targetEl.classList.add('selected');
+   ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].forEach(pos => {
+     const h = document.createElement('div');
+     h.className = `fr-resize-handle fr-resize-${pos}`;
+     h.dataset.handle = pos;
+     targetEl.appendChild(h);
+   });
+ }
  }
  }
 

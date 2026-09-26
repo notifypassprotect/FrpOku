@@ -1361,6 +1361,11 @@ async function saveEditMode(tabId, options = {}) {
  options = { ...options, syntaxConfirmed: true };
  }
 
+ if (_isLockedByOther) {
+   showToast(`Bu rapor şu anda ${_lockHolderName || 'başka bir kullanıcı'} tarafından düzenleniyor. Değişiklikler kaydedilemez.`, 'warning');
+   return null;
+ }
+
  const curUser = window.FrpAuth? window.FrpAuth.getUser(): null;
  const isOwner = curUser && currentFile.userId === curUser.id;
  const isAdmin = curUser && curUser.role === 'admin';
@@ -1691,6 +1696,138 @@ function showError(msg) {
  }
 }
 
+// ── DÜZENLEME KİLİT MODU (SOFT-LOCK / CHECK-OUT) ────────────
+let _reportLockTimer = null;
+let _isLockedByOther = false;
+let _lockHolderName = '';
+
+window._isReportLockedByOther = false;
+window._reportLockHolderName = '';
+
+async function initReportLock(reportId) {
+  if (!reportId) return;
+
+  async function tryAcquire() {
+    try {
+      const headers = window.FrpAuth?.getAuthHeaders ? window.FrpAuth.getAuthHeaders() : { 'Content-Type': 'application/json' };
+      const res = await fetch(`/api/reports/${encodeURIComponent(reportId)}/lock`, {
+        method: 'POST',
+        headers
+      });
+      if (res.ok) {
+        const data = await res.json();
+        applyLockState(data);
+      }
+    } catch (e) {
+      console.warn('Rapor kilidi alınamadı:', e);
+    }
+  }
+
+  function applyLockState(data) {
+    const banner = document.getElementById('reportLockBanner');
+    const titleEl = document.getElementById('reportLockBannerTitle');
+    const descEl = document.getElementById('reportLockBannerDesc');
+
+    if (!data.success && data.lock) {
+      _isLockedByOther = true;
+      _lockHolderName = data.lock.userName || 'Başka bir kullanıcı';
+      window._isReportLockedByOther = true;
+      window._reportLockHolderName = _lockHolderName;
+
+      if (banner) {
+        banner.style.display = 'flex';
+        if (titleEl) titleEl.textContent = `Rapor Düzenleniyor (Kilitli Mod - ${_lockHolderName})`;
+        if (descEl) descEl.textContent = `${_lockHolderName} şu anda bu rapor üzerinde çalışıyor. Değişiklik çakışmasını önlemek amacıyla düzenleme kilitlendi (salt-okunur mod).`;
+      }
+      disableEditingControls(true);
+      if (_reportLockTimer) {
+        clearInterval(_reportLockTimer);
+        _reportLockTimer = null;
+      }
+    } else if (data.success && data.lock) {
+      _isLockedByOther = false;
+      _lockHolderName = '';
+      window._isReportLockedByOther = false;
+      window._reportLockHolderName = '';
+
+      if (banner) banner.style.display = 'none';
+      disableEditingControls(false);
+
+      if (!_reportLockTimer) {
+        _reportLockTimer = setInterval(() => {
+          fetch(`/api/reports/${encodeURIComponent(reportId)}/lock`, {
+            method: 'POST',
+            headers: window.FrpAuth?.getAuthHeaders ? window.FrpAuth.getAuthHeaders() : {}
+          }).then(r => r.json()).then(d => {
+            if (!d.success && d.lock) {
+              applyLockState(d);
+            }
+          }).catch(() => {});
+        }, 20000);
+      }
+    }
+  }
+
+  function disableEditingControls(locked) {
+    const btnSaveDesign = document.getElementById('btnSaveDesignEdit');
+    const btnStartDesign = document.getElementById('btnStartDesignEdit');
+    if (btnSaveDesign) btnSaveDesign.disabled = locked;
+    if (btnStartDesign) btnStartDesign.disabled = locked;
+
+    const btnSaveNote = document.getElementById('btnSaveNote');
+    const btnSaveDesc = document.getElementById('btnSaveDesc');
+    if (btnSaveNote) btnSaveNote.disabled = locked;
+    if (btnSaveDesc) btnSaveDesc.disabled = locked;
+
+    document.querySelectorAll('[data-detail-action="save-edit"], [data-detail-action="save-download"]').forEach(btn => {
+      btn.disabled = locked;
+      btn.classList.toggle('disabled', locked);
+    });
+  }
+
+  document.getElementById('btnRefreshLockState')?.addEventListener('click', async () => {
+    try {
+      const headers = window.FrpAuth?.getAuthHeaders ? window.FrpAuth.getAuthHeaders() : {};
+      const res = await fetch(`/api/reports/${encodeURIComponent(reportId)}/lock`, { method: 'GET', headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (!data.lock) {
+          if (typeof showToast === 'function') showToast('Kilit serbest bırakıldı, kilit alınıyor...', 'success');
+          await tryAcquire();
+        } else {
+          applyLockState({ success: false, lock: data.lock });
+          if (typeof showToast === 'function') showToast(`Rapor halen ${data.lock.userName || 'başka bir kullanıcı'} tarafından kilitli.`, 'info');
+        }
+      }
+    } catch (e) {
+      if (typeof showToast === 'function') showToast('Kilit durumu kontrol edilemedi.', 'warning');
+    }
+  });
+
+  function releaseLock() {
+    if (_isLockedByOther) return;
+    const token = window.FrpAuth?.getToken?.();
+    const url = `/api/reports/${encodeURIComponent(reportId)}/unlock`;
+    try {
+      if (navigator.sendBeacon) {
+        const blob = new Blob([JSON.stringify({ token })], { type: 'application/json' });
+        navigator.sendBeacon(url, blob);
+      } else {
+        fetch(url, {
+          method: 'POST',
+          headers: window.FrpAuth?.getAuthHeaders ? window.FrpAuth.getAuthHeaders() : { 'Content-Type': 'application/json' },
+          keepalive: true
+        });
+      }
+    } catch (e) {}
+  }
+
+  window.addEventListener('beforeunload', releaseLock);
+  window.addEventListener('pagehide', releaseLock);
+
+  await tryAcquire();
+}
+
 async function init() {
  try {
  const params = new URLSearchParams(window.location.search);
@@ -1768,6 +1905,7 @@ async function init() {
  currentFile = file;
  window.currentFile = file;
  FrpStore.addRecent(file.id);
+ initReportLock(file.id);
 
  const metaName = file.meta?.reportName || file.name;
  document.title = `FrpOku — ${metaName}`;

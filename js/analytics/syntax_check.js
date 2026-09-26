@@ -971,13 +971,13 @@
       errors.push(`Satır ${lineNo}: Hatalı Operatör: '${doubleOpMatch[0]}' ardışık iki karşılaştırma operatörü kullanılamaz.`);
     }
 
-    if (/\bIN\s*\(\s*\)/i.test(clean)) {
+    if (/\bIN\s*\(\s*\)/i.test(rawWithoutComments)) {
       errors.push(`Satır ${lineNo}: 'IN ()' listesi boş bırakılamaz.`);
     }
 
     const emptyFuncMatch = /\b(COUNT|SUM|AVG|MIN|MAX|ROUND|TRUNC|COALESCE|NVL|NVL2|UPPER|LOWER|LENGTH|SUBSTR|REPLACE|TO_CHAR|TO_DATE|TO_NUMBER)\s*\(\s*\)/gi;
     let efm;
-    while ((efm = emptyFuncMatch.exec(clean)) !== null) {
+    while ((efm = emptyFuncMatch.exec(rawWithoutComments)) !== null) {
       errors.push(`Satır ${lineNo}: '${efm[1].toUpperCase()}' fonksiyonu parametresiz kullanılamaz.`);
     }
   });

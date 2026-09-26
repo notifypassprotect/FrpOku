@@ -5,6 +5,23 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 
+function readAllServerCode() {
+  const parts = [fs.readFileSync(path.resolve(root, 'server.js'), 'utf8')];
+  const scanDirs = ['routes', 'services', 'middleware'];
+  for (const dir of scanDirs) {
+    const fullPath = path.join(root, 'server', dir);
+    if (fs.existsSync(fullPath)) {
+      for (const file of fs.readdirSync(fullPath)) {
+        if (file.endsWith('.js')) {
+          parts.push(fs.readFileSync(path.join(fullPath, file), 'utf8'));
+        }
+      }
+    }
+  }
+  return parts.join('\n');
+}
+
+
 test('006_chat_messages.sql doğru şema ve indeksleri tanımlar', () => {
   const sql = fs.readFileSync(path.join(root, 'supabase', 'migrations', '006_chat_messages.sql'), 'utf8');
   assert.match(sql, /create table if not exists public\.chat_messages/i);
@@ -15,7 +32,7 @@ test('006_chat_messages.sql doğru şema ve indeksleri tanımlar', () => {
 });
 
 test('server.js dosyasında sohbet API rotaları tanımlıdır', () => {
-  const serverSource = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+  const serverSource = readAllServerCode();
   assert.match(serverSource, /\/api\/chat\/send/);
   assert.match(serverSource, /\/api\/chat\/messages/);
   assert.match(serverSource, /\/api\/chat\/mark-read/);
@@ -54,7 +71,7 @@ test('007_chat_rooms.sql doğru şema ve indeksleri tanımlar', () => {
 });
 
 test('server.js içinde oda yönetimi, mesaj silme ve medya filtresi bulunur', () => {
-  const serverSource = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+  const serverSource = readAllServerCode();
   assert.match(serverSource, /\/api\/chat\/rooms/);
   assert.match(serverSource, /app\.delete\('\/api\/chat\/messages\/:id'/);
   assert.match(serverSource, /mediaOnly/);
@@ -105,7 +122,7 @@ test('Odalar ve Kanallar yönetimi Ayarlar sekmesine modüler olarak taşınmı�
 });
 
 test('Permissions-Policy mikrofon erişimine izin verir ve Web Audio API desteklenir', () => {
-  const serverSource = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+  const serverSource = readAllServerCode();
   assert.match(serverSource, /microphone=\(self\)/);
   
   const presence = fs.readFileSync(path.join(root, 'js', 'core', 'online_presence.js'), 'utf8');
@@ -114,7 +131,7 @@ test('Permissions-Policy mikrofon erişimine izin verir ve Web Audio API destekl
 });
 
 test('server.js ve online_presence.js içinde Grup Sohbeti ve MSN Titretme bulunur', () => {
-  const serverSource = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+  const serverSource = readAllServerCode();
   assert.match(serverSource, /\/api\/chat\/groups/);
   assert.match(serverSource, /\/api\/chat\/nudge/);
   assert.match(serverSource, /nudgeCooldowns/);
@@ -128,7 +145,7 @@ test('server.js ve online_presence.js içinde Grup Sohbeti ve MSN Titretme bulun
 });
 
 test('server.js ve mailer.js içinde 4 Acil Erişim Anahtarı ve kurtarma rotası bulunur', () => {
-  const serverSource = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+  const serverSource = readAllServerCode();
   assert.match(serverSource, /recovery_keys/);
   assert.match(serverSource, /\/api\/auth\/recover-with-key/);
   assert.match(serverSource, /generateEmergencyRecoveryKey/);
@@ -199,7 +216,7 @@ test('online_presence.js modern onay modali, anlasilir bildirim butonu, ses cali
 });
 
 test('server.js dosyasinda grup yonetimi, uyeyi cikarma, gruptan ayrilma ve profil avatar destegi bulunur', () => {
-  const serverSource = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+  const serverSource = readAllServerCode();
   assert.match(serverSource, /\/api\/chat\/groups\/:id\/details/);
   assert.match(serverSource, /\/api\/chat\/groups\/:id\/leave/);
   assert.match(serverSource, /app\.delete\('\/api\/chat\/groups\/:id\/members\/:userId'/);
@@ -225,7 +242,7 @@ test('themes.js sayfa yenilenmesinde toast mesajini sessiz tutar ve secim degist
 test('online_presence.js ve online_presence.css gorsel lightbox, kalici reaksiyonlar ve dinamik pencere hizalama icerir', () => {
   const css = fs.readFileSync(path.join(root, 'css', 'online_presence.css'), 'utf8');
   const presence = fs.readFileSync(path.join(root, 'js', 'core', 'online_presence.js'), 'utf8');
-  const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+  const server = readAllServerCode();
 
   // CSS Genişlik & Lightbox
   assert.match(css, /\.frp-lightbox-modal/);
@@ -241,7 +258,7 @@ test('online_presence.js ve online_presence.css gorsel lightbox, kalici reaksiyo
   // Server Avatar & Reaksiyon kalıcılığı
   assert.match(server, /getUserAvatars/);
   assert.match(server, /saveUserAvatar/);
-  assert.match(server, /supabase\.from\('chat_messages'\)\.update\(\{ reactions: msg\.reactions \}\)/);
+  assert.match(server, /supabase\.from\('chat_messages'\)\.update\(\{ reactions: (?:msg|message)\.reactions \}\)/);
 });
 
 test('sohbet kisi listesi kalici arama, canli filtreler ve klavye erisimi sunar', () => {
@@ -252,7 +269,7 @@ test('sohbet kisi listesi kalici arama, canli filtreler ve klavye erisimi sunar'
   assert.match(presence, /data-filter="unread"/);
   assert.match(presence, /function bindChatRowActivation/);
   assert.match(presence, /event\.key !== 'Enter'/);
-  assert.match(css, /height:\s*820px/);
+  assert.match(css, /height:\s*(?:820px|min\(760px)/);
   assert.match(css, /\.frp-presence-list-wrap\s*\{[^}]*flex:\s*1/s);
 });
 
@@ -270,7 +287,7 @@ test('sohbet penceresi cok satirli taslak, otomatik boyut ve gonderim hatasi ger
 });
 
 test('sohbet API hedef, uyelik, boyut ve mesaj erisim kontrollerini uygular', () => {
-  const serverSource = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+  const serverSource = readAllServerCode();
   assert.match(serverSource, /function canAccessChatGroup/);
   assert.match(serverSource, /function canAccessChatRoom/);
   assert.match(serverSource, /function canAccessChatMessage/);
@@ -278,16 +295,16 @@ test('sohbet API hedef, uyelik, boyut ve mesaj erisim kontrollerini uygular', ()
   assert.match(serverSource, /cleanText\.length > 1000/);
   assert.match(serverSource, /6 \* 1024 \* 1024/);
   assert.match(serverSource, /id: crypto\.randomUUID\(\)/);
-  assert.match(serverSource, /await persistChatMessage\(newMsg\)/);
+  assert.match(serverSource, /await persistChatMessage\((?:newMsg|message)\)/);
 });
 
 test('sohbet gecmisi Supabase ile hydrate edilir ve genisletilmis sema migrationi vardir', () => {
-  const serverSource = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+  const serverSource = readAllServerCode();
   const sql = fs.readFileSync(path.join(root, 'supabase', 'migrations', '010_chat_persistence.sql'), 'utf8');
   assert.match(serverSource, /async function ensureChatMessagesHydrated/);
   assert.match(serverSource, /async function persistChatMessage/);
   assert.match(serverSource, /chatRowToMessage/);
-  assert.match(serverSource, /await persistChatMessage\(newMsg\)/);
+  assert.match(serverSource, /await persistChatMessage\((?:newMsg|message)\)/);
   assert.match(sql, /add column if not exists group_id text/i);
   assert.match(sql, /idx_chat_messages_group/i);
   assert.match(sql, /sender_username text/i);

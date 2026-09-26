@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 test('server.js dosyasında /api/presence/offline rotası requireAuth ile korunur ve oturum kullanıcısını çevrimdışı yapar', () => {
-  const serverCode = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  const serverCode = fs.readFileSync(path.join(__dirname, '..', 'server/routes/presence.js'), 'utf8');
   assert.match(
     serverCode,
     /app\.post\('\/api\/presence\/offline',\s*requireAuth/,
@@ -27,7 +27,7 @@ test('server.js dosyasında auth kurtarma ve şifre sıfırlama rotalarında Pos
 });
 
 test('server.js rapor ekleri indirmede Content-Disposition: attachment ve X-Content-Type-Options: nosniff başlıkları uygular', () => {
-  const serverCode = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  const serverCode = fs.readFileSync(path.join(__dirname, '..', 'server/routes/report_notes.js'), 'utf8');
   assert.match(
     serverCode,
     /res\.setHeader\('Content-Disposition',\s*`attachment; filename="\$\{encodeURIComponent\(filename\)\}"`\);/,
@@ -40,27 +40,17 @@ test('server.js rapor ekleri indirmede Content-Disposition: attachment ve X-Cont
   );
   assert.match(
     serverCode,
-    /if \(!targetDir\.startsWith\(ATTACHMENTS_DIR\)\)/,
+    /resolved\.startsWith\(attachmentRoot \+ path\.sep\)/,
     'Hedef dizin ATTACHMENTS_DIR sınırları içinde kalmalıdır.'
   );
 });
 
 test('server.js dosyasında JSON yazma işlemleri atomik (.tmp + rename) olarak gerçekleştirilir', () => {
-  const serverCode = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  const jsonStoreCode = fs.readFileSync(path.join(__dirname, '..', 'lib/json_store.js'), 'utf8');
   assert.match(
-    serverCode,
-    /const tempFile = LOGS_FILE \+ '\.tmp';[\s\S]*?fs\.renameSync\(tempFile, LOGS_FILE\);/,
-    'saveAuditLogs atomik yazma kullanmalıdır.'
-  );
-  assert.match(
-    serverCode,
-    /const tempFile = USER_SETTINGS_PATH \+ '\.tmp';[\s\S]*?fs\.renameSync\(tempFile, USER_SETTINGS_PATH\);/,
-    'saveUserSettingsFileMap atomik yazma kullanmalıdır.'
-  );
-  assert.match(
-    serverCode,
-    /const tempFile = CHAT_STORE_PATH \+ '\.tmp';[\s\S]*?fs\.renameSync\(tempFile, CHAT_STORE_PATH\);/,
-    'saveChatMessages atomik yazma kullanmalıdır.'
+    jsonStoreCode,
+    /const temporaryPath = `\$\{filePath\}\.tmp`;[\s\S]*?fs\.renameSync\(temporaryPath, filePath\);/,
+    'createJsonStore atomik yazma kullanmalıdır.'
   );
 });
 

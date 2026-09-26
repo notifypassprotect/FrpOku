@@ -8,10 +8,6 @@ function createPresenceService({ avatarStore, getLocalUsers, supabase }) {
     activePresence.set(String(user.id), { userId: String(user.id), lastSeen: Date.now(), customStatus: status });
   }
 
-  function removeUserPresence(userId) {
-    if (userId) activePresence.delete(String(userId));
-  }
-
   function getUserAvatars() {
     if (avatarCache !== null) return avatarCache;
     const avatars = avatarStore.read();
@@ -62,7 +58,99 @@ function createPresenceService({ avatarStore, getLocalUsers, supabase }) {
     }).sort((a, b) => a.isOnline !== b.isOnline ? (a.isOnline ? -1 : 1) : (a.fullName || a.username).localeCompare(b.fullName || b.username, 'tr'));
   }
 
-  return { getAllUsersWithPresence, getUserAvatars, recordUserPresence, removeUserPresence, saveUserAvatar };
+  // ── RAPOR KİLİT / DÜZENLEME KONTROLÜ (SOFT-LOCK / CHECK-OUT) ──
+  const activeReportLocks = new Map();
+
+  function getActiveReportLocks() {
+    const now = Date.now();
+    const locks = {};
+    for (const [id, lock] of activeReportLocks.entries()) {
+      if (now - lock.lastHeartbeat <= 45000) {
+        locks[id] = lock;
+      } else {
+        activeReportLocks.delete(id);
+      }
+    }
+    return locks;
+  }
+
+  function getReportLock(reportId) {
+    if (!reportId) return null;
+    const lock = activeReportLocks.get(String(reportId));
+    if (lock && Date.now() - lock.lastHeartbeat <= 45000) {
+      return lock;
+    }
+    if (lock) activeReportLocks.delete(String(reportId));
+    return null;
+  }
+
+  function acquireReportLock(reportId, user) {
+    if (!reportId || !user || !user.id) return { acquired: false, reason: 'Geçersiz parametreler' };
+    const rId = String(reportId);
+    const uId = String(user.id);
+    const existing = getReportLock(rId);
+
+    if (existing && existing.userId !== uId && user.role !== 'admin') {
+      return { acquired: false, lock: existing };
+    }
+
+    const avatars = getUserAvatars();
+    const lock = {
+      reportId: rId,
+      userId: uId,
+      username: user.username || '',
+      userFullName: user.full_name || user.fullName || user.username || '',
+      userAvatar: avatars[uId] || avatars[(user.username || '').toLowerCase()] || user.avatar || (user.username ? user.username[0].toUpperCase() : 'U'),
+      lockedAt: existing && existing.userId === uId ? existing.lockedAt : new Date().toISOString(),
+      lastHeartbeat: Date.now()
+    };
+    activeReportLocks.set(rId, lock);
+    return { acquired: true, lock };
+  }
+
+  function releaseReportLock(reportId, userId, isAdmin = false) {
+    if (!reportId) return false;
+    const rId = String(reportId);
+    const lock = activeReportLocks.get(rId);
+    if (lock && (lock.userId === String(userId) || isAdmin)) {
+      activeReportLocks.delete(rId);
+      return true;
+    }
+    return false;
+  }
+
+  function renewReportLock(reportId, userId) {
+    if (!reportId || !userId) return false;
+    const lock = activeReportLocks.get(String(reportId));
+    if (lock && lock.userId === String(userId)) {
+      lock.lastHeartbeat = Date.now();
+      return true;
+    }
+    return false;
+  }
+
+  function removeUserPresence(userId) {
+    if (userId) {
+      const uId = String(userId);
+      activePresence.delete(uId);
+      for (const [rId, lock] of activeReportLocks.entries()) {
+        if (lock.userId === uId) activeReportLocks.delete(rId);
+      }
+    }
+  }
+
+  return {
+    acquireReportLock,
+    getActiveReportLocks,
+    getAllUsersWithPresence,
+    getReportLock,
+    getUserAvatars,
+    recordUserPresence,
+    releaseReportLock,
+    removeUserPresence,
+    renewReportLock,
+    saveUserAvatar
+  };
 }
 
 module.exports = { createPresenceService };

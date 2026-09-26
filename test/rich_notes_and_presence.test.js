@@ -43,7 +43,9 @@ test('lib/report_access.js canEditReportNote fonksiyonunu dışa aktarır ve not
 });
 
 test('server.js dosyasında varlık (presence) ve zengin not/ek rotaları mevcuttur', () => {
-  const serverSource = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+  const serverSource = fs.readFileSync(path.join(root, 'server.js'), 'utf8') +
+    fs.readFileSync(path.join(root, 'server/routes/presence.js'), 'utf8') +
+    fs.readFileSync(path.join(root, 'server/routes/report_notes.js'), 'utf8');
   assert.match(serverSource, /\/api\/presence\/heartbeat/);
   assert.match(serverSource, /\/api\/presence\/users/);
   assert.match(serverSource, /\/api\/presence\/offline/);

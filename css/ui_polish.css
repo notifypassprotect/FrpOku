@@ -1560,167 +1560,388 @@ select:hover {
   .saved-view-controls .select-field { flex: 1 1 150px; max-width: none; }
 }
 
-/* Ana liste üst alanı — dengeli, hizalı ve sade masaüstü kabuğu */
+/* Ana liste üst alanı — dengeli, hizalı ve modern SaaS kabuğu */
 body:has(#workspaceSwitcher) .topbar {
-  min-height: 62px;
+  min-height: 64px;
   height: auto;
-  padding: .55rem clamp(.85rem, 1.35vw, 1.45rem);
+  padding: .6rem clamp(1rem, 1.6vw, 1.8rem);
   gap: 1.25rem;
-  background: color-mix(in srgb, var(--bg-surface) 94%, transparent);
-  box-shadow: 0 1px 0 var(--ui-border-subtle), 0 5px 18px rgba(15, 23, 42, .035);
+  background: color-mix(in srgb, var(--bg-surface) 92%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--ui-border-subtle);
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, .04);
 }
 body:has(#workspaceSwitcher) .topbar .brand { min-width: max-content; }
-body:has(#workspaceSwitcher) .topbar .brand > svg { width: 34px; height: 34px; filter: none !important; }
-body:has(#workspaceSwitcher) .topbar-right { margin-left: auto; gap: .38rem; }
-body:has(#workspaceSwitcher) .topbar-right > span[style*="width:1px"] { height: 26px !important; margin-inline: .28rem !important; }
+body:has(#workspaceSwitcher) .topbar .brand > svg { width: 34px; height: 34px; filter: drop-shadow(0 2px 8px rgba(37,99,235,0.25)) !important; }
+body:has(#workspaceSwitcher) .topbar-right { margin-left: auto; gap: .45rem; display: flex; align-items: center; }
+body:has(#workspaceSwitcher) .topbar-right > span[style*="width:1px"] { height: 24px !important; margin-inline: .35rem !important; opacity: 0.6; }
+
+/* Genel Modern Buton Tabanı */
 body:has(#workspaceSwitcher) .topbar-right :is(.btn, .theme-switch-pill, .btn-admin-pending, .btn-logout-compact) {
-  min-height: 36px;
-  height: 36px !important;
-  padding-inline: .72rem;
-  border: 1px solid var(--ui-border-subtle) !important;
-  border-radius: 9px !important;
-  background: var(--bg-surface) !important;
+  min-height: 38px;
+  height: 38px !important;
+  padding: .45rem .85rem;
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent) !important;
+  border-radius: 10px !important;
+  background: color-mix(in srgb, var(--bg-surface) 96%, transparent) !important;
   color: var(--text-secondary) !important;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, .035) !important;
-  font-size: .78rem !important;
-  font-weight: 680 !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .04) !important;
+  font-size: .8rem !important;
+  font-weight: 650 !important;
   line-height: 1;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .42rem;
+  transition: all .2s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
 }
 body:has(#workspaceSwitcher) .topbar-right :is(.btn, .theme-switch-pill, .btn-admin-pending, .btn-logout-compact):hover {
   color: var(--text-primary) !important;
-  border-color: color-mix(in srgb, var(--accent) 32%, var(--border)) !important;
-  background: color-mix(in srgb, var(--accent) 4%, var(--bg-surface)) !important;
-  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border)) !important;
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface)) !important;
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, .08) !important;
 }
+body:has(#workspaceSwitcher) .topbar-right :is(.btn, .theme-switch-pill, .btn-admin-pending, .btn-logout-compact):active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Birincil Butonlar: Rapor Ekle & Panel */
 body:has(#workspaceSwitcher) .topbar-right :is(#btnDashboardPanel, #dropdownAddReports > .btn) {
   color: #fff !important;
-  background: var(--accent) !important;
-  border-color: var(--accent) !important;
-  box-shadow: 0 3px 9px color-mix(in srgb, var(--accent) 20%, transparent) !important;
+  background: linear-gradient(135deg, var(--accent) 0%, #1d4ed8 100%) !important;
+  border: 1px solid color-mix(in srgb, var(--accent) 80%, #fff) !important;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 32%, transparent) !important;
+  font-weight: 750 !important;
 }
-body:has(#workspaceSwitcher) .topbar-right .btn-analytics {
-  color: #92400e !important;
-  background: color-mix(in srgb, #f59e0b 9%, var(--bg-surface)) !important;
-  border-color: color-mix(in srgb, #f59e0b 36%, var(--border)) !important;
+body:has(#workspaceSwitcher) .topbar-right :is(#btnDashboardPanel, #dropdownAddReports > .btn):hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%) !important;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 44%, transparent) !important;
+  transform: translateY(-2px);
 }
-body:has(#workspaceSwitcher) #btnUserProfile { max-width: 190px; overflow: hidden; text-overflow: ellipsis; }
 
+/* Analizler Menüsü */
+body:has(#workspaceSwitcher) .topbar-right .btn-analytics {
+  color: #b45309 !important;
+  background: color-mix(in srgb, #f59e0b 12%, var(--bg-surface)) !important;
+  border-color: color-mix(in srgb, #f59e0b 38%, transparent) !important;
+  font-weight: 750 !important;
+}
+body:has(#workspaceSwitcher) .topbar-right .btn-analytics:hover {
+  background: color-mix(in srgb, #f59e0b 18%, var(--bg-surface)) !important;
+  border-color: #f59e0b !important;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, .2) !important;
+}
+
+/* Kullanıcı Profil Butonu */
+body:has(#workspaceSwitcher) #btnUserProfile {
+  max-width: 210px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-surface)) !important;
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border)) !important;
+  color: var(--accent) !important;
+  font-weight: 750 !important;
+}
+body:has(#workspaceSwitcher) #btnUserProfile:hover {
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-surface)) !important;
+}
+
+/* Komut Paleti Tetikleyicisi */
+body:has(#workspaceSwitcher) .palette-trigger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  background: color-mix(in srgb, var(--bg-raised) 75%, var(--bg-surface)) !important;
+  border: 1px solid var(--ui-border-subtle) !important;
+  border-radius: 10px !important;
+  padding: .35rem .75rem !important;
+}
+body:has(#workspaceSwitcher) .palette-trigger-btn kbd {
+  font-size: .68rem;
+  padding: .15rem .4rem;
+  border-radius: 5px;
+  background: var(--bg-surface);
+  border: 1px solid var(--ui-border-subtle);
+  color: var(--text-muted);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+/* ÇALIŞMA ALANI & HAVUZ ÇUBUĞU */
 body:has(#workspaceSwitcher) .workspace-bar {
-  min-height: 58px;
-  padding: .62rem clamp(.85rem, 1.35vw, 1.45rem) !important;
-  gap: .8rem;
+  min-height: 56px;
+  padding: .65rem clamp(1rem, 1.6vw, 1.8rem) !important;
+  gap: 1rem;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--ui-border-subtle) !important;
 }
 body:has(#workspaceSwitcher) .workspace-switcher {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  padding: 3px;
-  border: 1px solid var(--ui-border-subtle);
-  border-radius: 11px;
-  background: color-mix(in srgb, var(--bg-raised) 78%, var(--bg-surface));
-  box-shadow: inset 0 1px 1px rgba(15, 23, 42, .025);
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg-raised) 82%, var(--bg-surface));
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, .03);
 }
 body:has(#workspaceSwitcher) #workspaceSwitcher .workspace-tab-btn {
   min-height: 36px;
-  padding: .45rem .88rem;
-  gap: .48rem;
+  padding: .45rem 1rem;
+  gap: .55rem;
   border: 0 !important;
-  border-radius: 8px;
+  border-radius: 9px;
   background: transparent !important;
   color: var(--text-secondary) !important;
   box-shadow: none !important;
-  font-size: .78rem;
-  font-weight: 680;
+  font-size: .8rem;
+  font-weight: 650;
+  transition: all .2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
 }
 body:has(#workspaceSwitcher) #workspaceSwitcher .workspace-tab-btn:hover {
   color: var(--text-primary) !important;
-  background: color-mix(in srgb, var(--bg-surface) 75%, transparent) !important;
+  background: color-mix(in srgb, var(--bg-surface) 60%, transparent) !important;
 }
 body:has(#workspaceSwitcher) #workspaceSwitcher .workspace-tab-btn.active {
   color: var(--accent) !important;
   background: var(--bg-surface) !important;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, .09), inset 0 -2px 0 color-mix(in srgb, var(--accent) 75%, transparent) !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, .08), 0 1px 2px rgba(15, 23, 42, .04) !important;
+  font-weight: 750;
 }
 body:has(#workspaceSwitcher) .pool-count-badge {
-  min-width: 20px;
+  min-width: 22px;
   height: 20px;
-  padding-inline: .38rem;
+  padding-inline: .45rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 0;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--text-muted) 10%, var(--bg-raised));
+  background: color-mix(in srgb, var(--text-muted) 12%, var(--bg-raised));
   color: var(--text-muted);
-  font-size: .68rem;
+  font-size: .7rem;
+  font-weight: 750;
   font-variant-numeric: tabular-nums;
+  transition: all .2s ease;
 }
-body:has(#workspaceSwitcher) .workspace-tab-btn.active .pool-count-badge { color: var(--accent); background: color-mix(in srgb, var(--accent) 11%, var(--bg-surface)); }
-body:has(#workspaceSwitcher) .workspace-sync-controls { margin-left: auto; gap: .72rem; }
-body:has(#workspaceSwitcher) .report-sync-status { font-size: .72rem; font-weight: 620; }
+body:has(#workspaceSwitcher) .workspace-tab-btn.active .pool-count-badge {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-surface));
+}
+
+body:has(#workspaceSwitcher) .workspace-sync-controls { margin-left: auto; gap: .75rem; }
+body:has(#workspaceSwitcher) .report-sync-status {
+  font-size: .75rem;
+  font-weight: 650;
+  padding: .3rem .65rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-raised) 70%, var(--bg-surface));
+  border: 1px solid var(--ui-border-subtle);
+}
 body:has(#workspaceSwitcher) #btnSyncCloudReports {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: .42rem;
+  gap: .45rem;
   min-height: 36px;
-  padding: .42rem .78rem;
-  border: 1px solid var(--ui-border-subtle);
-  border-radius: 9px;
-  background: var(--bg-surface);
-  color: var(--text-secondary);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, .035);
-  font-size: .75rem;
-  font-weight: 680;
-}
-body:has(#workspaceSwitcher) #btnSyncCloudReports:hover { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
-
-body:has(#workspaceSwitcher) .toolbar {
-  min-height: 58px;
-  padding: .58rem clamp(.85rem, 1.35vw, 1.45rem) !important;
-  gap: .7rem;
-  background: color-mix(in srgb, var(--bg-raised) 52%, var(--bg-surface));
-  border-bottom: 1px solid var(--ui-border-subtle) !important;
-}
-body:has(#workspaceSwitcher) .toolbar-left { gap: .42rem; flex-wrap: nowrap; }
-body:has(#workspaceSwitcher) .toolbar :is(.search-wrap, .select-field, .filter-chip, .saved-view-controls .btn) {
-  height: 36px;
-  min-height: 36px;
-  border-width: 1px;
-  border-color: var(--ui-border-subtle);
-  border-radius: 8px;
-  background: var(--bg-surface);
-  box-shadow: none;
-}
-body:has(#workspaceSwitcher) .toolbar .search-wrap { flex: 1 1 270px; min-width: 220px; max-width: 410px; }
-body:has(#workspaceSwitcher) .toolbar .select-field { min-width: 120px; max-width: 165px; padding-inline: .72rem; }
-body:has(#workspaceSwitcher) .toolbar :is(.filter-chip, .saved-view-controls .btn) { padding-inline: .7rem; color: var(--text-secondary); font-size: .74rem; font-weight: 650; }
-body:has(#workspaceSwitcher) .toolbar :is(.select-field, .filter-chip, .saved-view-controls .btn):hover { border-color: color-mix(in srgb, var(--accent) 28%, var(--border)); color: var(--text-primary); }
-body:has(#workspaceSwitcher) .toolbar-right { margin-left: auto; padding-left: .3rem; }
-body:has(#workspaceSwitcher) .view-mode-toggle {
-  height: 38px;
-  padding: 3px;
-  gap: 2px;
+  padding: .42rem .85rem;
   border: 1px solid var(--ui-border-subtle);
   border-radius: 10px;
   background: var(--bg-surface);
+  color: var(--text-secondary);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .03);
+  font-size: .76rem;
+  font-weight: 700;
+  transition: all .2s ease;
+}
+body:has(#workspaceSwitcher) #btnSyncCloudReports:hover {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface));
+  transform: translateY(-1px);
+}
+body:has(#workspaceSwitcher) #btnSyncCloudReports.syncing #syncIconSvg {
+  animation: spinSync 0.9s linear infinite;
+}
+@keyframes spinSync { 100% { transform: rotate(360deg); } }
+
+/* FİLTRE VE ARAMA ARAÇ ÇUBUĞU */
+body:has(#workspaceSwitcher) .toolbar {
+  min-height: 60px;
+  padding: .65rem clamp(1rem, 1.6vw, 1.8rem) !important;
+  gap: .8rem;
+  background: color-mix(in srgb, var(--bg-raised) 45%, var(--bg-surface));
+  border-bottom: 1px solid var(--ui-border-subtle) !important;
+}
+body:has(#workspaceSwitcher) .toolbar-left { gap: .55rem; flex-wrap: wrap; align-items: center; }
+
+/* Arama Kutusu */
+body:has(#workspaceSwitcher) .toolbar .search-wrap {
+  flex: 1 1 280px;
+  min-width: 240px;
+  max-width: 440px;
+  height: 38px;
+  min-height: 38px;
+  border: 1.5px solid var(--ui-border-subtle);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .03);
+  transition: all .2s ease;
+}
+body:has(#workspaceSwitcher) .toolbar .search-wrap:focus-within {
+  border-color: var(--accent-bright);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent), 0 2px 8px rgba(37,99,235,0.08);
+}
+body:has(#workspaceSwitcher) .toolbar .search-wrap .search-icon {
+  color: var(--text-muted);
+  transition: color .2s ease;
+}
+body:has(#workspaceSwitcher) .toolbar .search-wrap:focus-within .search-icon {
+  color: var(--accent);
+}
+body:has(#workspaceSwitcher) .toolbar .regex-btn {
+  border-radius: 7px;
+  font-weight: 700;
+  padding: .25rem .55rem;
+}
+
+/* Seçici Alanları (Dropdowns) */
+body:has(#workspaceSwitcher) .toolbar .select-field {
+  height: 38px;
+  min-height: 38px;
+  min-width: 125px;
+  max-width: 175px;
+  padding-inline: .85rem;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: .78rem;
+  font-weight: 650;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .03);
+  transition: all .2s ease;
+}
+body:has(#workspaceSwitcher) .toolbar .select-field:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+body:has(#workspaceSwitcher) .toolbar .select-field:focus {
+  border-color: var(--accent-bright);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+/* Hızlı Filtre Butonları (Pill Chips) */
+body:has(#workspaceSwitcher) .toolbar .filter-chip {
+  height: 38px;
+  min-height: 38px;
+  padding: .4rem .95rem;
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  border-radius: 999px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: .78rem;
+  font-weight: 680;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .03);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: .42rem;
+  transition: all .2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+body:has(#workspaceSwitcher) .toolbar .filter-chip:hover {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface));
+  transform: translateY(-1px);
+}
+body:has(#workspaceSwitcher) .toolbar .filter-chip.active {
+  color: var(--accent) !important;
+  border-color: var(--accent) !important;
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-surface)) !important;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 22%, transparent) !important;
+  font-weight: 750 !important;
+}
+
+/* Kayıtlı Görünümler Grubu */
+body:has(#workspaceSwitcher) .toolbar .saved-view-controls {
+  gap: .35rem;
+}
+body:has(#workspaceSwitcher) .toolbar .saved-view-controls .btn {
+  height: 38px;
+  min-height: 38px;
+  padding: .4rem .85rem;
+  border-radius: 10px;
+  border: 1px solid var(--ui-border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: .76rem;
+  font-weight: 680;
+  transition: all .2s ease;
+}
+body:has(#workspaceSwitcher) .toolbar .saved-view-controls .btn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  color: var(--accent);
+}
+
+/* Görünüm Değiştirici (Tablo / Kart / Zaman Çizelgesi) */
+body:has(#workspaceSwitcher) .toolbar-right {
+  margin-left: auto;
+  padding-left: .5rem;
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+}
+body:has(#workspaceSwitcher) .view-mode-toggle {
+  height: 40px;
+  padding: 3px;
+  gap: 3px;
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg-raised) 75%, var(--bg-surface));
+  display: inline-flex;
+  align-items: center;
 }
 body:has(#workspaceSwitcher) #viewModeToggle .view-btn {
-  min-height: 30px;
-  padding: .35rem .72rem;
+  min-height: 32px;
+  padding: .35rem .85rem;
   border: 0 !important;
-  border-radius: 7px;
+  border-radius: 8px;
   background: transparent !important;
-  color: var(--text-muted) !important;
+  color: var(--text-secondary) !important;
   box-shadow: none !important;
-  font-size: .72rem;
+  font-size: .76rem;
   font-weight: 680;
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  transition: all .2s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
 }
-body:has(#workspaceSwitcher) #viewModeToggle .view-btn.active { color: var(--accent) !important; background: color-mix(in srgb, var(--accent) 9%, var(--bg-surface)) !important; }
-body:has(#workspaceSwitcher) #resultCount { min-height: 34px; display: inline-flex; align-items: center; padding-inline: .68rem; font-size: .72rem; }
+body:has(#workspaceSwitcher) #viewModeToggle .view-btn:hover {
+  color: var(--text-primary) !important;
+}
+body:has(#workspaceSwitcher) #viewModeToggle .view-btn.active {
+  color: var(--accent) !important;
+  background: var(--bg-surface) !important;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, .08) !important;
+  font-weight: 750;
+}
+body:has(#workspaceSwitcher) #resultCount {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  padding: .3rem .8rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-muted) 10%, var(--bg-surface));
+  color: var(--text-muted);
+  font-size: .74rem;
+  font-weight: 700;
+  border: 1px solid var(--ui-border-subtle);
+}
 
 @media (min-width: 769px) and (max-width: 1480px) {
   body:has(#workspaceSwitcher) .topbar { align-items: flex-start; }
@@ -1740,4 +1961,90 @@ body:has(#workspaceSwitcher) #resultCount { min-height: 34px; display: inline-fl
   body:has(#workspaceSwitcher) .toolbar-left { display: grid; gap: .42rem; }
   body:has(#workspaceSwitcher) .toolbar :is(.search-wrap, .select-field, .filter-chip, .saved-view-controls .btn) { min-height: 40px; height: 40px; }
   body:has(#workspaceSwitcher) .toolbar-right { width: 100%; padding-left: 0; }
+}
+
+/* ════════════════════════════════════════════════════════════
+   SKELETON LOADING & MİKRO ETKİLEŞİMLER
+   ════════════════════════════════════════════════════════════ */
+.frp-skeleton-pulse {
+  background: linear-gradient(90deg, 
+    color-mix(in srgb, var(--bg-raised) 70%, var(--bg-surface)) 0%, 
+    color-mix(in srgb, var(--accent) 9%, var(--bg-raised)) 50%, 
+    color-mix(in srgb, var(--bg-raised) 70%, var(--bg-surface)) 100%
+  );
+  background-size: 200% 100%;
+  animation: frpShimmerWave 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  border-radius: 6px;
+}
+
+@keyframes frpShimmerWave {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Kart Mikro-Etkileşimleri */
+.report-card {
+  transition: transform .22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow .22s cubic-bezier(0.16, 1, 0.3, 1), border-color .22s ease !important;
+}
+.report-card:hover {
+  transform: translateY(-2.5px);
+  box-shadow: 0 10px 25px -4px rgba(15, 23, 42, .08), 0 4px 10px -2px rgba(15, 23, 42, .04) !important;
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border)) !important;
+}
+.report-card:active {
+  transform: translateY(-1px) scale(0.99);
+}
+
+/* Buton ve Chip Mikro-Etkileşimleri */
+.btn, .filter-chip, .view-btn, .workspace-tab-btn {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.btn:active:not(:disabled), .filter-chip:active {
+  transform: scale(0.97) !important;
+}
+
+/* Kilit / Check-out Rozeti (Soft-Lock Badge) */
+.report-lock-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .18rem .55rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, #f59e0b 16%, var(--bg-surface));
+  border: 1px solid color-mix(in srgb, #f59e0b 40%, transparent);
+  color: #d97706;
+  font-size: .68rem;
+  font-weight: 750;
+  box-shadow: 0 1px 4px rgba(245, 158, 11, .15);
+  animation: pulseLockGlow 2.5s ease-in-out infinite;
+}
+.report-lock-badge .lock-icon {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+}
+@keyframes pulseLockGlow {
+  0%, 100% { opacity: 1; border-color: color-mix(in srgb, #f59e0b 40%, transparent); }
+  50% { opacity: 0.85; border-color: #f59e0b; }
+}
+
+/* Detay Sayfası Kilit Uyarısı */
+.detail-lock-banner {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .75rem 1.25rem;
+  margin: .5rem 1rem .75rem;
+  background: color-mix(in srgb, #f59e0b 12%, var(--bg-surface));
+  border: 1px solid color-mix(in srgb, #f59e0b 35%, transparent);
+  border-radius: 12px;
+  color: var(--text-primary);
+  font-size: .82rem;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, .08);
+}
+.detail-lock-banner svg {
+  color: #f59e0b;
+  flex-shrink: 0;
 }

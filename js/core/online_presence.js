@@ -544,6 +544,15 @@
           if (data.unreadCounts) {
             handleUnreadUpdate(data.unreadCounts);
           }
+          if (data.activeReportLocks) {
+            const oldLocksStr = JSON.stringify(window.activeReportLocks || {});
+            const newLocksStr = JSON.stringify(data.activeReportLocks);
+            window.activeReportLocks = data.activeReportLocks;
+            if (oldLocksStr !== newLocksStr && typeof window.renderCurrentView === 'function') {
+              window.renderCurrentView();
+            }
+            window.dispatchEvent(new CustomEvent('frp:locks-updated', { detail: data.activeReportLocks }));
+          }
           if (currentTab === 'users') renderUsers();
           else if (currentTab === 'groups') renderGroups();
           else if (currentTab === 'rooms') renderRooms();
@@ -600,8 +609,9 @@
       lastMessage: unreadData.lastMessage || {}
     };
 
-    const notifySenders = newSenders.filter(({ senderId }) =>
-      !isConversationMuted('peer', senderId) && !isConversationActivelyVisible('peer', senderId));
+    const notifySenders = (typeof isConversationMuted === 'function' && typeof isConversationActivelyVisible === 'function')
+      ? newSenders.filter(({ senderId }) => !isConversationMuted('peer', senderId) && !isConversationActivelyVisible('peer', senderId))
+      : newSenders;
     if (notifySenders.length > 0 && total > lastTotalUnread && areChatNotificationsEnabled()) {
       playNotificationChime();
       notifySenders.forEach(({ senderId, count }) => {
@@ -2642,7 +2652,8 @@
                 return;
               }
               if (isImg) {
-                item.innerHTML = `<img src="${escHtml(safeMediaUrl)}" alt="${escHtml(m.attachment.name)}" />`;
+                const safeImgUrl = (m.attachment.dataUrl && (m.attachment.dataUrl.startsWith('data:image/') || /^https?:\/\//i.test(m.attachment.dataUrl))) ? escHtml(m.attachment.dataUrl) : '';
+                item.innerHTML = `<img src="${safeImgUrl || escHtml(safeMediaUrl)}" alt="${escHtml(m.attachment.name)}" />`;
                 item.addEventListener('click', () => {
                   openImageLightbox({ src: safeMediaUrl, name: m.attachment.name });
                 });
@@ -3432,7 +3443,7 @@
         <div class="frp-chat-msg-time">
           <span>${timeStr}</span>
           ${m.editedAt ? '<span class="frp-chat-edited" title="Mesaj düzenlendi">düzenlendi</span>' : ''}
-          ${isSelf ? `<span class="frp-chat-tick ${m.isRead ? 'read' : ''}" title="${m.isRead ? 'Okundu' : 'Sunucuya ulaştı'}">${m.isRead ? '✓✓' : '✓'}</span>` : ''}
+          ${isSelf ? `<span class="frp-chat-tick ${m.isRead ? 'read' : ''}" title="${m.isRead ? 'Okundu' : 'İletildi'}">${m.isRead ? '✓✓' : '✓'}</span>` : ''}
         </div>
       `;
 
@@ -3648,7 +3659,7 @@
           const tickEl = existingDiv.querySelector('.frp-chat-tick');
           if (tickEl && isSelf) {
             tickEl.classList.toggle('read', Boolean(m.isRead));
-            tickEl.title = m.isRead ? 'Okundu' : 'Sunucuya ulaştı';
+            tickEl.title = m.isRead ? 'Okundu' : 'İletildi';
             tickEl.textContent = m.isRead ? '✓✓' : '✓';
           }
           const reactionsWrap = existingDiv.querySelector('.frp-chat-reactions-row');

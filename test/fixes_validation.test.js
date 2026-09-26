@@ -190,7 +190,7 @@ test('assets/favicon.svg geçerli XML standartlarına ve yeni FrpOku vektörel t
 });
 
 test('server.js captcha endpointi hem token hem de captchaToken döner', () => {
-  const serverJs = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  const serverJs = fs.readFileSync(path.join(__dirname, '..', 'server/routes/account_login.js'), 'utf8');
 
   assert.match(serverJs, /token:\s*c\.token,\s*captchaToken:\s*c\.token/);
 });

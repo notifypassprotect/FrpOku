@@ -20,8 +20,9 @@ function registerChatSendRoute(app, deps) {
       const { receiverId, roomId, groupId, text, attachment, voice, isNudge, clientMessageId, replyTo } = req.body || {};
       if (!text && !attachment && !voice && !isNudge) return res.status(400).json({ success: false, reason: 'Mesaj içeriği boş olamaz.' });
       const targets = [receiverId, roomId, groupId].filter(Boolean);
-      if (!targets.length) return res.status(400).json({ success: false, reason: 'Alıcı, oda veya grup belirtilmelidir.' });
-      if (targets.length !== 1) return res.status(400).json({ success: false, reason: 'Her mesaj için yalnızca bir hedef belirtilmelidir.' });
+      const targetCount = targets.length;
+      if (!targetCount) return res.status(400).json({ success: false, reason: 'Alıcı, oda veya grup belirtilmelidir.' });
+      if (targetCount !== 1) return res.status(400).json({ success: false, reason: 'Her mesaj için yalnızca bir hedef belirtilmelidir.' });
       const cleanText = String(text || '').trim();
       if (cleanText.length > 1000) return res.status(400).json({ success: false, reason: 'Mesaj 1000 karakterden uzun olamaz.' });
       if (chatPayloadSize(attachment) > 6 * 1024 * 1024 || chatPayloadSize(voice) > 6 * 1024 * 1024) {

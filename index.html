@@ -128,16 +128,26 @@
       <button class="btn btn-sm" id="btnUserProfile" data-auth-badge title="Kullanıcı Giriş & Profil">Giriş Yap</button>
 
       <!-- Son Açılanlar & Son İndirilenler -->
-      <button class="btn btn-sm" id="btnOpenRecentModal" data-list-action="recent" style="font-weight:700;" title="Son İncelenen Raporlar">Son Açılanlar</button>
-      <button class="btn btn-sm" id="btnRecentDownloadsModal" data-list-action="downloads" style="font-weight:700;" title="Son İndirilen Dosyalar ve İndirme Geçmişi">Son İndirilenler</button>
+      <button class="btn btn-sm" id="btnOpenRecentModal" data-list-action="recent" style="font-weight:700;" title="Son İncelenen Raporlar">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span>Son Açılanlar</span>
+      </button>
+      <button class="btn btn-sm" id="btnRecentDownloadsModal" data-list-action="downloads" style="font-weight:700;" title="Son İndirilen Dosyalar ve İndirme Geçmişi">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Son İndirilenler</span>
+      </button>
 
       <!-- Panel (Sadece Sistem Yöneticisi Admin için) -->
-      <button class="btn btn-sm btn-primary" id="btnDashboardPanel" data-list-action="dashboard" title="İstatistik Paneli" style="display:none;">Panel</button>
+      <button class="btn btn-sm btn-primary" id="btnDashboardPanel" data-list-action="dashboard" title="İstatistik Paneli" style="display:none;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+        <span>Panel</span>
+      </button>
 
       <!-- Analizler Menüsü (Dropdown) -->
       <div class="topbar-dropdown" id="dropdownAnalytics">
         <button class="btn btn-sm topbar-dropdown-toggle btn-analytics" title="SQL & Rapor Analiz Araçları">
-          Analizler
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          <span>Analizler</span>
         </button>
         <div class="topbar-dropdown-menu">
           <button class="topbar-dropdown-item" id="btnDependencies" data-list-action="dependencies" title="Tüm raporlarda tablo kullanımı, sorgu bağlantıları ve değişiklik etkisi">
@@ -155,7 +165,8 @@
       <!-- Rapor Ekle (Dropdown) -->
       <div class="topbar-dropdown" id="dropdownAddReports">
         <button class="btn btn-sm btn-primary topbar-dropdown-toggle" title="Rapor Dosyası Yükle">
-          Rapor Ekle
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span>Rapor Ekle</span>
         </button>
         <div class="topbar-dropdown-menu">
           <button class="topbar-dropdown-item" id="btnAddSingle" title="Tek .frp dosyası seç">
@@ -176,7 +187,10 @@
       <button class="theme-switch-pill" id="btnThemeToggle" title="Gece / Gündüz Teması">Koyu Mod</button>
 
       <!-- Ayarlar Butonu -->
-      <button class="btn btn-sm" id="btnOpenSettingsModal" title="Görünüm, Kategoriler, Sütunlar, Çöp Kutusu, Yedekleme">Ayarlar</button>
+      <button class="btn btn-sm" id="btnOpenSettingsModal" title="Görünüm, Kategoriler, Sütunlar, Çöp Kutusu, Yedekleme">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        <span>Ayarlar</span>
+      </button>
 
       <!-- Mobil Menü Butonu (Sadece mobilde görünür) -->
       <button class="btn btn-sm btn-mobile-menu" id="btnMobileMenuToggle" title="Mobil Menüyü Aç" aria-label="Menü" aria-controls="mobileDrawer" aria-expanded="false">
@@ -327,9 +341,18 @@
         </select>
 
         <!-- Hızlı Filtre Butonları -->
-        <button class="filter-chip" id="btnFavOnly" title="Sadece favorileri göster">Favoriler</button>
-        <button class="filter-chip" id="btnPinnedOnly" title="Sadece sabitlenmişleri göster">Sabitlenmişler</button>
-        <button class="filter-chip" id="btnNotesOnly" title="Sadece not girilen raporları göster">Notlular</button>
+        <button class="filter-chip" id="btnFavOnly" title="Sadece favorileri göster">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="flex-shrink:0;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+          <span>Favoriler</span>
+        </button>
+        <button class="filter-chip" id="btnPinnedOnly" title="Sadece sabitlenmişleri göster">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="flex-shrink:0;"><path d="M12 17v5M9 2h6l1 7h-8z"/></svg>
+          <span>Sabitlenmişler</span>
+        </button>
+        <button class="filter-chip" id="btnNotesOnly" title="Sadece not girilen raporları göster">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          <span>Notlular</span>
+        </button>
 
         <div class="saved-view-controls" aria-label="Kayıtlı filtreler">
           <select class="select-field" id="savedViewSelect" aria-label="Kayıtlı görünüm seç">
@@ -348,9 +371,18 @@
       <div class="toolbar-right">
         <!-- Görünüm Seçici -->
         <div class="view-mode-toggle" id="viewModeToggle">
-          <button class="view-btn active" data-view="table" id="btnViewTable" title="Tablo Görünümü (F6)">Tablo</button>
-          <button class="view-btn" data-view="cards" id="btnViewCards" title="Kart Görünümü (F6)">Kart</button>
-          <button class="view-btn" data-view="timeline" id="btnViewTimeline" title="Zaman Çizelgesi (F6)">Zaman Çizelgesi</button>
+          <button class="view-btn active" data-view="table" id="btnViewTable" title="Tablo Görünümü (F6)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
+            <span>Tablo</span>
+          </button>
+          <button class="view-btn" data-view="cards" id="btnViewCards" title="Kart Görünümü (F6)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            <span>Kart</span>
+          </button>
+          <button class="view-btn" data-view="timeline" id="btnViewTimeline" title="Zaman Çizelgesi (F6)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>Zaman Çizelgesi</span>
+          </button>
         </div>
 
         <div class="result-count" id="resultCount">0 sonuç</div>

@@ -77,7 +77,7 @@ test('çıkış ekranı tamamlanınca kaldırılır ve giriş portalı daha sonr
 
 test('şifre değişiminde yeni token istemci oturumuna yazılır ve şema geçişi bulunur', () => {
   const authContent = fs.readFileSync(path.join(__dirname, '../js/core/auth.js'), 'utf8');
-  const serverContent = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
+  const serverContent = fs.readFileSync(path.join(__dirname, '../server/services/user_service.js'), 'utf8');
   const migration = fs.readFileSync(path.join(__dirname, '../supabase/migrations/004_add_password_changed_at.sql'), 'utf8');
   assert.match(authContent, /data\.success && data\.token/);
   assert.match(serverContent, /\['is_frozen', 'password_changed_at'\]/);
@@ -87,12 +87,12 @@ test('şifre değişiminde yeni token istemci oturumuna yazılır ve şema geçi
 test('kod ile şifre sıfırlama güvenli oturum kurar ve raporları yeniden yükler', () => {
   const authContent = fs.readFileSync(path.join(__dirname, '../js/core/auth.js'), 'utf8');
   const portalContent = fs.readFileSync(path.join(__dirname, '../js/core/auth/auth_portal.js'), 'utf8');
-  const serverContent = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
+  const serverContent = fs.readFileSync(path.join(__dirname, '../server/routes/account_recovery.js'), 'utf8');
   assert.match(authContent, /function applyExternalSession\(token, user, remember = true\)/);
   assert.match(authContent, /delete safeUser\.password_hash/);
   assert.match(portalContent, /FrpStore\.clearSessionCache/);
   assert.match(portalContent, /await window\.FrpStore\.refreshFromCloud\(\)/);
-  const resetRoute = serverContent.slice(serverContent.indexOf("app.post('/api/auth/reset-password-with-code'"), serverContent.indexOf("// ── 3. ADMİN"));
+  const resetRoute = serverContent;
   assert.match(resetRoute, /delete safeUser\.password_hash/);
   assert.match(resetRoute, /user: safeUser/);
   assert.doesNotMatch(resetRoute, /user: updatedUser/);
@@ -117,22 +117,22 @@ test('Supabase şeması kimlik kurtarma ve e-posta tercih alanlarını içerir',
 
 test('e-posta değişikliği yalnızca gönderilmiş kodla yapılır ve kod erken silinmez', () => {
   const authContent = fs.readFileSync(path.join(__dirname, '../js/core/auth.js'), 'utf8');
-  const serverContent = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
+  const serverContent = fs.readFileSync(path.join(__dirname, '../server/routes/account_email.js'), 'utf8');
   assert.match(authContent, /E-posta adresi yalnızca mevcut şifre ve doğrulama kodu ile güncellenebilir/);
   assert.doesNotMatch(authContent.slice(authContent.indexOf('async function updateEmail'), authContent.indexOf('async function updateProfile')), /updateSession/);
-  const directRoute = serverContent.slice(serverContent.indexOf("app.post('/api/auth/change-email'"), serverContent.indexOf('// ── RAPOR DEPOLAMA'));
+  const directRoute = serverContent;
   assert.match(directRoute, /res\.status\(409\)/);
   const requestRoute = serverContent.slice(serverContent.indexOf("app.post('/api/auth/request-email-change'"), serverContent.indexOf("app.post('/api/auth/confirm-email-change'"));
   assert.match(requestRoute, /if \(!mailResult\.sent\)/);
   assert.match(requestRoute, /crypto\.randomInt\(100000, 1000000\)/);
-  const confirmRoute = serverContent.slice(serverContent.indexOf("app.post('/api/auth/confirm-email-change'"), serverContent.indexOf('// ── ADMİN: KULLANICIYI KALICI SİL'));
+  const confirmRoute = serverContent.slice(serverContent.indexOf("app.post('/api/auth/confirm-email-change'"));
   assert.ok(confirmRoute.lastIndexOf('pendingEmailVerifications.delete(userId)') > confirmRoute.indexOf("update({ email: newEmail })"));
 });
 
 test('yeni kayıt bildirimi yalnızca aktif ve benzersiz admin adreslerine gönderilir', () => {
-  const serverContent = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
+  const serverContent = fs.readFileSync(path.join(__dirname, '../server/routes/account_registration.js'), 'utf8');
   const mailerContent = fs.readFileSync(path.join(__dirname, '../lib/mailer.js'), 'utf8');
-  const registerRoute = serverContent.slice(serverContent.indexOf("app.post('/api/auth/register'"), serverContent.indexOf('// ── CAPTCHA'));
+  const registerRoute = serverContent;
   assert.match(registerRoute, /\.eq\('role', 'admin'\)\.eq\('is_active', true\)/);
   assert.match(registerRoute, /new Map\(adminUsers\.filter/);
   assert.match(registerRoute, /await Promise\.all\(uniqueAdmins\.map/);

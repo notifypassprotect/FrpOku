@@ -82,11 +82,13 @@ test('reportRowToSummaryClient devasa XML ve sayfa verilerini ayıklar ancak tü
 });
 
 test('server.js dosyasında tekil rapor getirme rotası GET /api/reports/:id ve yetki denetimi mevcuttur', () => {
-  const serverCode = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8');
+  const serverCode = fs.readFileSync(path.join(__dirname, '../server.js'), 'utf8') +
+    fs.readFileSync(path.join(__dirname, '../server/routes/report_read.js'), 'utf8') +
+    fs.readFileSync(path.join(__dirname, '../server/services/report_service.js'), 'utf8');
   assert.match(serverCode, /app\.get\(['"]\/api\/reports\/:id['"]/);
   assert.match(serverCode, /canReadReport\(req\.authUser/);
   assert.match(serverCode, /loadVisibleReports\(req\.authUser,\s*false,\s*\{\s*summaryOnly:\s*true\s*\}\)/);
-  assert.match(serverCode, /SUMMARY_SELECT_COLUMNS/);
+  assert.match(serverCode, /summarySelectColumns/i);
 });
 
 test('store_main.js dosyasında ensureFullReport ve optimize edilmiş _reportHash mevcuttur', () => {

@@ -90,8 +90,8 @@ test('chat reconnect, deletion and mobile viewport flows fail safely', () => {
   const source=fs.readFileSync(path.join(__dirname,'../js/core/online_presence.js'),'utf8');
   const css=fs.readFileSync(path.join(__dirname,'../css/online_presence.css'),'utf8');
   assert.match(source,/window\.addEventListener\('offline', onNetworkOffline\)/);
-  assert.match(source,/Date\.now\(\) - failedText\.failedAt > 10 \* 60 \* 1000/);
-  assert.match(source,/autoRetryAttempts >= 1/);
+  assert.match(source,/Date\.now\(\) - item\.failedAt <= 10 \* 60 \* 1000/);
+  assert.match(source,/!autoRetryAttempts\.has\(item\.id\)/);
   assert.match(source,/if \(!response\.ok \|\| !data\.success\) throw new Error/);
   assert.match(source,/window\.visualViewport\?\.addEventListener\('resize', syncMobileViewport\)/);
   assert.match(source,/window\.visualViewport\?\.addEventListener\('scroll', syncMobileViewport\)/);

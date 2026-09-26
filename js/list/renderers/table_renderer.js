@@ -64,11 +64,17 @@ window.FrpListRenderers = window.FrpListRenderers || {};
         const oDept = file.ownerDepartment || file.owner_department || '';
         const ownerChip = `<span class="owner-chip" style="font-size:.72rem;padding:.12rem .5rem;border-radius:6px;margin-left:.35rem;" title="Yükleyen: ${escHtml(oName)}${oDept ? ' · ' + escHtml(oDept) : ''}">${escHtml(oName)}</span>`;
 
+        const lockInfo = window.activeReportLocks ? window.activeReportLocks[file.id] : null;
+        const currentUserId = String(window.FrpAuth?.getUser?.()?.id || '');
+        const isLockedByOther = lockInfo && String(lockInfo.userId) !== currentUserId;
+        const lockBadge = isLockedByOther ? `<span class="report-lock-badge" style="font-size:.68rem;padding:1px 6px;" title="${escHtml(lockInfo.userName || 'Kullanıcı')} şu anda bu raporu düzenliyor"><svg class="lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg> ${escHtml(lockInfo.userName || 'Biri')} düzenliyor</span>` : '';
+
         return `
           <td class="col-reportName" style="cursor:pointer;max-width:320px;">
             <div class="file-name" style="display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;">
               <button type="button" class="report-name-title report-title-action" data-list-action="open-detail" data-id="${encodeURIComponent(String(file.id))}" style="font-weight:var(--report-title-weight, 700);font-size:.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(reportName)}" aria-label="${escHtml(reportName)} raporunu aç">${escHtml(reportName)}</button>
               ${poolBadge}
+              ${lockBadge}
               ${riskBadge}
               ${ownerChip}
               ${hasNote ? `<span title="Not mevcut" style="font-size:.72rem;color:var(--accent);font-weight:var(--bold-weight, 700);">[Not]</span>` : ''}
@@ -301,4 +307,30 @@ window.FrpListRenderers = window.FrpListRenderers || {};
       });
     });
   };
+
+  window.FrpListRenderers.renderSkeletonTable = function(container, count = 7) {
+    if (!container) return;
+    const rows = Array.from({ length: count });
+    container.innerHTML = `
+      <div class="report-table-wrap" aria-hidden="true" style="border:1.5px solid var(--border-light);border-radius:14px;background:var(--bg-surface);overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.03);">
+        <div style="padding:.9rem 1.25rem;background:var(--bg-raised);border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:1.5rem;">
+          <div class="frp-skeleton-pulse skeleton-line" style="width:25px;height:16px;"></div>
+          <div class="frp-skeleton-pulse skeleton-line" style="width:28%;height:14px;"></div>
+          <div class="frp-skeleton-pulse skeleton-line" style="width:16%;height:14px;"></div>
+          <div class="frp-skeleton-pulse skeleton-line" style="width:14%;height:14px;"></div>
+          <div class="frp-skeleton-pulse skeleton-line" style="width:12%;height:14px;margin-left:auto;"></div>
+        </div>
+        ${rows.map(() => `
+          <div class="skeleton-table-row" style="display:flex;align-items:center;gap:1.25rem;padding:.85rem 1.25rem;border-bottom:1px solid var(--border-light);">
+            <div class="frp-skeleton-pulse" style="width:18px;height:18px;border-radius:4px;flex-shrink:0;"></div>
+            <div class="frp-skeleton-pulse skeleton-line" style="width:34%;height:14px;"></div>
+            <div class="frp-skeleton-pulse skeleton-line" style="width:16%;height:12px;"></div>
+            <div class="frp-skeleton-pulse" style="width:64px;height:20px;border-radius:999px;"></div>
+            <div class="frp-skeleton-pulse skeleton-line" style="width:14%;height:12px;margin-left:auto;"></div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  };
 })();
+

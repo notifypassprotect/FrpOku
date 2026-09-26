@@ -2,7 +2,7 @@ const crypto = require('crypto');
 
 function registerChatNudgeRoute(app, deps) {
   const { canAccessChatGroup, ensureChatMessagesHydrated, getChatMessages, persistChatMessage, requireAuth, saveChatMessages } = deps;
-  const cooldowns = new Map();
+  const nudgeCooldowns = new Map();
 
   app.post('/api/chat/nudge', requireAuth, async (req, res) => {
     try {
@@ -16,12 +16,12 @@ function registerChatNudgeRoute(app, deps) {
         return res.status(403).json({ success: false, reason: 'Bu gruba titreşim gönderme yetkiniz yok.' });
       }
       const targetKey = receiverId ? `${senderId}_${receiverId}` : `${senderId}_${groupId}`;
-      const lastNudge = cooldowns.get(targetKey) || 0;
+      const lastNudge = nudgeCooldowns.get(targetKey) || 0;
       if (Date.now() - lastNudge < 15000) {
         const waitSeconds = Math.ceil((15000 - (Date.now() - lastNudge)) / 1000);
         return res.status(429).json({ success: false, reason: `Lütfen tekrar titreşim göndermeden önce ${waitSeconds} saniye bekleyin.` });
       }
-      cooldowns.set(targetKey, Date.now());
+      nudgeCooldowns.set(targetKey, Date.now());
       const senderName = req.authUser.full_name || req.authUser.username;
       const message = {
         id: crypto.randomUUID(), senderId, senderName, senderUsername: req.authUser.username,

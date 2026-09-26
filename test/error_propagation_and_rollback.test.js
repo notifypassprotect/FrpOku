@@ -60,18 +60,19 @@ test('supabase.js çöp ve silme operasyonlarında hataları yutmaz ve yukarı i
 });
 
 test('server.js çöp kutusu boşaltmada admin kullanıcısına tüm silinmiş kayıtları temizleme yetkisi verir', () => {
-  const code = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+  const code = fs.readFileSync(path.join(root, 'server/routes/report_lifecycle.js'), 'utf8');
   const trashAllRoute = code.slice(code.indexOf("app.delete('/api/reports/trash/all'"), code.indexOf("app.delete('/api/reports/:id'"));
   assert.match(trashAllRoute, /isAdmin/);
   assert.match(trashAllRoute, /req\.authUser\?\.role === 'admin'/);
 });
 
 test('server.js çöp ve ortak havuz rotalarında -1 indeks sınır kontrolü yapar', () => {
-  const code = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
-  const trashRoute = code.slice(code.indexOf("app.patch('/api/reports/:id/trash'"), code.indexOf("app.post('/api/reports/toggle-pool'"));
+  const lifecycleCode = fs.readFileSync(path.join(root, 'server/routes/report_lifecycle.js'), 'utf8');
+  const trashRoute = lifecycleCode.slice(lifecycleCode.indexOf("app.patch('/api/reports/:id/trash'"));
   assert.match(trashRoute, /if \(index === -1\) return res\.status\(404\)/);
 
-  const togglePoolRoute = code.slice(code.indexOf("app.post('/api/reports/toggle-pool'"), code.indexOf("app.post('/api/reports/bulk-toggle-pool'"));
+  const poolCode = fs.readFileSync(path.join(root, 'server/routes/report_pool.js'), 'utf8');
+  const togglePoolRoute = poolCode.slice(poolCode.indexOf("app.post('/api/reports/toggle-pool'"), poolCode.indexOf("app.post('/api/reports/bulk-toggle-pool'"));
   assert.match(togglePoolRoute, /if \(index === -1\) return res\.status\(404\)/);
 });
 

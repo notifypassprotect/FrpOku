@@ -518,8 +518,9 @@
 }
 
 .frp-presence-item.unread {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--accent, #2563eb) 14%, var(--bg-surface, #ffffff)), color-mix(in srgb, var(--accent, #2563eb) 5%, var(--bg-surface, #ffffff))) !important;
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.12), rgba(37, 99, 235, 0.03)) !important;
   border-color: color-mix(in srgb, var(--accent, #2563eb) 24%, var(--border-light, #e2e8f0)) !important;
+  border-left: 4px solid var(--accent, #2563eb) !important;
   box-shadow: inset 3px 0 0 var(--accent, #2563eb);
 }
 

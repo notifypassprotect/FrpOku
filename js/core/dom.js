@@ -86,10 +86,15 @@ window.showToast = showToast;
   }
 
   const start = () => {
+    if (!document || !document.body) return;
     colorTree(document.body);
-    new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(colorTree)))
-      .observe(document.body, { childList: true, subtree: true });
+    if (typeof MutationObserver !== 'undefined') {
+      new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(colorTree)))
+        .observe(document.body, { childList: true, subtree: true });
+    }
   };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
-  else start();
+  if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
+    else start();
+  }
 })();

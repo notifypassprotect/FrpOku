@@ -15,12 +15,14 @@ test('store değişiklikleri toplu snapshot yerine tekil rapor kuyruğuna gönde
 });
 
 test('tekil rapor endpointi version koşullu güncelleme yapar', () => {
-  const source = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+  const source = fs.readFileSync(path.join(root, 'server.js'), 'utf8') +
+    fs.readFileSync(path.join(root, 'server/routes/report_write.js'), 'utf8') +
+    fs.readFileSync(path.join(root, 'server/services/report_service.js'), 'utf8');
   const reportAccessSource = fs.readFileSync(path.join(root, 'lib/report_access.js'), 'utf8');
   assert.match(source, /app\.put\('\/api\/reports\/:id'/);
   assert.match(source, /\.eq\('version', currentVersion\)/);
   assert.match(source, /REPORT_CONFLICT/);
-  assert.match(source, /SUMMARY_SELECT_COLUMNS = '[\s\S]*?\bversion\b/);
+  assert.match(source, /summarySelectColumns = '[\s\S]*?\bversion\b/i);
   assert.match(reportAccessSource, /existing\.version != null \? existing\.version : existing\.data\?\.version/);
   assert.match(reportAccessSource, /'version', 'created_at', 'updated_at'/);
 });
