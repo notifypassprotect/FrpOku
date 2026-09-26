@@ -437,8 +437,8 @@ function esc(str) {
  // ── ANA RENDER MOTORU (FastReportDesignerEngine) ───────────
  function createDesigner(file, containerEl) {
  let currentZoom = 1.0;
- let currentMode = 'designer'; // 'designer' | 'preview'
- let showRulers = true; // Cetveller Açık / Kapalı
+ let currentMode = 'preview'; // 'designer' | 'preview'
+ let showRulers = false; // Önizleme temiz açılır; tasarım modunda cetveller etkinleşir.
  let gridSnapStep = parseInt(localStorage.getItem('frp_designer_grid_step') || '4', 10);
  if (![0, 4, 8, 12].includes(gridSnapStep)) gridSnapStep = 4;
  let selectedItem = null;
@@ -461,8 +461,8 @@ function esc(str) {
  const gridStateClass = () => gridSnapStep > 1 ? 'grid-snap-on' : 'grid-snap-off';
  const gridStateStyle = () => `--fr-designer-grid:${gridSnapStep > 1 ? gridSnapStep : 8}px;`;
 
- // Canlı Tasarım Düzenleme Modu & Geri Al (Undo/Redo) Durumu (Tasarımcıda daima aktif)
- let isDesignEditing = true;
+ // Rapor ilk açıldığında temiz önizleme gösterilir; düzenleme kullanıcı isteğiyle başlar.
+ let isDesignEditing = false;
  let undoStack = [];
  let redoStack = [];
  let initialPagesBackup = null;
@@ -957,6 +957,7 @@ function esc(str) {
 
     const finalPageWidth = Math.max(stdPaperWidth, Math.ceil(maxCompRight + leftMarginPx + rightMarginPx));
     const finalPageMinHeight = Math.max(stdPaperHeight, totalBandsHeight + topMarginPx + bottomMarginPx + 60);
+    const freeDropHeight = Math.max(140, finalPageMinHeight - totalBandsHeight - 72);
 
     function renderResizeHandles(isSelected) {
  if (!isSelected || currentMode !== 'designer') return '';
@@ -1505,12 +1506,20 @@ function esc(str) {
  <div class="fr-band-header-right">
  ${band.dataSet? `<span class="badge-dataset-icon">${esc(band.dataSet)}</span>`: ''}
  ${band.stretched? `<span style="opacity:.8;font-size:9.5px;">[Stretched]</span>`: ''}
+ ${isDesignEditing ? `
+ <div class="fr-band-actions" aria-label="Bant işlemleri">
+   <button type="button" class="fr-band-action" data-band-action="up" data-band-idx="${bIdx}" title="Bandı yukarı taşı" aria-label="Bandı yukarı taşı">↑</button>
+   <button type="button" class="fr-band-action" data-band-action="down" data-band-idx="${bIdx}" title="Bandı aşağı taşı" aria-label="Bandı aşağı taşı">↓</button>
+   <button type="button" class="fr-band-action danger" data-band-action="delete" data-band-idx="${bIdx}" title="Bandı ve içindekileri sil" aria-label="Bandı sil">×</button>
+ </div>
+ ` : ''}
  </div>
  </div>
  `: ''}
  <div class="fr-band-body" data-band-idx="${bIdx}" style="min-height:${bHeight}px; height:${bHeight}px;">
  ${componentsHtml}
  </div>
+ ${currentMode === 'designer' && isDesignEditing ? `<div class="fr-band-resize-grip" data-band-idx="${bIdx}" title="Bant yüksekliğini değiştir"></div>` : ''}
  </div>
  `;
  }).join('');
@@ -1542,6 +1551,11 @@ function esc(str) {
  ">
  <div class="fr-smart-guides-layer" id="frSmartGuidesLayer"></div>
  ${bandsHtml}
+ ${currentMode === 'designer' && isDesignEditing ? `
+ <div class="fr-page-free-dropzone" style="min-height:${freeDropHeight}px;" aria-label="Serbest sayfa yerleşim alanı">
+   <div class="fr-page-free-dropzone-label"><strong>Serbest Sayfa Alanı</strong><span>Nesneyi buraya bırakarak bant dışına taşıyın</span></div>
+ </div>
+ ` : ''}
  ${vBandsHtml}
  </div>
  `;
@@ -2423,6 +2437,140 @@ function esc(str) {
      return getCompFromElement(el) === comp;
    }) || null;
  }
+
+ function isBandObject(target) {
+   const activePage = allPages[activePageIndex];
+   return Boolean(activePage?.type === 'report' && (activePage.data.bands || []).includes(target));
+ }
+
+ function getOrCreatePageContentBand(page) {
+   page.bands = page.bands || [];
+   let band = page.bands.find(item => item.type === 'TfrxPageContent' && !item.vertical);
+   if (!band) {
+     band = {
+       type: 'TfrxPageContent',
+       name: ensureUniqueComponentName('SerbestSayfaAlani'),
+       top: 0,
+       left: 0,
+       width: Math.max(200, Math.round(toDesignerNumber(page.paperWidth, 210) * 3.779527559)),
+       height: 180,
+       dataSet: '',
+       condition: '',
+       stretched: false,
+       vertical: false,
+       rawAttrs: '',
+       components: []
+     };
+     page.bands.push(band);
+   }
+   band.components = band.components || [];
+   return band;
+ }
+
+ function clearBandDropTargets() {
+   containerEl.querySelectorAll('.fr-band-container.is-drop-target,.fr-page-free-dropzone.is-drop-target').forEach(node => {
+     node.classList.remove('is-drop-target');
+   });
+ }
+
+ function resolveReportDropTarget(clientX, clientY) {
+   const activePage = allPages[activePageIndex];
+   const pageEl = containerEl.querySelector('#frReportPage');
+   if (!activePage || activePage.type !== 'report' || !pageEl) return null;
+   const pageRect = pageEl.getBoundingClientRect();
+   if (clientX < pageRect.left || clientX > pageRect.right || clientY < pageRect.top || clientY > pageRect.bottom) return null;
+
+   const bandEls = [...pageEl.querySelectorAll('.fr-band-container[data-band-idx]')];
+   const exact = bandEls.find(node => {
+     const rect = node.getBoundingClientRect();
+     return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+   });
+   if (exact) {
+     const index = Number.parseInt(exact.dataset.bandIdx, 10);
+     const band = activePage.data.bands?.[index];
+     const bodyEl = exact.querySelector('.fr-band-body') || exact;
+     if (band) return { band, bandEl: exact, bodyEl, label: band.name || 'Bant', isPageArea: false };
+   }
+
+   const freeZone = pageEl.querySelector('.fr-page-free-dropzone');
+   if (freeZone) {
+     const rect = freeZone.getBoundingClientRect();
+     if (clientY >= rect.top || bandEls.length === 0) {
+       const existing = (activePage.data.bands || []).find(item => item.type === 'TfrxPageContent' && !item.vertical) || null;
+       return { band: existing, bandEl: freeZone, bodyEl: freeZone, label: 'Serbest Sayfa Alanı', isPageArea: true };
+     }
+   }
+
+   let nearest = null;
+   let nearestDistance = Infinity;
+   bandEls.forEach(node => {
+     const rect = node.getBoundingClientRect();
+     const distance = clientY < rect.top ? rect.top - clientY : clientY > rect.bottom ? clientY - rect.bottom : 0;
+     if (distance < nearestDistance) {
+       const index = Number.parseInt(node.dataset.bandIdx, 10);
+       const band = activePage.data.bands?.[index];
+       if (band) {
+         nearest = { band, bandEl: node, bodyEl: node.querySelector('.fr-band-body') || node, label: band.name || 'Bant', isPageArea: false };
+         nearestDistance = distance;
+       }
+     }
+   });
+   return nearestDistance <= 28 ? nearest : null;
+ }
+
+ function getDropCoordinates(target, clientX, clientY, grabOffsetX = 0, grabOffsetY = 0) {
+   const rect = target.bodyEl.getBoundingClientRect();
+   return {
+     left: snapDesignerValue(Math.max(0, (clientX - rect.left) / currentZoom - grabOffsetX)),
+     top: snapDesignerValue(Math.max(0, (clientY - rect.top) / currentZoom - grabOffsetY))
+   };
+ }
+
+ function moveBand(index, direction) {
+   const activePage = allPages[activePageIndex];
+   if (!isDesignEditing || activePage?.type !== 'report') return;
+   const bands = activePage.data.bands || [];
+   const nextIndex = index + direction;
+   if (index < 0 || index >= bands.length || nextIndex < 0 || nextIndex >= bands.length) return;
+   pushUndoState();
+   const [band] = bands.splice(index, 1);
+   bands.splice(nextIndex, 0, band);
+   selectedItem = band;
+   selectedItems = [];
+   render();
+   pushUndoState();
+ }
+
+ function deleteBand(band) {
+   const activePage = allPages[activePageIndex];
+   if (!isDesignEditing || activePage?.type !== 'report') return;
+   const bands = activePage.data.bands || [];
+   const index = bands.indexOf(band);
+   if (index < 0) return;
+   const componentCount = (band.components || []).length;
+   const remove = () => {
+     pushUndoState();
+     bands.splice(index, 1);
+     selectedItem = null;
+     selectedItems = [];
+     render();
+     pushUndoState();
+     window.FrpNotify?.info(`'${band.name || 'Bant'}' ve ${componentCount} nesne silindi.`);
+   };
+   const message = `<strong>${esc(band.name || 'Bant')}</strong> bandı${componentCount ? ` ve içindeki ${componentCount} nesne` : ''} tasarımdan kaldırılacak.`;
+   if (typeof window.showConfirmDialog === 'function') {
+     window.showConfirmDialog({
+       title: 'Bandı silmek istiyor musunuz?',
+       message,
+       confirmText: 'Bandı Sil',
+       cancelText: 'Vazgeç',
+       isDanger: true,
+       onConfirm: remove
+     });
+   } else if (window.confirm(`${band.name || 'Bant'} silinsin mi?`)) {
+     remove();
+   }
+ }
  // ── BİLEŞEN EKLEME METODU (Genişletilmiş 18 Nesne Türü) ──
  function addNewComponent(type) {
  if (!isDesignEditing) return;
@@ -2701,6 +2849,11 @@ function esc(str) {
 
  const activePage = allPages[activePageIndex];
  if (!activePage) return;
+
+ if (isBandObject(selectedItem)) {
+   deleteBand(selectedItem);
+   return;
+ }
 
  pushUndoState();
 
@@ -3167,16 +3320,10 @@ function esc(str) {
  e.preventDefault();
  e.stopPropagation();
 
- // Tasarım Düzenleme Modunu Otomatik Başlat
+ // Salt görüntüleme modunda nesne seçilebilir; taşıma yalnızca açıkça düzenleme başlatılınca çalışır.
  if (!isDesignEditing) {
- isDesignEditing = true;
- initialPagesBackup = JSON.parse(JSON.stringify(allPages.map(p => p.data)));
- undoStack = [JSON.stringify(allPages.map(p => p.data))];
- redoStack = [];
- const btnSave = containerEl.querySelector('#btnSaveDesignEdit');
- const btnCancel = containerEl.querySelector('#btnCancelDesignEdit');
- if (btnSave) btnSave.style.display = 'inline-flex';
- if (btnCancel) btnCancel.style.display = 'inline-flex';
+   window.FrpNotify?.info('Taşımak veya boyutlandırmak için “Tasarımı Düzenle” düğmesine basın.');
+   return;
  }
 
  const resizeHandle = e.target.closest('.fr-resize-handle');
@@ -3212,9 +3359,39 @@ function esc(str) {
  const startWidth = toDesignerNumber(selectedItem.width, 100);
  const startHeight = toDesignerNumber(selectedItem.height, 30);
  const parentBounds = getElementBounds(el);
+ const sourceLocation = findComponentCollection(selectedItem);
+ const isReportFreeDrag = Boolean(isDragging && activePage.type === 'report' && sourceLocation?.band);
+ const startRect = el.getBoundingClientRect();
+ const grabOffsetX = (e.clientX - startRect.left) / currentZoom;
+ const grabOffsetY = (e.clientY - startRect.top) / currentZoom;
+ let lastPointerX = e.clientX;
+ let lastPointerY = e.clientY;
+ let lastDropTarget = null;
+ let reportDropCommitted = false;
+ let dragGhost = null;
  let geometryChanged = false;
 
- if (isDragging) el.classList.add('is-dragging');
+ if (isDragging) {
+   el.classList.add('is-dragging');
+   if (isReportFreeDrag) {
+     dragGhost = el.cloneNode(true);
+     dragGhost.classList.remove('selected', 'is-dragging', 'is-interacting');
+     dragGhost.classList.add('fr-drag-ghost');
+     dragGhost.querySelectorAll('.fr-resize-handle').forEach(handle => handle.remove());
+     Object.assign(dragGhost.style, {
+       position: 'fixed',
+       left: `${startRect.left}px`,
+       top: `${startRect.top}px`,
+       width: `${startRect.width}px`,
+       height: `${startRect.height}px`,
+       zIndex: '9999998',
+       margin: '0',
+       pointerEvents: 'none'
+     });
+     document.body.appendChild(dragGhost);
+     el.classList.add('fr-drag-source');
+   }
+ }
  el.classList.add('is-interacting');
  document.body.classList.add('fr-designer-interacting');
  try { el.setPointerCapture?.(e.pointerId); } catch {}
@@ -3267,6 +3444,31 @@ function esc(str) {
  }
  if (dx !== 0 || dy !== 0) geometryChanged = true;
  const snapStep = moveEvt.altKey ? 1 : ((gridSnapStep && gridSnapStep > 1) ? gridSnapStep : 1);
+
+ if (isReportFreeDrag) {
+   lastPointerX = moveEvt.clientX;
+   lastPointerY = moveEvt.clientY;
+   if (dragGhost) {
+     dragGhost.style.left = `${startRect.left + (moveEvt.clientX - startX)}px`;
+     dragGhost.style.top = `${startRect.top + (moveEvt.clientY - startY)}px`;
+   }
+   clearBandDropTargets();
+   lastDropTarget = resolveReportDropTarget(moveEvt.clientX, moveEvt.clientY);
+   if (lastDropTarget?.bandEl) lastDropTarget.bandEl.classList.add('is-drop-target');
+   const previewCoords = lastDropTarget
+     ? getDropCoordinates(lastDropTarget, moveEvt.clientX, moveEvt.clientY, grabOffsetX, grabOffsetY)
+     : { left: startLeft + dx, top: startTop + dy };
+   if (hud) {
+     hud.style.left = `${moveEvt.clientX}px`;
+     hud.style.top = `${moveEvt.clientY}px`;
+     hud.textContent = lastDropTarget
+       ? `${lastDropTarget.label} → X: ${previewCoords.left} Y: ${previewCoords.top}`
+       : 'Sayfa içine bırakarak taşıyın';
+   }
+   const statusCoords = containerEl.querySelector('#statusCoords');
+   if (statusCoords) statusCoords.innerHTML = `<span>X: ${previewCoords.left}, Y: ${previewCoords.top}</span>`;
+   return;
+ }
 
  if (isDragging) {
  if (isMultiDrag) {
@@ -3401,6 +3603,9 @@ function esc(str) {
  document.body.style.webkitUserSelect = '';
  document.body.style.cursor = '';
  if (hud) hud.style.display = 'none';
+ if (dragGhost) dragGhost.remove();
+ el.classList.remove('fr-drag-source');
+ clearBandDropTargets();
  clearSmartGuides();
  updateRulerTracker(selectedItem.left, selectedItem.width, selectedItem.top, selectedItem.height);
  window.removeEventListener('pointermove', onPointerMove);
@@ -3408,7 +3613,42 @@ function esc(str) {
  window.removeEventListener('pointercancel', onPointerUp);
  try { el.releasePointerCapture?.(e.pointerId); } catch {}
 
- if (commitChange && geometryChanged) pushUndoState();
+ if (commitChange && geometryChanged && isReportFreeDrag && lastDropTarget) {
+   let destinationBand = lastDropTarget.band;
+   if (!destinationBand && lastDropTarget.isPageArea) {
+     destinationBand = getOrCreatePageContentBand(activePage.data);
+   }
+   if (destinationBand) {
+     destinationBand.components = destinationBand.components || [];
+     const anchor = getDropCoordinates(lastDropTarget, lastPointerX, lastPointerY, grabOffsetX, grabOffsetY);
+     const targets = isMultiDrag ? multiStartPos : [{ comp: selectedItem, left: startLeft, top: startTop }];
+     const deltaLeft = anchor.left - startLeft;
+     const deltaTop = anchor.top - startTop;
+     targets.forEach(item => {
+       const location = findComponentCollection(item.comp);
+       if (location) location.items.splice(location.index, 1);
+     });
+     targets.forEach(item => {
+       item.comp.left = Math.max(0, snapDesignerValue(item.left + deltaLeft));
+       item.comp.top = Math.max(0, snapDesignerValue(item.top + deltaTop));
+       const maxWidth = Math.max(12, toDesignerNumber(destinationBand.width, parentBounds.width));
+       item.comp.width = Math.min(toDesignerNumber(item.comp.width, 100), maxWidth);
+       item.comp.left = Math.min(item.comp.left, Math.max(0, maxWidth - item.comp.width));
+       destinationBand.components.push(item.comp);
+     });
+     const requiredHeight = Math.max(...targets.map(item => toDesignerNumber(item.comp.top) + toDesignerNumber(item.comp.height, 30)), 30);
+     destinationBand.height = Math.max(toDesignerNumber(destinationBand.height, 30), Math.ceil(requiredHeight + 8));
+     selectedItems = targets.map(item => item.comp);
+     selectedItem = selectedItems[selectedItems.length - 1] || null;
+     pushUndoState();
+     reportDropCommitted = true;
+     renderCanvasOnly();
+     updateSelection();
+     window.FrpNotify?.success(`Nesne ${destinationBand.name || 'hedef banda'} taşındı.`);
+   }
+ }
+
+ if (commitChange && geometryChanged && !reportDropCommitted && !isReportFreeDrag) pushUndoState();
  activeCanvasGestureCleanup = null;
 
  // Object Inspector'ı Güncelle
@@ -3427,10 +3667,74 @@ function esc(str) {
  });
  });
 
+ // Bant başlığı işlemleri: sırala, sil ve yüksekliği doğrudan sahnede değiştir.
+ containerEl.querySelectorAll('.fr-band-action').forEach(button => {
+   button.addEventListener('click', (event) => {
+     event.preventDefault();
+     event.stopPropagation();
+     const index = Number.parseInt(button.dataset.bandIdx, 10);
+     const activePage = allPages[activePageIndex];
+     const band = activePage?.data?.bands?.[index];
+     if (!band) return;
+     const action = button.dataset.bandAction;
+     if (action === 'up') moveBand(index, -1);
+     if (action === 'down') moveBand(index, 1);
+     if (action === 'delete') deleteBand(band);
+   });
+ });
+
+ containerEl.querySelectorAll('.fr-band-resize-grip').forEach(grip => {
+   grip.addEventListener('pointerdown', (event) => {
+     if (!isDesignEditing || event.button !== 0) return;
+     event.preventDefault();
+     event.stopPropagation();
+     const index = Number.parseInt(grip.dataset.bandIdx, 10);
+     const activePage = allPages[activePageIndex];
+     const band = activePage?.data?.bands?.[index];
+     const container = grip.closest('.fr-band-container');
+     const body = container?.querySelector('.fr-band-body');
+     if (!band || !body) return;
+     selectedItem = band;
+     selectedItems = [];
+     updateSelection();
+     const startY = event.clientY;
+     const startHeight = Math.max(12, toDesignerNumber(band.height, 30), body.offsetHeight || 30);
+     let changed = false;
+     document.body.classList.add('fr-designer-band-resizing');
+     const move = moveEvent => {
+       if (moveEvent.pointerId !== event.pointerId) return;
+       moveEvent.preventDefault();
+       const delta = (moveEvent.clientY - startY) / currentZoom;
+       const nextHeight = Math.max(12, snapDesignerValue(startHeight + delta));
+       changed = changed || nextHeight !== startHeight;
+       band.height = nextHeight;
+       body.style.height = `${nextHeight}px`;
+       body.style.minHeight = `${nextHeight}px`;
+       container.style.minHeight = `${nextHeight}px`;
+       const statusDims = containerEl.querySelector('#statusDims');
+       if (statusDims) statusDims.innerHTML = `<span>Bant yüksekliği: ${nextHeight}</span>`;
+     };
+     const stop = stopEvent => {
+       if (stopEvent.pointerId !== event.pointerId) return;
+       document.body.classList.remove('fr-designer-band-resizing');
+       window.removeEventListener('pointermove', move);
+       window.removeEventListener('pointerup', stop);
+       window.removeEventListener('pointercancel', stop);
+       if (changed) pushUndoState();
+       renderCanvasOnly();
+       updateSelection();
+     };
+     window.addEventListener('pointermove', move, { passive: false });
+     window.addEventListener('pointerup', stop);
+     window.addEventListener('pointercancel', stop);
+   });
+ });
+
  // 2. Bantlara (Header, Footer, ReportTitle, MasterData, Dikey Bantlar vb.) Tıklama Dinleyicisi
  // ALL band-related elements: container, header, body, vertical overlay & header - both designer and preview mode
  containerEl.querySelectorAll('.fr-band-container,.fr-band-header,.fr-band-body,.fr-vertical-band-header,.fr-vertical-band-overlay,.fr-vband-box').forEach(bEl => {
  bEl.addEventListener('click', (e) => {
+ if (e.target.closest('.fr-band-action,.fr-band-resize-grip')) return;
  if (e.target.closest('.fr-view-item') || e.target.closest('.fr-ctrl-item')) return;
  e.stopPropagation();
  // Resolve band idx: from self or from closest parent container
@@ -3439,6 +3743,7 @@ function esc(str) {
  const activePage = allPages[activePageIndex];
  if (activePage && activePage.type === 'report' && activePage.data.bands?.[bandIdx]) {
  selectedItem = activePage.data.bands[bandIdx];
+ selectedItems = [];
  updateSelection();
  }
  });
@@ -3459,6 +3764,7 @@ function esc(str) {
  const activePage = allPages[activePageIndex];
  if (activePage && activePage.type === 'report' && activePage.data.bands?.[bandIdx]) {
  selectedItem = activePage.data.bands[bandIdx];
+ selectedItems = [];
  updateSelection();
  }
  }
@@ -3485,13 +3791,14 @@ function esc(str) {
  if (btnDesigner) {
  btnDesigner.addEventListener('click', () => {
  currentMode = 'designer';
- isDesignEditing = true;
+ showRulers = true;
  render();
  });
  }
  if (btnPreview) {
  btnPreview.addEventListener('click', () => {
  currentMode = 'preview';
+ showRulers = false;
  render();
  });
  }
@@ -3502,6 +3809,8 @@ function esc(str) {
    if (window.FrpNotify) window.FrpNotify.warning(`Bu rapor şu anda ${window._reportLockHolderName || 'başka bir kullanıcı'} tarafından düzenleniyor. Tasarım düzenleme kilitlidir.`);
    return;
  }
+ currentMode = 'designer';
+ showRulers = true;
  isDesignEditing = true;
  initialPagesBackup = JSON.parse(JSON.stringify(allPages.map(p => p.data)));
  undoStack = [JSON.stringify(allPages.map(p => p.data))];
@@ -3533,6 +3842,8 @@ function esc(str) {
  }
 
  isDesignEditing = false;
+ currentMode = 'preview';
+ showRulers = false;
  undoStack = [];
  redoStack = [];
  initialPagesBackup = null;
@@ -3550,6 +3861,8 @@ function esc(str) {
  });
  }
  isDesignEditing = false;
+ currentMode = 'preview';
+ showRulers = false;
  undoStack = [];
  redoStack = [];
  initialPagesBackup = null;
