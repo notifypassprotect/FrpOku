@@ -6,6 +6,12 @@ function registerReportNoteRoutes(app, deps) {
   const attachmentRoot = path.resolve(attachmentsDir);
   const allowedExtensions = new Set(['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'txt', 'csv', 'xlsx', 'xls', 'docx', 'doc']);
   const blockedMimeTypes = new Set(['text/html', 'image/svg+xml', 'application/javascript', 'text/javascript', 'application/x-httpd-php', 'application/x-msdownload']);
+  const attachmentMimeTypes = {
+    pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp',
+    txt: 'text/plain; charset=utf-8', csv: 'text/csv; charset=utf-8',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', xls: 'application/vnd.ms-excel',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', doc: 'application/msword'
+  };
 
 
   function resolveAttachmentPath(...segments) {
@@ -169,8 +175,12 @@ function registerReportNoteRoutes(app, deps) {
         return res.status(404).send('Ek dosya bulunamadı.');
       }
 
-      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
-      res.setHeader('Content-Type', 'application/octet-stream');
+      const extension = path.extname(filename).slice(1).toLowerCase();
+      const contentType = attachmentMimeTypes[extension] || 'application/octet-stream';
+      const displayName = filename.replace(/^\d+_/, '').replace(/["\\\r\n]/g, '_');
+      res.setHeader('Content-Disposition', `inline; filename="${displayName}"; filename*=UTF-8''${encodeURIComponent(displayName)}`);
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'private, no-store');
       res.setHeader('X-Content-Type-Options', 'nosniff');
       res.sendFile(filePath);
     } catch (err) {

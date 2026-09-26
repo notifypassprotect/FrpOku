@@ -38,7 +38,7 @@
   }
 
   // Ekleri yetkili istekle alır; oturum anahtarı URL'ye, geçmişe veya loglara yazılmaz.
-  async function getAuthenticatedMediaUrl(rawUrl) {
+  async function getAuthenticatedMediaUrl(rawUrl, expectedType = '') {
     if (!rawUrl) throw new Error('Dosya adresi bulunamadı.');
     if (rawUrl.startsWith('data:') || rawUrl.startsWith('blob:')) return rawUrl;
     const resolved = new URL(rawUrl, window.location.origin);
@@ -46,14 +46,19 @@
     const headers = window.FrpAuth?.getAuthHeaders?.() || {};
     const res = await fetch(resolved.href, { headers, credentials: 'same-origin' });
     if (!res.ok) throw new Error('Dosya alınamadı veya erişim yetkiniz yok.');
-    return URL.createObjectURL(await res.blob());
+    const receivedBlob = await res.blob();
+    const normalizedType = String(expectedType || '').split(';')[0].trim();
+    const blob = normalizedType && receivedBlob.type !== normalizedType
+      ? new Blob([await receivedBlob.arrayBuffer()], { type: normalizedType })
+      : receivedBlob;
+    return URL.createObjectURL(blob);
   }
 
   async function downloadAttachment(att) {
     let blobUrl = '';
     try {
       window.toast?.(`"${att.name}" indiriliyor...`, 'info');
-      blobUrl = await getAuthenticatedMediaUrl(att.url);
+      blobUrl = await getAuthenticatedMediaUrl(att.url, att.type);
       const a = document.createElement('a');
       a.href = blobUrl;
       a.download = att.name || 'dosya';
@@ -151,9 +156,9 @@
             ${(isImage || isWord || isPdf) ? `
               <!-- Zoom & Önizleme Kontrolleri -->
               <div style="display: flex; align-items: center; background: var(--bg-surface, #fff); border: 1px solid var(--border, #cbd5e1); border-radius: 8px; padding: 0.15rem 0.35rem; gap: 0.2rem;">
-                <button type="button" id="btnPrevZoomOut" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.45rem; font-size: 0.85rem;" title="Uzaklaştır">➖</button>
+                <button type="button" id="btnPrevZoomOut" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.45rem; font-size: 0.85rem;" title="Uzaklaştır">−</button>
                 <span id="prevZoomBadge" style="font-size: 0.75rem; font-weight: 800; min-width: 44px; text-align: center; color: var(--text-primary, #0f172a);">%100</span>
-                <button type="button" id="btnPrevZoomIn" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.45rem; font-size: 0.85rem;" title="Yakınlaştır">➕</button>
+                <button type="button" id="btnPrevZoomIn" class="btn btn-sm btn-ghost" style="padding: 0.2rem 0.45rem; font-size: 0.85rem;" title="Yakınlaştır">+</button>
                 <button type="button" id="btnPrevZoom100" class="btn btn-sm btn-ghost" style="font-size: 0.72rem; padding: 0.2rem 0.4rem; font-weight: 700;" title="Gerçek Boyut (%100)">1:1</button>
                 <button type="button" id="btnPrevZoomFit" class="btn btn-sm btn-ghost" style="font-size: 0.72rem; padding: 0.2rem 0.45rem; font-weight: 700;" title="Ekrana Sığdır">Sığdır</button>
                 ${(isImage || isPdf) ? `<button type="button" id="btnPrevRotate" class="btn btn-sm btn-ghost" style="font-size: 0.74rem; padding: 0.2rem 0.4rem;" title="90° Döndür">↷</button>` : ''}
@@ -161,7 +166,7 @@
             ` : ''}
 
             <button type="button" id="btnAttDownloadAction" class="btn btn-sm btn-primary" style="padding: 0.4rem 0.95rem; font-size: 0.82rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.35rem;">
-              <span>⬇️ İndir</span>
+              <span>İndir</span>
             </button>
             <button type="button" id="btnAttPreviewClose" style="width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--border, #cbd5e1); background: var(--bg-surface, #ffffff); color: var(--text-muted, #64748b); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;" title="Kapat">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -201,7 +206,7 @@
 
     const previewBody = overlay.querySelector('#attPreviewBody');
     let mediaUrl = '';
-    try { mediaUrl = previewMediaUrl = await getAuthenticatedMediaUrl(att.url); }
+    try { mediaUrl = previewMediaUrl = await getAuthenticatedMediaUrl(att.url, isPdf ? 'application/pdf' : att.type); }
     catch (error) { previewBody.innerHTML = `<div style="color:#fca5a5;padding:2rem;text-align:center;">${escHtml(error.message)}</div>`; return; }
 
     // Kütüphane Yükleyici Yardımcısı
@@ -397,7 +402,7 @@
             <div style="font-size: 3rem; margin-bottom: 0.75rem;">📊</div>
             <div style="font-size: 1.1rem; font-weight: 800; color: #ffffff; margin-bottom: 0.4rem;">Excel Tablosu Hazırlandı</div>
             <div style="font-size: 0.82rem; color: #94a3b8; margin-bottom: 1.25rem;">Bu dosya doğrudan bilgisayarınıza indirilerek Excel veya LibreOffice ile açılabilir.</div>
-            <button type="button" id="btnFallbackExcelDownload" class="btn btn-primary" style="padding: 0.5rem 1.4rem; font-weight: 700;">⬇️ Excel Dosyasını İndir</button>
+            <button type="button" id="btnFallbackExcelDownload" class="btn btn-primary" style="padding: 0.5rem 1.4rem; font-weight: 700;">Excel Dosyasını İndir</button>
           </div>
         `;
         previewBody.querySelector('#btnFallbackExcelDownload')?.addEventListener('click', () => downloadAttachment(att));
@@ -455,7 +460,7 @@
             <div style="font-size: 3rem; margin-bottom: 0.75rem;">📝</div>
             <div style="font-size: 1.1rem; font-weight: 800; color: #ffffff; margin-bottom: 0.4rem;">Word Belgesi Hazırlandı</div>
             <div style="font-size: 0.82rem; color: #94a3b8; margin-bottom: 1.25rem;">Bu belge bilgisayarınıza indirilerek Microsoft Word veya LibreOffice ile düzenlenebilir.</div>
-            <button type="button" id="btnFallbackWordDownload" class="btn btn-primary" style="padding: 0.5rem 1.4rem; font-weight: 700;">⬇️ Word Belgesini İndir</button>
+            <button type="button" id="btnFallbackWordDownload" class="btn btn-primary" style="padding: 0.5rem 1.4rem; font-weight: 700;">Word Belgesini İndir</button>
           </div>
         `;
         previewBody.querySelector('#btnFallbackWordDownload')?.addEventListener('click', () => downloadAttachment(att));
@@ -474,10 +479,10 @@
               <span style="max-width: 45vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escHtml(att.name)}</span>
             </div>
             <div style="display: flex; align-items: center; gap: 0.4rem;">
-              <button type="button" id="btnPdfNightMode" class="btn btn-sm btn-ghost" style="font-size: 0.74rem; padding: 0.2rem 0.55rem; color: #facc15; border: 1px solid #334155;" title="Gece Okuma / Yüksek Kontrast">🌓 Kontrast</button>
-              <button type="button" id="btnPdfFullscreen" class="btn btn-sm btn-ghost" style="font-size: 0.74rem; padding: 0.2rem 0.55rem; color: #cbd5e1; border: 1px solid #334155;" title="Tam Ekran Modu">⛶ Tam Ekran</button>
-              <a href="${mediaUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; text-decoration: none;">↗️ Yeni Sekmede Aç</a>
-              <button type="button" id="btnPreviewDirectDownload" class="btn btn-sm btn-primary" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; font-weight: 700;">⬇️ İndir</button>
+              <button type="button" id="btnPdfNightMode" class="btn btn-sm btn-ghost" style="font-size: 0.74rem; padding: 0.2rem 0.55rem; color: #facc15; border: 1px solid #334155;" title="Gece Okuma / Yüksek Kontrast">Kontrast</button>
+              <button type="button" id="btnPdfFullscreen" class="btn btn-sm btn-ghost" style="font-size: 0.74rem; padding: 0.2rem 0.55rem; color: #cbd5e1; border: 1px solid #334155;" title="Tam Ekran Modu">Tam Ekran</button>
+              <a href="${mediaUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-secondary" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; text-decoration: none;">Yeni Sekmede Aç</a>
+              <button type="button" id="btnPreviewDirectDownload" class="btn btn-sm btn-primary" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; font-weight: 700;">İndir</button>
             </div>
           </div>
           <div id="pdfViewport" style="flex: 1; position: relative; overflow: auto; display: flex; align-items: center; justify-content: center; background: #1e293b; transition: filter 0.15s ease;">
@@ -551,7 +556,7 @@
           <div style="font-size: 3.5rem; margin-bottom: 1rem;">📄</div>
           <div style="font-size: 1.15rem; font-weight: 800; color: #ffffff; margin-bottom: 0.5rem;">Bu dosya türü için doğrudan önizleme desteklenmiyor.</div>
           <div style="font-size: 0.88rem; margin-bottom: 1.5rem;">Dosyayı bilgisayarınıza indirerek görüntüleyebilirsiniz.</div>
-          <button type="button" id="btnDownloadUnsupported" class="btn btn-primary" style="padding: 0.55rem 1.4rem; font-weight: 700;">⬇️ Dosyayı İndir</button>
+          <button type="button" id="btnDownloadUnsupported" class="btn btn-primary" style="padding: 0.55rem 1.4rem; font-weight: 700;">Dosyayı İndir</button>
         </div>
       `;
       previewBody.querySelector('#btnDownloadUnsupported')?.addEventListener('click', () => downloadAttachment(att));
@@ -601,7 +606,7 @@
               <input type="checkbox" id="chkModalLinkTarget" checked style="accent-color: var(--accent, #2563eb);" />
               <span>Yeni sekmede açılsın (target="_blank")</span>
             </label>
-            <button type="button" id="btnModalLinkTest" class="btn btn-sm btn-ghost" style="font-size: 0.76rem; color: var(--accent, #2563eb); font-weight: 700;">↗️ Test Et</button>
+            <button type="button" id="btnModalLinkTest" class="btn btn-sm btn-ghost" style="font-size: 0.76rem; color: var(--accent, #2563eb); font-weight: 700;">Bağlantıyı Test Et</button>
           </div>
         </div>
 
@@ -713,8 +718,8 @@
           
           <!-- Geri Al / Yinele -->
           <div style="display: flex; align-items: center; gap: 0.15rem;">
-            <button type="button" id="tbUndo" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.45rem; font-size: 0.85rem;" title="Geri Al (Ctrl+Z)">↩️</button>
-            <button type="button" id="tbRedo" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.45rem; font-size: 0.85rem;" title="Yinele (Ctrl+Y)">↪️</button>
+            <button type="button" id="tbUndo" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.45rem; font-size: 0.85rem;" title="Geri Al (Ctrl+Z)">Geri Al</button>
+            <button type="button" id="tbRedo" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.45rem; font-size: 0.85rem;" title="Yinele (Ctrl+Y)">Yinele</button>
           </div>
 
           <div style="width: 1px; height: 20px; background: var(--border-light, #e2e8f0); margin: 0 0.15rem;"></div>
@@ -848,45 +853,45 @@
           <!-- Vurgu Kutusu, Tablo, Link, Çizgi, Temizle -->
           <div style="display: flex; align-items: center; gap: 0.2rem; flex-wrap: wrap;">
             <select id="tbCallout" style="padding: 0.3rem 0.45rem; border-radius: 7px; border: 1px solid var(--border, #cbd5e1); font-size: 0.78rem; background: var(--bg-card); color: var(--text-primary); cursor: pointer;" title="Vurgu Kutusu Ekle">
-              <option value="">💡 Vurgu Kutusu</option>
-              <option value="info">ℹ️ Bilgi Kutusu</option>
-              <option value="warning">⚠️ Uyarı Kutusu</option>
-              <option value="success">✅ Başarı Kutusu</option>
-              <option value="danger">❌ Kritik Hata</option>
+              <option value="">Vurgu Kutusu</option>
+              <option value="info">Bilgi Kutusu</option>
+              <option value="warning">Uyarı Kutusu</option>
+              <option value="success">Başarı Kutusu</option>
+              <option value="danger">Kritik Hata</option>
             </select>
             <select id="tbTemplates" style="padding: 0.3rem 0.45rem; border-radius: 7px; border: 1px solid var(--border, #cbd5e1); font-size: 0.78rem; background: var(--bg-card); color: var(--text-primary); cursor: pointer;" title="Hazır Şablon Ekle">
-              <option value="">📋 Şablonlar</option>
-              <option value="bug">⚠️ Hata Bildirimi</option>
-              <option value="sql">🔄 SQL Revizyonu</option>
-              <option value="perf">⚡ Performans İncelemesi</option>
-              <option value="approved">✅ Onay & Teslim</option>
+              <option value="">Şablonlar</option>
+              <option value="bug">Hata Bildirimi</option>
+              <option value="sql">SQL Revizyonu</option>
+              <option value="perf">Performans İncelemesi</option>
+              <option value="approved">Onay & Teslim</option>
             </select>
-            <button type="button" id="tbChecklist" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Görev Listesi / Checklist Ekle">☑ Liste</button>
+            <button type="button" id="tbChecklist" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Görev Listesi Ekle">Görev Listesi</button>
             <button type="button" id="tbSqlSnippet" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem; font-family: monospace; font-weight: 800; color: var(--accent, #2563eb);" title="SQL Sorgusu Ekle">&lt;/&gt; SQL</button>
-            <button type="button" id="tbTimestamp" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Tarih &amp; Zaman Damgası Ekle">📅 Zaman</button>
+            <button type="button" id="tbTimestamp" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Tarih &amp; Zaman Damgası Ekle">Zaman</button>
             <button type="button" id="tbTable" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Tablo Ekle">▦ Tablo</button>
-            <button type="button" id="tbLink" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Bağlantı (Link) Ekle">🔗 Link</button>
+            <button type="button" id="tbLink" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Bağlantı Ekle">Bağlantı</button>
             <button type="button" id="tbHr" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Yatay Çizgi Ekle">― Çizgi</button>
-            <button type="button" id="tbFindReplace" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Bul &amp; Değiştir (Ctrl+F)">🔍 Bul</button>
-            <button type="button" id="tbVoice" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem; color: #ef4444;" title="Sesli Not Kaydet">🎙️ Ses</button>
-            <button type="button" id="tbPrint" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Yazdır / PDF Olarak Kaydet">🖨️ Yazdır</button>
-            <button type="button" id="tbFullscreen" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Tam Ekran Aç / Kapat">⛶</button>
-            <button type="button" id="tbExportTxt" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Notu İndir (.txt / .md)">💾 İndir</button>
-            <button type="button" id="tbClearFormat" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem; color: #ef4444;" title="Biçimlendirmeyi Temizle">🧹</button>
+            <button type="button" id="tbFindReplace" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Bul &amp; Değiştir (Ctrl+F)">Bul</button>
+            <button type="button" id="tbVoice" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem; color: #ef4444;" title="Sesli Not Kaydet">Ses Kaydı</button>
+            <button type="button" id="tbPrint" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Yazdır / PDF Olarak Kaydet">Yazdır</button>
+            <button type="button" id="tbFullscreen" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Tam Ekran Aç / Kapat">Tam Ekran</button>
+            <button type="button" id="tbExportTxt" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Notu İndir (.txt / .md)">Dışa Aktar</button>
+            <button type="button" id="tbClearFormat" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem; color: #ef4444;" title="Biçimlendirmeyi Temizle">Biçimi Temizle</button>
           </div>
 
           <!-- Medya & Ek Ekleme Butonları -->
           <div style="margin-left: auto; display: flex; align-items: center; gap: 0.5rem;">
-            <input type="file" id="inputAttachFile" multiple accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt" style="display: none;" />
+            <input type="file" id="inputAttachFile" multiple accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt" style="display: none;" />
             <button type="button" id="btnAddAttachment" class="btn btn-sm" style="background: rgba(37,99,235,0.1); color: var(--accent, #2563eb); border: 1px solid rgba(37,99,235,0.25); font-weight: 700; display: flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.85rem;">
-              <span>📎 Dosya / Belge Ekle</span>
+              <span>Dosya / Belge Ekle</span>
             </button>
           </div>
         </div>
 
         <!-- BUL & DEĞİŞTİR ÇUBUĞU (FIND & REPLACE MINI-BAR) -->
         <div id="noteFindReplaceBar" style="display: none; align-items: center; gap: 0.5rem; padding: 0.45rem 1.2rem; background: var(--bg-card, #f1f5f9); border-bottom: 1px solid var(--border-light, #e2e8f0); flex-wrap: wrap;">
-          <span style="font-size: 0.8rem; font-weight: 800; color: var(--text-secondary, #475569);">🔍 Bul &amp; Değiştir:</span>
+          <span style="font-size: 0.8rem; font-weight: 800; color: var(--text-secondary, #475569);">Bul &amp; Değiştir:</span>
           <input type="text" id="findInput" placeholder="Aranacak metin..." style="padding: 0.25rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border, #cbd5e1); border-radius: 6px; width: 160px; background: var(--bg-surface, #fff); color: var(--text-primary, #0f172a);" />
           <input type="text" id="replaceInput" placeholder="Yeni metin..." style="padding: 0.25rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border, #cbd5e1); border-radius: 6px; width: 160px; background: var(--bg-surface, #fff); color: var(--text-primary, #0f172a);" />
           <button type="button" id="btnFindNext" class="btn btn-sm btn-ghost" style="font-size: 0.76rem; padding: 0.25rem 0.5rem;">Sonraki</button>
@@ -901,7 +906,7 @@
           <span style="width: 10px; height: 10px; border-radius: 50%; background: #ef4444; display: inline-block;"></span>
           <span style="font-size: 0.82rem; font-weight: 800; color: #ef4444;">Ses Kaydediliyor...</span>
           <span id="voiceTimer" style="font-family: monospace; font-size: 0.85rem; font-weight: 700;">00:00</span>
-          <button type="button" id="btnStopVoice" class="btn btn-sm" style="background: #ef4444; color: #ffffff; border: none; font-weight: 700; padding: 0.25rem 0.8rem; font-size: 0.78rem; border-radius: 6px;">⏹ Durdur ve Nota Ekle</button>
+          <button type="button" id="btnStopVoice" class="btn btn-sm" style="background: #ef4444; color: #ffffff; border: none; font-weight: 700; padding: 0.25rem 0.8rem; font-size: 0.78rem; border-radius: 6px;">Durdur ve Nota Ekle</button>
           <button type="button" id="btnCancelVoice" class="btn btn-sm btn-ghost" style="font-size: 0.78rem; padding: 0.25rem 0.5rem;">İptal</button>
         </div>
 
@@ -917,7 +922,7 @@
           <div id="richNoteAttachmentsSidebar" style="width: 320px; border-left: 1px solid var(--border-light, #e2e8f0); background: var(--bg-surface, #ffffff); display: flex; flex-direction: column; overflow: hidden;">
             <div style="padding: 0.85rem 1rem; border-bottom: 1px solid var(--border-light, #e2e8f0); background: var(--bg-card, #f8fafc); display: flex; align-items: center; justify-content: space-between;">
               <div style="font-size: 0.88rem; font-weight: 800; color: var(--text-primary, #0f172a); display: flex; align-items: center; gap: 0.4rem;">
-                <span>📎 Ekli Belgeler & Resimler</span>
+                <span>Ekli Belgeler &amp; Resimler</span>
                 <span id="attCountBadge" style="font-size: 0.72rem; font-weight: 800; background: var(--bg-raised, #e2e8f0); padding: 1px 6px; border-radius: 9999px;">${attachments.length}</span>
               </div>
             </div>
@@ -929,7 +934,7 @@
 
             <!-- SÜRÜKLE BIRAK BİLGİLENDİRMESİ -->
             <div style="padding: 0.75rem; border-top: 1px solid var(--border-light, #e2e8f0); background: var(--bg-card, #f8fafc); font-size: 0.75rem; color: var(--text-muted, #64748b); text-align: center;">
-              💡 Resimleri doğrudan <strong>Ctrl+V</strong> ile yapıştırabilir veya bu alana sürükleyebilirsiniz.
+              Resimleri doğrudan <strong>Ctrl+V</strong> ile yapıştırabilir veya bu alana sürükleyebilirsiniz.
             </div>
           </div>
         </div>
@@ -944,7 +949,7 @@
 
           <div style="display: flex; align-items: center; gap: 0.75rem;">
             <button type="button" id="btnRichNoteDelete" class="btn btn-sm btn-ghost" style="color: #ef4444; font-weight: 700;">
-              🗑️ Notu Sil
+              Notu Sil
             </button>
             <button type="button" id="btnRichNoteCancel" class="btn btn-sm btn-secondary">Kapat</button>
             <button type="button" id="btnRichNoteSave" class="btn btn-sm btn-primary" style="font-weight: 800; padding: 0.5rem 1.5rem;">
@@ -1076,7 +1081,7 @@
         if (isImage) {
           const img = document.createElement('img');
           img.alt = att.name;
-          getAuthenticatedMediaUrl(att.url).then(url => {
+          getAuthenticatedMediaUrl(att.url, att.type || '').then(url => {
             if (!card.isConnected) { if (url.startsWith('blob:') && url !== att.url) URL.revokeObjectURL(url); return; }
             img.src = url;
             if (url.startsWith('blob:') && url !== att.url) img.addEventListener('load', () => URL.revokeObjectURL(url), { once: true });
@@ -1123,10 +1128,10 @@
         actRow.style.cssText = 'display: flex; align-items: center; gap: 0.35rem; justify-content: flex-end; padding-top: 0.35rem; border-top: 1px dashed var(--border-light, #e2e8f0);';
         actRow.innerHTML = `
           ${isImage ? `
-            <button type="button" class="btn btn-sm btn-ghost btn-att-annotate" data-idx="${idx}" style="font-size: 0.72rem; padding: 0.2rem 0.45rem; color: var(--accent, #2563eb); font-weight: 700;" title="Görsel üzerine daire, ok ve çizim yap">✏️ İşaretle</button>
+            <button type="button" class="btn btn-sm btn-ghost btn-att-annotate" data-idx="${idx}" style="font-size: 0.72rem; padding: 0.2rem 0.45rem; color: var(--accent, #2563eb); font-weight: 700;" title="Görsel üzerine daire, ok ve çizim yap">İşaretle</button>
           ` : ''}
-          <button type="button" class="btn btn-sm btn-ghost btn-att-preview" data-idx="${idx}" style="font-size: 0.72rem; padding: 0.2rem 0.45rem;" title="Önizle">👁️ Önizle</button>
-          <button type="button" class="btn btn-sm btn-ghost btn-att-download" data-idx="${idx}" style="font-size: 0.72rem; padding: 0.2rem 0.45rem;" title="İndir">⬇️ İndir</button>
+          <button type="button" class="btn btn-sm btn-ghost btn-att-preview" data-idx="${idx}" style="font-size: 0.72rem; padding: 0.2rem 0.45rem;" title="Önizle">Önizle</button>
+          <button type="button" class="btn btn-sm btn-ghost btn-att-download" data-idx="${idx}" style="font-size: 0.72rem; padding: 0.2rem 0.45rem;" title="İndir">İndir</button>
           <button type="button" class="btn btn-sm btn-ghost btn-att-delete" data-idx="${idx}" style="font-size: 0.72rem; padding: 0.2rem 0.45rem; color: #ef4444;" title="Sil">✕</button>
         `;
         card.appendChild(actRow);
@@ -1136,7 +1141,7 @@
         if (btnAnnotate) {
           btnAnnotate.addEventListener('click', async () => {
             if (typeof window.openImageAnnotator === 'function') {
-              const fullImageUrl = await getAuthenticatedMediaUrl(att.url);
+              const fullImageUrl = await getAuthenticatedMediaUrl(att.url, att.type || 'image/png');
               window.openImageAnnotator({
                 imageUrl: fullImageUrl,
                 imageName: att.name,
@@ -1332,7 +1337,7 @@
         <div class="note-sql-card" style="margin: 0.8rem 0; border: 1px solid var(--border, #cbd5e1); border-radius: 8px; overflow: hidden; background: #0f172a; color: #f8fafc; font-family: 'Fira Code', Consolas, monospace;">
           <div style="display:flex;align-items:center;justify-content:space-between;padding:0.35rem 0.75rem;background:#1e293b;border-bottom:1px solid #334155;font-size:0.75rem;font-weight:700;color:#94a3b8;" contenteditable="false">
             <span>SQL SORGUSU</span>
-            <button type="button" class="btn-copy-sql" style="border:none;background:rgba(255,255,255,0.1);color:#38bdf8;cursor:pointer;font-size:0.72rem;font-weight:700;padding:2px 8px;border-radius:4px;">📋 Kopyala</button>
+            <button type="button" class="btn-copy-sql" style="border:none;background:rgba(255,255,255,0.1);color:#38bdf8;cursor:pointer;font-size:0.72rem;font-weight:700;padding:2px 8px;border-radius:4px;">Kopyala</button>
           </div>
           <pre contenteditable="true" style="margin:0;padding:0.75rem 1rem;font-size:0.85rem;line-height:1.5;overflow-x:auto;color:#38bdf8;white-space:pre-wrap;font-family:inherit;">SELECT ID, RAPOR_ADI, TARIH&#10;FROM TBL_RAPOR&#10;WHERE AKTIF = 1&#10;ORDER BY ID DESC;</pre>
         </div>
@@ -1706,10 +1711,10 @@
         <a href="${escHtml(hrefDisplay)}" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem;" title="${escHtml(hrefDisplay)}">
           <span>🔗</span> <span>${escHtml(hrefDisplay)}</span>
         </a>
-        <button type="button" id="btnTipOpen" style="padding: 0.22rem 0.55rem; font-size: 0.72rem; background: #2563eb; color: #ffffff; border: none; border-radius: 6px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 0.25rem;">↗️ Aç</button>
-        <button type="button" id="btnTipCopy" style="padding: 0.22rem 0.55rem; font-size: 0.72rem; background: rgba(255,255,255,0.12); color: #f1f5f9; border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem;">📋 Kopyala</button>
-        <button type="button" id="btnTipEdit" style="padding: 0.22rem 0.55rem; font-size: 0.72rem; background: rgba(255,255,255,0.12); color: #f8fafc; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem;">✏️ Düzenle</button>
-        <button type="button" id="btnTipRemove" style="padding: 0.22rem 0.55rem; font-size: 0.72rem; background: rgba(239,68,68,0.2); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); border-radius: 6px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem;">🗑️ Kaldır</button>
+        <button type="button" id="btnTipOpen" style="padding: 0.22rem 0.55rem; font-size: 0.72rem; background: #2563eb; color: #ffffff; border: none; border-radius: 6px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 0.25rem;">Aç</button>
+        <button type="button" id="btnTipCopy" style="padding: 0.22rem 0.55rem; font-size: 0.72rem; background: rgba(255,255,255,0.12); color: #f1f5f9; border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem;">Kopyala</button>
+        <button type="button" id="btnTipEdit" style="padding: 0.22rem 0.55rem; font-size: 0.72rem; background: rgba(255,255,255,0.12); color: #f8fafc; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem;">Düzenle</button>
+        <button type="button" id="btnTipRemove" style="padding: 0.22rem 0.55rem; font-size: 0.72rem; background: rgba(239,68,68,0.2); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); border-radius: 6px; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem;">Kaldır</button>
       `;
 
       document.body.appendChild(tip);
@@ -1779,17 +1784,35 @@
 
     // Dosya Ekleme İşleyicisi
     const btnAddAttachment = overlay.querySelector('#btnAddAttachment');
-    btnAddAttachment.addEventListener('click', () => fileInput.click());
+    btnAddAttachment.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      fileInput.click();
+    });
 
     fileInput.addEventListener('change', async () => {
       const files = Array.from(fileInput.files || []);
+      if (!files.length) return;
+      btnAddAttachment.disabled = true;
+      btnAddAttachment.textContent = `${files.length} dosya yükleniyor…`;
       for (const f of files) {
         await processUploadedFile(f);
       }
       fileInput.value = '';
+      btnAddAttachment.disabled = false;
+      btnAddAttachment.textContent = 'Dosya / Belge Ekle';
     });
 
     async function processUploadedFile(fileObj) {
+      const permittedExtension = /\.(pdf|png|jpe?g|gif|webp|docx?|xlsx?|csv|txt)$/i.test(fileObj.name || '');
+      if (!permittedExtension) {
+        window.toast?.(`${fileObj.name || 'Dosya'} desteklenen bir belge türü değil.`, 'warning');
+        return;
+      }
+      if (attachments.length >= 50) {
+        window.toast?.('Bir nota en fazla 50 dosya eklenebilir.', 'warning');
+        return;
+      }
       if (fileObj.size > 15 * 1024 * 1024) {
         if (typeof window.toast === 'function') window.toast(`${fileObj.name} dosyası 15 MB sınırını aşıyor.`, 'error');
         return;
@@ -1812,6 +1835,7 @@
         if (!res.ok || !data.success || !data.attachment) throw new Error(data.reason || 'Dosya yüklenemedi.');
         attachments.push(data.attachment);
         renderAttachments();
+        saveStatus.textContent = `${fileObj.name} yüklendi · Notu kaydederek eki ilişkilendirin`;
       } catch (error) {
         saveStatus.textContent = error.message;
         window.toast?.(error.message, 'error');
@@ -1820,6 +1844,31 @@
         if (!uploadsPending) persistDraft();
       }
     }
+
+    // Dosyaların tarayıcı penceresine bırakıldığında sayfayı açmasını/indirmesini engelle;
+    // yalnızca ekler alanına bırakılan desteklenen dosyaları yükle.
+    const attachmentDropTarget = overlay.querySelector('#richNoteAttachmentsSidebar');
+    ['dragenter', 'dragover'].forEach(eventName => attachmentDropTarget?.addEventListener(eventName, event => {
+      event.preventDefault();
+      event.stopPropagation();
+      attachmentDropTarget.style.boxShadow = 'inset 0 0 0 2px var(--accent, #2563eb)';
+    }));
+    attachmentDropTarget?.addEventListener('dragleave', event => {
+      if (attachmentDropTarget.contains(event.relatedTarget)) return;
+      attachmentDropTarget.style.boxShadow = '';
+    });
+    attachmentDropTarget?.addEventListener('drop', async event => {
+      event.preventDefault();
+      event.stopPropagation();
+      attachmentDropTarget.style.boxShadow = '';
+      const droppedFiles = Array.from(event.dataTransfer?.files || []);
+      if (!droppedFiles.length) return;
+      btnAddAttachment.disabled = true;
+      btnAddAttachment.textContent = `${droppedFiles.length} dosya yükleniyor…`;
+      for (const droppedFile of droppedFiles) await processUploadedFile(droppedFile);
+      btnAddAttachment.disabled = false;
+      btnAddAttachment.textContent = 'Dosya / Belge Ekle';
+    });
 
     // Pano Görsel Yapıştırma (Ctrl+V)
     editor.addEventListener('paste', async (e) => {

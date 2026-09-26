@@ -1533,9 +1533,17 @@ function esc(str) {
  const isSelected = selectedItem === vBand || (selectedItem && selectedItem.name === vBand.name);
  return `
  <div class="fr-vertical-band-overlay ${isSelected? 'selected-band': ''}" data-band-idx="${origBandIdx}" data-vband-idx="${vIdx}" style="left:${vLeft}px; width:${vWidth}px;">
- <div class="fr-vertical-band-header ${meta.class} ${isSelected? 'selected-band': ''}" data-band-idx="${origBandIdx}" data-vband-idx="${vIdx}" style="left:0; cursor:pointer;" title="${esc(meta.label)}: ${esc(vBand.name)} ${vBand.dataSet? '(' + esc(vBand.dataSet) + ')': ''}">
+ <div class="fr-vertical-band-header ${meta.class} ${isSelected? 'selected-band': ''}" data-band-idx="${origBandIdx}" data-vband-idx="${vIdx}" style="left:0; cursor:ew-resize;" title="${esc(meta.label)}: ${esc(vBand.name)} ${vBand.dataSet? '(' + esc(vBand.dataSet) + ')': ''} · Sürükleyerek konumlandır">
  ${meta.icon} ${esc(meta.label)}: ${esc(vBand.name)} ${vBand.dataSet? '(' + esc(vBand.dataSet) + ')': ''}
  </div>
+ ${isDesignEditing ? `
+ <div class="fr-vband-toolbar" aria-label="Dikey bant işlemleri">
+   <button type="button" class="fr-band-action" data-band-action="vleft" data-band-idx="${origBandIdx}" title="Bandı sola taşı" aria-label="Bandı sola taşı">←</button>
+   <button type="button" class="fr-band-action" data-band-action="vright" data-band-idx="${origBandIdx}" title="Bandı sağa taşı" aria-label="Bandı sağa taşı">→</button>
+   <button type="button" class="fr-band-action danger" data-band-action="delete" data-band-idx="${origBandIdx}" title="Dikey bandı sil" aria-label="Dikey bandı sil">×</button>
+ </div>
+ <div class="fr-vband-resize-grip" data-band-idx="${origBandIdx}" title="Dikey bant genişliğini değiştir"></div>
+ ` : ''}
  </div>
  `;
  }).join(''): '';
@@ -1950,7 +1958,8 @@ function esc(str) {
  let propList = [];
  const isPage = (obj.type === 'TfrxReportPage' || obj.type === 'TfrxDMPPage' || (!obj.type && obj.bands) || obj.name === 'Page1');
  const isDialogPage = obj.type === 'TfrxDialogPage' || Array.isArray(obj.controls);
- const isBand = (obj.type && (BAND_META[obj.type] || obj.type.includes('Band') || obj.type.includes('Header') || obj.type.includes('Footer') || obj.type === 'TfrxMasterData' || obj.type === 'TfrxReportTitle'));
+ const isBand = Boolean(obj.vertical || String(obj.rawAttrs || '').includes('Vertical="True"') ||
+   (obj.type && (BAND_META[obj.type] || obj.type.includes('Band') || obj.type.includes('Header') || obj.type.includes('Footer') || obj.type === 'TfrxMasterData' || obj.type === 'TfrxReportTitle')));
 
  if (inspectorTab === 'events') {
  propList = [
@@ -2538,6 +2547,18 @@ function esc(str) {
    selectedItem = band;
    selectedItems = [];
    render();
+   pushUndoState();
+ }
+
+ function moveVerticalBand(band, direction) {
+   if (!isDesignEditing || !band) return;
+   const step = Math.max(1, Number(gridSnapStep) || 5);
+   pushUndoState();
+   band.left = Math.max(0, snapDesignerValue(toDesignerNumber(band.left) + (direction * step)));
+   selectedItem = band;
+   selectedItems = [];
+   renderCanvasOnly();
+   updateSelection();
    pushUndoState();
  }
 
@@ -3679,6 +3700,8 @@ function esc(str) {
      const action = button.dataset.bandAction;
      if (action === 'up') moveBand(index, -1);
      if (action === 'down') moveBand(index, 1);
+     if (action === 'vleft') moveVerticalBand(band, -1);
+     if (action === 'vright') moveVerticalBand(band, 1);
      if (action === 'delete') deleteBand(band);
    });
  });
@@ -3717,6 +3740,101 @@ function esc(str) {
      const stop = stopEvent => {
        if (stopEvent.pointerId !== event.pointerId) return;
        document.body.classList.remove('fr-designer-band-resizing');
+       window.removeEventListener('pointermove', move);
+       window.removeEventListener('pointerup', stop);
+       window.removeEventListener('pointercancel', stop);
+       if (changed) pushUndoState();
+       renderCanvasOnly();
+       updateSelection();
+     };
+     window.addEventListener('pointermove', move, { passive: false });
+     window.addEventListener('pointerup', stop);
+     window.addEventListener('pointercancel', stop);
+   });
+ });
+
+ // Dikey bantlar yatay eksende taşınır ve sağ kenardan genişletilir.
+ containerEl.querySelectorAll('.fr-vertical-band-header').forEach(header => {
+   header.addEventListener('pointerdown', event => {
+     if (!isDesignEditing || event.button !== 0 || event.target.closest('.fr-band-action')) return;
+     event.preventDefault();
+     event.stopPropagation();
+     const index = Number.parseInt(header.dataset.bandIdx, 10);
+     const activePage = allPages[activePageIndex];
+     const band = activePage?.data?.bands?.[index];
+     const overlayEl = header.closest('.fr-vertical-band-overlay');
+     if (!band || !overlayEl) return;
+     selectedItem = band;
+     selectedItems = [];
+     updateSelection();
+     const startX = event.clientX;
+     const startLeft = Math.max(0, toDesignerNumber(band.left));
+     let changed = false;
+     document.body.classList.add('fr-designer-interacting');
+     document.body.style.userSelect = 'none';
+     const move = moveEvent => {
+       if (moveEvent.pointerId !== event.pointerId) return;
+       moveEvent.preventDefault();
+       const nextLeft = Math.max(0, snapDesignerValue(startLeft + ((moveEvent.clientX - startX) / currentZoom)));
+       changed = changed || nextLeft !== startLeft;
+       band.left = nextLeft;
+       overlayEl.style.left = `${nextLeft}px`;
+       updateRulerTracker(nextLeft, toDesignerNumber(band.width, 90), 0, 0);
+       const statusCoords = containerEl.querySelector('#statusCoords');
+       if (statusCoords) statusCoords.innerHTML = `<span>Dikey bant X: ${nextLeft}</span>`;
+     };
+     const stop = stopEvent => {
+       if (stopEvent.pointerId !== event.pointerId) return;
+       document.body.classList.remove('fr-designer-interacting');
+       document.body.style.userSelect = '';
+       window.removeEventListener('pointermove', move);
+       window.removeEventListener('pointerup', stop);
+       window.removeEventListener('pointercancel', stop);
+       if (changed) pushUndoState();
+       renderCanvasOnly();
+       updateSelection();
+     };
+     window.addEventListener('pointermove', move, { passive: false });
+     window.addEventListener('pointerup', stop);
+     window.addEventListener('pointercancel', stop);
+   });
+ });
+
+ containerEl.querySelectorAll('.fr-vband-resize-grip').forEach(grip => {
+   grip.addEventListener('pointerdown', event => {
+     if (!isDesignEditing || event.button !== 0) return;
+     event.preventDefault();
+     event.stopPropagation();
+     const index = Number.parseInt(grip.dataset.bandIdx, 10);
+     const activePage = allPages[activePageIndex];
+     const band = activePage?.data?.bands?.[index];
+     const overlayEl = grip.closest('.fr-vertical-band-overlay');
+     if (!band || !overlayEl) return;
+     selectedItem = band;
+     selectedItems = [];
+     updateSelection();
+     const startX = event.clientX;
+     const startWidth = Math.max(18, toDesignerNumber(band.width, 90));
+     let changed = false;
+     document.body.classList.add('fr-designer-interacting');
+     document.body.style.cursor = 'ew-resize';
+     document.body.style.userSelect = 'none';
+     const move = moveEvent => {
+       if (moveEvent.pointerId !== event.pointerId) return;
+       moveEvent.preventDefault();
+       const nextWidth = Math.max(18, snapDesignerValue(startWidth + ((moveEvent.clientX - startX) / currentZoom)));
+       changed = changed || nextWidth !== startWidth;
+       band.width = nextWidth;
+       overlayEl.style.width = `${nextWidth}px`;
+       updateRulerTracker(toDesignerNumber(band.left), nextWidth, 0, 0);
+       const statusDims = containerEl.querySelector('#statusDims');
+       if (statusDims) statusDims.innerHTML = `<span>Dikey bant genişliği: ${nextWidth}</span>`;
+     };
+     const stop = stopEvent => {
+       if (stopEvent.pointerId !== event.pointerId) return;
+       document.body.classList.remove('fr-designer-interacting');
+       document.body.style.cursor = '';
+       document.body.style.userSelect = '';
        window.removeEventListener('pointermove', move);
        window.removeEventListener('pointerup', stop);
        window.removeEventListener('pointercancel', stop);

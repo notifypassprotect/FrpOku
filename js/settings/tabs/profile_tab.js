@@ -81,6 +81,15 @@ window.FrpSettingsTabs.profile = {
 
     const colorDepth = (typeof screen !== 'undefined' && screen.colorDepth) ? `${screen.colorDepth}-bit Renk Derinliği` : '24-bit sRGB';
     const curTheme = (typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark') ? 'Koyu Mod (Dark)' : 'Aydınlık Mod (Light)';
+    const viewport = typeof window !== 'undefined' ? `${window.innerWidth} x ${window.innerHeight} CSS px` : 'Bilinmiyor';
+    const language = typeof navigator !== 'undefined' ? (navigator.language || 'tr-TR') : 'tr-TR';
+    let timeZone = 'UTC';
+    try { timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch {}
+    const connection = typeof navigator !== 'undefined' ? (navigator.connection || navigator.mozConnection || navigator.webkitConnection) : null;
+    const connectionLabel = connection
+      ? `${String(connection.effectiveType || connection.type || 'Çevrimiçi').toUpperCase()}${Number(connection.downlink) ? ` · ${connection.downlink} Mbps` : ''}`
+      : (typeof navigator !== 'undefined' && navigator.onLine ? 'Çevrimiçi' : 'Çevrimdışı');
+    const touchPoints = typeof navigator !== 'undefined' ? Number(navigator.maxTouchPoints || 0) : 0;
 
     const getInitials = () => {
       const f = (stagedProfile.firstName || '').trim();
@@ -290,7 +299,8 @@ window.FrpSettingsTabs.profile = {
 
               <div style="background:var(--bg-surface);padding:.55rem .75rem;border-radius:9px;border:1px solid var(--border-light);">
                 <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">Ağ Gecikmesi (RTT)</div>
-                <div id="telemetryPing" style="font-size:.8rem;font-weight:800;color:#10b981;margin-top:.15rem;font-family:var(--mono);">Ölçülüyor…</div>
+                <div id="telemetryPing" style="font-size:.8rem;font-weight:800;color:#64748b;margin-top:.15rem;font-family:var(--mono);">Canlı ölçüm başlatılıyor…</div>
+                <div id="telemetryPingMeta" style="font-size:.64rem;color:var(--text-muted);margin-top:.12rem;">5 saniyede bir yenilenir</div>
               </div>
 
               <div style="background:var(--bg-surface);padding:.55rem .75rem;border-radius:9px;border:1px solid var(--border-light);">
@@ -336,6 +346,26 @@ window.FrpSettingsTabs.profile = {
               <div style="background:var(--bg-surface);padding:.55rem .75rem;border-radius:9px;border:1px solid var(--border-light);">
                 <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">Sunucu Modu & Port</div>
                 <div style="font-size:.8rem;font-weight:700;color:var(--text-primary);margin-top:.15rem;font-family:var(--mono);">${escHtml(protocol)} · ${escHtml(host)}</div>
+              </div>
+
+              <div style="background:var(--bg-surface);padding:.55rem .75rem;border-radius:9px;border:1px solid var(--border-light);">
+                <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">Görünür Pencere</div>
+                <div id="telemetryViewport" style="font-size:.8rem;font-weight:700;color:var(--text-primary);margin-top:.15rem;">${escHtml(viewport)}</div>
+              </div>
+
+              <div style="background:var(--bg-surface);padding:.55rem .75rem;border-radius:9px;border:1px solid var(--border-light);">
+                <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">Ağ Bağlantısı</div>
+                <div id="telemetryConnection" style="font-size:.8rem;font-weight:700;color:var(--accent);margin-top:.15rem;">${escHtml(connectionLabel)}</div>
+              </div>
+
+              <div style="background:var(--bg-surface);padding:.55rem .75rem;border-radius:9px;border:1px solid var(--border-light);">
+                <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">Dil & Saat Dilimi</div>
+                <div style="font-size:.8rem;font-weight:700;color:var(--text-primary);margin-top:.15rem;">${escHtml(language)} · ${escHtml(timeZone)}</div>
+              </div>
+
+              <div style="background:var(--bg-surface);padding:.55rem .75rem;border-radius:9px;border:1px solid var(--border-light);">
+                <div style="font-size:.7rem;color:var(--text-muted);font-weight:700;">Dokunma & Girdi</div>
+                <div style="font-size:.8rem;font-weight:700;color:var(--text-primary);margin-top:.15rem;">${touchPoints > 0 ? `${touchPoints} dokunma noktası` : 'Fare / Klavye'}</div>
               </div>
 
             </div>
@@ -442,18 +472,69 @@ window.FrpSettingsTabs.profile = {
     bindInput('#profUsername', 'username');
     bindInput('#profDepartment', 'department');
 
-    // Ağ gecikmesini (RTT / Ping) canlı ölç
+    // Ağ gecikmesini (RTT / Ping) modal açık kaldığı sürece canlı ölç.
     const pingEl = overlay.querySelector('#telemetryPing');
-    if (pingEl) {
-      const t0 = performance.now();
-      fetch('/api/health', { method: 'HEAD', cache: 'no-store' }).then(() => {
-        const rtt = Math.round(performance.now() - t0);
-        pingEl.textContent = `${rtt} ms (Stabil)`;
-        pingEl.style.color = rtt < 60 ? '#10b981' : (rtt < 150 ? '#f59e0b' : '#ef4444');
-      }).catch(() => {
-        pingEl.textContent = 'Yerel Mod (< 5 ms)';
-      });
-    }
+    const pingMetaEl = overlay.querySelector('#telemetryPingMeta');
+    const connectionEl = overlay.querySelector('#telemetryConnection');
+    const viewportEl = overlay.querySelector('#telemetryViewport');
+    const telemetryLifecycle = new AbortController();
+    const pingSamples = [];
+    let pingTimer = 0;
+    let pingRunning = false;
+    const updateConnection = () => {
+      if (!connectionEl) return;
+      const net = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (!navigator.onLine) {
+        connectionEl.textContent = 'Çevrimdışı';
+        connectionEl.style.color = '#ef4444';
+        return;
+      }
+      connectionEl.textContent = net
+        ? `${String(net.effectiveType || net.type || 'Çevrimiçi').toUpperCase()}${Number(net.downlink) ? ` · ${net.downlink} Mbps` : ''}`
+        : 'Çevrimiçi';
+      connectionEl.style.color = 'var(--accent)';
+    };
+    const updateViewport = () => {
+      if (viewportEl) viewportEl.textContent = `${window.innerWidth} x ${window.innerHeight} CSS px`;
+    };
+    const measurePing = async () => {
+      if (!pingEl || pingRunning || !pingEl.isConnected) return;
+      pingRunning = true;
+      const startedAt = performance.now();
+      try {
+        const response = await fetch(`/api/health?ping=${Date.now()}`, { method: 'GET', cache: 'no-store', credentials: 'same-origin' });
+        if (!response.ok) throw new Error('Sunucu yanıt vermedi');
+        const rtt = Math.max(1, Math.round(performance.now() - startedAt));
+        pingSamples.push(rtt);
+        if (pingSamples.length > 6) pingSamples.shift();
+        const average = Math.round(pingSamples.reduce((sum, sample) => sum + sample, 0) / pingSamples.length);
+        const quality = rtt < 80 ? 'İyi' : (rtt < 180 ? 'Orta' : 'Yüksek');
+        pingEl.textContent = `${rtt} ms · ${quality}`;
+        pingEl.style.color = rtt < 80 ? '#10b981' : (rtt < 180 ? '#f59e0b' : '#ef4444');
+        if (pingMetaEl) pingMetaEl.textContent = `Son ${pingSamples.length} ölçüm ortalaması: ${average} ms · ${new Date().toLocaleTimeString('tr-TR')}`;
+      } catch {
+        pingEl.textContent = navigator.onLine ? 'Sunucuya ulaşılamıyor' : 'Çevrimdışı';
+        pingEl.style.color = '#ef4444';
+        if (pingMetaEl) pingMetaEl.textContent = 'Bağlantı yeniden kurulduğunda otomatik ölçülecek';
+      } finally {
+        pingRunning = false;
+        if (pingEl.isConnected) pingTimer = window.setTimeout(measurePing, 5000);
+      }
+    };
+    measurePing();
+    updateConnection();
+    window.addEventListener('online', updateConnection, { signal: telemetryLifecycle.signal });
+    window.addEventListener('offline', updateConnection, { signal: telemetryLifecycle.signal });
+    window.addEventListener('resize', updateViewport, { signal: telemetryLifecycle.signal });
+    const connectionApi = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    connectionApi?.addEventListener?.('change', updateConnection, { signal: telemetryLifecycle.signal });
+    const telemetryObserver = new MutationObserver(() => {
+      if (overlay.isConnected && pingEl?.isConnected) return;
+      window.clearTimeout(pingTimer);
+      telemetryLifecycle.abort();
+      telemetryObserver.disconnect();
+    });
+    telemetryObserver.observe(document.body, { childList: true });
 
     // ── AVATAR VE PROFİL RESMİ YÖNETİMİ ──
     const avatarPreviewWrap = overlay.querySelector('#profAvatarPreviewWrap');

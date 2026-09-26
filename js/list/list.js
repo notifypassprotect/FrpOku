@@ -1233,6 +1233,8 @@ function initListPage() {
     const personalTabLabel = document.querySelector('#tabWsPersonal > span:first-child');
     if (personalTabLabel) personalTabLabel.textContent = isAdmin ? 'Tüm Kişisel Raporlar' : 'Kişisel Raporlarım';
     if (mineTab) mineTab.hidden = !isAdmin;
+    const poolTab = document.getElementById('tabWsPool');
+    if (poolTab) poolTab.hidden = false;
     if (!isAdmin && FrpStore.getActiveWorkspace?.() === 'mine') {
       FrpStore.setActiveWorkspace?.('personal');
     }

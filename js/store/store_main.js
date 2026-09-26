@@ -131,7 +131,8 @@
     if (!user) return [];
     return files.filter(file => {
       if (user.role === 'admin') return true;
-      return !file.userId && !file.user_id || String(file.userId || file.user_id) === String(user.id);
+      const ownerId = file?.userId || file?.user_id || file?.data?.userId || file?.data?.user_id;
+      return Boolean(ownerId) && String(ownerId) === String(user.id);
     });
   }
 
@@ -1496,7 +1497,11 @@
 
   // ── 6.5. Ortak Rapor Havuzu & Çalışma Alanı Yönetimi ─────────
   const WORKSPACE_KEY = 'frpoku_active_workspace';
-  let _activeWorkspace = localStorage.getItem(WORKSPACE_KEY) || 'personal';
+  function _workspaceStorageKey() {
+    const user = window.FrpAuth?.getUser?.();
+    return `${WORKSPACE_KEY}:${encodeURIComponent(String(user?.id || 'anonymous'))}`;
+  }
+  let _activeWorkspace = localStorage.getItem(_workspaceStorageKey()) || 'personal';
 
   function getActiveWorkspace() {
     return _activeWorkspace;
@@ -1505,7 +1510,7 @@
   function setActiveWorkspace(ws) {
     if (ws === 'pool' || ws === 'personal' || ws === 'mine') {
       _activeWorkspace = ws;
-      localStorage.setItem(WORKSPACE_KEY, ws);
+      localStorage.setItem(_workspaceStorageKey(), ws);
       if (typeof window.refreshAll === 'function') window.refreshAll();
     }
     return _activeWorkspace;
@@ -2532,6 +2537,9 @@
   window.FrpStore = FrpStore;
   window.addEventListener('frp:session-changed', () => {
     try {
+      const sessionUser = window.FrpAuth?.getUser?.();
+      _activeWorkspace = localStorage.getItem(_workspaceStorageKey()) || 'personal';
+      if (sessionUser?.role !== 'admin' && _activeWorkspace === 'mine') _activeWorkspace = 'personal';
       applyPreferences();
       const prefs = getPreferences();
       localStorage.setItem(THEME_KEY, prefs.theme === 'dark' ? 'dark' : 'light');
