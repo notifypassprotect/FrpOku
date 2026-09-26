@@ -2736,16 +2736,10 @@ tr.pinned-row > td:first-child {
   width: 0%;
   opacity: 0;
   background: linear-gradient(90deg, #38bdf8, #818cf8, #c084fc, #34d399, #38bdf8);
-  background-size: 250% 100%;
-  animation: circuitGradientFlow 2s linear infinite;
+  background-size: 100% 100%;
   box-shadow: 0 0 8px rgba(56, 189, 248, 0.9), 0 0 16px rgba(129, 140, 248, 0.7);
   transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
 }
-@keyframes circuitGradientFlow {
-  0% { background-position: 0% 50%; }
-  100% { background-position: 250% 50%; }
-}
-
 .circuit-boot-screen {
   position: fixed;
   inset: 0;
@@ -2818,9 +2812,8 @@ tr.pinned-row > td:first-child {
   100% { transform: translateY(-4px); }
 }
 @keyframes circuitBarBounce {
-  0% { left: -40%; width: 30%; }
-  50% { width: 50%; }
-  100% { left: 110%; width: 30%; }
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(360%); }
 }
 @keyframes circuitIndeterminate {
   0% { transform: translateX(-100%); }

@@ -1372,6 +1372,17 @@ select:hover {
 .card-mobile-actions, .table-mobile-actions { display: none; }
 @media (max-width: 768px) {
   html, body, .app-wrap { max-width: 100%; overflow-x: clip; }
+  .toolbar :is(.search-wrap, .select-field, .filter-chip, .saved-view-controls .btn),
+  #workspaceSwitcher .workspace-tab-btn,
+  #viewModeToggle .view-btn,
+  .mobile-drawer-item,
+  .table-context-menu button {
+    min-height: 44px !important;
+  }
+  :is(.row-checkbox, input[type="checkbox"], input[type="radio"]) {
+    min-width: 22px;
+    min-height: 22px;
+  }
   .topbar { display: flex; flex-wrap: wrap; gap: .45rem; padding-block: .55rem !important; }
   .topbar > .brand { min-width: 0; flex: 1 1 auto; }
   .topbar > .brand > div span:nth-child(2) { display: none !important; }
