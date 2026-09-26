@@ -1696,3 +1696,194 @@ body.fr-designer-interacting {
   .designer-root .designer-page-tabs { min-width: max-content; }
   .designer-root .designer-comp-palette { order: 10; }
 }
+
+/* ── SERBEST YERLEŞİM & MODERN BANT DENEYİMİ ─────────────── */
+.fr-report-page.designer-mode {
+  border-radius: 4px;
+  overflow: visible;
+}
+
+.fr-report-page.designer-mode .fr-band-container {
+  margin: 0 0 5px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  transition: border-color .14s ease, box-shadow .14s ease, background-color .14s ease;
+}
+
+.fr-report-page.designer-mode .fr-band-header {
+  height: 24px;
+  padding: 0 .38rem 0 .55rem;
+  border-radius: 4px 4px 0 0;
+  cursor: default;
+  box-shadow: inset 0 -1px rgba(15, 23, 42, .12);
+}
+
+.fr-band-header-left {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.fr-band-header-right {
+  flex: 0 0 auto;
+}
+
+.fr-band-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: 3px;
+  border-left: 1px solid rgba(15, 23, 42, .16);
+}
+
+.fr-band-action {
+  display: inline-grid;
+  place-items: center;
+  width: 21px;
+  height: 19px;
+  padding: 0;
+  border: 1px solid rgba(15, 23, 42, .18);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, .66);
+  color: #334155;
+  font: 800 12px/1 system-ui, sans-serif;
+  cursor: pointer;
+  transition: transform .12s ease, background-color .12s ease, color .12s ease;
+}
+
+.fr-band-action:hover {
+  background: #fff;
+  color: #2563eb;
+  transform: translateY(-1px);
+}
+
+.fr-band-action.danger:hover {
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, .35);
+  background: #fff1f2;
+}
+
+.fr-band-resize-grip {
+  position: absolute;
+  z-index: 80;
+  left: 12%;
+  right: 12%;
+  bottom: -4px;
+  height: 8px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.fr-band-resize-grip::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 2px;
+  width: 46px;
+  height: 3px;
+  border-radius: 99px;
+  background: transparent;
+  transform: translateX(-50%);
+  transition: background-color .14s ease, box-shadow .14s ease;
+}
+
+.fr-band-container:hover > .fr-band-resize-grip::after,
+.fr-band-resize-grip:hover::after {
+  background: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, .14);
+}
+
+.fr-band-container.is-drop-target,
+.fr-page-free-dropzone.is-drop-target {
+  border-color: #2563eb !important;
+  background: rgba(37, 99, 235, .075) !important;
+  box-shadow: inset 0 0 0 2px rgba(37, 99, 235, .2), 0 0 0 3px rgba(37, 99, 235, .08) !important;
+}
+
+.fr-band-container.is-drop-target::after,
+.fr-page-free-dropzone.is-drop-target::after {
+  content: 'Buraya bırak';
+  position: absolute;
+  z-index: 99990;
+  right: 10px;
+  top: 29px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #fff;
+  font: 700 10px/1 system-ui, sans-serif;
+  box-shadow: 0 5px 14px rgba(37, 99, 235, .28);
+  pointer-events: none;
+}
+
+.fr-page-free-dropzone {
+  position: relative;
+  box-sizing: border-box;
+  margin: 8px 10px 16px;
+  border: 1.5px dashed rgba(100, 116, 139, .35);
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(248, 250, 252, .7), rgba(239, 246, 255, .42));
+  transition: border-color .14s ease, background-color .14s ease, box-shadow .14s ease;
+}
+
+.fr-page-free-dropzone-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  gap: 4px;
+  min-width: 230px;
+  padding: 12px 18px;
+  border: 1px solid rgba(148, 163, 184, .24);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .82);
+  color: #64748b;
+  text-align: center;
+  font: 600 11px/1.35 system-ui, sans-serif;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+}
+
+.fr-page-free-dropzone-label strong {
+  color: #334155;
+  font-size: 12px;
+}
+
+.fr-drag-ghost {
+  opacity: .9 !important;
+  overflow: hidden !important;
+  outline: 2px solid #2563eb !important;
+  outline-offset: 2px;
+  border-radius: 3px;
+  box-shadow: 0 16px 34px rgba(15, 23, 42, .24), 0 0 0 5px rgba(37, 99, 235, .11) !important;
+  cursor: grabbing !important;
+  transform: rotate(.25deg);
+}
+
+.fr-drag-source {
+  opacity: .25 !important;
+  filter: saturate(.5);
+}
+
+body.fr-designer-band-resizing,
+body.fr-designer-band-resizing * {
+  cursor: ns-resize !important;
+  user-select: none !important;
+}
+
+[data-theme="dark"] .fr-page-free-dropzone {
+  border-color: rgba(148, 163, 184, .28);
+  background: linear-gradient(135deg, rgba(15, 23, 42, .58), rgba(30, 58, 138, .18));
+}
+
+[data-theme="dark"] .fr-page-free-dropzone-label {
+  border-color: rgba(148, 163, 184, .2);
+  background: rgba(15, 23, 42, .82);
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .fr-page-free-dropzone-label strong {
+  color: #e2e8f0;
+}
