@@ -369,10 +369,13 @@
     }
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initAuthUI);
-  } else {
+  // Bu dosya body sonunda çalışır; giriş ekranını onlarca ikincil modülün
+  // indirilmesini bekletmeden hemen göster. Body henüz yoksa güvenli geri dönüş
+  // olarak DOMContentLoaded kullanılmaya devam edilir.
+  if (document.body) {
     initAuthUI();
+  } else {
+    document.addEventListener('DOMContentLoaded', initAuthUI, { once: true });
   }
 
  window.addEventListener('frp:auth-expired', () => {
