@@ -434,6 +434,7 @@ function parseFrp(xmlText) {
     const frameTyp = numVal(getAttr(attrsChunk, 'Frame.Typ'), 0);
     const frameColor = getAttr(attrsChunk, 'Frame.Color') || '-16777208';
     const frameWidth = numVal(getAttr(attrsChunk, 'Frame.Width'), 1);
+    const frameStyle = getAttr(attrsChunk, 'Frame.Style') || 'fsSolid';
     
     // Align & Rotation
     const align = getAttr(attrsChunk, 'Align') || 'baNone';
@@ -445,6 +446,7 @@ function parseFrp(xmlText) {
     const dataSet = getAttr(attrsChunk, 'DataSetName') || getAttr(attrsChunk, 'DataSet') || '';
     const dataField = getAttr(attrsChunk, 'DataField') || '';
     const displayFormat = getAttr(attrsChunk, 'DisplayFormat.FormatStr') || getAttr(attrsChunk, 'DisplayFormat') || '';
+    const hyperlink = getAttr(attrsChunk, 'Hyperlink.Value') || getAttr(attrsChunk, 'Hyperlink') || '';
     
     // Events
     const onBeforePrint = getAttr(attrsChunk, 'OnBeforePrint') || '';
@@ -455,6 +457,14 @@ function parseFrp(xmlText) {
     // Additional Delphi Properties
     const allowExpressions = getAttr(attrsChunk, 'AllowExpressions') !== 'False';
     const autoWidth = getAttr(attrsChunk, 'AutoWidth') === 'True';
+    const allowHTMLTags = getAttr(attrsChunk, 'AllowHTMLTags') === 'True';
+    const wordWrap = getAttr(attrsChunk, 'WordWrap') !== 'False';
+    const printable = getAttr(attrsChunk, 'Printable') !== 'False';
+    const suppressRepeatedValues = getAttr(attrsChunk, 'SuppressRepeatedValues') === 'True';
+    const hideZeros = getAttr(attrsChunk, 'HideZeros') === 'True';
+    const clipped = getAttr(attrsChunk, 'Clipped') !== 'False';
+    const lineSpacing = numVal(getAttr(attrsChunk, 'LineSpacing'), 0);
+    const paragraphGap = numVal(getAttr(attrsChunk, 'ParagraphGap'), 0);
     const shiftMode = getAttr(attrsChunk, 'ShiftMode') || 'smAlways';
     const stretchMode = getAttr(attrsChunk, 'StretchMode') || 'smDontStretch';
     const visible = getAttr(attrsChunk, 'Visible') !== 'False';
@@ -523,6 +533,7 @@ function parseFrp(xmlText) {
       frameTyp,
       frameColor,
       frameWidth,
+      frameStyle,
       align,
       hAlign,
       vAlign,
@@ -530,12 +541,21 @@ function parseFrp(xmlText) {
       dataSet: dataSet || chartDataSet,
       dataField,
       displayFormat,
+      hyperlink,
       onBeforePrint,
       onClick,
       onAfterPrint,
       onPreviewClick,
       allowExpressions,
       autoWidth,
+      allowHTMLTags,
+      wordWrap,
+      printable,
+      suppressRepeatedValues,
+      hideZeros,
+      clipped,
+      lineSpacing,
+      paragraphGap,
       shiftMode,
       stretchMode,
       visible,
@@ -576,11 +596,12 @@ function parseFrp(xmlText) {
       rightMargin: numVal(getAttr(pAttrs, 'RightMargin'), 10),
       bottomMargin: numVal(getAttr(pAttrs, 'BottomMargin'), 10),
       columnWidth: numVal(getAttr(pAttrs, 'ColumnWidth'), 0),
+      visible: getAttr(pAttrs, 'Visible') !== 'False',
       bands: []
     };
 
     // Bantlar
-    const bandTagRx = /<(Tfrx(?:MasterData|DetailData|SubdetailData|Header|Footer|PageHeader|PageFooter|GroupHeader|GroupFooter|ColumnHeader|ColumnFooter|ReportTitle|ReportSummary|DataBand|Overlay|DMPHeader|DMPFooter|DMPGroupHeader|DMPGroupFooter|DMPMasterData|DMPDetailData|DMPSubdetailData))\b([\s\S]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi;
+    const bandTagRx = /<(Tfrx(?:MasterData|DetailData|SubdetailData|Header|Footer|PageHeader|PageFooter|GroupHeader|GroupFooter|ColumnHeader|ColumnFooter|ReportTitle|ReportSummary|DataBand|Child|Overlay|DMPHeader|DMPFooter|DMPGroupHeader|DMPGroupFooter|DMPMasterData|DMPDetailData|DMPSubdetailData))\b([\s\S]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi;
     let bMatch;
     while ((bMatch = bandTagRx.exec(pContent)) !== null) {
       const bType = bMatch[1];
@@ -596,6 +617,14 @@ function parseFrp(xmlText) {
         dataSet: getAttr(bAttrs, 'DataSetName') || getAttr(bAttrs, 'DataSet') || '',
         condition: getAttr(bAttrs, 'Condition') || '',
         stretched: getAttr(bAttrs, 'Stretched') === 'True',
+        allowSplit: getAttr(bAttrs, 'AllowSplit') === 'True',
+        keepTogether: getAttr(bAttrs, 'KeepTogether') === 'True',
+        keepChild: getAttr(bAttrs, 'KeepChild') === 'True',
+        keepHeader: getAttr(bAttrs, 'KeepHeader') === 'True',
+        keepFooter: getAttr(bAttrs, 'KeepFooter') === 'True',
+        startNewPage: getAttr(bAttrs, 'StartNewPage') === 'True',
+        printIfDetailEmpty: getAttr(bAttrs, 'PrintIfDetailEmpty') === 'True',
+        rowCount: numVal(getAttr(bAttrs, 'RowCount'), 0),
         vertical: getAttr(bAttrs, 'Vertical') === 'True',
         left: numVal(getAttr(bAttrs, 'Left'), 0),
         rawAttrs: bAttrs,
@@ -922,7 +951,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
         setAttrs(pageNode, {
           Orientation: page.orientation, PaperWidth: page.paperWidth, PaperHeight: page.paperHeight,
           LeftMargin: page.leftMargin, TopMargin: page.topMargin, RightMargin: page.rightMargin,
-          BottomMargin: page.bottomMargin, ColumnWidth: page.columnWidth
+          BottomMargin: page.bottomMargin, ColumnWidth: page.columnWidth, Visible: page.visible
         });
         (page.bands || []).forEach(band => {
           const synthetic = band.type === 'TfrxPageContent';
@@ -932,7 +961,10 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
           if (!synthetic && bandNode.parentNode === pageNode) pageNode.appendChild(bandNode);
           if (!synthetic) setAttrs(bandNode, {
             Left: band.left, Top: band.top, Width: band.width, Height: band.height,
-            DataSetName: band.dataSet, Condition: band.condition, Stretched: band.stretched, Vertical: band.vertical
+            DataSetName: band.dataSet, Condition: band.condition, Stretched: band.stretched,
+            AllowSplit: band.allowSplit, KeepTogether: band.keepTogether, KeepChild: band.keepChild,
+            KeepHeader: band.keepHeader, KeepFooter: band.keepFooter, StartNewPage: band.startNewPage,
+            PrintIfDetailEmpty: band.printIfDetailEmpty, RowCount: band.rowCount, Vertical: band.vertical
           });
           (band.components || []).forEach(component => {
             const componentNode = ensureNode(component, bandNode);
@@ -943,10 +975,23 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
               [textAttr]: component.text, 'Font.Name': component.fontName,
               'Font.Height': component.fontSize ? -Math.abs(component.fontSize) : component.fontHeight,
               'Font.Color': component.fontColor, 'Font.Style': component.fontStyle,
-              'Fill.BackColor': component.fillBackColor, 'Frame.Typ': component.frameTyp,
-              'Frame.Color': component.frameColor, 'Frame.Width': component.frameWidth,
-              HAlign: component.hAlign, VAlign: component.vAlign, Rotation: component.rotation,
+              'Fill.BackColor': component.fillBackColor, 'Fill.ForeColor': component.fillForeColor,
+              'Fill.Style': component.fillStyle, FillType: component.fillType,
+              'Frame.Typ': component.frameTyp, 'Frame.Color': component.frameColor,
+              'Frame.Width': component.frameWidth, 'Frame.Style': component.frameStyle,
+              Align: component.align, HAlign: component.hAlign, VAlign: component.vAlign, Rotation: component.rotation,
               DataSetName: component.dataSet, DataField: component.dataField, DisplayFormat: component.displayFormat,
+              'Hyperlink.Value': component.hyperlink,
+              WordWrap: component.wordWrap, AutoWidth: component.autoWidth,
+              AllowExpressions: component.allowExpressions, AllowHTMLTags: component.allowHTMLTags,
+              StretchMode: component.stretchMode, ShiftMode: component.shiftMode,
+              Printable: component.printable, SuppressRepeatedValues: component.suppressRepeatedValues,
+              HideZeros: component.hideZeros, Clipped: component.clipped,
+              LineSpacing: component.lineSpacing, ParagraphGap: component.paragraphGap,
+              FileLink: component.fileLink, KeepAspectRatio: component.keepAspectRatio,
+              Center: component.center, Stretched: component.stretched,
+              BarType: component.barType, ShowText: component.showText,
+              CalcCheckSum: component.calcCheckSum, Zoom: component.zoom, Shape: component.shape,
               Visible: component.visible, Enabled: component.enabled, OnBeforePrint: component.onBeforePrint,
               OnAfterPrint: component.onAfterPrint, OnClick: component.onClick, OnPreviewClick: component.onPreviewClick
             });
@@ -969,7 +1014,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
         Array.from(pageNode.childNodes || []).forEach(child => {
           if (child.nodeType === 1) {
             const bName = child.getAttribute('Name');
-            if (bName && !activeBandNames.has(bName) && /Band|Header|Footer|Data|Summary|Title|Group/i.test(child.nodeName)) {
+            if (bName && !activeBandNames.has(bName) && /Band|Header|Footer|Data|Summary|Title|Group|Child/i.test(child.nodeName)) {
               pageNode.removeChild(child);
             }
           }
