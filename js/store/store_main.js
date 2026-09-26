@@ -1985,6 +1985,46 @@
     return updated;
   }
 
+  function loadSelectedGoogleFonts(fontFamily, codeFont) {
+    const googleFontMap = {
+      manrope: 'Manrope:wght@400;500;600;700',
+      dmsans: 'DM+Sans:wght@400;500;600;700',
+      ibmplexsans: 'IBM+Plex+Sans:wght@400;500;600;700',
+      inter: 'Inter:wght@400;500;600;700;800',
+      jakarta: 'Plus+Jakarta+Sans:wght@400;500;600;700;800',
+      outfit: 'Outfit:wght@400;500;600;700;800',
+      roboto: 'Roboto:wght@400;500;700',
+      poppins: 'Poppins:wght@400;500;600;700;800',
+      montserrat: 'Montserrat:wght@400;500;600;700;800',
+      nunito: 'Nunito:wght@400;600;700;800',
+      raleway: 'Raleway:wght@400;600;700;800',
+      ubuntu: 'Ubuntu:wght@400;500;700',
+      sourcesans: 'Source+Sans+3:wght@400;600;700',
+      opensans: 'Open+Sans:wght@400;600;700',
+      jetbrains: 'JetBrains+Mono:wght@400;500;600;700',
+      fira: 'Fira+Code:wght@400;500;600;700',
+      ibmplexmono: 'IBM+Plex+Mono:wght@400;500;600;700',
+      robotomono: 'Roboto+Mono:wght@400;500;600;700',
+      firamono: 'Fira+Mono:wght@400;500;700',
+      inconsolata: 'Inconsolata:wght@400;600;700',
+      sourcecode: 'Source+Code+Pro:wght@400;600;700',
+      courierprime: 'Courier+Prime:wght@400;700'
+    };
+    const selected = [...new Set([googleFontMap[fontFamily], googleFontMap[codeFont]].filter(Boolean))];
+    const existing = document.getElementById('frpokuSelectedFonts');
+    if (!selected.length) {
+      existing?.remove();
+      return;
+    }
+    const href = `https://fonts.googleapis.com/css2?${selected.map(value => `family=${value}`).join('&')}&display=swap`;
+    if (existing?.href === href) return;
+    const link = existing || document.createElement('link');
+    link.id = 'frpokuSelectedFonts';
+    link.rel = 'stylesheet';
+    link.href = href;
+    if (!existing) document.head.appendChild(link);
+  }
+
   function applyPreferences() {
     const prefs = getPreferences();
     if (!prefs) return;
@@ -2061,6 +2101,7 @@
     if (prefs.codeFont && codeFontMap[prefs.codeFont]) {
       root.style.setProperty('--mono', codeFontMap[prefs.codeFont]);
     }
+    loadSelectedGoogleFonts(prefs.fontFamily, prefs.codeFont);
 
     // 4. Arayüz & Yazı Boyutu (UI Scale)
     const fontSizeMap = {
