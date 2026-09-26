@@ -440,6 +440,7 @@ function esc(str) {
  let currentMode = 'designer'; // 'designer' | 'preview'
  let showRulers = true; // Cetveller Açık / Kapalı
  let selectedItem = null;
+ let selectedItems = [];
  let showInspector = !window.matchMedia('(max-width: 768px)').matches;
  let rightTab = 'inspector'; // 'inspector' | 'datatree'
  let inspectorSearchQuery = '';
@@ -659,6 +660,22 @@ function esc(str) {
  <button type="button" class="designer-palette-btn" id="btnToolAddCombobox" title="Yeni Açılır Liste Ekle">Combo</button>
  <button type="button" class="designer-palette-btn" id="btnToolAddPanel" title="Yeni Panel Ekle">Panel</button>
  <button type="button" class="designer-palette-btn danger" id="btnToolDeleteSelected" title="Seçili Bileşeni Sil (Delete)">Sil</button>
+ </div>
+
+ <div class="fr-multi-align-bar" id="frMultiAlignBar" style="${(selectedItems && selectedItems.length > 1) ? 'display:flex;' : 'display:none;'}">
+ <span class="fr-align-badge" id="frAlignBadge">${selectedItems ? selectedItems.length : 0} Seçili</span>
+ <button type="button" class="fr-align-btn" id="btnAlignLeft" title="Sola Hizala">⬅ Sol</button>
+ <button type="button" class="fr-align-btn" id="btnAlignCenter" title="Yatay Ortala">↔ Orta</button>
+ <button type="button" class="fr-align-btn" id="btnAlignRight" title="Sağa Hizala">➡ Sağ</button>
+ <div class="fr-align-sep"></div>
+ <button type="button" class="fr-align-btn" id="btnAlignTop" title="Üste Hizala">⬆ Üst</button>
+ <button type="button" class="fr-align-btn" id="btnAlignMiddle" title="Düşey Ortala">↕ Dikey</button>
+ <button type="button" class="fr-align-btn" id="btnAlignBottom" title="Alta Hizala">⬇ Alt</button>
+ <div class="fr-align-sep"></div>
+ <button type="button" class="fr-align-btn" id="btnDistributeH" title="Yatayda Eşit Dağıt">⬌ Dağıt</button>
+ <button type="button" class="fr-align-btn" id="btnDistributeV" title="Dikeyde Eşit Dağıt">⬍ Dağıt</button>
+ <div class="fr-align-sep"></div>
+ <button type="button" class="fr-align-btn danger" id="btnDeleteMulti" title="Tüm Seçilileri Sil">🗑️ Sil</button>
  </div>
  `: ''}
 
@@ -2473,6 +2490,10 @@ function esc(str) {
  // ── BİLEŞEN SİLME METODU ──────────────────────────────────
  function deleteSelectedComponent() {
  if (!isDesignEditing) return;
+ if (selectedItems && selectedItems.length > 1) {
+   deleteMultiSelected();
+   return;
+ }
  if (!selectedItem) {
  if (typeof toast === 'function') toast('Silinecek bir bileşen seçilmedi.', 'info');
  return;
@@ -2503,11 +2524,145 @@ function esc(str) {
  if (deleted) {
  const delName = selectedItem.name;
  selectedItem = null;
+ selectedItems = [];
  render();
  pushUndoState();
  if (window.FrpNotify) window.FrpNotify.info(`'${delName}' silindi ️`);
  else if (typeof toast === 'function') toast(`'${delName}' silindi ️`, 'info');
  }
+ }
+
+ function deleteMultiSelected() {
+   if (!isDesignEditing || !selectedItems || selectedItems.length === 0) return;
+   const activePage = allPages[activePageIndex];
+   if (!activePage) return;
+   pushUndoState();
+
+   const namesToDelete = new Set(selectedItems.map(c => c.name).filter(Boolean));
+   let deletedCount = 0;
+
+   if (activePage.type === 'report') {
+     (activePage.data.bands || []).forEach(b => {
+       if (!b.components) return;
+       const initialLen = b.components.length;
+       b.components = b.components.filter(c => !namesToDelete.has(c.name));
+       deletedCount += (initialLen - b.components.length);
+     });
+   } else {
+     if (activePage.data.controls) {
+       const initialLen = activePage.data.controls.length;
+       activePage.data.controls = activePage.data.controls.filter(c => !namesToDelete.has(c.name));
+       deletedCount += (initialLen - activePage.data.controls.length);
+     }
+   }
+
+   selectedItems = [];
+   selectedItem = null;
+   render();
+   pushUndoState();
+   if (window.FrpNotify) window.FrpNotify.info(`${deletedCount} bileşen silindi 🗑️`);
+   else if (typeof toast === 'function') toast(`${deletedCount} bileşen silindi 🗑️`, 'info');
+ }
+
+ function alignSelected(type) {
+   if (!isDesignEditing || !selectedItems || selectedItems.length < 2) return;
+   pushUndoState();
+
+   if (type === 'left') {
+     const minLeft = Math.min(...selectedItems.map(c => Number(c.left) || 0));
+     selectedItems.forEach(c => { c.left = minLeft; });
+   } else if (type === 'center') {
+     const minLeft = Math.min(...selectedItems.map(c => Number(c.left) || 0));
+     const maxRight = Math.max(...selectedItems.map(c => (Number(c.left) || 0) + (Number(c.width) || 0)));
+     const midX = (minLeft + maxRight) / 2;
+     selectedItems.forEach(c => {
+       const w = Number(c.width) || 0;
+       c.left = Math.round(midX - w / 2);
+     });
+   } else if (type === 'right') {
+     const maxRight = Math.max(...selectedItems.map(c => (Number(c.left) || 0) + (Number(c.width) || 0)));
+     selectedItems.forEach(c => {
+       const w = Number(c.width) || 0;
+       c.left = maxRight - w;
+     });
+   } else if (type === 'top') {
+     const minTop = Math.min(...selectedItems.map(c => Number(c.top) || 0));
+     selectedItems.forEach(c => { c.top = minTop; });
+   } else if (type === 'middle') {
+     const minTop = Math.min(...selectedItems.map(c => Number(c.top) || 0));
+     const maxBottom = Math.max(...selectedItems.map(c => (Number(c.top) || 0) + (Number(c.height) || 0)));
+     const midY = (minTop + maxBottom) / 2;
+     selectedItems.forEach(c => {
+       const h = Number(c.height) || 0;
+       c.top = Math.round(midY - h / 2);
+     });
+   } else if (type === 'bottom') {
+     const maxBottom = Math.max(...selectedItems.map(c => (Number(c.top) || 0) + (Number(c.height) || 0)));
+     selectedItems.forEach(c => {
+       const h = Number(c.height) || 0;
+       c.top = maxBottom - h;
+     });
+   } else if (type === 'distributeH') {
+     if (selectedItems.length >= 3) {
+       const sorted = [...selectedItems].sort((a, b) => (Number(a.left) || 0) - (Number(b.left) || 0));
+       const first = sorted[0];
+       const last = sorted[sorted.length - 1];
+       const startX = Number(first.left) || 0;
+       const totalSpan = (Number(last.left) || 0) + (Number(last.width) || 0) - startX;
+       const totalItemsWidth = sorted.reduce((sum, c) => sum + (Number(c.width) || 0), 0);
+       const freeSpace = Math.max(0, totalSpan - totalItemsWidth);
+       const gap = freeSpace / (sorted.length - 1);
+       let curX = startX;
+       sorted.forEach(c => {
+         c.left = Math.round(curX);
+         curX += (Number(c.width) || 0) + gap;
+       });
+     }
+   } else if (type === 'distributeV') {
+     if (selectedItems.length >= 3) {
+       const sorted = [...selectedItems].sort((a, b) => (Number(a.top) || 0) - (Number(b.top) || 0));
+       const first = sorted[0];
+       const last = sorted[sorted.length - 1];
+       const startY = Number(first.top) || 0;
+       const totalSpan = (Number(last.top) || 0) + (Number(last.height) || 0) - startY;
+       const totalItemsHeight = sorted.reduce((sum, c) => sum + (Number(c.height) || 0), 0);
+       const freeSpace = Math.max(0, totalSpan - totalItemsHeight);
+       const gap = freeSpace / (sorted.length - 1);
+       let curY = startY;
+       sorted.forEach(c => {
+         c.top = Math.round(curY);
+         curY += (Number(c.height) || 0) + gap;
+       });
+     }
+   }
+
+   render();
+   pushUndoState();
+   if (window.FrpNotify) window.FrpNotify.info('Seçili bileşenler hizalandı');
+   else if (typeof toast === 'function') toast('Seçili bileşenler hizalandı', 'info');
+ }
+
+ function getCompFromElement(el) {
+   if (!el) return null;
+   const activePage = allPages[activePageIndex];
+   if (!activePage) return null;
+   const bandIdx = parseInt(el.dataset.bandIdx, 10);
+   const compIdx = parseInt(el.dataset.compIdx, 10);
+   const rawIdx = el.dataset.ctrlIdx;
+
+   if (activePage.type === 'report' && !isNaN(bandIdx) && !isNaN(compIdx)) {
+     return activePage.data.bands?.[bandIdx]?.components?.[compIdx] || null;
+   } else if (activePage.type === 'dialog' && rawIdx !== undefined) {
+     if (rawIdx.includes('_')) {
+       const parts = rawIdx.split('_').map(n => parseInt(n, 10));
+       const parentCtrl = activePage.data.controls?.[parts[0]];
+       return parentCtrl?.children?.[parts[1]] || parentCtrl || null;
+     } else {
+       const idx = parseInt(rawIdx, 10);
+       return activePage.data.controls?.[idx] || null;
+     }
+   }
+   return null;
  }
 
  // ── SAHNE İÇİ İNTERAKTİF SÜRÜKLE / BOYUTLANDIR / DÜZENLE BAĞLAYICI ──
@@ -2520,6 +2675,7 @@ function esc(str) {
         const activePage = allPages[activePageIndex];
         if (activePage) {
           selectedItem = activePage.data;
+          selectedItems = [];
           updateSelection();
         }
       });
@@ -2529,30 +2685,105 @@ function esc(str) {
         if (rTop) rTop.scrollLeft = vpEl.scrollLeft;
         if (rLeft) rLeft.scrollTop = vpEl.scrollTop;
       });
+
+      // ── LASSO SEÇİMİ (MARQUEE SELECTION) ──
+      let isLassoing = false;
+      let lassoStartX = 0;
+      let lassoStartY = 0;
+      let lassoBox = null;
+
+      vpEl.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        if (e.target.closest('.fr-view-item') || e.target.closest('.fr-ctrl-item') || e.target.closest('.fr-resize-handle') || e.target.closest('.fr-vertical-band-header') || e.target.closest('.designer-inspector')) return;
+
+        const vpRect = vpEl.getBoundingClientRect();
+        lassoStartX = e.clientX;
+        lassoStartY = e.clientY;
+        isLassoing = true;
+
+        lassoBox = document.createElement('div');
+        lassoBox.className = 'fr-lasso-marquee';
+        lassoBox.id = 'frLassoMarquee';
+        lassoBox.style.left = `${(e.clientX - vpRect.left + vpEl.scrollLeft)}px`;
+        lassoBox.style.top = `${(e.clientY - vpRect.top + vpEl.scrollTop)}px`;
+        lassoBox.style.width = '0px';
+        lassoBox.style.height = '0px';
+        vpEl.appendChild(lassoBox);
+
+        const onLassoMove = (moveEvt) => {
+          if (!isLassoing || !lassoBox) return;
+          const curVpRect = vpEl.getBoundingClientRect();
+          const minX = Math.min(lassoStartX, moveEvt.clientX);
+          const maxX = Math.max(lassoStartX, moveEvt.clientX);
+          const minY = Math.min(lassoStartY, moveEvt.clientY);
+          const maxY = Math.max(lassoStartY, moveEvt.clientY);
+
+          lassoBox.style.left = `${(minX - curVpRect.left + vpEl.scrollLeft)}px`;
+          lassoBox.style.top = `${(minY - curVpRect.top + vpEl.scrollTop)}px`;
+          lassoBox.style.width = `${(maxX - minX)}px`;
+          lassoBox.style.height = `${(maxY - minY)}px`;
+
+          if ((maxX - minX) > 6 || (maxY - minY) > 6) {
+            const matched = [];
+            containerEl.querySelectorAll('.fr-view-item, .fr-ctrl-item').forEach(cEl => {
+              const cRect = cEl.getBoundingClientRect();
+              const overlaps = !(
+                cRect.right < minX ||
+                cRect.left > maxX ||
+                cRect.bottom < minY ||
+                cRect.top > maxY
+              );
+              if (overlaps) {
+                const compObj = getCompFromElement(cEl);
+                if (compObj && !matched.includes(compObj)) {
+                  matched.push(compObj);
+                }
+              }
+            });
+
+            if (matched.length > 0) {
+              selectedItems = matched;
+              selectedItem = matched[0];
+              updateSelection();
+            }
+          }
+        };
+
+        const onLassoUp = () => {
+          isLassoing = false;
+          if (lassoBox) {
+            lassoBox.remove();
+            lassoBox = null;
+          }
+          window.removeEventListener('mousemove', onLassoMove);
+          window.removeEventListener('mouseup', onLassoUp);
+        };
+
+        window.addEventListener('mousemove', onLassoMove);
+        window.addEventListener('mouseup', onLassoUp);
+      });
     }
 
     containerEl.querySelectorAll('.fr-view-item,.fr-ctrl-item').forEach(el => {
  el.addEventListener('click', (e) => {
  e.stopPropagation();
- const bandIdx = parseInt(el.dataset.bandIdx, 10);
- const compIdx = parseInt(el.dataset.compIdx, 10);
- const rawIdx = el.dataset.ctrlIdx;
- const activePage = allPages[activePageIndex];
+ const compObj = getCompFromElement(el);
+ if (!compObj) return;
 
- if (activePage.type === 'report' && activePage.data.bands?.[bandIdx]?.components?.[compIdx]) {
- selectedItem = activePage.data.bands[bandIdx].components[compIdx];
- updateSelection();
- } else if (activePage.type === 'dialog' && rawIdx!== undefined) {
- if (rawIdx.includes('_')) {
- const parts = rawIdx.split('_').map(n => parseInt(n, 10));
- const parentCtrl = activePage.data.controls?.[parts[0]];
- selectedItem = parentCtrl?.children?.[parts[1]] || parentCtrl;
+ if (e.shiftKey || e.ctrlKey || e.metaKey) {
+   const idx = selectedItems.indexOf(compObj);
+   if (idx !== -1) {
+     selectedItems.splice(idx, 1);
+     selectedItem = selectedItems[selectedItems.length - 1] || null;
+   } else {
+     selectedItems.push(compObj);
+     selectedItem = compObj;
+   }
  } else {
- const idx = parseInt(rawIdx, 10);
- selectedItem = activePage.data.controls?.[idx];
+   selectedItems = [compObj];
+   selectedItem = compObj;
  }
  updateSelection();
- }
  });
 
  // Çift Tıklama ile Metin Düzenleme (In-place Text Edit with Modern Modal)
@@ -2609,24 +2840,15 @@ function esc(str) {
  if (e.target.closest('.designer-prop-input') || e.target.closest('.designer-prop-select')) return;
 
  // Otomatik Seçim Senkronizasyonu
- const bandIdx = parseInt(el.dataset.bandIdx, 10);
- const compIdx = parseInt(el.dataset.compIdx, 10);
- const rawIdx = el.dataset.ctrlIdx;
- const activePage = allPages[activePageIndex];
- let targetComp = null;
- if (activePage?.type === 'report' && activePage.data.bands?.[bandIdx]?.components?.[compIdx]) {
- targetComp = activePage.data.bands[bandIdx].components[compIdx];
- } else if (activePage?.type === 'dialog' && rawIdx !== undefined) {
- if (rawIdx.includes('_')) {
- const parts = rawIdx.split('_').map(n => parseInt(n, 10));
- targetComp = activePage.data.controls?.[parts[0]]?.children?.[parts[1]];
- } else {
- targetComp = activePage.data.controls?.[parseInt(rawIdx, 10)];
- }
- }
- if (targetComp && selectedItem !== targetComp) {
- selectedItem = targetComp;
- updateSelection();
+ const targetComp = getCompFromElement(el);
+ if (targetComp) {
+   if (!selectedItems.includes(targetComp)) {
+     selectedItem = targetComp;
+     selectedItems = [targetComp];
+     updateSelection();
+   } else {
+     selectedItem = targetComp;
+   }
  }
 
  if (!selectedItem) return;
@@ -2649,6 +2871,14 @@ function esc(str) {
  let isDragging = !handleType;
  let isResizing = !!handleType;
 
+ const isMultiDrag = isDragging && selectedItems.length > 1 && selectedItems.includes(selectedItem);
+ const multiStartPos = isMultiDrag ? selectedItems.map(c => ({
+   comp: c,
+   left: c.left || 0,
+   top: c.top || 0,
+   el: (c.name ? containerEl.querySelector(`[data-comp-name="${c.name}"]`) : null)
+ })) : [];
+
  const startX = e.clientX;
  const startY = e.clientY;
  const startLeft = selectedItem.left || 0;
@@ -2667,12 +2897,13 @@ function esc(str) {
  document.body.appendChild(hud);
  }
  hud.style.display = 'block';
- hud.textContent = `X: ${selectedItem.left} Y: ${selectedItem.top} | ${selectedItem.width}×${selectedItem.height}`;
+ hud.textContent = isMultiDrag ? `${selectedItems.length} bileşen taşınıyor` : `X: ${selectedItem.left} Y: ${selectedItem.top} | ${selectedItem.width}×${selectedItem.height}`;
  hud.style.left = `${e.clientX}px`;
  hud.style.top = `${e.clientY}px`;
 
  // Komşu Bileşenleri Topla (Smart Snapping için)
  const siblingComps = [];
+ const bandIdx = parseInt(el.dataset.bandIdx, 10);
  if (activePage?.type === 'report' && !isNaN(bandIdx)) {
  const b = activePage.data.bands?.[bandIdx];
  (b?.components || []).forEach(c => {
@@ -2689,6 +2920,17 @@ function esc(str) {
  const dy = Math.round((moveEvt.clientY - startY) / currentZoom);
 
  if (isDragging) {
+ if (isMultiDrag) {
+   multiStartPos.forEach(p => {
+     p.comp.left = Math.max(0, Math.round((p.left + dx) / 2) * 2);
+     p.comp.top = Math.max(0, Math.round((p.top + dy) / 2) * 2);
+     if (p.el) {
+       p.el.style.left = `${p.comp.left}px`;
+       p.el.style.top = `${p.comp.top}px`;
+     }
+   });
+   updateRulerTracker(selectedItem.left, selectedItem.width, selectedItem.top, selectedItem.height);
+ } else {
  let targetLeft = startLeft + dx;
  let targetTop = startTop + dy;
  const curW = selectedItem.width || 100;
@@ -2754,6 +2996,7 @@ function esc(str) {
 
  renderSmartGuides(activeGuideX, activeGuideY);
  updateRulerTracker(selectedItem.left, selectedItem.width, selectedItem.top, selectedItem.height);
+ }
  } else if (isResizing) {
  if (handleType.includes('e')) selectedItem.width = Math.max(12, Math.round((startWidth + dx) / 4) * 4);
  if (handleType.includes('s')) selectedItem.height = Math.max(8, Math.round((startHeight + dy) / 4) * 4);
@@ -2963,6 +3206,17 @@ function esc(str) {
  containerEl.querySelector('#btnToolAddPanel')?.addEventListener('click', () => addNewComponent('panel'));
  containerEl.querySelector('#btnToolDeleteSelected')?.addEventListener('click', deleteSelectedComponent);
 
+ // Multi-Align Araç Çubuğu Butonları
+ containerEl.querySelector('#btnAlignLeft')?.addEventListener('click', () => alignSelected('left'));
+ containerEl.querySelector('#btnAlignCenter')?.addEventListener('click', () => alignSelected('center'));
+ containerEl.querySelector('#btnAlignRight')?.addEventListener('click', () => alignSelected('right'));
+ containerEl.querySelector('#btnAlignTop')?.addEventListener('click', () => alignSelected('top'));
+ containerEl.querySelector('#btnAlignMiddle')?.addEventListener('click', () => alignSelected('middle'));
+ containerEl.querySelector('#btnAlignBottom')?.addEventListener('click', () => alignSelected('bottom'));
+ containerEl.querySelector('#btnDistributeH')?.addEventListener('click', () => alignSelected('distributeH'));
+ containerEl.querySelector('#btnDistributeV')?.addEventListener('click', () => alignSelected('distributeV'));
+ containerEl.querySelector('#btnDeleteMulti')?.addEventListener('click', () => deleteMultiSelected());
+
  // 5. Zoom Kontrolleri
  containerEl.querySelector('#btnZoomIn')?.addEventListener('click', () => {
  currentZoom = Math.min(2.5, Math.round((currentZoom + 0.15) * 100) / 100);
@@ -3076,6 +3330,7 @@ function esc(str) {
  if (e.target.id === 'designerViewport' || e.target.id === 'frReportPage' || e.target.classList.contains('fr-band-box')) {
  const activePage = allPages[activePageIndex];
  selectedItem = activePage? activePage.data: null;
+ selectedItems = [];
  updateSelection();
  }
  });
@@ -3091,7 +3346,7 @@ function esc(str) {
  } else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
  e.preventDefault();
  redo();
- } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedItem) {
+ } else if ((e.key === 'Delete' || e.key === 'Backspace') && (selectedItem || (selectedItems && selectedItems.length > 0))) {
  e.preventDefault();
  deleteSelectedComponent();
  }
@@ -3115,8 +3370,28 @@ function esc(str) {
   el.classList.remove('selected', 'selected-band');
  });
  
- // YALNIZCA Tasarımcı modundaysa ve seçim varsa sınıf ekle
- if (selectedItem) {
+ if (selectedItems && selectedItems.length > 0) {
+   selectedItems.forEach(item => {
+     const targetEl = (item.name ? containerEl.querySelector(`[data-comp-name="${item.name}"]`) : null) ||
+                      containerEl.querySelector(`[title*="${item.name}"]`);
+     if (targetEl) {
+       targetEl.classList.add('selected');
+     }
+   });
+   if (selectedItems.length === 1 && currentMode === 'designer') {
+     const item = selectedItems[0];
+     const targetEl = (item.name ? containerEl.querySelector(`[data-comp-name="${item.name}"]`) : null) ||
+                      containerEl.querySelector(`[title*="${item.name}"]`);
+     if (targetEl) {
+       ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].forEach(pos => {
+         const h = document.createElement('div');
+         h.className = `fr-resize-handle fr-resize-${pos}`;
+         h.dataset.handle = pos;
+         targetEl.appendChild(h);
+       });
+     }
+   }
+ } else if (selectedItem) {
  const isBand = (selectedItem.type && (BAND_META[selectedItem.type] || selectedItem.type.includes('Band') || selectedItem.type.includes('Header') || selectedItem.type.includes('Footer') || selectedItem.type === 'TfrxMasterData' || selectedItem.type === 'TfrxReportTitle' || selectedItem.vertical || String(selectedItem.rawAttrs || '').includes('Vertical="True"')));
  if (isBand) {
  const activePage = allPages[activePageIndex];
@@ -3148,8 +3423,25 @@ function esc(str) {
  }
  }
 
+ const alignBar = containerEl.querySelector('#frMultiAlignBar');
+ const alignBadge = containerEl.querySelector('#frAlignBadge');
+ if (alignBar) {
+   if (selectedItems && selectedItems.length > 1 && currentMode === 'designer' && isDesignEditing) {
+     alignBar.style.display = 'flex';
+     if (alignBadge) alignBadge.textContent = `${selectedItems.length} Seçili`;
+   } else {
+     alignBar.style.display = 'none';
+   }
+ }
+
  const compTypeBadge = containerEl.querySelector('#inspectorCompType');
- if (compTypeBadge) compTypeBadge.textContent = selectedItem? (selectedItem.type || selectedItem.name || 'TfrxComponent'): 'TfrxPage';
+ if (compTypeBadge) {
+   if (selectedItems && selectedItems.length > 1) {
+     compTypeBadge.textContent = `${selectedItems.length} Bileşen (Çoklu Seçim)`;
+   } else {
+     compTypeBadge.textContent = selectedItem? (selectedItem.type || selectedItem.name || 'TfrxComponent'): 'TfrxPage';
+   }
+ }
 
  const propTable = containerEl.querySelector('#propTableBody');
  if (propTable) {

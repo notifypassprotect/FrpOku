@@ -46,3 +46,35 @@ test('auth portal presents one restrained login form without a decorative banner
   assert.ok(!authContent.includes('auth-brand-pane'), 'Decorative banner is removed');
   assert.ok(!authContent.includes('auth-brand-preview'), 'Fake product preview is removed');
 });
+
+test('designer engine supports Barcodes, Picture hex decode, Rulers, Smart Guides, Lasso marquee, and Multi-Align toolbar', () => {
+  const designerContent = fs.readFileSync(path.join(ROOT, 'js/detail/report_designer.js'), 'utf8');
+  const parserContent = fs.readFileSync(path.join(ROOT, 'js/core/parser.js'), 'utf8');
+  const designerCss = fs.readFileSync(path.join(ROOT, 'css/designer.css'), 'utf8');
+
+  // Part 1A: Barcode Engine
+  assert.ok(designerContent.includes('TfrxBarCodeView'), 'Must support TfrxBarCodeView');
+  assert.ok(designerContent.includes('TfrxQRCodeView'), 'Must support TfrxQRCodeView');
+  assert.ok(designerContent.includes('renderBarcodeSvg'), 'Must include vector SVG barcode generator');
+  assert.ok(designerContent.includes('btnToolAddBarcode'), 'Must have barcode tool button in palette');
+
+  // Part 1B: Picture Hex Decoder
+  assert.ok(designerContent.includes('decodeDelphiPictureHex'), 'Designer must have decodeDelphiPictureHex helper');
+  assert.ok(designerContent.includes('TfrxPictureView'), 'Designer must support TfrxPictureView');
+  assert.ok(designerContent.includes('btnToolAddPicture'), 'Must have picture tool button in palette');
+
+  // Part 1C: Canvas Rulers & Smart Alignment Guides
+  assert.ok(designerContent.includes('renderRulerTopSvg'), 'Must render top mm/cm metric ruler');
+  assert.ok(designerContent.includes('renderRulerLeftSvg'), 'Must render left mm/cm metric ruler');
+  assert.ok(designerContent.includes('renderSmartGuides'), 'Must render Figma-style alignment guides');
+  assert.ok(designerCss.includes('fr-smart-guide-line'), 'CSS must style smart alignment guides');
+
+  // Part 1D: Multi-selection Lasso & Multi-Align Toolbar
+  assert.ok(designerContent.includes('fr-multi-align-bar'), 'Must include Multi-Align Toolbar HTML');
+  assert.ok(designerContent.includes('fr-lasso-marquee'), 'Must include Lasso Marquee drag selection');
+  assert.ok(designerContent.includes('alignSelected'), 'Must implement alignSelected for left/center/right/top/middle/bottom/distribute');
+  assert.ok(designerContent.includes('deleteMultiSelected'), 'Must implement deleteMultiSelected');
+  assert.ok(designerCss.includes('.fr-multi-align-bar'), 'CSS must style multi-align bar');
+  assert.ok(designerCss.includes('.fr-lasso-marquee'), 'CSS must style lasso marquee');
+});
+
