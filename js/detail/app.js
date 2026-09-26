@@ -598,15 +598,24 @@ function getCodeDiagnostics(tabCfg, rawCode) {
  const errors = [];
  const warnings = [];
  const seen = new Set();
+ const inferToken = message => {
+   const match = String(message || '').match(/\b(JOIN|USING|ON|CASE|WHEN|THEN|ELSE|END|SELECT|FROM|WHERE|GROUP\s+BY|ORDER\s+BY|HAVING|UNION)\b/i);
+   return match ? match[1].toUpperCase() : '';
+ };
  const add = (target, item, fallbackType) => {
    const value = typeof item === 'string' ? { text: item } : (item || {});
-   const message = value.message || value.text || String(item || 'Sözdizimi sorunu');
-   const line = Math.max(1, Number(value.line) || 1);
+   const rawMessage = value.message || value.text || String(item || 'Sözdizimi sorunu');
+   const embeddedPosition = String(rawMessage).match(/^\s*Satır\s+(\d+)(?::(\d+))?\s*:\s*/i);
+   const message = embeddedPosition ? String(rawMessage).slice(embeddedPosition[0].length).trim() : rawMessage;
+   const line = Math.max(1, Number(value.line) || Number(embeddedPosition?.[1]) || 1);
    const col = Math.max(1, Number(value.col) || 1);
-   const key = `${fallbackType}:${line}:${col}:${message}`;
+   const token = value.token || inferToken(message);
+   const isJoinIssue = /\bJOIN\b/i.test(message) || /^(?:JOIN|ON|USING)$/i.test(token);
+   if (isJoinIssue && target.some(existing => existing.line === line && existing.issueFamily === 'join')) return;
+   const key = `${fallbackType}:${line}:${col}:${token}:${message}`;
    if (seen.has(key)) return;
    seen.add(key);
-   target.push({ line, col, token: value.token || '', suggestion: value.suggestion || '', message, type: fallbackType });
+   target.push({ line, col, token, suggestion: value.suggestion || '', message, type: fallbackType, issueFamily: isJoinIssue ? 'join' : '' });
  };
 
  if (typeof window.findSyntaxErrors === 'function') {
