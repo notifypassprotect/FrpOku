@@ -218,6 +218,151 @@ function esc(str) {
  return /^[\p{L}\p{N} ._-]{1,80}$/u.test(font)? font: fallback;
  }
 
+  // ── FASTREPORT VCL BARKOD & QR KOD SVG ÇİZİCİ ─────────────
+  function renderBarcodeSvg(barType, rawText, width, height, showText, strokeColor, bgColor, isQr, isPdf417) {
+    const text = String(rawText || '').trim() || (isQr ? 'https://fast-report.com' : '1234567890');
+    strokeColor = strokeColor || '#000000';
+    bgColor = (bgColor && bgColor !== 'transparent') ? bgColor : '#ffffff';
+
+    if (isQr) {
+      const matrixSize = 21;
+      const padding = 2;
+      const totalUnits = matrixSize + (padding * 2);
+      const unitSize = Math.max(1, Math.min(width, height) / totalUnits);
+      const offsetX = (width - (totalUnits * unitSize)) / 2;
+      const offsetY = (height - (totalUnits * unitSize)) / 2;
+
+      function isFinderPattern(r, c) {
+        if ((r >= 0 && r < 7 && c >= 0 && c < 7) ||
+            (r >= 0 && r < 7 && c >= 14 && c < 21) ||
+            (r >= 14 && r < 21 && c >= 0 && c < 7)) {
+          const inCorner = (r < 7 && c < 7) ? [r, c] : (r < 7 ? [r, c - 14] : [r - 14, c]);
+          const lr = inCorner[0], lc = inCorner[1];
+          if (lr === 0 || lr === 6 || lc === 0 || lc === 6) return true;
+          if (lr >= 2 && lr <= 4 && lc >= 2 && lc <= 4) return true;
+          return false;
+        }
+        return null;
+      }
+
+      let hash = 0;
+      for (let i = 0; i < text.length; i++) {
+        hash = ((hash << 5) - hash) + text.charCodeAt(i);
+        hash |= 0;
+      }
+
+      const rects = [];
+      for (let r = 0; r < matrixSize; r++) {
+        for (let c = 0; c < matrixSize; c++) {
+          const finder = isFinderPattern(r, c);
+          let isDark = false;
+          if (finder !== null) {
+            isDark = finder;
+          } else if (r === 6 || c === 6) {
+            isDark = ((r + c) % 2 === 0);
+          } else {
+            const bit = Math.abs(Math.sin((r * 29) + (c * 17) + hash) * 10000) % 1;
+            isDark = bit > 0.48;
+          }
+          if (isDark) {
+            const x = offsetX + ((c + padding) * unitSize);
+            const y = offsetY + ((r + padding) * unitSize);
+            rects.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.ceil(unitSize)}" height="${Math.ceil(unitSize)}" fill="${strokeColor}" />`);
+          }
+        }
+      }
+
+      return `
+        <svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" shape-rendering="crispEdges">
+          <rect width="${width}" height="${height}" fill="${bgColor}" />
+          ${rects.join('')}
+        </svg>
+      `;
+    }
+
+    if (isPdf417) {
+      const rows = 12;
+      const cols = 35;
+      const rowHeight = Math.max(2, (height - (showText ? 14 : 4)) / rows);
+      const colWidth = Math.max(1, (width - 16) / cols);
+      const rects = [];
+      let hash = 0;
+      for (let i = 0; i < text.length; i++) {
+        hash = ((hash << 5) - hash) + text.charCodeAt(i);
+        hash |= 0;
+      }
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          let isDark = false;
+          if (c < 3) isDark = (c !== 1);
+          else if (c >= cols - 3) isDark = (c !== cols - 2);
+          else isDark = (Math.abs(Math.sin((r * 31) + (c * 19) + hash) * 1000) % 1) > 0.5;
+
+          if (isDark) {
+            const x = 8 + (c * colWidth);
+            const y = 4 + (r * rowHeight);
+            rects.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.ceil(colWidth)}" height="${Math.ceil(rowHeight)}" fill="${strokeColor}" />`);
+          }
+        }
+      }
+      return `
+        <svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" shape-rendering="crispEdges">
+          <rect width="${width}" height="${height}" fill="${bgColor}" />
+          ${rects.join('')}
+          ${showText ? `<text x="${width / 2}" y="${height - 2}" text-anchor="middle" font-family="'Courier New', monospace" font-size="8.5" font-weight="700" fill="${strokeColor}">${esc(text.slice(0, 30))}</text>` : ''}
+        </svg>
+      `;
+    }
+
+    // 1D Barcode (Code128, EAN13, Code39, UPCA vb.)
+    const textH = showText ? 12 : 0;
+    const barH = Math.max(8, height - textH - 6);
+    const quietZone = Math.max(4, width * 0.04);
+    const usableW = width - (quietZone * 2);
+
+    const barModules = [2, 1, 2];
+    let seed = 0;
+    for (let i = 0; i < text.length; i++) {
+      seed = ((seed << 5) - seed) + text.charCodeAt(i);
+      seed |= 0;
+    }
+    const pseudoRand = () => {
+      seed = (seed * 9301 + 49297) % 233280;
+      return seed / 233280;
+    };
+
+    const charCount = Math.max(6, Math.min(24, text.length * 2));
+    for (let i = 0; i < charCount; i++) {
+      const barW = Math.floor(pseudoRand() * 3) + 1;
+      const spaceW = Math.floor(pseudoRand() * 3) + 1;
+      barModules.push(barW, spaceW);
+    }
+    barModules.push(2, 1, 2);
+
+    const totalModuleUnits = barModules.reduce((acc, v) => acc + v, 0);
+    const unitScale = Math.max(0.5, usableW / totalModuleUnits);
+
+    const barRects = [];
+    let curX = quietZone;
+    let isBar = true;
+    for (const mod of barModules) {
+      const w = mod * unitScale;
+      if (isBar) {
+        barRects.push(`<rect x="${curX.toFixed(1)}" y="4" width="${Math.max(1, w).toFixed(1)}" height="${barH.toFixed(1)}" fill="${strokeColor}" />`);
+      }
+      curX += w;
+      isBar = !isBar;
+    }
+
+    return `
+      <svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" shape-rendering="crispEdges">
+        <rect width="${width}" height="${height}" fill="${bgColor}" />
+        ${barRects.join('')}
+        ${showText ? `<text x="${width / 2}" y="${height - 2}" text-anchor="middle" font-family="'Courier New', monospace, sans-serif" font-size="9" font-weight="700" fill="${strokeColor}">${esc(text)}</text>` : ''}
+      </svg>
+    `;
+  }
+
  // Delphi Date to formatted string (Delphi float date 45954 -> DD.MM.YYYY)
  function delphiDateToStr(val) {
  if (!val) return '09.02.2024';
@@ -349,6 +494,7 @@ function esc(str) {
  <button type="button" class="designer-palette-btn" id="btnToolAddPicture" title="Yeni Resim / Logo Ekle">Resim</button>
  <button type="button" class="designer-palette-btn" id="btnToolAddLine" title="Yeni Çizgi Ekle">Çizgi</button>
  <button type="button" class="designer-palette-btn" id="btnToolAddBarcode" title="Yeni Barkod Ekle">Barkod</button>
+ <button type="button" class="designer-palette-btn" id="btnToolAddQRCode" title="Yeni QR Kod Ekle">QR Kod</button>
  <button type="button" class="designer-palette-btn" id="btnToolAddShape" title="Yeni Şekil Ekle">Şekil</button>
  <button type="button" class="designer-palette-btn" id="btnToolAddChart" title="Yeni Grafik Ekle">Grafik</button>
  <button type="button" class="designer-palette-btn" id="btnToolAddBand" title="Yeni Bant Ekle">Bant</button>
@@ -1035,6 +1181,33 @@ function esc(str) {
  `;
  }
 
+ // 12. Barkod / Karekod Bileşeni (TfrxBarCodeView, TfrxQRCodeView, TfrxBarcode2DView - FastReport VCL)
+ if (comp.type === 'TfrxBarCodeView' || comp.type === 'TfrxQRCodeView' || comp.type === 'TfrxBarcode2DView') {
+ const barType = String(comp.barType || comp.type || 'bcCode128');
+ const isQr = barType.toLowerCase().includes('qr') || comp.type === 'TfrxQRCodeView';
+ const isPdf417 = barType.toLowerCase().includes('pdf417');
+ const barText = comp.text || comp.expression || comp.dataField || (isQr ? 'https://fast-report.com' : '1234567890');
+ const showText = comp.showText !== false && comp.showText !== 'False' && !isQr;
+ const w = Math.max(20, comp.width || (isQr ? 75 : 130));
+ const h = Math.max(16, comp.height || (isQr ? 75 : 45));
+ const barSvg = renderBarcodeSvg(barType, barText, w, h, showText, textColor, fillBg, isQr, isPdf417);
+
+ return `
+ <div class="fr-view-item fr-barcode-view ${hasEvent ? 'fr-has-event' : ''} ${isSelected ? 'selected' : ''}"
+ data-band-idx="${bIdx}" data-comp-idx="${cIdx}" data-comp-name="${esc(comp.name || '')}"
+ style="
+ left:${comp.left}px; top:${comp.top}px; width:${w}px; height:${h}px;
+ background-color:${fillBg === 'transparent' ? '#ffffff' : fillBg};
+ border:${comp.frameWidth || 1}px solid ${isSelected ? 'var(--accent, #2563eb)' : '#cbd5e1'};
+ border-radius:3px; box-sizing:border-box; overflow:hidden; display:flex; align-items:center; justify-content:center;
+ "
+ title="${esc(comp.name)} [${isQr ? 'QR Kod' : 'Barkod'}: ${esc(barType)}] ${esc(barText)}${eventTitle}">
+ ${barSvg}
+ ${renderResizeHandles(isSelected)}
+ </div>
+ `;
+ }
+
  // 7. Standart TfrxMemoView
  return `
  <div class="fr-view-item ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
@@ -1602,10 +1775,11 @@ function esc(str) {
         { name: 'Picture.File', val: obj.picture || obj.file || '', propKey: 'picture', editable: isDesignEditing },
         { name: 'KeepAspectRatio', val: obj.keepAspectRatio !== false ? 'true' : 'false', propKey: 'keepAspectRatio', isSelect: isDesignEditing, options: ['true', 'false'] }
       );
-    } else if (obj.type === 'TfrxBarCodeView') {
+    } else if (obj.type === 'TfrxBarCodeView' || obj.type === 'TfrxQRCodeView' || obj.type === 'TfrxBarcode2DView') {
       propList.push(
-        { name: 'BarType', val: obj.barType || 'bcCode128', propKey: 'barType', isSelect: isDesignEditing, options: ['bcCode128', 'bcCode39', 'bcEAN13', 'bcUPCA', 'bcQR', 'bcPDF417'] },
+        { name: 'BarType', val: obj.barType || (obj.type === 'TfrxQRCodeView' ? 'bcQR' : 'bcCode128'), propKey: 'barType', isSelect: isDesignEditing, options: ['bcCode128', 'bcCode128A', 'bcCode128B', 'bcCode128C', 'bcCode39', 'bcEAN13', 'bcEAN8', 'bcUPCA', 'bcQR', 'bcPDF417', 'bcCode93', 'bcMSI', 'bcCodabar'] },
         { name: 'Expression', val: obj.expression || obj.text || '', propKey: 'expression', editable: isDesignEditing },
+        { name: 'ShowText', val: obj.showText !== false ? 'true' : 'false', propKey: 'showText', isSelect: isDesignEditing, options: ['true', 'false'] },
         { name: 'Zoom', val: obj.zoom || 1, propKey: 'zoom', isNumber: true, editable: isDesignEditing }
       );
     } else if (obj.type === 'TfrxShapeView') {
@@ -1942,10 +2116,23 @@ function esc(str) {
  type: 'TfrxBarCodeView',
  left: 60,
  top: 30,
- width: 130,
- height: 45,
+ width: 140,
+ height: 50,
  text: '1234567890',
- barType: 'bcCode128'
+ barType: 'bcCode128',
+ showText: true
+ };
+ } else if (type === 'qrcode') {
+ newComp = {
+ name: `QRCode${randomId}`,
+ type: 'TfrxBarCodeView',
+ left: 60,
+ top: 30,
+ width: 75,
+ height: 75,
+ text: 'https://fast-report.com',
+ barType: 'bcQR',
+ showText: false
  };
  } else if (type === 'shape') {
  newComp = {
@@ -2484,6 +2671,7 @@ function esc(str) {
  containerEl.querySelector('#btnToolAddPicture')?.addEventListener('click', () => addNewComponent('picture'));
  containerEl.querySelector('#btnToolAddLine')?.addEventListener('click', () => addNewComponent('line'));
  containerEl.querySelector('#btnToolAddBarcode')?.addEventListener('click', () => addNewComponent('barcode'));
+ containerEl.querySelector('#btnToolAddQRCode')?.addEventListener('click', () => addNewComponent('qrcode'));
  containerEl.querySelector('#btnToolAddShape')?.addEventListener('click', () => addNewComponent('shape'));
  containerEl.querySelector('#btnToolAddChart')?.addEventListener('click', () => addNewComponent('chart'));
  containerEl.querySelector('#btnToolAddBand')?.addEventListener('click', () => addNewComponent('band'));
