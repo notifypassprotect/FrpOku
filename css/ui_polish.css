@@ -1559,3 +1559,185 @@ select:hover {
   .toolbar-left .saved-view-controls { grid-column: 1 / -1; display: flex; flex-wrap: wrap; }
   .saved-view-controls .select-field { flex: 1 1 150px; max-width: none; }
 }
+
+/* Ana liste üst alanı — dengeli, hizalı ve sade masaüstü kabuğu */
+body:has(#workspaceSwitcher) .topbar {
+  min-height: 62px;
+  height: auto;
+  padding: .55rem clamp(.85rem, 1.35vw, 1.45rem);
+  gap: 1.25rem;
+  background: color-mix(in srgb, var(--bg-surface) 94%, transparent);
+  box-shadow: 0 1px 0 var(--ui-border-subtle), 0 5px 18px rgba(15, 23, 42, .035);
+}
+body:has(#workspaceSwitcher) .topbar .brand { min-width: max-content; }
+body:has(#workspaceSwitcher) .topbar .brand > svg { width: 34px; height: 34px; filter: none !important; }
+body:has(#workspaceSwitcher) .topbar-right { margin-left: auto; gap: .38rem; }
+body:has(#workspaceSwitcher) .topbar-right > span[style*="width:1px"] { height: 26px !important; margin-inline: .28rem !important; }
+body:has(#workspaceSwitcher) .topbar-right :is(.btn, .theme-switch-pill, .btn-admin-pending, .btn-logout-compact) {
+  min-height: 36px;
+  height: 36px !important;
+  padding-inline: .72rem;
+  border: 1px solid var(--ui-border-subtle) !important;
+  border-radius: 9px !important;
+  background: var(--bg-surface) !important;
+  color: var(--text-secondary) !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .035) !important;
+  font-size: .78rem !important;
+  font-weight: 680 !important;
+  line-height: 1;
+  white-space: nowrap;
+}
+body:has(#workspaceSwitcher) .topbar-right :is(.btn, .theme-switch-pill, .btn-admin-pending, .btn-logout-compact):hover {
+  color: var(--text-primary) !important;
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--border)) !important;
+  background: color-mix(in srgb, var(--accent) 4%, var(--bg-surface)) !important;
+  transform: translateY(-1px);
+}
+body:has(#workspaceSwitcher) .topbar-right :is(#btnDashboardPanel, #dropdownAddReports > .btn) {
+  color: #fff !important;
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 3px 9px color-mix(in srgb, var(--accent) 20%, transparent) !important;
+}
+body:has(#workspaceSwitcher) .topbar-right .btn-analytics {
+  color: #92400e !important;
+  background: color-mix(in srgb, #f59e0b 9%, var(--bg-surface)) !important;
+  border-color: color-mix(in srgb, #f59e0b 36%, var(--border)) !important;
+}
+body:has(#workspaceSwitcher) #btnUserProfile { max-width: 190px; overflow: hidden; text-overflow: ellipsis; }
+
+body:has(#workspaceSwitcher) .workspace-bar {
+  min-height: 58px;
+  padding: .62rem clamp(.85rem, 1.35vw, 1.45rem) !important;
+  gap: .8rem;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--ui-border-subtle) !important;
+}
+body:has(#workspaceSwitcher) .workspace-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--ui-border-subtle);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--bg-raised) 78%, var(--bg-surface));
+  box-shadow: inset 0 1px 1px rgba(15, 23, 42, .025);
+}
+body:has(#workspaceSwitcher) #workspaceSwitcher .workspace-tab-btn {
+  min-height: 36px;
+  padding: .45rem .88rem;
+  gap: .48rem;
+  border: 0 !important;
+  border-radius: 8px;
+  background: transparent !important;
+  color: var(--text-secondary) !important;
+  box-shadow: none !important;
+  font-size: .78rem;
+  font-weight: 680;
+}
+body:has(#workspaceSwitcher) #workspaceSwitcher .workspace-tab-btn:hover {
+  color: var(--text-primary) !important;
+  background: color-mix(in srgb, var(--bg-surface) 75%, transparent) !important;
+}
+body:has(#workspaceSwitcher) #workspaceSwitcher .workspace-tab-btn.active {
+  color: var(--accent) !important;
+  background: var(--bg-surface) !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .09), inset 0 -2px 0 color-mix(in srgb, var(--accent) 75%, transparent) !important;
+}
+body:has(#workspaceSwitcher) .pool-count-badge {
+  min-width: 20px;
+  height: 20px;
+  padding-inline: .38rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-muted) 10%, var(--bg-raised));
+  color: var(--text-muted);
+  font-size: .68rem;
+  font-variant-numeric: tabular-nums;
+}
+body:has(#workspaceSwitcher) .workspace-tab-btn.active .pool-count-badge { color: var(--accent); background: color-mix(in srgb, var(--accent) 11%, var(--bg-surface)); }
+body:has(#workspaceSwitcher) .workspace-sync-controls { margin-left: auto; gap: .72rem; }
+body:has(#workspaceSwitcher) .report-sync-status { font-size: .72rem; font-weight: 620; }
+body:has(#workspaceSwitcher) #btnSyncCloudReports {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .42rem;
+  min-height: 36px;
+  padding: .42rem .78rem;
+  border: 1px solid var(--ui-border-subtle);
+  border-radius: 9px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .035);
+  font-size: .75rem;
+  font-weight: 680;
+}
+body:has(#workspaceSwitcher) #btnSyncCloudReports:hover { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+
+body:has(#workspaceSwitcher) .toolbar {
+  min-height: 58px;
+  padding: .58rem clamp(.85rem, 1.35vw, 1.45rem) !important;
+  gap: .7rem;
+  background: color-mix(in srgb, var(--bg-raised) 52%, var(--bg-surface));
+  border-bottom: 1px solid var(--ui-border-subtle) !important;
+}
+body:has(#workspaceSwitcher) .toolbar-left { gap: .42rem; flex-wrap: nowrap; }
+body:has(#workspaceSwitcher) .toolbar :is(.search-wrap, .select-field, .filter-chip, .saved-view-controls .btn) {
+  height: 36px;
+  min-height: 36px;
+  border-width: 1px;
+  border-color: var(--ui-border-subtle);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  box-shadow: none;
+}
+body:has(#workspaceSwitcher) .toolbar .search-wrap { flex: 1 1 270px; min-width: 220px; max-width: 410px; }
+body:has(#workspaceSwitcher) .toolbar .select-field { min-width: 120px; max-width: 165px; padding-inline: .72rem; }
+body:has(#workspaceSwitcher) .toolbar :is(.filter-chip, .saved-view-controls .btn) { padding-inline: .7rem; color: var(--text-secondary); font-size: .74rem; font-weight: 650; }
+body:has(#workspaceSwitcher) .toolbar :is(.select-field, .filter-chip, .saved-view-controls .btn):hover { border-color: color-mix(in srgb, var(--accent) 28%, var(--border)); color: var(--text-primary); }
+body:has(#workspaceSwitcher) .toolbar-right { margin-left: auto; padding-left: .3rem; }
+body:has(#workspaceSwitcher) .view-mode-toggle {
+  height: 38px;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--ui-border-subtle);
+  border-radius: 10px;
+  background: var(--bg-surface);
+}
+body:has(#workspaceSwitcher) #viewModeToggle .view-btn {
+  min-height: 30px;
+  padding: .35rem .72rem;
+  border: 0 !important;
+  border-radius: 7px;
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  box-shadow: none !important;
+  font-size: .72rem;
+  font-weight: 680;
+}
+body:has(#workspaceSwitcher) #viewModeToggle .view-btn.active { color: var(--accent) !important; background: color-mix(in srgb, var(--accent) 9%, var(--bg-surface)) !important; }
+body:has(#workspaceSwitcher) #resultCount { min-height: 34px; display: inline-flex; align-items: center; padding-inline: .68rem; font-size: .72rem; }
+
+@media (min-width: 769px) and (max-width: 1480px) {
+  body:has(#workspaceSwitcher) .topbar { align-items: flex-start; }
+  body:has(#workspaceSwitcher) .topbar-right { flex-wrap: wrap; justify-content: flex-end; }
+  body:has(#workspaceSwitcher) .toolbar { align-items: flex-start; }
+  body:has(#workspaceSwitcher) .toolbar-left { flex-wrap: wrap; }
+}
+
+@media (max-width: 768px) {
+  body:has(#workspaceSwitcher) .topbar { min-height: 56px; padding: .55rem .75rem; align-items: center; }
+  body:has(#workspaceSwitcher) .topbar .brand > svg { width: 32px; height: 32px; }
+  body:has(#workspaceSwitcher) .workspace-bar { padding: .55rem .75rem !important; }
+  body:has(#workspaceSwitcher) .workspace-switcher { width: 100%; overflow-x: auto; }
+  body:has(#workspaceSwitcher) #workspaceSwitcher .workspace-tab-btn { min-width: max-content; flex: 1 0 auto; }
+  body:has(#workspaceSwitcher) .workspace-sync-controls { margin-left: 0; }
+  body:has(#workspaceSwitcher) .toolbar { padding: .55rem .75rem !important; }
+  body:has(#workspaceSwitcher) .toolbar-left { display: grid; gap: .42rem; }
+  body:has(#workspaceSwitcher) .toolbar :is(.search-wrap, .select-field, .filter-chip, .saved-view-controls .btn) { min-height: 40px; height: 40px; }
+  body:has(#workspaceSwitcher) .toolbar-right { width: 100%; padding-left: 0; }
+}
