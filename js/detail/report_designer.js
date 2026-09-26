@@ -449,6 +449,9 @@ function esc(str) {
  let inspectorTab = 'properties'; // 'properties' | 'events' | 'favorites'
  let inspectorWidth = parseInt(localStorage.getItem('frp_inspector_width') || '330', 10);
  let designerKeydownHandler = null;
+ let designerClipboard = [];
+ let activeCanvasGestureCleanup = null;
+ const INTERACTIVE_ITEM_SELECTOR = '.fr-view-item,.fr-ctrl-item:not(.fr-ctrl-tabsheet)';
 
  const toDesignerNumber = (value, fallback = 0) => {
    const parsed = Number.parseFloat(String(value ?? '').replace(',', '.'));
@@ -581,6 +584,7 @@ function esc(str) {
   }
 
  function render() {
+ if (activeCanvasGestureCleanup) activeCanvasGestureCleanup();
  if (allPages.length === 0) {
  containerEl.innerHTML = `
  <div style="padding:3rem;text-align:center;color:var(--text-muted);">
@@ -676,6 +680,8 @@ function esc(str) {
  <button type="button" class="designer-palette-btn" id="btnToolAddCombobox" title="Yeni Açılır Liste Ekle">Combo</button>
  <button type="button" class="designer-palette-btn" id="btnToolAddPanel" title="Yeni Panel Ekle">Panel</button>
  <button type="button" class="designer-palette-btn" id="btnDuplicateSelected" title="Seçili bileşenleri çoğalt (Ctrl+D)">Çoğalt</button>
+ <button type="button" class="designer-palette-btn" id="btnCopySelected" title="Seçili bileşenleri kopyala (Ctrl+C)">Kopyala</button>
+ <button type="button" class="designer-palette-btn" id="btnPasteSelected" title="Kopyalanan bileşenleri yapıştır (Ctrl+V)" ${designerClipboard.length ? '' : 'disabled'}>Yapıştır</button>
  <button type="button" class="designer-palette-btn" id="btnBringToFront" title="Seçimi en öne getir">Öne Getir</button>
  <button type="button" class="designer-palette-btn" id="btnSendToBack" title="Seçimi en arkaya gönder">Arkaya Gönder</button>
  <button type="button" class="designer-palette-btn danger" id="btnToolDeleteSelected" title="Seçili Bileşeni Sil (Delete)">Sil</button>
@@ -693,6 +699,8 @@ function esc(str) {
  <div class="fr-align-sep"></div>
  <button type="button" class="fr-align-btn" id="btnDistributeH" title="Yatayda Eşit Dağıt">⬌ Dağıt</button>
  <button type="button" class="fr-align-btn" id="btnDistributeV" title="Dikeyde Eşit Dağıt">⬍ Dağıt</button>
+ <button type="button" class="fr-align-btn" id="btnSameWidth" title="Aynı genişlik">Eşit W</button>
+ <button type="button" class="fr-align-btn" id="btnSameHeight" title="Aynı yükseklik">Eşit H</button>
  <div class="fr-align-sep"></div>
  <button type="button" class="fr-align-btn" id="btnMultiDuplicate" title="Seçilileri çoğalt">Çoğalt</button>
  <button type="button" class="fr-align-btn" id="btnMultiFront" title="Seçilileri en öne getir">Öne</button>
@@ -708,6 +716,7 @@ function esc(str) {
  <button type="button" class="designer-zoom-btn" id="btnZoomOut" title="Küçült">−</button>
  <span class="designer-zoom-val" id="zoomValText">${Math.round(currentZoom * 100)}%</span>
  <button type="button" class="designer-zoom-btn" id="btnZoomIn" title="Büyüt">+</button>
+ <button type="button" class="designer-zoom-btn" id="btnZoomReset" title="Yakınlaştırmayı yüzde 100 yap">100%</button>
  <button type="button" class="designer-zoom-btn" id="btnZoomFit" title="Sayfaya Sığdır" style="margin-left:.25rem;font-size:.75rem;">Sığdır</button>
  <button type="button" class="designer-zoom-btn ${showRulers ? 'active' : ''}" id="btnToggleRulers" title="Cetvelleri göster veya gizle" style="margin-left:.25rem;font-size:.75rem;padding:0 8px;">Cetvel</button>
  <button type="button" class="designer-zoom-btn ${gridSnapStep > 1 ? 'active' : ''}" id="btnToggleGridSnap" title="Izgaraya yapışma: 4 / 8 / 12 px. Sürüklerken Alt ile geçici olarak kapatın." style="margin-left:.25rem;font-size:.75rem;padding:0 8px;">Izgara · ${gridSnapStep > 1 ? gridSnapStep + ' px' : 'Serbest'}</button>
@@ -811,6 +820,10 @@ function esc(str) {
  <div class="designer-status-cell" id="statusCompPath" style="font-weight:600;color:var(--text-primary);">
  ${renderStatusCompPath(selectedItem, activePage)}
  </div>
+ ${(currentMode === 'designer' && isDesignEditing) ? `
+ <div class="designer-status-cell designer-shortcut-hint" title="Tasarım klavye kısayolları">
+ Taşı: yön tuşları · Boyut: Ctrl+yön · Hassas: Alt · Eksen kilidi: Shift
+ </div>` : ''}
  </div>
 
  </div>
@@ -931,11 +944,11 @@ function esc(str) {
     let totalBandsHeight = 0;
 
     horizontalBands.forEach(b => {
-      let maxCompBottom = b.height > 0 ? b.height : 25;
+      let maxCompBottom = toDesignerNumber(b.height, 25) > 0 ? toDesignerNumber(b.height, 25) : 25;
       (b.components || []).forEach(c => {
-        const bottom = (c.top || 0) + (c.height || 0);
+        const bottom = toDesignerNumber(c.top) + toDesignerNumber(c.height);
         if (bottom > maxCompBottom) maxCompBottom = bottom;
-        const r = (c.left || 0) + (c.width || 0);
+        const r = toDesignerNumber(c.left) + toDesignerNumber(c.width);
         if (r > maxCompRight) maxCompRight = r;
       });
       const bHeight = Math.ceil(maxCompBottom);
@@ -963,9 +976,9 @@ function esc(str) {
  const bandsHtml = horizontalBands.map((band) => {
  const bIdx = (page.bands || []).indexOf(band);
  const meta = BAND_META[band.type] || { label: band.type, icon: '', class: 'fr-band-header-type' };
- let maxCompBottom = band.height > 0? band.height: 25;
+ let maxCompBottom = toDesignerNumber(band.height, 25) > 0? toDesignerNumber(band.height, 25): 25;
  (band.components || []).forEach(c => {
- const bottom = (c.top || 0) + (c.height || 0);
+ const bottom = toDesignerNumber(c.top) + toDesignerNumber(c.height);
  if (bottom > maxCompBottom) maxCompBottom = bottom;
  });
  const bHeight = Math.ceil(maxCompBottom);
@@ -1538,11 +1551,15 @@ function esc(str) {
  function renderDialogControlItem(ctrl, cIdx, parentOffsetLeft = 0, parentOffsetTop = 0) {
  const isSelected = selectedItem && selectedItem.name === ctrl.name;
  const fontName = safeFontFamily(ctrl.fontName, 'Segoe UI');
- const fontSize = ctrl.fontSize || 11;
+ const fontSize = toDesignerNumber(ctrl.fontSize, 11);
  const isBold = ctrl.fontStyle === '1' || String(ctrl.fontStyle).includes('fsBold');
 
- const leftPos = (ctrl.left || 0) + parentOffsetLeft;
- const topPos = (ctrl.top || 0) + parentOffsetTop;
+ const ctrlLeft = toDesignerNumber(ctrl.left);
+ const ctrlTop = toDesignerNumber(ctrl.top);
+ const ctrlWidth = toDesignerNumber(ctrl.width, 100);
+ const ctrlHeight = toDesignerNumber(ctrl.height, 24);
+ const leftPos = ctrlLeft + toDesignerNumber(parentOffsetLeft);
+ const topPos = ctrlTop + toDesignerNumber(parentOffsetTop);
 
  // Event Kontrolü (DialogPage kontrollerinde kırmızı ok/üçgen - Image 3 & 4)
  const hasEvent = Boolean(ctrl.onClick || ctrl.onBeforePrint || ctrl.onChange || ctrl.onEnter || ctrl.onExit || ctrl.onKeyDown || (ctrl.rawAttrs && /\bOn[A-Z]\w+=/i.test(ctrl.rawAttrs)));
@@ -1550,21 +1567,21 @@ function esc(str) {
 
  // 1. GroupBox Kontrolü (TfrxGroupBoxControl)
  if (ctrl.type === 'TfrxGroupBoxControl') {
- let maxChildBottom = ctrl.height || 40;
- let maxChildRight = ctrl.width || 100;
+ let maxChildBottom = ctrlHeight || 40;
+ let maxChildRight = ctrlWidth || 100;
  (ctrl.children || []).forEach(ch => {
- const b = (ch.top || 0) + (ch.height || 0);
- const r = (ch.left || 0) + (ch.width || 0);
+ const b = toDesignerNumber(ch.top) + toDesignerNumber(ch.height);
+ const r = toDesignerNumber(ch.left) + toDesignerNumber(ch.width);
  if (b > maxChildBottom) maxChildBottom = b;
  if (r > maxChildRight) maxChildRight = r;
  });
- const gbWidth = Math.max(ctrl.width || 100, Math.ceil(maxChildRight + 10));
- const gbHeight = Math.max(ctrl.height || 40, Math.ceil(maxChildBottom + 10));
+ const gbWidth = Math.max(ctrlWidth || 100, Math.ceil(maxChildRight + 10));
+ const gbHeight = Math.max(ctrlHeight || 40, Math.ceil(maxChildBottom + 10));
 
  const childHtml = (ctrl.children || []).map((ch, idx) => renderDialogControlItem(ch, `${cIdx}_${idx}`, 0, 0)).join('');
  return `
  <fieldset class="fr-ctrl-item fr-ctrl-groupbox ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
- data-ctrl-idx="${cIdx}"
+ data-ctrl-idx="${cIdx}" data-comp-name="${esc(ctrl.name || '')}"
  style="
  left:${leftPos}px;
  top:${topPos}px;
@@ -1587,12 +1604,12 @@ function esc(str) {
  const childHtml = (ctrl.children || []).map((ch, idx) => renderDialogControlItem(ch, `${cIdx}_${idx}`, 0, 0)).join('');
  return `
  <div class="fr-ctrl-item fr-ctrl-panel ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
- data-ctrl-idx="${cIdx}"
+ data-ctrl-idx="${cIdx}" data-comp-name="${esc(ctrl.name || '')}"
  style="
  left:${leftPos}px;
  top:${topPos}px;
- width:${ctrl.width}px;
- height:${ctrl.height}px;
+ width:${ctrlWidth}px;
+ height:${ctrlHeight}px;
  font-family:${fontName}, Tahoma, sans-serif;
  font-size:${fontSize}px;
  border: 1px solid rgba(0,0,0,0.18);
@@ -1624,7 +1641,7 @@ function esc(str) {
  const tabBodyHtml = tabs.map((tab, tIdx) => {
  let maxTabBottom = 100;
  (tab.children || []).forEach(ch => {
- const b = (ch.top || 0) + (ch.height || 0);
+ const b = toDesignerNumber(ch.top) + toDesignerNumber(ch.height);
  if (b > maxTabBottom) maxTabBottom = b;
  });
  const childHtml = (tab.children || []).map((ch, idx) => renderDialogControlItem(ch, `${cIdx}_${tIdx}_${idx}`, 0, 0)).join('');
@@ -1639,12 +1656,12 @@ function esc(str) {
  return `
  <div class="fr-ctrl-item fr-ctrl-pagecontrol ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
  id="pc_${cIdx}"
- data-ctrl-idx="${cIdx}"
+ data-ctrl-idx="${cIdx}" data-comp-name="${esc(ctrl.name || '')}"
  style="
  left:${leftPos}px;
  top:${topPos}px;
- width:${ctrl.width}px;
- height:${ctrl.height}px;
+ width:${ctrlWidth}px;
+ height:${ctrlHeight}px;
  font-family:${fontName}, Tahoma, sans-serif;
  font-size:${fontSize}px;
  box-sizing: border-box;
@@ -1666,6 +1683,7 @@ function esc(str) {
  const childHtml = (ctrl.children || []).map((ch, idx) => renderDialogControlItem(ch, `${cIdx}_${idx}`, 0, 0)).join('');
  return `
  <div class="fr-ctrl-item fr-ctrl-tabsheet"
+ data-comp-name="${esc(ctrl.name || '')}" data-designer-passive="true"
  style="position:relative;width:100%;height:100%;">
  ${childHtml}
  </div>
@@ -1676,12 +1694,12 @@ function esc(str) {
  if (ctrl.type === 'TfrxRadioButtonControl') {
  return `
  <div class="fr-ctrl-item fr-ctrl-radio ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
- data-ctrl-idx="${cIdx}"
+ data-ctrl-idx="${cIdx}" data-comp-name="${esc(ctrl.name || '')}"
  style="
  left:${leftPos}px;
  top:${topPos}px;
- width:${ctrl.width}px;
- height:${ctrl.height}px;
+ width:${ctrlWidth}px;
+ height:${ctrlHeight}px;
  font-family:${fontName}, Tahoma, sans-serif;
  font-size:${fontSize}px;
  display: inline-flex;
@@ -1701,12 +1719,12 @@ function esc(str) {
  if (ctrl.type === 'TfrxLabelControl') {
  return `
  <div class="fr-ctrl-item fr-ctrl-label ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
- data-ctrl-idx="${cIdx}"
+ data-ctrl-idx="${cIdx}" data-comp-name="${esc(ctrl.name || '')}"
  style="
  left:${leftPos}px;
  top:${topPos}px;
- width:${ctrl.width}px;
- height:${ctrl.height}px;
+ width:${ctrlWidth}px;
+ height:${ctrlHeight}px;
  font-family:${fontName}, Tahoma, sans-serif;
  font-size:${fontSize}px;
  font-weight:${isBold? '700': '600'};
@@ -1726,12 +1744,12 @@ function esc(str) {
  if (ctrl.type === 'TfrxButtonControl' || ctrl.type === 'TfrxBitBtnControl') {
  return `
  <div class="fr-ctrl-item fr-ctrl-button ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
- data-ctrl-idx="${cIdx}"
+ data-ctrl-idx="${cIdx}" data-comp-name="${esc(ctrl.name || '')}"
  style="
  left:${leftPos}px;
  top:${topPos}px;
- width:${ctrl.width}px;
- height:${ctrl.height}px;
+ width:${ctrlWidth}px;
+ height:${ctrlHeight}px;
  font-family:${fontName}, Tahoma, sans-serif;
  font-size:${fontSize}px;
  "
@@ -1746,12 +1764,12 @@ function esc(str) {
  const dateStr = delphiDateToStr(ctrl.date);
  return `
  <div class="fr-ctrl-item fr-ctrl-dateedit ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
- data-ctrl-idx="${cIdx}"
+ data-ctrl-idx="${cIdx}" data-comp-name="${esc(ctrl.name || '')}"
  style="
  left:${leftPos}px;
  top:${topPos}px;
- width:${ctrl.width}px;
- height:${ctrl.height}px;
+ width:${ctrlWidth}px;
+ height:${ctrlHeight}px;
  font-family:${fontName}, Tahoma, sans-serif;
  font-size:${fontSize}px;
  "
@@ -1766,12 +1784,12 @@ function esc(str) {
  if (ctrl.type === 'TfrxCheckBoxControl') {
  return `
  <div class="fr-ctrl-item fr-ctrl-checkbox ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
- data-ctrl-idx="${cIdx}"
+ data-ctrl-idx="${cIdx}" data-comp-name="${esc(ctrl.name || '')}"
  style="
  left:${leftPos}px;
  top:${topPos}px;
- width:${ctrl.width}px;
- height:${ctrl.height}px;
+ width:${ctrlWidth}px;
+ height:${ctrlHeight}px;
  font-family:${fontName}, Tahoma, sans-serif;
  font-size:${fontSize}px;
  display: inline-flex;
@@ -1790,12 +1808,12 @@ function esc(str) {
  if (ctrl.type === 'TfrxComboBoxControl') {
  return `
  <div class="fr-ctrl-item fr-ctrl-combobox ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
- data-ctrl-idx="${cIdx}"
+ data-ctrl-idx="${cIdx}" data-comp-name="${esc(ctrl.name || '')}"
  style="
  left:${leftPos}px;
  top:${topPos}px;
- width:${ctrl.width}px;
- height:${ctrl.height}px;
+ width:${ctrlWidth}px;
+ height:${ctrlHeight}px;
  font-family:${fontName}, Tahoma, sans-serif;
  font-size:${fontSize}px;
  "
@@ -1810,12 +1828,12 @@ function esc(str) {
  if (ctrl.type === 'TfrxDBCheckListBoxControl' || ctrl.type === 'TfrxListBoxControl' || ctrl.type === 'TfrxCheckListBoxControl') {
  return `
  <div class="fr-ctrl-item fr-ctrl-checklistbox ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
- data-ctrl-idx="${cIdx}"
+ data-ctrl-idx="${cIdx}" data-comp-name="${esc(ctrl.name || '')}"
  style="
  left:${leftPos}px;
  top:${topPos}px;
- width:${ctrl.width}px;
- height:${ctrl.height}px;
+ width:${ctrlWidth}px;
+ height:${ctrlHeight}px;
  font-family:${fontName}, Tahoma, sans-serif;
  font-size:${fontSize}px;
  "
@@ -1842,12 +1860,12 @@ function esc(str) {
  // Standart Edit Control
  return `
  <div class="fr-ctrl-item fr-ctrl-edit ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
- data-ctrl-idx="${cIdx}"
+ data-ctrl-idx="${cIdx}" data-comp-name="${esc(ctrl.name || '')}"
  style="
  left:${leftPos}px;
  top:${topPos}px;
- width:${ctrl.width}px;
- height:${ctrl.height}px;
+ width:${ctrlWidth}px;
+ height:${ctrlHeight}px;
  font-family:${fontName}, Tahoma, sans-serif;
  font-size:${fontSize}px;
  "
@@ -1863,11 +1881,13 @@ function esc(str) {
  let maxCtrlBottom = dialog.height || 240;
 
  function measureCtrl(c, pL = 0, pT = 0) {
- const r = (c.left || 0) + (c.width || 0) + pL;
- const b = (c.top || 0) + (c.height || 0) + pT;
+ const left = toDesignerNumber(c.left);
+ const top = toDesignerNumber(c.top);
+ const r = left + toDesignerNumber(c.width) + toDesignerNumber(pL);
+ const b = top + toDesignerNumber(c.height) + toDesignerNumber(pT);
  if (r > maxCtrlRight) maxCtrlRight = r;
  if (b > maxCtrlBottom) maxCtrlBottom = b;
- (c.children || []).forEach(ch => measureCtrl(ch, (c.left || 0) + pL, (c.top || 0) + pT));
+ (c.children || []).forEach(ch => measureCtrl(ch, left + toDesignerNumber(pL), top + toDesignerNumber(pT)));
  }
 
  (dialog.controls || []).forEach(c => measureCtrl(c));
@@ -2215,6 +2235,7 @@ function esc(str) {
 
  function undo() {
  if (!isDesignEditing || undoStack.length <= 1) return;
+ const selectedNames = new Set((selectedItems.length ? selectedItems : (selectedItem ? [selectedItem] : [])).map(item => item?.name).filter(Boolean));
  const cur = undoStack.pop();
  redoStack.push(cur);
  const prevStr = undoStack[undoStack.length - 1];
@@ -2222,7 +2243,10 @@ function esc(str) {
  allPages.forEach((p, idx) => {
  if (prevData[idx]) p.data = prevData[idx];
  });
+ selectedItems = getPageComponents().filter(item => selectedNames.has(item.name));
+ selectedItem = selectedItems[selectedItems.length - 1] || null;
  renderCanvasOnly();
+ updateSelection();
  updateUndoRedoButtonStates();
  if (window.FrpNotify) window.FrpNotify.info('İşlem geri alındı (Undo) ↩️');
  else if (typeof toast === 'function') toast('İşlem geri alındı ↩️', 'info');
@@ -2230,13 +2254,17 @@ function esc(str) {
 
  function redo() {
  if (!isDesignEditing || redoStack.length === 0) return;
+ const selectedNames = new Set((selectedItems.length ? selectedItems : (selectedItem ? [selectedItem] : [])).map(item => item?.name).filter(Boolean));
  const nextStr = redoStack.pop();
  undoStack.push(nextStr);
  const nextData = JSON.parse(nextStr);
  allPages.forEach((p, idx) => {
  if (nextData[idx]) p.data = nextData[idx];
  });
+ selectedItems = getPageComponents().filter(item => selectedNames.has(item.name));
+ selectedItem = selectedItems[selectedItems.length - 1] || null;
  renderCanvasOnly();
+ updateSelection();
  updateUndoRedoButtonStates();
  if (window.FrpNotify) window.FrpNotify.info('İşlem ileri alındı (Redo) ↪️');
  else if (typeof toast === 'function') toast('İşlem ileri alındı ↪️', 'info');
@@ -2254,6 +2282,7 @@ function esc(str) {
  const vp = containerEl.querySelector('#designerViewport');
  const activePage = allPages[activePageIndex];
  if (vp && activePage) {
+ if (activeCanvasGestureCleanup) activeCanvasGestureCleanup();
  vp.innerHTML = activePage.type === 'report'? renderReportPageHtml(activePage.data): renderDialogPageHtml(activePage.data);
  bindCanvasInteraction();
  }
@@ -2271,6 +2300,21 @@ function esc(str) {
        visit(page.data.controls || []);
      }
    });
+ }
+
+ function getPageComponents(page = allPages[activePageIndex]) {
+   const components = [];
+   if (!page) return components;
+   if (page.type === 'report') {
+     (page.data.bands || []).forEach(band => components.push(...(band.components || [])));
+   } else {
+     const visit = controls => (controls || []).forEach(control => {
+       if (control.type !== 'TfrxTabSheet') components.push(control);
+       visit(control.children || []);
+     });
+     visit(page.data.controls || []);
+   }
+   return components;
  }
 
  function getDesignerObjectNames() {
@@ -2331,6 +2375,17 @@ function esc(str) {
    return null;
  }
 
+ function groupComponentsByCollection(components) {
+   const groups = new Map();
+   (components || []).forEach(component => {
+     const location = findComponentCollection(component);
+     if (!location) return;
+     if (!groups.has(location.items)) groups.set(location.items, []);
+     groups.get(location.items).push(component);
+   });
+   return groups;
+ }
+
  function getElementBounds(el) {
    const parent = el?.parentElement;
    if (!parent) return { width: Infinity, height: Infinity };
@@ -2342,7 +2397,7 @@ function esc(str) {
 
  function clampComponentGeometry(comp, bounds, options = {}) {
    const minWidth = options.minWidth || 12;
-   const minHeight = options.minHeight || 8;
+   const minHeight = options.minHeight || (comp?.type === 'TfrxLineView' ? 2 : 8);
    comp.width = Math.max(minWidth, toDesignerNumber(comp.width, 100));
    comp.height = Math.max(minHeight, toDesignerNumber(comp.height, 30));
    if (Number.isFinite(bounds.width)) comp.width = Math.min(comp.width, Math.max(minWidth, bounds.width));
@@ -2363,7 +2418,7 @@ function esc(str) {
 
  function findElementForComponent(comp) {
    if (!comp) return null;
-   return [...containerEl.querySelectorAll('.fr-view-item,.fr-ctrl-item')].find(el => {
+   return [...containerEl.querySelectorAll(INTERACTIVE_ITEM_SELECTOR)].find(el => {
      if (el.dataset.compName) return el.dataset.compName === comp.name;
      return getCompFromElement(el) === comp;
    }) || null;
@@ -2601,8 +2656,14 @@ function esc(str) {
  if (activePage.type === 'report') {
  const bands = activePage.data.bands || [];
  if (bands.length > 0) {
- if (!bands[0].components) bands[0].components = [];
- bands[0].components.push(newComp);
+ let targetBand = bands[0];
+ if (selectedItem) {
+   const selectedLocation = findComponentCollection(selectedItem);
+   if (selectedLocation?.band) targetBand = selectedLocation.band;
+   else if (bands.includes(selectedItem)) targetBand = selectedItem;
+ }
+ if (!targetBand.components) targetBand.components = [];
+ targetBand.components.push(newComp);
  } else {
  activePage.data.bands = [{
  name: 'MasterData1',
@@ -2643,22 +2704,8 @@ function esc(str) {
 
  pushUndoState();
 
- let deleted = false;
- if (activePage.type === 'report') {
- (activePage.data.bands || []).forEach(b => {
- const idx = (b.components || []).findIndex(c => c.name === selectedItem.name);
- if (idx!== -1) {
- b.components.splice(idx, 1);
- deleted = true;
- }
- });
- } else {
- const idx = (activePage.data.controls || []).findIndex(c => c.name === selectedItem.name);
- if (idx!== -1) {
- activePage.data.controls.splice(idx, 1);
- deleted = true;
- }
- }
+ const location = findComponentCollection(selectedItem);
+ const deleted = Boolean(location && location.items.splice(location.index, 1).length);
 
  if (deleted) {
  const delName = selectedItem.name;
@@ -2677,23 +2724,13 @@ function esc(str) {
    if (!activePage) return;
    pushUndoState();
 
-   const namesToDelete = new Set(selectedItems.map(c => c.name).filter(Boolean));
    let deletedCount = 0;
-
-   if (activePage.type === 'report') {
-     (activePage.data.bands || []).forEach(b => {
-       if (!b.components) return;
-       const initialLen = b.components.length;
-       b.components = b.components.filter(c => !namesToDelete.has(c.name));
-       deletedCount += (initialLen - b.components.length);
-     });
-   } else {
-     if (activePage.data.controls) {
-       const initialLen = activePage.data.controls.length;
-       activePage.data.controls = activePage.data.controls.filter(c => !namesToDelete.has(c.name));
-       deletedCount += (initialLen - activePage.data.controls.length);
-     }
-   }
+   groupComponentsByCollection(selectedItems).forEach((targets, items) => {
+     const targetSet = new Set(targets);
+     const kept = items.filter(item => !targetSet.has(item));
+     deletedCount += items.length - kept.length;
+     items.splice(0, items.length, ...kept);
+   });
 
    selectedItems = [];
    selectedItem = null;
@@ -2706,75 +2743,56 @@ function esc(str) {
  function alignSelected(type) {
    if (!isDesignEditing || !selectedItems || selectedItems.length < 2) return;
    pushUndoState();
+   let changed = false;
+   groupComponentsByCollection(selectedItems).forEach(group => {
+     if (group.length < 2) return;
+     const left = c => toDesignerNumber(c.left);
+     const top = c => toDesignerNumber(c.top);
+     const width = c => toDesignerNumber(c.width, 100);
+     const height = c => toDesignerNumber(c.height, 30);
+     if (type === 'left') {
+       const value = Math.min(...group.map(left));
+       group.forEach(c => { c.left = value; });
+     } else if (type === 'center') {
+       const value = (Math.min(...group.map(left)) + Math.max(...group.map(c => left(c) + width(c)))) / 2;
+       group.forEach(c => { c.left = Math.round(value - width(c) / 2); });
+     } else if (type === 'right') {
+       const value = Math.max(...group.map(c => left(c) + width(c)));
+       group.forEach(c => { c.left = value - width(c); });
+     } else if (type === 'top') {
+       const value = Math.min(...group.map(top));
+       group.forEach(c => { c.top = value; });
+     } else if (type === 'middle') {
+       const value = (Math.min(...group.map(top)) + Math.max(...group.map(c => top(c) + height(c)))) / 2;
+       group.forEach(c => { c.top = Math.round(value - height(c) / 2); });
+     } else if (type === 'bottom') {
+       const value = Math.max(...group.map(c => top(c) + height(c)));
+       group.forEach(c => { c.top = value - height(c); });
+     } else if (type === 'sameWidth') {
+       const value = width(selectedItem && group.includes(selectedItem) ? selectedItem : group[0]);
+       group.forEach(c => { c.width = value; });
+     } else if (type === 'sameHeight') {
+       const value = height(selectedItem && group.includes(selectedItem) ? selectedItem : group[0]);
+       group.forEach(c => { c.height = value; });
+     } else if (type === 'distributeH' && group.length >= 3) {
+       const sorted = [...group].sort((a, b) => left(a) - left(b));
+       const start = left(sorted[0]);
+       const span = left(sorted.at(-1)) + width(sorted.at(-1)) - start;
+       const gap = Math.max(0, span - sorted.reduce((sum, c) => sum + width(c), 0)) / (sorted.length - 1);
+       let cursor = start;
+       sorted.forEach(c => { c.left = Math.round(cursor); cursor += width(c) + gap; });
+     } else if (type === 'distributeV' && group.length >= 3) {
+       const sorted = [...group].sort((a, b) => top(a) - top(b));
+       const start = top(sorted[0]);
+       const span = top(sorted.at(-1)) + height(sorted.at(-1)) - start;
+       const gap = Math.max(0, span - sorted.reduce((sum, c) => sum + height(c), 0)) / (sorted.length - 1);
+       let cursor = start;
+       sorted.forEach(c => { c.top = Math.round(cursor); cursor += height(c) + gap; });
+     } else return;
+     changed = true;
+   });
 
-   if (type === 'left') {
-     const minLeft = Math.min(...selectedItems.map(c => Number(c.left) || 0));
-     selectedItems.forEach(c => { c.left = minLeft; });
-   } else if (type === 'center') {
-     const minLeft = Math.min(...selectedItems.map(c => Number(c.left) || 0));
-     const maxRight = Math.max(...selectedItems.map(c => (Number(c.left) || 0) + (Number(c.width) || 0)));
-     const midX = (minLeft + maxRight) / 2;
-     selectedItems.forEach(c => {
-       const w = Number(c.width) || 0;
-       c.left = Math.round(midX - w / 2);
-     });
-   } else if (type === 'right') {
-     const maxRight = Math.max(...selectedItems.map(c => (Number(c.left) || 0) + (Number(c.width) || 0)));
-     selectedItems.forEach(c => {
-       const w = Number(c.width) || 0;
-       c.left = maxRight - w;
-     });
-   } else if (type === 'top') {
-     const minTop = Math.min(...selectedItems.map(c => Number(c.top) || 0));
-     selectedItems.forEach(c => { c.top = minTop; });
-   } else if (type === 'middle') {
-     const minTop = Math.min(...selectedItems.map(c => Number(c.top) || 0));
-     const maxBottom = Math.max(...selectedItems.map(c => (Number(c.top) || 0) + (Number(c.height) || 0)));
-     const midY = (minTop + maxBottom) / 2;
-     selectedItems.forEach(c => {
-       const h = Number(c.height) || 0;
-       c.top = Math.round(midY - h / 2);
-     });
-   } else if (type === 'bottom') {
-     const maxBottom = Math.max(...selectedItems.map(c => (Number(c.top) || 0) + (Number(c.height) || 0)));
-     selectedItems.forEach(c => {
-       const h = Number(c.height) || 0;
-       c.top = maxBottom - h;
-     });
-   } else if (type === 'distributeH') {
-     if (selectedItems.length >= 3) {
-       const sorted = [...selectedItems].sort((a, b) => (Number(a.left) || 0) - (Number(b.left) || 0));
-       const first = sorted[0];
-       const last = sorted[sorted.length - 1];
-       const startX = Number(first.left) || 0;
-       const totalSpan = (Number(last.left) || 0) + (Number(last.width) || 0) - startX;
-       const totalItemsWidth = sorted.reduce((sum, c) => sum + (Number(c.width) || 0), 0);
-       const freeSpace = Math.max(0, totalSpan - totalItemsWidth);
-       const gap = freeSpace / (sorted.length - 1);
-       let curX = startX;
-       sorted.forEach(c => {
-         c.left = Math.round(curX);
-         curX += (Number(c.width) || 0) + gap;
-       });
-     }
-   } else if (type === 'distributeV') {
-     if (selectedItems.length >= 3) {
-       const sorted = [...selectedItems].sort((a, b) => (Number(a.top) || 0) - (Number(b.top) || 0));
-       const first = sorted[0];
-       const last = sorted[sorted.length - 1];
-       const startY = Number(first.top) || 0;
-       const totalSpan = (Number(last.top) || 0) + (Number(last.height) || 0) - startY;
-       const totalItemsHeight = sorted.reduce((sum, c) => sum + (Number(c.height) || 0), 0);
-       const freeSpace = Math.max(0, totalSpan - totalItemsHeight);
-       const gap = freeSpace / (sorted.length - 1);
-       let curY = startY;
-       sorted.forEach(c => {
-         c.top = Math.round(curY);
-         curY += (Number(c.height) || 0) + gap;
-       });
-     }
-   }
-
+   if (!changed) return;
    render();
    pushUndoState();
    if (window.FrpNotify) window.FrpNotify.info('Seçili bileşenler hizalandı');
@@ -2820,6 +2838,57 @@ function esc(str) {
    }
  }
 
+ function copySelectedComponents() {
+   const targets = (selectedItems && selectedItems.length > 0) ? selectedItems : (selectedItem ? [selectedItem] : []);
+   const components = targets.filter(component => findComponentCollection(component));
+   if (components.length === 0) {
+     if (window.FrpNotify) window.FrpNotify.info('Kopyalamak için bir bileşen seçin.');
+     return;
+   }
+   designerClipboard = components.map(component => JSON.parse(JSON.stringify(component)));
+   const pasteButton = containerEl.querySelector('#btnPasteSelected');
+   if (pasteButton) pasteButton.disabled = false;
+   if (window.FrpNotify) window.FrpNotify.success(`${designerClipboard.length} bileşen tasarım panosuna kopyalandı.`);
+ }
+
+ function pasteCopiedComponents() {
+   if (!isDesignEditing || designerClipboard.length === 0) return;
+   const activePage = allPages[activePageIndex];
+   if (!activePage) return;
+   let destination = selectedItem ? findComponentCollection(selectedItem)?.items : null;
+   if (!destination) {
+     if (activePage.type === 'report') {
+       const bands = activePage.data.bands || [];
+       const band = bands.includes(selectedItem) ? selectedItem : bands[0];
+       if (!band) {
+         if (window.FrpNotify) window.FrpNotify.warning('Yapıştırmak için raporda en az bir bant bulunmalıdır.');
+         return;
+       }
+       band.components = band.components || [];
+       destination = band.components;
+     } else {
+       activePage.data.controls = activePage.data.controls || [];
+       destination = activePage.data.controls;
+     }
+   }
+
+   pushUndoState();
+   const pasted = designerClipboard.map((source, index) => {
+     const clone = JSON.parse(JSON.stringify(source));
+     clone.name = makeUniqueComponentName(source.name);
+     const offset = ((gridSnapStep > 1 ? gridSnapStep : 4) * (index + 2));
+     clone.left = snapDesignerValue(toDesignerNumber(source.left) + offset);
+     clone.top = snapDesignerValue(toDesignerNumber(source.top) + offset);
+     destination.push(clone);
+     return clone;
+   });
+   selectedItems = pasted;
+   selectedItem = pasted[pasted.length - 1] || null;
+   render();
+   pushUndoState();
+   if (window.FrpNotify) window.FrpNotify.success(`${pasted.length} bileşen yapıştırıldı.`);
+ }
+
  // ── Z-ORDER DÜZENLEME (Öne / Arkaya) ──
  function changeZOrder(direction) {
    if (!isDesignEditing) isDesignEditing = true;
@@ -2831,36 +2900,17 @@ function esc(str) {
 
    pushUndoState();
 
-   if (activePage.type === 'report') {
-     (activePage.data.bands || []).forEach(b => {
-       if (!b.components || b.components.length <= 1) return;
-       targets.forEach(t => {
-         const idx = b.components.findIndex(c => c.name === t.name);
-         if (idx !== -1) {
-           const [item] = b.components.splice(idx, 1);
-           if (direction === 'front') {
-             b.components.push(item);
-           } else {
-             b.components.unshift(item);
-           }
-         }
-       });
-     });
-   } else {
-     if (activePage.data.controls && activePage.data.controls.length > 1) {
-       targets.forEach(t => {
-         const idx = activePage.data.controls.findIndex(c => c.name === t.name);
-         if (idx !== -1) {
-           const [item] = activePage.data.controls.splice(idx, 1);
-           if (direction === 'front') {
-             activePage.data.controls.push(item);
-           } else {
-             activePage.data.controls.unshift(item);
-           }
-         }
-       });
-     }
-   }
+   let changed = false;
+   groupComponentsByCollection(targets).forEach((group, items) => {
+     if (items.length <= 1) return;
+     const targetSet = new Set(group);
+     const orderedTargets = items.filter(item => targetSet.has(item));
+     const rest = items.filter(item => !targetSet.has(item));
+     items.splice(0, items.length, ...(direction === 'front' ? [...rest, ...orderedTargets] : [...orderedTargets, ...rest]));
+     changed = true;
+   });
+
+   if (!changed) return;
 
    render();
    updateSelection();
@@ -2939,9 +2989,11 @@ function esc(str) {
       let lassoStartY = 0;
       let lassoBox = null;
 
-      vpEl.addEventListener('mousedown', (e) => {
+      vpEl.addEventListener('pointerdown', (e) => {
         if (e.button !== 0) return;
+        if (e.isPrimary === false || currentMode !== 'designer' || !isDesignEditing) return;
         if (e.target.closest('.fr-view-item') || e.target.closest('.fr-ctrl-item') || e.target.closest('.fr-resize-handle') || e.target.closest('.fr-vertical-band-header') || e.target.closest('.designer-inspector')) return;
+        e.preventDefault();
 
         const vpRect = vpEl.getBoundingClientRect();
         lassoStartX = e.clientX;
@@ -2958,7 +3010,9 @@ function esc(str) {
         vpEl.appendChild(lassoBox);
 
         const onLassoMove = (moveEvt) => {
+          if (moveEvt.pointerId !== e.pointerId) return;
           if (!isLassoing || !lassoBox) return;
+          moveEvt.preventDefault();
           const curVpRect = vpEl.getBoundingClientRect();
           const minX = Math.min(lassoStartX, moveEvt.clientX);
           const maxX = Math.max(lassoStartX, moveEvt.clientX);
@@ -2972,7 +3026,7 @@ function esc(str) {
 
           if ((maxX - minX) > 6 || (maxY - minY) > 6) {
             const matched = [];
-            containerEl.querySelectorAll('.fr-view-item, .fr-ctrl-item').forEach(cEl => {
+            containerEl.querySelectorAll(INTERACTIVE_ITEM_SELECTOR).forEach(cEl => {
               const cRect = cEl.getBoundingClientRect();
               const overlaps = !(
                 cRect.right < minX ||
@@ -2996,22 +3050,25 @@ function esc(str) {
           }
         };
 
-        const onLassoUp = () => {
+        const onLassoUp = (upEvt) => {
+          if (upEvt.pointerId !== e.pointerId) return;
           isLassoing = false;
           if (lassoBox) {
             lassoBox.remove();
             lassoBox = null;
           }
-          window.removeEventListener('mousemove', onLassoMove);
-          window.removeEventListener('mouseup', onLassoUp);
+          window.removeEventListener('pointermove', onLassoMove);
+          window.removeEventListener('pointerup', onLassoUp);
+          window.removeEventListener('pointercancel', onLassoUp);
         };
 
-        window.addEventListener('mousemove', onLassoMove);
-        window.addEventListener('mouseup', onLassoUp);
+        window.addEventListener('pointermove', onLassoMove, { passive: false });
+        window.addEventListener('pointerup', onLassoUp);
+        window.addEventListener('pointercancel', onLassoUp);
       });
     }
 
-    containerEl.querySelectorAll('.fr-view-item,.fr-ctrl-item').forEach(el => {
+    containerEl.querySelectorAll(INTERACTIVE_ITEM_SELECTOR).forEach(el => {
  el.addEventListener('click', (e) => {
  e.stopPropagation();
  const compObj = getCompFromElement(el);
@@ -3082,11 +3139,15 @@ function esc(str) {
  if (currentMode !== 'designer') return;
  if (e.button !== 0) return;
  if (e.isPrimary === false) return;
+ if (e.target.closest('.fr-tab-btn')) return;
  if (window._isReportLockedByOther) {
    if (window.FrpNotify) window.FrpNotify.warning(`Bu rapor şu anda ${window._reportLockHolderName || 'başka bir kullanıcı'} tarafından düzenleniyor. Salt-okunur moddasınız.`);
    return;
  }
  if (e.target.closest('.designer-prop-input') || e.target.closest('.designer-prop-select')) return;
+ const activePage = allPages[activePageIndex];
+ if (!activePage) return;
+ if (activeCanvasGestureCleanup) activeCanvasGestureCleanup();
 
  // Otomatik Seçim Senkronizasyonu
  const targetComp = getCompFromElement(el);
@@ -3144,6 +3205,8 @@ function esc(str) {
 
  const startX = e.clientX;
  const startY = e.clientY;
+ const startScrollLeft = vpEl.scrollLeft;
+ const startScrollTop = vpEl.scrollTop;
  const startLeft = toDesignerNumber(selectedItem.left);
  const startTop = toDesignerNumber(selectedItem.top);
  const startWidth = toDesignerNumber(selectedItem.width, 100);
@@ -3185,8 +3248,23 @@ function esc(str) {
 
  const onPointerMove = (moveEvt) => {
  if (moveEvt.pointerId !== e.pointerId) return;
- const dx = Math.round((moveEvt.clientX - startX) / currentZoom);
- const dy = Math.round((moveEvt.clientY - startY) / currentZoom);
+ moveEvt.preventDefault();
+
+ // Uzun sayfalarda sürükleme sırasında sahneyi kenarlardan otomatik kaydır.
+ const viewportRect = vpEl.getBoundingClientRect();
+ const edgeZone = 42;
+ const scrollSpeed = 18;
+ if (moveEvt.clientX < viewportRect.left + edgeZone) vpEl.scrollLeft = Math.max(0, vpEl.scrollLeft - scrollSpeed);
+ else if (moveEvt.clientX > viewportRect.right - edgeZone) vpEl.scrollLeft += scrollSpeed;
+ if (moveEvt.clientY < viewportRect.top + edgeZone) vpEl.scrollTop = Math.max(0, vpEl.scrollTop - scrollSpeed);
+ else if (moveEvt.clientY > viewportRect.bottom - edgeZone) vpEl.scrollTop += scrollSpeed;
+
+ let dx = Math.round((moveEvt.clientX - startX + vpEl.scrollLeft - startScrollLeft) / currentZoom);
+ let dy = Math.round((moveEvt.clientY - startY + vpEl.scrollTop - startScrollTop) / currentZoom);
+ if (isDragging && moveEvt.shiftKey) {
+   if (Math.abs(dx) >= Math.abs(dy)) dy = 0;
+   else dx = 0;
+ }
  if (dx !== 0 || dy !== 0) geometryChanged = true;
  const snapStep = moveEvt.altKey ? 1 : ((gridSnapStep && gridSnapStep > 1) ? gridSnapStep : 1);
 
@@ -3284,6 +3362,16 @@ function esc(str) {
  selectedItem.height = newH;
  el.style.top = `${selectedItem.top}px`;
  }
+ if (moveEvt.shiftKey && /^(?:nw|ne|sw|se)$/.test(handleType) && startHeight > 0) {
+   const ratio = startWidth / startHeight;
+   if (Math.abs(dx) >= Math.abs(dy)) {
+     selectedItem.height = Math.max(8, Math.round((toDesignerNumber(selectedItem.width, startWidth) / ratio) / rSnap) * rSnap);
+     if (handleType.includes('n')) selectedItem.top = Math.max(0, startTop + startHeight - selectedItem.height);
+   } else {
+     selectedItem.width = Math.max(12, Math.round((toDesignerNumber(selectedItem.height, startHeight) * ratio) / rSnap) * rSnap);
+     if (handleType.includes('w')) selectedItem.left = Math.max(0, startLeft + startWidth - selectedItem.width);
+   }
+ }
  clampComponentGeometry(selectedItem, parentBounds);
  syncComponentElement(el, selectedItem);
  updateRulerTracker(selectedItem.left, selectedItem.width, selectedItem.top, selectedItem.height);
@@ -3304,7 +3392,7 @@ function esc(str) {
  if (statusDims) statusDims.innerHTML = `<span>W: ${selectedItem.width}, H: ${selectedItem.height}</span>`;
  };
 
- const onPointerUp = (upEvt) => {
+ const onPointerUp = (upEvt, commitChange = true) => {
  if (upEvt.pointerId !== e.pointerId) return;
  el.classList.remove('is-dragging');
  el.classList.remove('is-interacting');
@@ -3320,7 +3408,8 @@ function esc(str) {
  window.removeEventListener('pointercancel', onPointerUp);
  try { el.releasePointerCapture?.(e.pointerId); } catch {}
 
- if (geometryChanged) pushUndoState();
+ if (commitChange && geometryChanged) pushUndoState();
+ activeCanvasGestureCleanup = null;
 
  // Object Inspector'ı Güncelle
  const propTable = containerEl.querySelector('#propTableBody');
@@ -3334,6 +3423,7 @@ function esc(str) {
  window.addEventListener('pointermove', onPointerMove);
  window.addEventListener('pointerup', onPointerUp);
  window.addEventListener('pointercancel', onPointerUp);
+ activeCanvasGestureCleanup = () => onPointerUp({ pointerId: e.pointerId }, false);
  });
  });
 
@@ -3384,6 +3474,7 @@ function esc(str) {
  btn.addEventListener('click', () => {
  activePageIndex = parseInt(btn.dataset.idx, 10) || 0;
  selectedItem = null;
+ selectedItems = [];
  render();
  });
  });
@@ -3445,6 +3536,8 @@ function esc(str) {
  undoStack = [];
  redoStack = [];
  initialPagesBackup = null;
+ selectedItem = null;
+ selectedItems = [];
  render();
  if (window.FrpNotify) window.FrpNotify.success('Rapor tasarımı başarıyla kaydedildi! ');
  else if (typeof toast === 'function') toast('Rapor tasarımı kaydedildi! ', 'success');
@@ -3460,6 +3553,8 @@ function esc(str) {
  undoStack = [];
  redoStack = [];
  initialPagesBackup = null;
+ selectedItem = null;
+ selectedItems = [];
  render();
  if (window.FrpNotify) window.FrpNotify.info('Tasarım değişiklikleri iptal edildi. ↩️');
  });
@@ -3488,6 +3583,8 @@ function esc(str) {
  containerEl.querySelector('#btnToolAddPanel')?.addEventListener('click', () => addNewComponent('panel'));
  containerEl.querySelector('#btnToolDeleteSelected')?.addEventListener('click', deleteSelectedComponent);
  containerEl.querySelector('#btnDuplicateSelected')?.addEventListener('click', duplicateSelected);
+ containerEl.querySelector('#btnCopySelected')?.addEventListener('click', copySelectedComponents);
+ containerEl.querySelector('#btnPasteSelected')?.addEventListener('click', pasteCopiedComponents);
  containerEl.querySelector('#btnBringToFront')?.addEventListener('click', () => changeZOrder('front'));
  containerEl.querySelector('#btnSendToBack')?.addEventListener('click', () => changeZOrder('back'));
  containerEl.querySelector('#btnMultiDuplicate')?.addEventListener('click', duplicateSelected);
@@ -3515,6 +3612,8 @@ function esc(str) {
  containerEl.querySelector('#btnAlignBottom')?.addEventListener('click', () => alignSelected('bottom'));
  containerEl.querySelector('#btnDistributeH')?.addEventListener('click', () => alignSelected('distributeH'));
  containerEl.querySelector('#btnDistributeV')?.addEventListener('click', () => alignSelected('distributeV'));
+ containerEl.querySelector('#btnSameWidth')?.addEventListener('click', () => alignSelected('sameWidth'));
+ containerEl.querySelector('#btnSameHeight')?.addEventListener('click', () => alignSelected('sameHeight'));
  containerEl.querySelector('#btnDeleteMulti')?.addEventListener('click', () => deleteMultiSelected());
 
  // 5. Zoom Kontrolleri
@@ -3524,6 +3623,10 @@ function esc(str) {
  });
  containerEl.querySelector('#btnZoomOut')?.addEventListener('click', () => {
  currentZoom = Math.max(0.3, Math.round((currentZoom - 0.15) * 100) / 100);
+ updateZoom();
+ });
+ containerEl.querySelector('#btnZoomReset')?.addEventListener('click', () => {
+ currentZoom = 1;
  updateZoom();
  });
  containerEl.querySelector('#btnZoomFit')?.addEventListener('click', () => {
@@ -3648,9 +3751,25 @@ function esc(str) {
  } else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
  e.preventDefault();
  redo();
+ } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+ e.preventDefault();
+ selectedItems = getPageComponents();
+ selectedItem = selectedItems[selectedItems.length - 1] || null;
+ updateSelection();
+ } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+ e.preventDefault();
+ copySelectedComponents();
+ } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+ e.preventDefault();
+ pasteCopiedComponents();
  } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
  e.preventDefault();
  duplicateSelected();
+ } else if (e.key === 'Escape') {
+ e.preventDefault();
+ selectedItem = null;
+ selectedItems = [];
+ updateSelection();
  } else if ((e.key === 'Delete' || e.key === 'Backspace') && (selectedItem || (selectedItems && selectedItems.length > 0))) {
  e.preventDefault();
  deleteSelectedComponent();
@@ -3660,11 +3779,19 @@ function esc(str) {
    if (targets.length > 0) {
      e.preventDefault();
      const step = e.altKey ? 1 : (e.shiftKey ? 10 : ((gridSnapStep && gridSnapStep > 1) ? gridSnapStep : 1));
+     const resizeMode = e.ctrlKey || e.metaKey;
      targets.forEach(c => {
-       if (e.key === 'ArrowUp') c.top = Math.max(0, toDesignerNumber(c.top) - step);
-       if (e.key === 'ArrowDown') c.top = Math.max(0, toDesignerNumber(c.top) + step);
-       if (e.key === 'ArrowLeft') c.left = Math.max(0, toDesignerNumber(c.left) - step);
-       if (e.key === 'ArrowRight') c.left = Math.max(0, toDesignerNumber(c.left) + step);
+       if (resizeMode) {
+         if (e.key === 'ArrowUp') c.height = Math.max(8, toDesignerNumber(c.height, 30) - step);
+         if (e.key === 'ArrowDown') c.height = Math.max(8, toDesignerNumber(c.height, 30) + step);
+         if (e.key === 'ArrowLeft') c.width = Math.max(12, toDesignerNumber(c.width, 100) - step);
+         if (e.key === 'ArrowRight') c.width = Math.max(12, toDesignerNumber(c.width, 100) + step);
+       } else {
+         if (e.key === 'ArrowUp') c.top = Math.max(0, toDesignerNumber(c.top) - step);
+         if (e.key === 'ArrowDown') c.top = Math.max(0, toDesignerNumber(c.top) + step);
+         if (e.key === 'ArrowLeft') c.left = Math.max(0, toDesignerNumber(c.left) - step);
+         if (e.key === 'ArrowRight') c.left = Math.max(0, toDesignerNumber(c.left) + step);
+       }
        const domEl = findElementForComponent(c);
        if (domEl) {
          clampComponentGeometry(c, getElementBounds(domEl));
@@ -3697,8 +3824,8 @@ function esc(str) {
  }
 
  function updateSelection() {
+ containerEl.querySelectorAll('.fr-resize-handle').forEach(h => h.remove());
  containerEl.querySelectorAll('.fr-view-item.selected,.fr-ctrl-item.selected,.fr-band-container.selected-band,.fr-band-header.selected-band,.fr-vertical-band-overlay.selected-band,.fr-vertical-band-header.selected-band,.fr-vband-box.selected-band').forEach(el => {
-  containerEl.querySelectorAll('.fr-resize-handle').forEach(h => h.remove());
   el.classList.remove('selected', 'selected-band');
  });
  

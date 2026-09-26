@@ -911,6 +911,14 @@
   white-space: nowrap;
 }
 
+.designer-statusbar .designer-shortcut-hint {
+  margin-left: auto;
+  flex: 0 1 auto;
+  color: var(--text-muted, #64748b);
+  font-size: 10px;
+  font-weight: 600;
+}
+
 /* ── SAĞ PANEL: GENİŞLETİLEBİLİR OBJECT INSPECTOR & DATA TREE ── */
 .designer-inspector {
   background: #1e293b;
@@ -1622,8 +1630,24 @@ body.theme-light .designer-prop-select {
 }
 .fr-report-page.designer-mode .fr-view-item,
 .fr-dialog-window .fr-ctrl-item {
+  pointer-events: auto !important;
   touch-action: none;
   -webkit-user-drag: none;
+}
+.fr-report-page.designer-mode .fr-view-item > .fr-memo-content,
+.fr-report-page.designer-mode .fr-view-item > svg,
+.fr-report-page.designer-mode .fr-view-item > img,
+.fr-report-page.designer-mode .fr-view-item > canvas,
+.fr-dialog-window .fr-ctrl-item > input,
+.fr-dialog-window .fr-ctrl-item > select,
+.fr-dialog-window .fr-ctrl-item > textarea,
+.fr-dialog-window .fr-ctrl-item > label,
+.fr-dialog-window .fr-ctrl-item > .fr-ctrl-dateedit-val,
+.fr-dialog-window .fr-ctrl-item > .fr-ctrl-dateedit-btn {
+  pointer-events: none;
+}
+.fr-dialog-window .fr-tab-btn {
+  pointer-events: auto;
 }
 .fr-report-page.designer-mode .fr-line-view { pointer-events: auto !important; min-height: 5px; }
 .fr-report-page.designer-mode .fr-view-item:hover,
@@ -1632,6 +1656,10 @@ body.theme-light .designer-prop-select {
 .fr-dialog-window .fr-ctrl-item.is-interacting { cursor: grabbing !important; }
 body.fr-designer-interacting,
 body.fr-designer-interacting * { user-select: none !important; }
+
+body.fr-designer-interacting {
+  cursor: grabbing;
+}
 
 .fr-resize-handle {
   width: 11px;
