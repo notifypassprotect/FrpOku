@@ -114,9 +114,17 @@ const { adminRateLimiter, apiWriteRateLimiter, authRateLimiter } = configureHttp
 });
 
 // Yalnızca tarayıcıya gerekli dosyaları yayınla; sunucu, test, migration ve
-// deployment dosyaları statik olarak erişilebilir değildir.
-app.use('/css', express.static(path.join(__dirname, 'css')));
-app.use('/js', express.static(path.join(__dirname, 'js')));
+// deployment dosyaları statik olarak erişilebilir değildir. Sürüm parametreli
+// statik kaynaklar dağıtım ortamında uzun süre önbellekte tutulabilir.
+const staticAssetOptions = IS_DEPLOYED_ENVIRONMENT
+  ? { etag: true, immutable: true, maxAge: '7d' }
+  : { etag: true, maxAge: 0 };
+app.use('/css', express.static(path.join(__dirname, 'css'), staticAssetOptions));
+app.use('/js', express.static(path.join(__dirname, 'js'), staticAssetOptions));
+app.use('/assets', express.static(path.join(__dirname, 'assets'), {
+  ...staticAssetOptions,
+  maxAge: IS_DEPLOYED_ENVIRONMENT ? '30d' : 0
+}));
 registerSystemRoutes(app, {
   appEnvironment: APP_ENV,
   browserSupabaseEnabled: BROWSER_SUPABASE_ENABLED,
@@ -254,6 +262,30 @@ registerAdminHealthRoute(app, { adminRateLimiter, getLocalUsers, mailer, require
 
 // ── ADMİN: SİSTEM & HAVUZ DURUM ÖZETİ E-POSTASI GÖNDERME ──────────────────
 registerAdminMailRoutes(app, { adminRateLimiter, getLocalUsers, isValidEmail, mailer, readLocalReports, recordAuditLog, requireAdmin, supabase });
+
+// API isteklerinde makine-okur hata; sayfa isteklerinde sade ve erişilebilir
+// bir geri dönüş sağla. Böylece yanlış adresler Express'in varsayılan metnine
+// veya boş bir ekrana düşmez.
+app.use((req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ success: false, reason: 'İstenen servis bulunamadı.' });
+  }
+  return res.status(404).type('html').send(`<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sayfa Bulunamadı — FrpOku</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f4f7fb;color:#172033;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}.card{width:min(90vw,520px);padding:36px;border:1px solid #dbe3ef;border-radius:20px;background:#fff;box-shadow:0 18px 50px rgba(15,23,42,.1);text-align:center}.code{color:#2563eb;font-size:3rem;font-weight:800}h1{margin:.25rem 0 .5rem;font-size:1.5rem}p{color:#64748b}a{display:inline-block;margin-top:1rem;padding:.75rem 1rem;border-radius:10px;background:#2563eb;color:#fff;text-decoration:none;font-weight:700}</style></head>
+<body><main class="card"><div class="code">404</div><h1>Sayfa bulunamadı</h1><p>Aradığınız adres kaldırılmış veya değiştirilmiş olabilir.</p><a href="/">Rapor listesine dön</a></main></body></html>`);
+});
+
+app.use((error, req, res, next) => {
+  if (res.headersSent) return next(error);
+  console.error('İstek işlenemedi:', safeLogStr(error?.message || error));
+  res.setHeader('Cache-Control', 'no-store');
+  if (req.path.startsWith('/api/')) {
+    return res.status(500).json({ success: false, reason: 'İşlem sırasında beklenmeyen bir hata oluştu.' });
+  }
+  return res.status(500).type('html').send('<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sunucu Hatası — FrpOku</title></head><body><main><h1>İşlem tamamlanamadı</h1><p>Lütfen kısa bir süre sonra yeniden deneyin.</p><a href="/">Ana sayfaya dön</a></main></body></html>');
+});
 
 startServer(app, { ensureAdminUser, port: PORT, safeLogStr }).catch(error => {
   console.error('Sunucu başlatılamadı:', safeLogStr(error.message));
