@@ -8,3 +8,4 @@ data/user_settings.json
 data/*.json
 *.log
 .vscode/
+*.pdf

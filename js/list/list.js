@@ -668,14 +668,16 @@ function renderTable() {
     return `
       <tr class="${isSelected ? 'selected' : ''} ${file.isPinned ? 'pinned-row' : ''}" data-list-action="row" data-id="${encodedId}" style="cursor:pointer;">
         <td data-list-action="stop"><input type="checkbox" class="row-checkbox" data-id="${encodedId}" data-list-change="select" ${isSelected ? 'checked' : ''} /></td>
-        <td style="white-space:nowrap;text-align:center;display:flex;align-items:center;justify-content:center;gap:4px;" data-list-action="stop">
-          <button class="star-btn ${file.isFavorite ? 'active' : ''}" data-list-action="toggle-fav" data-id="${encodedId}" title="Favori" style="background:none;border:none;cursor:pointer;padding:2px;display:inline-flex;align-items:center;color:${file.isFavorite ? '#f59e0b' : 'inherit'};opacity:${file.isFavorite ? '1' : '0.4'};">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="${file.isFavorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-          </button>
-          <button class="pin-btn ${file.isPinned ? 'active' : ''}" data-list-action="toggle-pin" data-id="${encodedId}" title="Üste Sabitle" style="background:none;border:none;cursor:pointer;padding:2px;display:inline-flex;align-items:center;opacity:${file.isPinned ? '1' : '0.35'};color:${file.isPinned ? 'var(--accent)' : 'inherit'};">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="${file.isPinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 2h6l1 7h-8z"/></svg>
-          </button>
-          <button type="button" class="table-mobile-actions" data-list-action="open-actions" data-id="${encodedId}" aria-label="${escHtml(reportName)} işlemleri">···</button>
+        <td class="col-actions-fav" style="white-space:nowrap;text-align:center;vertical-align:middle;padding:0.25rem 0.4rem;width:56px;" data-list-action="stop">
+          <div style="display:inline-flex;align-items:center;justify-content:center;gap:4px;">
+            <button class="star-btn ${file.isFavorite ? 'active' : ''}" data-list-action="toggle-fav" data-id="${encodedId}" title="Favori" style="background:none;border:none;cursor:pointer;padding:2px;display:inline-flex;align-items:center;color:${file.isFavorite ? '#f59e0b' : 'inherit'};opacity:${file.isFavorite ? '1' : '0.4'};">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="${file.isFavorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+            </button>
+            <button class="pin-btn ${file.isPinned ? 'active' : ''}" data-list-action="toggle-pin" data-id="${encodedId}" title="Üste Sabitle" style="background:none;border:none;cursor:pointer;padding:2px;display:inline-flex;align-items:center;opacity:${file.isPinned ? '1' : '0.35'};color:${file.isPinned ? 'var(--accent)' : 'inherit'};">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="${file.isPinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 2h6l1 7h-8z"/></svg>
+            </button>
+            <button type="button" class="table-mobile-actions" data-list-action="open-actions" data-id="${encodedId}" aria-label="${escHtml(reportName)} işlemleri">···</button>
+          </div>
         </td>
         ${colsHtml}
       </tr>

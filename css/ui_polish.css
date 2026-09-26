@@ -1227,7 +1227,16 @@ select:hover {
   border-top-color: var(--ui-border-subtle) !important;
 }
 
-.topbar-dropdown,
+.topbar-dropdown {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.topbar-dropdown-menu,
 [class*="dropdown-menu"],
 [class*="context-menu"] {
   border-color: var(--ui-border-subtle) !important;
@@ -2047,4 +2056,49 @@ body:has(#workspaceSwitcher) #resultCount {
 .detail-lock-banner svg {
   color: #f59e0b;
   flex-shrink: 0;
+}
+
+/* ── UI Ölçekleme Taşma & Esneklik İyileştirmeleri (Scaling & Zoom Resilience) ── */
+html[data-ui-scale="large"] .topbar,
+html[data-ui-scale="xlarge"] .topbar {
+  flex-wrap: wrap !important;
+  row-gap: 0.5rem !important;
+  min-height: auto !important;
+  padding-top: 0.4rem !important;
+  padding-bottom: 0.4rem !important;
+}
+
+html[data-ui-scale="large"] .topbar-right,
+html[data-ui-scale="xlarge"] .topbar-right {
+  flex-wrap: wrap !important;
+  gap: 0.35rem !important;
+}
+
+html[data-ui-scale="large"] .toolbar,
+html[data-ui-scale="xlarge"] .toolbar {
+  flex-wrap: wrap !important;
+  row-gap: 0.5rem !important;
+  min-height: auto !important;
+}
+
+html[data-ui-scale="large"] .toolbar-left,
+html[data-ui-scale="large"] .toolbar-right,
+html[data-ui-scale="xlarge"] .toolbar-left,
+html[data-ui-scale="xlarge"] .toolbar-right {
+  flex-wrap: wrap !important;
+  gap: 0.35rem !important;
+}
+
+html[data-ui-scale="large"] .btn,
+html[data-ui-scale="xlarge"] .btn,
+html[data-ui-scale="large"] .filter-chip,
+html[data-ui-scale="xlarge"] .filter-chip {
+  white-space: normal !important;
+  line-height: 1.25 !important;
+}
+
+html[data-ui-scale="large"] .quick-filters-scroll,
+html[data-ui-scale="xlarge"] .quick-filters-scroll {
+  flex-wrap: wrap !important;
+  max-width: 100% !important;
 }
