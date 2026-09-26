@@ -593,11 +593,78 @@ function buildLineTable(rawCode, highlightFn, errorLineSet) {
  return html;
 }
 
+function getCodeDiagnostics(tabCfg, rawCode) {
+ const code = String(rawCode || '');
+ const errors = [];
+ const warnings = [];
+ const seen = new Set();
+ const add = (target, item, fallbackType) => {
+   const value = typeof item === 'string' ? { text: item } : (item || {});
+   const message = value.message || value.text || String(item || 'Sözdizimi sorunu');
+   const line = Math.max(1, Number(value.line) || 1);
+   const col = Math.max(1, Number(value.col) || 1);
+   const key = `${fallbackType}:${line}:${col}:${message}`;
+   if (seen.has(key)) return;
+   seen.add(key);
+   target.push({ line, col, token: value.token || '', suggestion: value.suggestion || '', message, type: fallbackType });
+ };
+
+ if (typeof window.findSyntaxErrors === 'function') {
+   window.findSyntaxErrors(code, tabCfg.type).forEach(item => add(errors, item, 'error'));
+ }
+
+ if (tabCfg.type === 'sql' && window.FrpStore?.checkSqlStaticSyntax) {
+   const result = window.FrpStore.checkSqlStaticSyntax(code) || {};
+   (result.errors || []).forEach(item => add(errors, item, 'error'));
+   (result.warnings || []).forEach(item => add(warnings, item, 'warning'));
+ } else if (tabCfg.type === 'pascal' && window.FrpStore?.checkPascalSyntax) {
+   const result = window.FrpStore.checkPascalSyntax(code, currentFile) || {};
+   (result.errors || []).forEach(item => add(errors, item, 'error'));
+   (result.warnings || []).forEach(item => add(warnings, item, 'warning'));
+ }
+
+ return { errors, warnings };
+}
+
+function updateTabSyntaxState(tabId, diagnostics) {
+ const btn = document.getElementById(tabId + '_btn');
+ if (!btn) return;
+ const errorCount = diagnostics?.errors?.length || 0;
+ const warningCount = diagnostics?.warnings?.length || 0;
+ btn.classList.toggle('syntax-error-tab', errorCount > 0);
+ btn.classList.toggle('syntax-warning-tab', errorCount === 0 && warningCount > 0);
+ btn.dataset.syntaxErrors = String(errorCount);
+ btn.title = errorCount > 0
+   ? `${errorCount} sözdizimi hatası bulundu. Ayrıntılar için sekmeyi açın.`
+   : (warningCount > 0 ? `${warningCount} sözdizimi uyarısı bulundu.` : 'Sözdizimi sorunu bulunamadı.');
+ let marker = btn.querySelector('.tab-syntax-marker');
+ if (errorCount > 0 || warningCount > 0) {
+   if (!marker) {
+     marker = document.createElement('span');
+     marker.className = 'tab-syntax-marker';
+     btn.appendChild(marker);
+   }
+   marker.textContent = errorCount > 0 ? `! ${errorCount}` : `△ ${warningCount}`;
+ } else if (marker) marker.remove();
+}
+
+function refreshTabSyntaxState(tabId, forcedCode) {
+ const tabCfg = activeTabs.find(tab => tab.id === tabId);
+ if (!tabCfg || !['sql', 'pascal'].includes(tabCfg.type)) return { errors: [], warnings: [] };
+ const editArea = document.getElementById(tabId + '_editarea');
+ const isEditing = editArea && editArea.style.display !== 'none';
+ const code = forcedCode !== undefined ? forcedCode : (isEditing ? editArea.value : tabCfg.rawCode);
+ const diagnostics = getCodeDiagnostics(tabCfg, code);
+ updateTabSyntaxState(tabId, diagnostics);
+ return diagnostics;
+}
+
 function addTab(cfg) {
  const tabBar = document.getElementById('tabBar');
  const panels = document.getElementById('panels');
  if (!tabBar ||!panels) return;
 
+ const initialDiagnostics = ['sql', 'pascal'].includes(cfg.type) ? getCodeDiagnostics(cfg, cfg.rawCode) : { errors: [], warnings: [] };
  const btn = document.createElement('button');
  btn.className = 'tab' + (cfg.type === 'sql'? ' sql-tab': '');
  btn.id = cfg.id + '_btn';
@@ -633,7 +700,7 @@ function addTab(cfg) {
  <div class="code-scroll">${cfg.treeHtml}</div>
  `;
  } else {
- const codeHtml = buildLineTable(cfg.rawCode, cfg.highlightFn);
+ const codeHtml = buildLineTable(cfg.rawCode, cfg.highlightFn, new Set(initialDiagnostics.errors.map(error => error.line)));
 
  // Edit modu için benzersiz ID'ler
  const editAreaId = cfg.id + '_editarea';
@@ -696,6 +763,9 @@ function addTab(cfg) {
  ${sqlSecurityHtml}
  ${commentsNoticeHtml}
 
+ <!-- Sözdizimi Hataları Bildirim Bandı (görüntüleme ve düzenleme modunda ortak) -->
+ <div class="syntax-error-notice" id="${cfg.id}_errnotice" style="display:none;padding:.45rem.9rem;background:rgba(239,68,68,.12);border-bottom:1px solid rgba(239,68,68,.3);font-size:.78rem;align-items:center;gap:.6rem;flex-wrap:wrap;"></div>
+
  <!-- Görüntüleme modu -->
  <div class="code-scroll" id="${viewScrollId}">${codeHtml}</div>
 
@@ -710,9 +780,6 @@ function addTab(cfg) {
  <button class="btn btn-sm" data-detail-action="cancel-edit" data-tab="${encodeInlineArg(cfg.id)}">İptal</button>
  </div>
  </div>
-
- <!-- Sözdizimi Hataları Bildirim Bandı -->
- <div class="syntax-error-notice" id="${cfg.id}_errnotice" style="display:none;padding:.45rem.9rem;background:rgba(239,68,68,.12);border-bottom:1px solid rgba(239,68,68,.3);font-size:.78rem;align-items:center;gap:.6rem;flex-wrap:wrap;"></div>
 
  <!-- Renkli Canlı Düzenleyici (Live Highlighting Editor) -->
  <div class="code-editor-wrap" id="${cfg.id}_editorwrap" style="display:none;">
@@ -733,6 +800,10 @@ function addTab(cfg) {
  }
 
  activeTabs.push(cfg);
+ if (!cfg.isTree && ['sql', 'pascal'].includes(cfg.type)) {
+   updateTabSyntaxState(cfg.id, initialDiagnostics);
+   requestAnimationFrame(() => updateSyntaxErrorNotice(cfg.id, initialDiagnostics.errors, initialDiagnostics.warnings));
+ }
 }
 
 function updateEditorCursorInfo(tabId) {
@@ -805,7 +876,8 @@ function syncEditorBackdrop(tabId) {
  const lines = rawCode.split('\n');
  const total = lines.length;
 
- const errors = typeof findSyntaxErrors === 'function'? findSyntaxErrors(rawCode, tabCfg.type): [];
+ const diagnostics = getCodeDiagnostics(tabCfg, rawCode);
+ const errors = diagnostics.errors;
  const errorLineSet = new Set(errors.map(e => e.line));
 
  const hlFn = tabCfg.type === 'sql'? (window.highlightSQL || (s => esc(s))): (window.highlightPascal || (s => esc(s)));
@@ -832,41 +904,50 @@ function syncEditorBackdrop(tabId) {
  backdrop.scrollTop = editArea.scrollTop;
  backdrop.scrollLeft = editArea.scrollLeft;
 
- updateSyntaxErrorNotice(tabId, errors);
+ updateSyntaxErrorNotice(tabId, errors, diagnostics.warnings);
+ updateTabSyntaxState(tabId, diagnostics);
  updateEditorCursorInfo(tabId);
  if (tabId === 'tab_pascal') refreshPascalSyntaxButtonState();
 }
 
-function updateSyntaxErrorNotice(tabId, existingErrors) {
+function updateSyntaxErrorNotice(tabId, existingErrors, existingWarnings) {
  const tabCfg = activeTabs.find(t => t.id === tabId);
  const editArea = document.getElementById(tabId + '_editarea');
  const errNotice = document.getElementById(tabId + '_errnotice');
- if (!tabCfg ||!editArea ||!errNotice) return;
+ if (!tabCfg ||!errNotice) return;
 
- const errors = existingErrors || (typeof findSyntaxErrors === 'function'? findSyntaxErrors(editArea.value, tabCfg.type): []);
- if (errors.length === 0) {
+ const isEditing = editArea && editArea.style.display !== 'none';
+ const diagnostics = (existingErrors || existingWarnings)
+   ? { errors: existingErrors || [], warnings: existingWarnings || [] }
+   : getCodeDiagnostics(tabCfg, isEditing ? editArea.value : tabCfg.rawCode);
+ const errors = diagnostics.errors || [];
+ const warnings = diagnostics.warnings || [];
+ updateTabSyntaxState(tabId, diagnostics);
+ if (errors.length === 0 && warnings.length === 0) {
  errNotice.style.display = 'none';
  errNotice.innerHTML = '';
  } else {
  errNotice.style.display = 'flex';
+ errNotice.classList.toggle('has-warnings-only', errors.length === 0);
+ const issues = errors.length > 0 ? errors : warnings;
  errNotice.innerHTML = `
  <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:.5rem;flex-wrap:wrap;">
  <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;flex:1;">
- <span style="font-weight:800;color:var(--red);display:flex;align-items:center;gap:.3rem;font-size:.78rem;">Sözdizimi (${errors.length}):</span>
+ <span style="font-weight:800;color:${errors.length ? 'var(--red)' : 'var(--orange)'};display:flex;align-items:center;gap:.3rem;font-size:.78rem;">${errors.length ? `Sözdizimi (${errors.length} hata)` : `Sözdizimi (${warnings.length} uyarı)`}:</span>
  <div style="display:flex;gap:.35rem;flex-wrap:wrap;flex:1;">
- ${errors.slice(0, 6).map(e => `
- <span style="font-family:var(--mono);font-size:.74rem;background:rgba(239,68,68,.15);color:var(--red);padding:.15rem.5rem;border-radius:6px;border:1px solid rgba(239,68,68,.3);cursor:pointer;"
+ ${issues.slice(0, 6).map(e => `
+ <span style="font-family:var(--mono);font-size:.74rem;background:${errors.length ? 'rgba(239,68,68,.15)' : 'rgba(245,158,11,.14)'};color:${errors.length ? 'var(--red)' : 'var(--orange)'};padding:.15rem.5rem;border-radius:6px;border:1px solid ${errors.length ? 'rgba(239,68,68,.3)' : 'rgba(245,158,11,.35)'};cursor:pointer;"
  data-detail-action="jump-editor" data-tab="${encodeInlineArg(tabId)}" data-line="${e.line}" data-token="${encodeInlineArg(e.token || '')}"
  title="${esc(e.message)} — Satıra sıçramak için tıklayın">
- Satır ${e.line}: <strong>${esc(e.token)}</strong> (${esc(e.suggestion)})
+ Satır ${e.line}: <strong>${esc(e.token || 'İncele')}</strong>${e.suggestion ? ` (${esc(e.suggestion)})` : ''}
  </span>
  `).join('')}
  </div>
  </div>
  <button type="button" class="btn btn-sm" style="background:rgba(239,68,68,0.18);color:var(--red);border:1px solid rgba(239,68,68,0.4);font-size:.74rem;font-weight:700;padding:.2rem.6rem;border-radius:6px;cursor:pointer;"
  data-detail-action="all-syntax" data-tab="${encodeInlineArg(tabId)}"
- title="Tüm ${errors.length} hatayı detaylı liste olarak aç">
- Tümünü Listele (${errors.length})
+ title="Tüm ${issues.length} bulguyu detaylı liste olarak aç">
+ Analiz Raporu (${issues.length})
  </button>
  </div>
  `;
@@ -876,37 +957,44 @@ function updateSyntaxErrorNotice(tabId, existingErrors) {
 function openAllSyntaxErrorsModal(tabId) {
  const tabCfg = activeTabs.find(t => t.id === tabId);
  const editArea = document.getElementById(tabId + '_editarea');
- if (!tabCfg ||!editArea) return;
+ if (!tabCfg) return;
 
- const errors = typeof findSyntaxErrors === 'function'? findSyntaxErrors(editArea.value, tabCfg.type): [];
- if (errors.length === 0) {
+ const isEditing = editArea && editArea.style.display !== 'none';
+ const code = isEditing ? editArea.value : tabCfg.rawCode;
+ const diagnostics = getCodeDiagnostics(tabCfg, code);
+ const issues = [...diagnostics.errors, ...diagnostics.warnings];
+ if (issues.length === 0) {
  showToast('Tebrikler! Sözdizimi hatası bulunamadı.', 'success');
  return;
  }
 
- const errItemsHtml = errors.map((e, idx) => `
- <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:.6rem.8rem;margin-bottom:.5rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem;cursor:pointer;"
+ const codeLines = String(code || '').split('\n');
+ const errItemsHtml = issues.map((e, idx) => `
+ <div class="syntax-report-item ${e.type === 'warning' ? 'is-warning' : 'is-error'}" style="border-radius:12px;padding:.85rem 1rem;margin-bottom:.65rem;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:1rem;cursor:pointer;"
  data-detail-action="jump-editor" data-tab="${encodeInlineArg(tabId)}" data-line="${e.line}" data-token="${encodeInlineArg(e.token || '')}" data-close-modal="true"
  title="Satır ${e.line}'e git">
  <div style="flex:1;">
  <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.2rem;">
- <span class="badge" style="background:rgba(239,68,68,0.2);color:var(--red);font-weight:800;font-size:.72rem;">Satır ${e.line}</span>
+ <span class="badge" style="font-weight:800;font-size:.72rem;">${e.type === 'warning' ? 'Uyarı' : 'Hata'} · Satır ${e.line}${e.col ? `:${e.col}` : ''}</span>
  <span style="font-family:var(--mono);font-weight:700;color:var(--text-primary);font-size:.8rem;">${esc(e.token || '')}</span>
  </div>
  <div style="font-size:.78rem;color:var(--text-secondary);line-height:1.4;">${esc(e.message || '')}</div>
  ${e.suggestion? `<div style="font-size:.74rem;color:var(--accent);margin-top:.2rem;font-weight:600;"> Öneri: ${esc(e.suggestion)}</div>`: ''}
+ <pre style="margin:.55rem 0 0;padding:.55rem .7rem;background:var(--bg-code);border:1px solid var(--border-light);border-radius:8px;color:var(--text-code);font:600 .74rem/1.45 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere;">${esc(codeLines[e.line - 1] || '')}</pre>
  </div>
- <button type="button" class="btn btn-sm btn-primary" style="font-size:.74rem;padding:.25rem.6rem;flex-shrink:0;">
- Git
+ <button type="button" class="btn btn-sm btn-primary" style="font-size:.74rem;padding:.4rem.75rem;flex-shrink:0;">
+ Satıra Git
  </button>
  </div>
  `).join('');
 
  showModal({
- title: ` Sözdizimi Analiz Raporu (${errors.length} Hata / Uyarı)`,
- body: `<div style="max-height:65vh;overflow-y:auto;padding-right:.3rem;">${errItemsHtml}</div>`,
+ title: `Sözdizimi Analiz Raporu · ${tabCfg.label || tabCfg.langLabel || 'Kod'}`,
+ body: `<div class="syntax-report-summary"><strong>${diagnostics.errors.length} hata</strong><span>${diagnostics.warnings.length} uyarı</span><span>${codeLines.length} satır tarandı</span></div><div class="syntax-report-list">${errItemsHtml}</div>`,
  confirmText: 'Kapat',
- cancelText: ''
+ cancelText: '',
+ maxWidth: '1120px',
+ onOpen: overlay => overlay.querySelector('.modal')?.classList.add('syntax-analysis-modal')
  });
 }
 window.openAllSyntaxErrorsModal = openAllSyntaxErrorsModal;
@@ -1227,11 +1315,14 @@ function cancelEditMode(tabId) {
  editArea.value = ''; // Reset value to force reload from rawCode on next open
  }
  if (editTool) editTool.style.display = 'none';
- if (errNotice) errNotice.style.display = 'none';
  removeSelectionReplacePopover(tabId);
  if (editBtn) editBtn.textContent = 'Düzenle';
  hasUnsavedChanges = false;
  if (tabId === 'tab_pascal') refreshPascalSyntaxButtonState();
+ requestAnimationFrame(() => {
+ const diagnostics = refreshTabSyntaxState(tabId);
+ updateSyntaxErrorNotice(tabId, diagnostics.errors, diagnostics.warnings);
+ });
 }
 
 async function saveEditMode(tabId, options = {}) {
@@ -1242,6 +1333,32 @@ async function saveEditMode(tabId, options = {}) {
  const newCode = editArea.value;
  const tabCfg = activeTabs.find(t => t.id === tabId);
  if (!tabCfg) return null;
+
+ const diagnostics = getCodeDiagnostics(tabCfg, newCode);
+ if (diagnostics.errors.length > 0 && !options.syntaxConfirmed) {
+ const preview = diagnostics.errors.slice(0, 5).map(error => `
+ <li><strong>Satır ${error.line}${error.col ? `:${error.col}` : ''}</strong> — ${esc(error.message || error.token || 'Sözdizimi hatası')}</li>
+ `).join('');
+ const approved = await showModal({
+ title: 'Kod Hatalarıyla Kaydedilecek',
+ body: `
+ <div class="syntax-save-warning">
+ <p><strong>${diagnostics.errors.length} sözdizimi hatası bulundu.</strong> Bu haliyle kaydetmek raporun çalışmasını engelleyebilir.</p>
+ <ul>${preview}</ul>
+ ${diagnostics.errors.length > 5 ? `<p class="syntax-save-warning-more">+ ${diagnostics.errors.length - 5} hata daha var. Ayrıntılar için Analiz Raporu'nu açabilirsiniz.</p>` : ''}
+ </div>`,
+ confirmText: 'Yine de Kaydet',
+ cancelText: 'Düzeltmeye Dön',
+ danger: true,
+ maxWidth: '680px'
+ });
+ if (!approved) {
+ const firstError = diagnostics.errors[0];
+ jumpToEditorLine(tabId, firstError.line || 1, firstError.token || '');
+ return null;
+ }
+ options = { ...options, syntaxConfirmed: true };
+ }
 
  const curUser = window.FrpAuth? window.FrpAuth.getUser(): null;
  const isOwner = curUser && currentFile.userId === curUser.id;
@@ -1270,7 +1387,7 @@ async function saveEditMode(tabId, options = {}) {
  FrpStore.updateCode(currentFile.id, { queryIndex: tabCfg.queryIndex, sql: newCode });
  currentFile = FrpStore.getById(currentFile.id);
  tabCfg.rawCode = newCode;
- if (viewScroll) viewScroll.innerHTML = buildLineTable(newCode, tabCfg.highlightFn);
+ if (viewScroll) viewScroll.innerHTML = buildLineTable(newCode, tabCfg.highlightFn, new Set(diagnostics.errors.map(error => error.line)));
  showToast('SQL sorgusu kaydedildi.', 'success');
  if (window.FrpAudit) {
  window.FrpAudit.logAction({
@@ -1283,7 +1400,7 @@ async function saveEditMode(tabId, options = {}) {
  FrpStore.updateCode(currentFile.id, { pascalScript: newCode });
  currentFile = FrpStore.getById(currentFile.id);
  tabCfg.rawCode = newCode;
- if (viewScroll) viewScroll.innerHTML = buildLineTable(newCode, tabCfg.highlightFn);
+ if (viewScroll) viewScroll.innerHTML = buildLineTable(newCode, tabCfg.highlightFn, new Set(diagnostics.errors.map(error => error.line)));
  showToast('PascalScript kaydedildi.', 'success');
  if (window.FrpAudit) {
  window.FrpAudit.logAction({
@@ -1415,6 +1532,11 @@ function activateTab(id) {
     if (panel) panel.classList.toggle('active', isTarget);
   });
   updateLastEditBtnState(id);
+  const activatedTab = activeTabs.find(tab => tab.id === id);
+  if (activatedTab && ['sql', 'pascal'].includes(activatedTab.type)) {
+    const diagnostics = refreshTabSyntaxState(id);
+    updateSyntaxErrorNotice(id, diagnostics.errors, diagnostics.warnings);
+  }
   if (id === 'tab_pascal') refreshPascalSyntaxButtonState();
   if (id === 'tab_designer') {
     const wrap = document.getElementById('tab_designer_designer_wrap');
@@ -2106,21 +2228,24 @@ window.scrollToPascalLine = scrollToPascalLine;
 
 function updateLastEditBtnState(tabId) {
  const btn = document.getElementById(tabId + '_lasteditbtn');
- if (!btn ||!currentFile ||!Array.isArray(currentFile.editHistory)) return;
+ if (!btn ||!currentFile) return;
+ const history = Array.isArray(currentFile.editHistory)
+ ? currentFile.editHistory
+ : (Array.isArray(currentFile.edit_history) ? currentFile.edit_history : []);
 
  const tabCfg = activeTabs.find(t => t.id === tabId);
  if (!tabCfg) return;
 
  const targetField = tabCfg.type === 'pascal'? 'pascalScript': `sql[${tabCfg.queryIndex}]`;
- const historyItems = currentFile.editHistory.filter(h => h.field === targetField);
+ const historyItems = history.filter(h => h.field === targetField);
  const count = historyItems.length;
 
  if (count > 0) {
- btn.textContent = ` Son Değişiklik (${count})`;
- btn.classList.add('flash-red-btn');
+ btn.textContent = `Geçmiş (${count})`;
+ btn.classList.remove('flash-red-btn');
  btn.title = `Bu kod alanında ${count} kaydedilmiş düzenleme geçmişi var. İncelemek için tıklayın.`;
  } else {
- btn.textContent = ' Son Değişiklik';
+ btn.textContent = 'Geçmiş';
  btn.classList.remove('flash-red-btn');
  btn.title = 'Son yapılan değişikliğin farkını gör';
  }
@@ -2128,7 +2253,10 @@ function updateLastEditBtnState(tabId) {
 window.updateLastEditBtnState = updateLastEditBtnState;
 
 function openLastEditDiffModal(tabId) {
- if (!currentFile ||!Array.isArray(currentFile.editHistory)) {
+ const history = currentFile && (Array.isArray(currentFile.editHistory)
+ ? currentFile.editHistory
+ : (Array.isArray(currentFile.edit_history) ? currentFile.edit_history : []));
+ if (!currentFile || !history || history.length === 0) {
  showToast('Henüz bu raporda kaydedilmiş bir değişiklik bulunmuyor.', 'info');
  return;
  }
@@ -2137,7 +2265,7 @@ function openLastEditDiffModal(tabId) {
  if (!tabCfg) return;
 
  const targetField = tabCfg.type === 'pascal'? 'pascalScript': `sql[${tabCfg.queryIndex}]`;
- const historyItems = currentFile.editHistory.filter(h => h.field === targetField);
+ const historyItems = history.filter(h => h.field === targetField);
 
  if (historyItems.length === 0) {
  showToast('Bu alanda kaydedilmiş geçmiş bir düzenleme bulunamadı.', 'info');
@@ -2251,7 +2379,10 @@ function openLastEditDiffModal(tabId) {
 window.openLastEditDiffModal = openLastEditDiffModal;
 
 function undoLastEditInTab(tabId) {
- if (!currentFile ||!Array.isArray(currentFile.editHistory)) {
+ const history = currentFile && (Array.isArray(currentFile.editHistory)
+ ? currentFile.editHistory
+ : (Array.isArray(currentFile.edit_history) ? currentFile.edit_history : []));
+ if (!currentFile || !history || history.length === 0) {
  showToast('Geri alınacak bir düzenleme geçmişi yok.', 'warning');
  return;
  }
@@ -2271,12 +2402,14 @@ function undoLastEditInTab(tabId) {
  tabCfg.rawCode = revertedCode;
 
  const viewScroll = document.getElementById(tabId + '_viewscroll');
- if (viewScroll) viewScroll.innerHTML = buildLineTable(revertedCode, tabCfg.highlightFn);
+ const diagnostics = getCodeDiagnostics(tabCfg, revertedCode);
+ if (viewScroll) viewScroll.innerHTML = buildLineTable(revertedCode, tabCfg.highlightFn, new Set(diagnostics.errors.map(error => error.line)));
 
  const editArea = document.getElementById(tabId + '_editarea');
  if (editArea) editArea.value = revertedCode;
 
  updateLastEditBtnState(tabId);
+ updateSyntaxErrorNotice(tabId, diagnostics.errors, diagnostics.warnings);
  if (tabId === 'tab_pascal') refreshPascalSyntaxButtonState();
  showToast('Son yapılan düzenleme geri alındı. ↩️', 'success');
 }
@@ -2331,30 +2464,7 @@ function checkPascalSyntaxInTab() {
  return;
  }
 
- const errHtml = res.errors.map(e => `
- <div style="color:var(--red);margin-bottom:.35rem;cursor:pointer;background:rgba(220,38,38,0.08);padding:.45rem.75rem;border-radius:6px;border:1px solid rgba(220,38,38,0.2);"
- data-detail-action="scroll-pascal" data-line="${e.line}" data-close-modal="true"
- title="Tıklayarak Satır ${e.line}'e sıçrayın">
- Hata: ${esc(typeof e === 'object'? e.text: e)}
- <span style="float:right;font-size:.7rem;text-decoration:underline;font-weight:700;">[Satır ${e.line || 1}'e Git]</span>
- </div>
- `).join('');
-
- const warnHtml = res.warnings.map(w => `
- <div style="color:var(--orange);margin-bottom:.35rem;cursor:pointer;background:rgba(245,158,11,0.08);padding:.45rem.75rem;border-radius:6px;border:1px solid rgba(245,158,11,0.2);"
- data-detail-action="scroll-pascal" data-line="${w.line}" data-close-modal="true"
- title="Tıklayarak Satır ${w.line}'e sıçrayın">
- Uyarı: ${esc(typeof w === 'object'? w.text: w)}
- <span style="float:right;font-size:.7rem;text-decoration:underline;font-weight:700;">[Satır ${w.line || 1}'e Git]</span>
- </div>
- `).join('');
-
- showModal({
- title: ' PascalScript Sözdizimi Analizi',
- body: `<div style="font-size:.85rem;line-height:1.6;">${errHtml}${warnHtml}</div>`,
- confirmText: 'Kapat',
- cancelText: ''
- });
+ openAllSyntaxErrorsModal('tab_pascal');
 }
 
 // ── TAM EKRAN (ODAKLANMA) MODU ──────────────────────────────

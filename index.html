@@ -9,10 +9,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;600;700&family=Fira+Mono:wght@400;500;700&family=Courier+Prime:wght@400;700&family=Fira+Code:wght@400;500;600;700&family=Inconsolata:wght@400;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700;800&family=Nunito:wght@400;600;700;800&family=Open+Sans:wght@400;600;700&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&family=Raleway:wght@400;600;700;800&family=Roboto:wght@400;500;700&family=Source+Code+Pro:wght@400;600;700&family=Source+Sans+3:wght@400;600;700&family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css?v=5.10.0" />
-  <link rel="stylesheet" href="css/list.css?v=5.1" />
+  <link rel="stylesheet" href="css/list.css?v=5.2" />
   <link rel="stylesheet" href="css/themes.css?v=5.0" />
   <link rel="stylesheet" href="css/online_presence.css?v=5.7.0" />
-  <link rel="stylesheet" href="css/ui_polish.css?v=5.20.0" />
+  <link rel="stylesheet" href="css/ui_polish.css?v=5.22.0" />
   <script src="js/core/theme_bootstrap.js?v=5.0"></script>
   <script src="js/core/circuit_fx.js?v=5.6.1"></script>
 </head>
@@ -262,6 +262,10 @@
           <span>Kişisel Raporlarım</span>
           <span class="pool-count-badge" id="badgeMyCount">0</span>
         </button>
+        <button type="button" class="workspace-tab-btn" id="tabWsMine" data-ws="mine" title="Yalnızca sizin oluşturduğunuz kişisel raporlar" hidden>
+          <span>Kendi Raporlarım</span>
+          <span class="pool-count-badge" id="badgeOwnCount">0</span>
+        </button>
         <button type="button" class="workspace-tab-btn" id="tabWsPool" data-ws="pool" title="Tüm kullanıcıların paylaştığı ortak havuz">
           <span>Ortak Rapor Havuzu</span>
           <span class="pool-count-badge" id="badgePoolCount">0</span>
@@ -452,10 +456,10 @@
 <script src="js/core/auth/auth_admin_modal.js?v=5.1"></script>
 <script src="js/core/auth.js?v=5.4"></script>
 <script src="js/core/online_presence.js?v=5.7.0"></script>
-<script src="js/core/dom.js?v=5.0"></script>
+<script src="js/core/dom.js?v=5.1"></script>
 <script src="js/core/file_safety.js?v=5.0"></script>
 <script src="js/core/formatter.js?v=5.0"></script>
-<script src="js/core/themes.js?v=5.6.1"></script>
+<script src="js/core/themes.js?v=5.6.2"></script>
 <script src="js/core/text_helpers.js?v=5.0"></script>
 <script src="js/core/param_helpers.js?v=5.0"></script>
 <script src="js/core/sql_helpers.js?v=5.0"></script>
@@ -473,12 +477,12 @@
 
 <!-- 3. Veri Katmanı & Depolama -->
 <script src="js/store/store_tags.js?v=5.0"></script>
-<script src="js/store/store_main.js?v=5.14.0"></script>
+<script src="js/store/store_main.js?v=5.16.0"></script>
 
 <!-- 4. Sorgu Kütüphanesi & Ayarlar (Modüler) -->
 <script src="js/core/snippet_tools.js?v=5.0"></script>
 <script src="js/core/snippet_modal.js?v=5.0"></script>
-<script src="js/settings/tabs/appearance_tab.js?v=5.6.1"></script>
+<script src="js/settings/tabs/appearance_tab.js?v=5.6.2"></script>
 <script src="js/settings/tabs/profile_tab.js?v=5.0"></script>
 <script src="js/settings/tabs/categories_tab.js?v=5.0"></script>
 <script src="js/settings/tabs/columns_tab.js?v=5.0"></script>
@@ -487,8 +491,8 @@
 <script src="js/settings/tabs/storage_tab.js?v=5.11.0"></script>
 <script src="js/settings/tabs/rooms_tab.js?v=5.0"></script>
 <script src="js/settings/tabs/mail_tab.js?v=5.0"></script>
-<script src="js/settings/tabs/audit_tab.js?v=5.11.0"></script>
-<script src="js/settings/settings_modal.js?v=5.15.0"></script>
+<script src="js/settings/tabs/audit_tab.js?v=5.11.1"></script>
+<script src="js/settings/settings_modal.js?v=5.15.1"></script>
 
 <!-- 5. Liste Sayfası Modülleri (Modüler) -->
 <script src="js/list/code_search_tools.js?v=5.0"></script>
@@ -501,7 +505,7 @@
 <script src="js/list/renderers/cards_renderer.js?v=5.17.0"></script>
 <script src="js/list/renderers/timeline_renderer.js?v=5.17.0"></script>
 <script src="js/list/list_events.js?v=5.12.0"></script>
-<script src="js/list/list.js?v=5.20.0"></script>
+<script src="js/list/list.js?v=5.20.1"></script>
 
 </body>
 </html>

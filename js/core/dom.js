@@ -46,3 +46,50 @@ window.encodeInlineArg = encodeInlineArg;
 window.showToast = showToast;
 // Note: window.toast is NOT set here - list.js defines function toast() for the list page
 // detail.js/app.js pages use showToast() directly
+
+// İşlevi anlaşılır metin taşıyan butonlara uygulama genelinde tutarlı renk dili kazandırır.
+// Açıkça atanmış btn-primary / btn-danger sınıflarına dokunmaz; dinamik modalları da izler.
+(function initSemanticButtonTones() {
+  const toneClasses = ['action-tone-success', 'action-tone-danger', 'action-tone-create', 'action-tone-edit', 'action-tone-info', 'action-tone-neutral'];
+  const normalize = value => String(value || '').toLocaleLowerCase('tr-TR')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  function inferTone(button) {
+    if (!(button instanceof HTMLElement) || button.matches('[data-button-tone="none"], .btn-danger, .btn-success')) return '';
+    const explicit = button.dataset.buttonTone;
+    if (explicit && explicit !== 'auto') return explicit;
+    const source = normalize([
+      button.id, button.name, button.title, button.getAttribute('aria-label'), button.textContent,
+      button.dataset.action, button.dataset.detailAction
+    ].filter(Boolean).join(' '));
+    if (!source.trim()) return '';
+    if (/(sil|delete|remove|kaldir|cop|sifirla|reset|purge|cikis|logout|vazgec)/.test(source)) return 'danger';
+    if (/(kaydet|save|onayla|confirm|uygula|tamamla|geri yukle|restore)/.test(source)) return 'success';
+    if (/(ekle|yeni|olustur|upload|yukle|paylas|share|indir|download|ice aktar|kopyala)/.test(source)) return 'create';
+    if (/(duzenle|edit|format|bicim|yeniden adlandir|degistir|kompakt|tek satir|buyuk harf)/.test(source)) return 'edit';
+    if (/(gecmis|history|denetim|audit|analiz|analysis|test|kontrol|detay|bilgi|incele)/.test(source)) return 'info';
+    if (/(iptal|cancel|kapat|close|geri|back|goruntule|preview)/.test(source)) return 'neutral';
+    return '';
+  }
+
+  function colorButton(button) {
+    if (!(button instanceof HTMLElement) || !button.matches('button, [role="button"]')) return;
+    toneClasses.forEach(className => button.classList.remove(className));
+    const tone = inferTone(button);
+    if (tone) button.classList.add(`action-tone-${tone}`);
+  }
+
+  function colorTree(root) {
+    if (!root || root.nodeType !== Node.ELEMENT_NODE) return;
+    colorButton(root);
+    root.querySelectorAll?.('button, [role="button"]').forEach(colorButton);
+  }
+
+  const start = () => {
+    colorTree(document.body);
+    new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(colorTree)))
+      .observe(document.body, { childList: true, subtree: true });
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
+  else start();
+})();

@@ -167,6 +167,12 @@
     return `${baseKey}:${encodeURIComponent(String(user?.id || 'anonymous'))}`;
   }
 
+  function _readUserScopedStorage(baseKey) {
+    const user = window.FrpAuth && typeof window.FrpAuth.getUser === 'function' ? window.FrpAuth.getUser() : null;
+    if (user?.id) return localStorage.getItem(_scopedStorageKey(baseKey));
+    return localStorage.getItem(baseKey);
+  }
+
   function getSyncConflictDrafts() {
     try { return JSON.parse(localStorage.getItem(_scopedStorageKey(CONFLICT_DRAFT_KEY)) || '{}'); }
     catch { return {}; }
@@ -385,6 +391,7 @@
             typeof window.FrpCloud.loadSnippets === 'function' ? window.FrpCloud.loadSnippets() : Promise.resolve(null),
             typeof window.FrpCloud.loadSettings === 'function' ? window.FrpCloud.loadSettings() : Promise.resolve(null)
           ]);
+          if (_sessionIdentity() !== bootstrapSessionIdentity) return;
 
           // 1. Aktif Raporları İşle
           if (activeSettled.status === 'fulfilled') {
@@ -458,7 +465,9 @@
           if (settingsSettled.status === 'fulfilled' && settingsSettled.value) {
             const cloudSettings = settingsSettled.value;
             if (cloudSettings.preferences && typeof cloudSettings.preferences === 'object') {
-              setPreferences({ ...cloudSettings.preferences, theme: getTheme() }, { syncCloud: false });
+              const cloudPreferences = { ...cloudSettings.preferences };
+              if (cloudSettings.theme && !cloudPreferences.theme) cloudPreferences.theme = cloudSettings.theme;
+              setPreferences(cloudPreferences, { syncCloud: false });
             }
             const cloudTags = cloudSettings?.custom_tags ?? cloudSettings?.customTags;
             if (Array.isArray(cloudTags)) {
@@ -1193,17 +1202,37 @@
     if (idx < 0) return false;
 
     const file = files[idx];
+    const curUser = window.FrpAuth?.getUser?.();
+    const history = Array.isArray(file.editHistory) ? file.editHistory : (Array.isArray(file.edit_history) ? file.edit_history : []);
+    const recordCodeChange = (field, oldValue, newValue) => {
+      if (String(oldValue || '') === String(newValue || '')) return;
+      history.push({
+        field,
+        fullOldValue: String(oldValue || ''),
+        fullNewValue: String(newValue || ''),
+        editedAt: new Date().toISOString(),
+        editedBy: curUser?.username || curUser?.full_name || curUser?.name || 'Kullanıcı',
+        userId: curUser?.id || null
+      });
+      if (history.length > 20) history.splice(0, history.length - 20);
+      file.editHistory = history;
+      file.edit_history = history;
+    };
 
     if (typeof patch.sql === 'string' && typeof patch.queryIndex === 'number') {
       if (!Array.isArray(file.queries)) file.queries = [];
       if (file.queries[patch.queryIndex]) {
+        recordCodeChange(`sql[${patch.queryIndex}]`, file.queries[patch.queryIndex].sql, patch.sql);
         file.queries[patch.queryIndex].sql = patch.sql;
       }
     }
 
     if (typeof patch.pascalScript === 'string') {
+      recordCodeChange('pascalScript', file.pascalScript, patch.pascalScript);
       file.pascalScript = patch.pascalScript;
     }
+
+    file.updated_at = new Date().toISOString();
 
     if (window.buildUpdatedFrpXml) {
       file.rawXml = window.buildUpdatedFrpXml(file);
@@ -1212,6 +1241,38 @@
     _write(files);
     _audit('REPORT_CODE_UPDATE', file.name || id, 'SQL veya Pascal kodu güncellendi.');
     return true;
+  }
+
+  function revertLastCodeEdit(id, field) {
+    const files = _read();
+    const idx = files.findIndex(file => String(file.id) === String(id));
+    if (idx < 0) return null;
+    const file = files[idx];
+    const history = Array.isArray(file.editHistory) ? file.editHistory : (Array.isArray(file.edit_history) ? file.edit_history : []);
+    let historyIndex = -1;
+    for (let i = history.length - 1; i >= 0; i--) {
+      if (history[i]?.field === field) { historyIndex = i; break; }
+    }
+    if (historyIndex < 0) return null;
+
+    const entry = history[historyIndex];
+    const restoredCode = String(entry.fullOldValue || '');
+    if (field === 'pascalScript') file.pascalScript = restoredCode;
+    else {
+      const match = /^sql\[(\d+)\]$/.exec(field || '');
+      const queryIndex = match ? Number(match[1]) : -1;
+      if (queryIndex < 0 || !file.queries?.[queryIndex]) return null;
+      file.queries[queryIndex].sql = restoredCode;
+    }
+
+    history.splice(historyIndex, 1);
+    file.editHistory = history;
+    file.edit_history = history;
+    file.updated_at = new Date().toISOString();
+    if (window.buildUpdatedFrpXml) file.rawXml = window.buildUpdatedFrpXml(file);
+    _write(files);
+    _audit('REPORT_CODE_REVERT', file.name || id, `${field} alanındaki son kod değişikliği geri alındı.`);
+    return restoredCode;
   }
 
   function updateReport(id, reportPatch) {
@@ -1400,7 +1461,7 @@
   }
 
   function setActiveWorkspace(ws) {
-    if (ws === 'pool' || ws === 'personal') {
+    if (ws === 'pool' || ws === 'personal' || ws === 'mine') {
       _activeWorkspace = ws;
       localStorage.setItem(WORKSPACE_KEY, ws);
       if (typeof window.refreshAll === 'function') window.refreshAll();
@@ -1415,6 +1476,16 @@
 
     if (curUser.role === 'admin') return list;
     return list.filter(f => String(f.userId || f.user_id || '') === String(curUser.id));
+  }
+
+  function getOwnReports() {
+    const list = getAll();
+    const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
+    if (!curUser) return [];
+    return list.filter(file => {
+      const ownerId = file?.userId || file?.user_id || file?.data?.userId || file?.data?.user_id;
+      return ownerId && String(ownerId) === String(curUser.id);
+    });
   }
 
   function getPoolReports() {
@@ -1771,10 +1842,10 @@
 
   // ── 10. Tercihler, Tema, Son Açılanlar ─────────────────────────
   function getTheme() { 
-    const saved = localStorage.getItem(_scopedStorageKey(THEME_KEY)) || localStorage.getItem(THEME_KEY);
+    const saved = _readUserScopedStorage(THEME_KEY);
     if (saved) return saved === 'dark' ? 'dark' : 'light';
     try {
-      const p = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
+      const p = JSON.parse(_readUserScopedStorage(PREFS_KEY) || '{}');
       if (p && p.theme) return p.theme === 'dark' ? 'dark' : 'light';
     } catch (e) {}
     return 'light'; 
@@ -1782,13 +1853,15 @@
 
   function setTheme(theme) {
     const safeTheme = theme === 'dark' ? 'dark' : 'light';
+    localStorage.setItem(_scopedStorageKey(THEME_KEY), safeTheme);
     localStorage.setItem(THEME_KEY, safeTheme);
     localStorage.setItem('frpoku_theme', safeTheme);
     document.documentElement.setAttribute('data-theme', safeTheme);
 
     try {
-      const p = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
+      const p = JSON.parse(_readUserScopedStorage(PREFS_KEY) || '{}');
       p.theme = safeTheme;
+      localStorage.setItem(_scopedStorageKey(PREFS_KEY), JSON.stringify(p));
       localStorage.setItem(PREFS_KEY, JSON.stringify(p));
     } catch (e) {}
 
@@ -1805,7 +1878,7 @@
 
   function getPreferences() {
     try {
-      const raw = localStorage.getItem(_scopedStorageKey(PREFS_KEY)) || localStorage.getItem(PREFS_KEY);
+      const raw = _readUserScopedStorage(PREFS_KEY);
       const defaults = { 
         theme: getTheme(), 
         fontWeight: 'normal',
@@ -1908,10 +1981,12 @@
 
     // 2.1. Yazı Tipi Kalınlığı (Font Weight Dinamik Skalası)
     const weightMap = {
+      'thin':      { base: '250', bold: '450', heading: '550' },
       'light':     { base: '300', bold: '500', heading: '600' },
       'normal':    { base: '400', bold: '600', heading: '700' },
       'bold':      { base: '500', bold: '700', heading: '800' },
-      'extrabold': { base: '600', bold: '800', heading: '900' }
+      'extrabold': { base: '600', bold: '800', heading: '900' },
+      'black':     { base: '700', bold: '850', heading: '900' }
     };
     const fwConfig = weightMap[prefs.fontWeight] || weightMap['normal'];
     root.setAttribute('data-font-weight', prefs.fontWeight || 'normal');
@@ -1942,11 +2017,13 @@
 
     // 4. Arayüz & Yazı Boyutu (UI Scale)
     const fontSizeMap = {
+      'tiny': '10px',
       'micro': '11px',
       'compact': '12.5px',
       'normal': '14px',
       'spacious': '16px',
-      'large': '18px'
+      'large': '18px',
+      'xlarge': '20px'
     };
     if (prefs.fontSize) {
       root.setAttribute('data-ui-scale', prefs.fontSize);
@@ -1962,9 +2039,15 @@
     if (density === 'minimal' || density === 'compact-ultra' || density === 'ultra') {
       root.style.setProperty('--row-height', '24px');
       root.style.setProperty('--cell-padding', '2px 6px');
+    } else if (density === 'dense') {
+      root.style.setProperty('--row-height', '27px');
+      root.style.setProperty('--cell-padding', '3px 7px');
     } else if (density === 'compact') {
       root.style.setProperty('--row-height', '30px');
       root.style.setProperty('--cell-padding', '5px 8px');
+    } else if (density === 'airy') {
+      root.style.setProperty('--row-height', '56px');
+      root.style.setProperty('--cell-padding', '15px 16px');
     } else if (density === 'comfortable' || density === 'spacious') {
       root.style.setProperty('--row-height', '48px');
       root.style.setProperty('--cell-padding', '12px 14px');
@@ -1976,7 +2059,7 @@
 
   function getUserProfile() {
     try {
-      const raw = localStorage.getItem(_scopedStorageKey(PROFILE_KEY)) || localStorage.getItem(PROFILE_KEY);
+      const raw = _readUserScopedStorage(PROFILE_KEY);
       return raw ? JSON.parse(raw) : { name: 'Kullanıcı', email: '' };
     } catch {
       return { name: 'Kullanıcı', email: '' };
@@ -2213,7 +2296,7 @@
   const FrpStore = {
     getSyncStatus, getSyncConflictDrafts,
     getAll, getById, ensureFullReport, add, addMany, deleteOne, deleteMany, deleteAll, resetAllUserData, clearSessionCache,
-    updateNote, updateMeta, updateCode, updateReport, saveFile, updateFileName, restoreFromIndexedDB, hydrateFromIndexedDB,
+    updateNote, updateMeta, updateCode, revertLastCodeEdit, updateReport, saveFile, updateFileName, restoreFromIndexedDB, hydrateFromIndexedDB,
     exportBackup, importBackup,
     toggleFavorite, togglePin, setFavoriteMany, toggleFavoriteMany, addTag, removeTag, getAllTags, getCustomTags, addCustomTag, deleteCustomTag,
     setCategory, getCategories, getCategoryObjects, addCategory, updateCategory, deleteCategory,
@@ -2226,7 +2309,7 @@
     exportAllSqls, exportAllSqlsCsv, search, getStats, isStorageNearFull,
 
     // Ortak Havuz & Çalışma Alanı
-    getActiveWorkspace, setActiveWorkspace, getMyReports, getPoolReports, canManagePoolReport,
+    getActiveWorkspace, setActiveWorkspace, getMyReports, getOwnReports, getPoolReports, canManagePoolReport,
     toggleReportPool, bulkToggleReportPool, cloneReportToPersonal,
     // Aliaslar (Geriye Dönük Uyumluluk ve UI Bağlantıları)
     addManyToPool: (ids) => bulkToggleReportPool(ids, true),
@@ -2264,6 +2347,12 @@
       if (snippetSettled.status === 'fulfilled' && Array.isArray(snippetSettled.value)) localStorage.setItem(SNIPPET_KEY, JSON.stringify(snippetSettled.value));
       if (settingsSettled.status === 'fulfilled' && settingsSettled.value) {
         const settings = settingsSettled.value;
+        if (settings.preferences && typeof settings.preferences === 'object') {
+          const cloudPreferences = { ...settings.preferences };
+          if (settings.theme && !cloudPreferences.theme) cloudPreferences.theme = settings.theme;
+          setPreferences(cloudPreferences, { syncCloud: false });
+          applyPreferences();
+        }
         const customTags = settings.custom_tags ?? settings.customTags;
         if (Array.isArray(customTags)) {
           localStorage.setItem(_scopedStorageKey(CUSTOM_TAGS_KEY), JSON.stringify(customTags));
@@ -2359,6 +2448,14 @@
   }
 
   window.FrpStore = FrpStore;
+  window.addEventListener('frp:session-changed', () => {
+    try {
+      applyPreferences();
+      const prefs = getPreferences();
+      localStorage.setItem(THEME_KEY, prefs.theme === 'dark' ? 'dark' : 'light');
+      localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+    } catch (e) {}
+  });
   try { 
     applyPreferences(); 
     startAutoBackupTimer();

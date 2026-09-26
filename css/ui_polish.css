@@ -15,6 +15,14 @@
 
 /* Görünüm ayarları gerçek bir ölçek sistemi olarak çalışır. Rem tabanlı
    bileşenler kök boyutla, sabit kontroller ise ortak değişkenlerle küçülür. */
+html[data-ui-scale="tiny"] {
+  font-size: 10.4px;
+  --font-size-base: 10px !important;
+  --ui-control-h: 24px;
+  --ui-radius-sm: 5px;
+  --ui-radius-md: 7px;
+}
+
 html[data-ui-scale="micro"] {
   font-size: 12px;
   --font-size-base: 11px !important;
@@ -33,6 +41,7 @@ html[data-ui-scale="compact"] {
 html[data-ui-scale="normal"] { font-size: 16px; --font-size-base: 14px !important; }
 html[data-ui-scale="spacious"] { font-size: 18.4px; --font-size-base: 16px !important; --ui-control-h: 42px; }
 html[data-ui-scale="large"] { font-size: 20.8px; --font-size-base: 18px !important; --ui-control-h: 46px; }
+html[data-ui-scale="xlarge"] { font-size: 23.2px; --font-size-base: 20px !important; --ui-control-h: 50px; }
 
 body { font-size: var(--font-size-base, 14px) !important; }
 
@@ -300,7 +309,7 @@ html[data-ui-scale="micro"][data-density="minimal"] :is(.badge, .tag-pill, .pool
 }
 
 @media (max-width: 860px) {
-  :root:not([data-ui-scale="micro"]):not([data-ui-scale="compact"]) { --ui-control-h: 42px; }
+  :root:not([data-ui-scale="tiny"]):not([data-ui-scale="micro"]):not([data-ui-scale="compact"]) { --ui-control-h: 42px; }
 
   .topbar,
   .cmp-topbar {
@@ -314,7 +323,7 @@ html[data-ui-scale="micro"][data-density="minimal"] :is(.badge, .tag-pill, .pool
   .workspace-bar,
   .cmp-selector-bar { padding-inline: 0.75rem !important; }
 
-  :root:not([data-ui-scale="micro"]):not([data-ui-scale="compact"]) :is(
+  :root:not([data-ui-scale="tiny"]):not([data-ui-scale="micro"]):not([data-ui-scale="compact"]) :is(
     .btn, .dash-action-btn, .filter-chip
   ) { min-height: 42px; }
 
@@ -638,6 +647,154 @@ html[data-ui-scale="micro"][data-density="minimal"] :is(.badge, .tag-pill, .pool
   #regexErrMsg { grid-column: 1 / -1; }
   #viewModeToggle { flex-wrap: wrap; }
   #viewModeToggle .view-btn { white-space: normal; }
+}
+
+/* İşlem türleri: tüm ekranlarda aynı eylem aynı renk ailesini kullanır. */
+:is(.btn, .btn-copy, .dash-action-btn, button)[class*="action-tone-"] {
+  box-shadow: none !important;
+}
+:is(.btn, .btn-copy, .dash-action-btn, button).action-tone-success {
+  color: #047857 !important;
+  border-color: color-mix(in srgb, #10b981 42%, var(--border)) !important;
+  background: color-mix(in srgb, #10b981 10%, var(--bg-surface)) !important;
+}
+:is(.btn, .btn-copy, .dash-action-btn, button).action-tone-danger {
+  color: #b91c1c !important;
+  border-color: color-mix(in srgb, #ef4444 42%, var(--border)) !important;
+  background: color-mix(in srgb, #ef4444 9%, var(--bg-surface)) !important;
+}
+:is(.btn, .btn-copy, .dash-action-btn, button).action-tone-create {
+  color: #1d4ed8 !important;
+  border-color: color-mix(in srgb, #3b82f6 42%, var(--border)) !important;
+  background: color-mix(in srgb, #3b82f6 9%, var(--bg-surface)) !important;
+}
+:is(.btn, .btn-copy, .dash-action-btn, button).action-tone-edit {
+  color: #6d28d9 !important;
+  border-color: color-mix(in srgb, #8b5cf6 40%, var(--border)) !important;
+  background: color-mix(in srgb, #8b5cf6 9%, var(--bg-surface)) !important;
+}
+:is(.btn, .btn-copy, .dash-action-btn, button).action-tone-info {
+  color: #0369a1 !important;
+  border-color: color-mix(in srgb, #0ea5e9 38%, var(--border)) !important;
+  background: color-mix(in srgb, #0ea5e9 8%, var(--bg-surface)) !important;
+}
+:is(.btn, .btn-copy, .dash-action-btn, button).action-tone-neutral {
+  color: var(--text-secondary) !important;
+  border-color: var(--border) !important;
+  background: var(--bg-surface) !important;
+}
+:is(.btn, .btn-copy, .dash-action-btn, button)[class*="action-tone-"]:not(:disabled):hover {
+  filter: brightness(.97) saturate(1.08);
+  box-shadow: 0 2px 7px rgba(15, 23, 42, .08) !important;
+}
+[data-theme="dark"] :is(.btn, .btn-copy, .dash-action-btn, button).action-tone-success { color: #6ee7b7 !important; }
+[data-theme="dark"] :is(.btn, .btn-copy, .dash-action-btn, button).action-tone-danger { color: #fca5a5 !important; }
+[data-theme="dark"] :is(.btn, .btn-copy, .dash-action-btn, button).action-tone-create { color: #93c5fd !important; }
+[data-theme="dark"] :is(.btn, .btn-copy, .dash-action-btn, button).action-tone-edit { color: #c4b5fd !important; }
+[data-theme="dark"] :is(.btn, .btn-copy, .dash-action-btn, button).action-tone-info { color: #7dd3fc !important; }
+
+/* Detay çalışma alanı ve canlı sözdizimi durumları. */
+.tab.sql-tab.active,
+.tab.active {
+  color: var(--accent) !important;
+  border-bottom-color: var(--accent) !important;
+  background: color-mix(in srgb, var(--accent) 9%, var(--bg-surface)) !important;
+}
+.tab.syntax-error-tab {
+  color: #b91c1c !important;
+  border-color: color-mix(in srgb, #ef4444 48%, var(--border)) !important;
+  background: color-mix(in srgb, #ef4444 9%, var(--bg-surface)) !important;
+  animation: syntaxTabPulse 1.6s ease-in-out infinite;
+}
+.tab.syntax-error-tab.active {
+  color: var(--accent) !important;
+  border-bottom-color: var(--accent) !important;
+  background: color-mix(in srgb, var(--accent) 11%, var(--bg-surface)) !important;
+}
+.tab.syntax-warning-tab:not(.active) {
+  color: #a16207 !important;
+  background: color-mix(in srgb, #f59e0b 8%, var(--bg-surface)) !important;
+}
+.tab-syntax-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.15rem;
+  margin-left: .25rem;
+  padding: 0 .3rem;
+  border-radius: 999px;
+  color: #fff;
+  background: #dc2626;
+  font-size: .63rem;
+  font-weight: 850;
+  line-height: 1;
+}
+.syntax-warning-tab .tab-syntax-marker { background: #d97706; }
+@keyframes syntaxTabPulse {
+  0%, 100% { box-shadow: inset 0 -2px 0 rgba(239, 68, 68, .55); }
+  50% { box-shadow: inset 0 -2px 0 #ef4444, 0 0 0 3px rgba(239, 68, 68, .10); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tab.syntax-error-tab { animation: none; }
+}
+.code-scroll .code-line.syntax-error-line {
+  background: color-mix(in srgb, #ef4444 12%, var(--bg-code)) !important;
+  box-shadow: inset 3px 0 0 #ef4444;
+}
+.code-scroll .code-line.syntax-error-line .line-num {
+  color: #dc2626 !important;
+  font-weight: 850;
+}
+.syntax-error-notice {
+  position: relative;
+  box-shadow: inset 3px 0 0 #ef4444;
+}
+.syntax-error-notice.has-warnings-only { box-shadow: inset 3px 0 0 #f59e0b; }
+.code-toolbar {
+  background: color-mix(in srgb, var(--bg-surface) 94%, var(--accent) 6%) !important;
+  border-bottom: 1px solid var(--ui-border-subtle) !important;
+}
+.code-toolbar-actions { gap: .35rem !important; }
+.code-scroll { background: var(--bg-code); }
+
+.syntax-analysis-modal {
+  width: min(1120px, 94vw) !important;
+  max-height: min(88dvh, 920px);
+  display: flex;
+  flex-direction: column;
+}
+.syntax-analysis-modal .modal-title { flex: 0 0 auto; font-size: 1.05rem; }
+.syntax-analysis-modal .modal-body { min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+.syntax-analysis-modal .modal-actions { flex: 0 0 auto; }
+.syntax-report-summary {
+  display: flex;
+  gap: .55rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: .8rem;
+  padding: .7rem .85rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+}
+.syntax-report-summary > * { padding: .2rem .5rem; border-radius: 999px; background: var(--bg-surface); }
+.syntax-report-summary strong { color: #dc2626; }
+.syntax-report-list { min-height: 260px; max-height: 66dvh; overflow-y: auto; padding-right: .3rem; }
+.syntax-report-item { border: 1px solid color-mix(in srgb, #ef4444 32%, var(--border)); background: color-mix(in srgb, #ef4444 6%, var(--bg-surface)); }
+.syntax-report-item.is-warning { border-color: color-mix(in srgb, #f59e0b 35%, var(--border)); background: color-mix(in srgb, #f59e0b 6%, var(--bg-surface)); }
+.syntax-report-item:hover { border-color: var(--accent); box-shadow: 0 5px 18px rgba(15, 23, 42, .08); }
+.syntax-save-warning { color: var(--text-secondary); line-height: 1.55; }
+.syntax-save-warning > p:first-child { margin-top: 0; padding: .75rem; border-radius: 9px; background: color-mix(in srgb, #ef4444 8%, var(--bg-surface)); color: var(--text-primary); }
+.syntax-save-warning ul { max-height: 250px; overflow-y: auto; margin: .8rem 0; padding-left: 1.4rem; }
+.syntax-save-warning li { margin-bottom: .45rem; }
+.syntax-save-warning-more { color: #b45309; font-weight: 700; }
+
+@media (max-width: 700px) {
+  .syntax-analysis-modal { width: 96vw !important; max-height: 92dvh; }
+  .syntax-report-item { grid-template-columns: 1fr !important; }
+  .syntax-report-item .btn { width: 100%; }
 }
 
 /* Çalışma alanı sekmeleri: tema uyumu ve okunabilir sayaçlar */
