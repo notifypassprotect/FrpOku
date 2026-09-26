@@ -438,6 +438,7 @@ function esc(str) {
  function createDesigner(file, containerEl) {
  let currentZoom = 1.0;
  let currentMode = 'designer'; // 'designer' | 'preview'
+ let showRulers = true; // Cetveller Açık / Kapalı
  let selectedItem = null;
  let showInspector = !window.matchMedia('(max-width: 768px)').matches;
  let rightTab = 'inspector'; // 'inspector' | 'datatree'
@@ -461,6 +462,106 @@ function esc(str) {
  ];
 
  let activePageIndex = 0;
+
+  // ── CETVEL (RULER) SVG ÇİZİCİLERİ ─────────────────────────
+  function renderRulerTopSvg(widthPx, zoom) {
+    const PX_PER_MM = 3.779527559;
+    const mmPx = PX_PER_MM * zoom;
+    const cmPx = 10 * mmPx;
+    const maxCm = Math.ceil(widthPx / cmPx) + 6;
+    const ticks = [];
+
+    for (let cm = 0; cm <= maxCm; cm++) {
+      const cmX = cm * cmPx;
+      ticks.push(`<line x1="${cmX.toFixed(1)}" y1="12" x2="${cmX.toFixed(1)}" y2="24" stroke="#94a3b8" stroke-width="1"/>`);
+      ticks.push(`<text x="${(cmX + 2).toFixed(1)}" y="10" font-size="8" font-family="monospace" font-weight="700" fill="#64748b">${cm}</text>`);
+
+      for (let mm = 1; mm < 10; mm++) {
+        const mmX = cmX + (mm * mmPx);
+        const tickH = mm === 5 ? 7 : 4;
+        ticks.push(`<line x1="${mmX.toFixed(1)}" y1="${24 - tickH}" x2="${mmX.toFixed(1)}" y2="24" stroke="#cbd5e1" stroke-width="0.8"/>`);
+      }
+    }
+
+    return `
+      <svg width="${Math.max(widthPx * zoom + 300, 2200)}" height="24" style="display:block;" shape-rendering="crispEdges">
+        ${ticks.join('')}
+      </svg>
+    `;
+  }
+
+  function renderRulerLeftSvg(heightPx, zoom) {
+    const PX_PER_MM = 3.779527559;
+    const mmPx = PX_PER_MM * zoom;
+    const cmPx = 10 * mmPx;
+    const maxCm = Math.ceil(heightPx / cmPx) + 6;
+    const ticks = [];
+
+    for (let cm = 0; cm <= maxCm; cm++) {
+      const cmY = cm * cmPx;
+      ticks.push(`<line x1="12" y1="${cmY.toFixed(1)}" x2="24" y2="${cmY.toFixed(1)}" stroke="#94a3b8" stroke-width="1"/>`);
+      ticks.push(`<text x="2" y="${(cmY + 9).toFixed(1)}" font-size="8" font-family="monospace" font-weight="700" fill="#64748b">${cm}</text>`);
+
+      for (let mm = 1; mm < 10; mm++) {
+        const mmY = cmY + (mm * mmPx);
+        const tickW = mm === 5 ? 7 : 4;
+        ticks.push(`<line x1="${24 - tickW}" y1="${mmY.toFixed(1)}" x2="24" y2="${mmY.toFixed(1)}" stroke="#cbd5e1" stroke-width="0.8"/>`);
+      }
+    }
+
+    return `
+      <svg width="24" height="${Math.max(heightPx * zoom + 300, 2600)}" style="display:block;" shape-rendering="crispEdges">
+        ${ticks.join('')}
+      </svg>
+    `;
+  }
+
+  function updateRulerTracker(left, width, top, height) {
+    if (!showRulers) return;
+    const trackTop = containerEl.querySelector('#rulerTrackTop');
+    const trackLeft = containerEl.querySelector('#rulerTrackLeft');
+    if (!trackTop || !trackLeft) return;
+
+    if (left !== undefined && width !== undefined) {
+      trackTop.style.display = 'block';
+      trackTop.style.left = `${Math.round(left * currentZoom)}px`;
+      trackTop.style.width = `${Math.max(4, Math.round(width * currentZoom))}px`;
+    } else {
+      trackTop.style.display = 'none';
+    }
+
+    if (top !== undefined && height !== undefined) {
+      trackLeft.style.display = 'block';
+      trackLeft.style.top = `${Math.round(top * currentZoom)}px`;
+      trackLeft.style.height = `${Math.max(4, Math.round(height * currentZoom))}px`;
+    } else {
+      trackLeft.style.display = 'none';
+    }
+  }
+
+  function renderSmartGuides(guideX, guideY) {
+    const pageEl = containerEl.querySelector('#frReportPage') || containerEl.querySelector('#frDialogWindow');
+    if (!pageEl) return;
+    let layer = pageEl.querySelector('.fr-smart-guides-layer');
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.className = 'fr-smart-guides-layer';
+      pageEl.appendChild(layer);
+    }
+    let html = '';
+    if (guideX !== null && guideX !== undefined) {
+      html += `<div class="fr-smart-guide-line vertical" style="left:${guideX}px;"></div>`;
+    }
+    if (guideY !== null && guideY !== undefined) {
+      html += `<div class="fr-smart-guide-line horizontal" style="top:${guideY}px;"></div>`;
+    }
+    layer.innerHTML = html;
+  }
+
+  function clearSmartGuides() {
+    const layer = containerEl.querySelector('.fr-smart-guides-layer');
+    if (layer) layer.innerHTML = '';
+  }
 
  function render() {
  if (allPages.length === 0) {
@@ -568,6 +669,7 @@ function esc(str) {
  <span class="designer-zoom-val" id="zoomValText">${Math.round(currentZoom * 100)}%</span>
  <button type="button" class="designer-zoom-btn" id="btnZoomIn" title="Büyüt">+</button>
  <button type="button" class="designer-zoom-btn" id="btnZoomFit" title="Sayfaya Sığdır" style="margin-left:.25rem;font-size:.75rem;">Sığdır</button>
+ <button type="button" class="designer-zoom-btn ${showRulers ? 'active' : ''}" id="btnToggleRulers" title="Cetvelleri Göster / Gizle" style="margin-left:.25rem;font-size:.75rem;padding:0 6px;">📏 Cetvel</button>
  </div>
 
  <!-- Sağ Panel Sekmeleri: Inspector vs Data Tree -->
@@ -586,9 +688,22 @@ function esc(str) {
  <!-- ÇALIŞMA ALANI & SAHNE -->
  <div class="designer-stage-wrap">
  
+ <div class="designer-canvas-area ${showRulers ? 'has-rulers' : ''}" id="designerCanvasArea">
+ ${showRulers ? `
+ <div class="designer-ruler-corner">cm</div>
+ <div class="designer-ruler-top" id="designerRulerTop">
+ <div class="ruler-track-top" id="rulerTrackTop"></div>
+ ${renderRulerTopSvg(1400, currentZoom)}
+ </div>
+ <div class="designer-ruler-left" id="designerRulerLeft">
+ <div class="ruler-track-left" id="rulerTrackLeft"></div>
+ ${renderRulerLeftSvg(1800, currentZoom)}
+ </div>
+ ` : ''}
  <!-- Canvas Viewport -->
  <div class="designer-canvas-viewport" id="designerViewport">
  ${activePage.type === 'report'? renderReportPageHtml(activePage.data): renderDialogPageHtml(activePage.data)}
+ </div>
  </div>
 
  <!-- SAĞ PANEL: NESNE DENETÇİSİ & DATA TREE (GENİŞLETİLEBİLİR RESIZABLE) -->
@@ -1366,6 +1481,7 @@ function esc(str) {
  min-height:${finalPageMinHeight}px;
  transform:scale(${currentZoom});
  ">
+ <div class="fr-smart-guides-layer" id="frSmartGuidesLayer"></div>
  ${bandsHtml}
  ${vBandsHtml}
  </div>
@@ -2407,6 +2523,12 @@ function esc(str) {
           updateSelection();
         }
       });
+      vpEl.addEventListener('scroll', () => {
+        const rTop = containerEl.querySelector('#designerRulerTop');
+        const rLeft = containerEl.querySelector('#designerRulerLeft');
+        if (rTop) rTop.scrollLeft = vpEl.scrollLeft;
+        if (rLeft) rLeft.scrollTop = vpEl.scrollTop;
+      });
     }
 
     containerEl.querySelectorAll('.fr-view-item,.fr-ctrl-item').forEach(el => {
@@ -2549,18 +2671,89 @@ function esc(str) {
  hud.style.left = `${e.clientX}px`;
  hud.style.top = `${e.clientY}px`;
 
+ // Komşu Bileşenleri Topla (Smart Snapping için)
+ const siblingComps = [];
+ if (activePage?.type === 'report' && !isNaN(bandIdx)) {
+ const b = activePage.data.bands?.[bandIdx];
+ (b?.components || []).forEach(c => {
+ if (c !== selectedItem && c.name !== selectedItem.name) siblingComps.push(c);
+ });
+ } else if (activePage?.type === 'dialog') {
+ (activePage.data.controls || []).forEach(c => {
+ if (c !== selectedItem && c.name !== selectedItem.name) siblingComps.push(c);
+ });
+ }
+
  const onMouseMove = (moveEvt) => {
  const dx = Math.round((moveEvt.clientX - startX) / currentZoom);
  const dy = Math.round((moveEvt.clientY - startY) / currentZoom);
 
  if (isDragging) {
- // 4px Manyetik Izgara Hizalama (Grid Snapping)
- const snapLeft = Math.round((startLeft + dx) / 4) * 4;
- const snapTop = Math.round((startTop + dy) / 4) * 4;
- selectedItem.left = Math.max(0, snapLeft);
- selectedItem.top = Math.max(0, snapTop);
+ let targetLeft = startLeft + dx;
+ let targetTop = startTop + dy;
+ const curW = selectedItem.width || 100;
+ const curH = selectedItem.height || 30;
+
+ let snappedLeft = Math.max(0, Math.round(targetLeft / 2) * 2);
+ let snappedTop = Math.max(0, Math.round(targetTop / 2) * 2);
+ let activeGuideX = null;
+ let activeGuideY = null;
+ const SNAP_THRESH = 6;
+
+ if (siblingComps.length > 0) {
+ for (const sib of siblingComps) {
+ const sLeft = sib.left || 0;
+ const sTop = sib.top || 0;
+ const sW = sib.width || 100;
+ const sH = sib.height || 30;
+
+ if (activeGuideX === null) {
+ if (Math.abs(targetLeft - sLeft) <= SNAP_THRESH) {
+ snappedLeft = sLeft;
+ activeGuideX = sLeft;
+ } else if (Math.abs((targetLeft + curW) - (sLeft + sW)) <= SNAP_THRESH) {
+ snappedLeft = sLeft + sW - curW;
+ activeGuideX = sLeft + sW;
+ } else if (Math.abs((targetLeft + curW / 2) - (sLeft + sW / 2)) <= SNAP_THRESH) {
+ snappedLeft = Math.round(sLeft + sW / 2 - curW / 2);
+ activeGuideX = Math.round(sLeft + sW / 2);
+ } else if (Math.abs(targetLeft - (sLeft + sW)) <= SNAP_THRESH) {
+ snappedLeft = sLeft + sW;
+ activeGuideX = sLeft + sW;
+ } else if (Math.abs((targetLeft + curW) - sLeft) <= SNAP_THRESH) {
+ snappedLeft = sLeft - curW;
+ activeGuideX = sLeft;
+ }
+ }
+
+ if (activeGuideY === null) {
+ if (Math.abs(targetTop - sTop) <= SNAP_THRESH) {
+ snappedTop = sTop;
+ activeGuideY = sTop;
+ } else if (Math.abs((targetTop + curH) - (sTop + sH)) <= SNAP_THRESH) {
+ snappedTop = sTop + sH - curH;
+ activeGuideY = sTop + sH;
+ } else if (Math.abs((targetTop + curH / 2) - (sTop + sH / 2)) <= SNAP_THRESH) {
+ snappedTop = Math.round(sTop + sH / 2 - curH / 2);
+ activeGuideY = Math.round(sTop + sH / 2);
+ } else if (Math.abs(targetTop - (sTop + sH)) <= SNAP_THRESH) {
+ snappedTop = sTop + sH;
+ activeGuideY = sTop + sH;
+ } else if (Math.abs((targetTop + curH) - sTop) <= SNAP_THRESH) {
+ snappedTop = sTop - curH;
+ activeGuideY = sTop;
+ }
+ }
+ }
+ }
+
+ selectedItem.left = Math.max(0, snappedLeft);
+ selectedItem.top = Math.max(0, snappedTop);
  el.style.left = `${selectedItem.left}px`;
  el.style.top = `${selectedItem.top}px`;
+
+ renderSmartGuides(activeGuideX, activeGuideY);
+ updateRulerTracker(selectedItem.left, selectedItem.width, selectedItem.top, selectedItem.height);
  } else if (isResizing) {
  if (handleType.includes('e')) selectedItem.width = Math.max(12, Math.round((startWidth + dx) / 4) * 4);
  if (handleType.includes('s')) selectedItem.height = Math.max(8, Math.round((startHeight + dy) / 4) * 4);
@@ -2578,6 +2771,7 @@ function esc(str) {
  }
  el.style.width = `${selectedItem.width}px`;
  el.style.height = `${selectedItem.height}px`;
+ updateRulerTracker(selectedItem.left, selectedItem.width, selectedItem.top, selectedItem.height);
  }
 
  // Canlı HUD ve Status Bar Güncellemesi
@@ -2598,6 +2792,8 @@ function esc(str) {
  const onMouseUp = () => {
  el.classList.remove('is-dragging');
  if (hud) hud.style.display = 'none';
+ clearSmartGuides();
+ updateRulerTracker(selectedItem.left, selectedItem.width, selectedItem.top, selectedItem.height);
  window.removeEventListener('mousemove', onMouseMove);
  window.removeEventListener('mouseup', onMouseUp);
 
@@ -2787,6 +2983,11 @@ function esc(str) {
  }
  });
 
+ containerEl.querySelector('#btnToggleRulers')?.addEventListener('click', () => {
+ showRulers = !showRulers;
+ render();
+ });
+
  // 6. Sağ Panel Sekmeleri (Object Inspector vs Data Tree)
  containerEl.querySelector('#btnTabInspector')?.addEventListener('click', () => {
  rightTab = 'inspector';
@@ -2966,6 +3167,7 @@ function esc(str) {
  if (statusCoords) statusCoords.innerHTML = `<span>X: ${selectedItem? (selectedItem.left?? 0): 0}, Y: ${selectedItem? (selectedItem.top?? 0): 0}</span>`;
  if (statusDims) statusDims.innerHTML = `<span>W: ${selectedItem? (selectedItem.width?? 0): 0}, H: ${selectedItem? (selectedItem.height?? 0): 0}</span>`;
  if (statusCompPath) statusCompPath.innerHTML = renderStatusCompPath(selectedItem, activePage);
+ updateRulerTracker(selectedItem?.left, selectedItem?.width, selectedItem?.top, selectedItem?.height);
  }
 
  render();
