@@ -148,6 +148,10 @@ window.showPromptDialog = function({
 // ── AYARLAR ANA MODALI ──────────────────────────────────────
 window.openSettingsModal = function(initialTab = 'appearance') {
   const authUser = window.FrpAuth?.getUser();
+  if (initialTab === 'audit' && authUser?.role === 'admin' && typeof window.openAuditLogModal === 'function') {
+    window.openAuditLogModal();
+    return;
+  }
   let activeTab = initialTab === 'audit' && authUser?.role !== 'admin' ? 'appearance' : initialTab;
   const authNameParts = (authUser?.name || '').trim().split(' ');
   const authFirstName = authNameParts[0] || '';

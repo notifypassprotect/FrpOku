@@ -1322,6 +1322,7 @@ function cancelEditMode(tabId) {
  requestAnimationFrame(() => {
  const diagnostics = refreshTabSyntaxState(tabId);
  updateSyntaxErrorNotice(tabId, diagnostics.errors, diagnostics.warnings);
+ updateLastEditBtnState(tabId);
  });
 }
 
@@ -1384,7 +1385,8 @@ async function saveEditMode(tabId, options = {}) {
  }
 
  if (tabCfg.type === 'sql') {
- FrpStore.updateCode(currentFile.id, { queryIndex: tabCfg.queryIndex, sql: newCode });
+ const saved = FrpStore.updateCode(currentFile.id, { queryIndex: tabCfg.queryIndex, sql: newCode });
+ if (!saved) { showToast('SQL değişikliği kaydedilemedi; rapor kaydı bulunamadı.', 'error'); return null; }
  currentFile = FrpStore.getById(currentFile.id);
  tabCfg.rawCode = newCode;
  if (viewScroll) viewScroll.innerHTML = buildLineTable(newCode, tabCfg.highlightFn, new Set(diagnostics.errors.map(error => error.line)));
@@ -1397,7 +1399,8 @@ async function saveEditMode(tabId, options = {}) {
  });
  }
  } else if (tabCfg.type === 'pascal') {
- FrpStore.updateCode(currentFile.id, { pascalScript: newCode });
+ const saved = FrpStore.updateCode(currentFile.id, { pascalScript: newCode });
+ if (!saved) { showToast('PascalScript değişikliği kaydedilemedi; rapor kaydı bulunamadı.', 'error'); return null; }
  currentFile = FrpStore.getById(currentFile.id);
  tabCfg.rawCode = newCode;
  if (viewScroll) viewScroll.innerHTML = buildLineTable(newCode, tabCfg.highlightFn, new Set(diagnostics.errors.map(error => error.line)));
@@ -2229,15 +2232,14 @@ window.scrollToPascalLine = scrollToPascalLine;
 function updateLastEditBtnState(tabId) {
  const btn = document.getElementById(tabId + '_lasteditbtn');
  if (!btn ||!currentFile) return;
- const history = Array.isArray(currentFile.editHistory)
- ? currentFile.editHistory
- : (Array.isArray(currentFile.edit_history) ? currentFile.edit_history : []);
 
  const tabCfg = activeTabs.find(t => t.id === tabId);
  if (!tabCfg) return;
 
  const targetField = tabCfg.type === 'pascal'? 'pascalScript': `sql[${tabCfg.queryIndex}]`;
- const historyItems = history.filter(h => h.field === targetField);
+ const historyItems = window.FrpStore?.getCodeHistory
+ ? FrpStore.getCodeHistory(currentFile.id, targetField)
+ : (Array.isArray(currentFile.editHistory) ? currentFile.editHistory : (currentFile.edit_history || [])).filter(h => h.field === targetField);
  const count = historyItems.length;
 
  if (count > 0) {
@@ -2253,10 +2255,7 @@ function updateLastEditBtnState(tabId) {
 window.updateLastEditBtnState = updateLastEditBtnState;
 
 function openLastEditDiffModal(tabId) {
- const history = currentFile && (Array.isArray(currentFile.editHistory)
- ? currentFile.editHistory
- : (Array.isArray(currentFile.edit_history) ? currentFile.edit_history : []));
- if (!currentFile || !history || history.length === 0) {
+ if (!currentFile) {
  showToast('Henüz bu raporda kaydedilmiş bir değişiklik bulunmuyor.', 'info');
  return;
  }
@@ -2265,7 +2264,9 @@ function openLastEditDiffModal(tabId) {
  if (!tabCfg) return;
 
  const targetField = tabCfg.type === 'pascal'? 'pascalScript': `sql[${tabCfg.queryIndex}]`;
- const historyItems = history.filter(h => h.field === targetField);
+ const historyItems = window.FrpStore?.getCodeHistory
+ ? FrpStore.getCodeHistory(currentFile.id, targetField)
+ : (Array.isArray(currentFile.editHistory) ? currentFile.editHistory : (currentFile.edit_history || [])).filter(h => h.field === targetField);
 
  if (historyItems.length === 0) {
  showToast('Bu alanda kaydedilmiş geçmiş bir düzenleme bulunamadı.', 'info');
@@ -2379,10 +2380,7 @@ function openLastEditDiffModal(tabId) {
 window.openLastEditDiffModal = openLastEditDiffModal;
 
 function undoLastEditInTab(tabId) {
- const history = currentFile && (Array.isArray(currentFile.editHistory)
- ? currentFile.editHistory
- : (Array.isArray(currentFile.edit_history) ? currentFile.edit_history : []));
- if (!currentFile || !history || history.length === 0) {
+ if (!currentFile) {
  showToast('Geri alınacak bir düzenleme geçmişi yok.', 'warning');
  return;
  }
@@ -2391,6 +2389,13 @@ function undoLastEditInTab(tabId) {
  if (!tabCfg) return;
 
  const targetField = tabCfg.type === 'pascal'? 'pascalScript': `sql[${tabCfg.queryIndex}]`;
+ const history = window.FrpStore?.getCodeHistory
+ ? FrpStore.getCodeHistory(currentFile.id, targetField)
+ : (Array.isArray(currentFile.editHistory) ? currentFile.editHistory : (currentFile.edit_history || [])).filter(h => h.field === targetField);
+ if (history.length === 0) {
+ showToast('Geri alınacak bir düzenleme geçmişi yok.', 'warning');
+ return;
+ }
  const revertedCode = FrpStore.revertLastCodeEdit(currentFile.id, targetField);
 
  if (revertedCode === null) {

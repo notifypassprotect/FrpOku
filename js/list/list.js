@@ -328,7 +328,9 @@ function applySearch() {
   const curWs = FrpStore.getActiveWorkspace ? FrpStore.getActiveWorkspace() : 'personal';
   let baseList = curWs === 'pool'
     ? (FrpStore.getPoolReports ? FrpStore.getPoolReports() : [])
-    : (FrpStore.getMyReports ? FrpStore.getMyReports() : FrpStore.getAll());
+    : curWs === 'mine'
+      ? (FrpStore.getOwnReports ? FrpStore.getOwnReports() : [])
+      : (FrpStore.getMyReports ? FrpStore.getMyReports() : FrpStore.getAll());
 
   allFiles = baseList.filter(file => {
     if (onlyFavorites && !file.isFavorite) return false;
@@ -421,10 +423,13 @@ window.applySearch = applySearch;
 
 function updateWorkspaceCounts() {
   const myCount = (FrpStore.getMyReports ? FrpStore.getMyReports() : FrpStore.getAll()).length;
+  const ownCount = (FrpStore.getOwnReports ? FrpStore.getOwnReports() : []).length;
   const poolCount = (FrpStore.getPoolReports ? FrpStore.getPoolReports() : []).length;
   const myBadge = document.getElementById('badgeMyCount');
+  const ownBadge = document.getElementById('badgeOwnCount');
   const poolBadge = document.getElementById('badgePoolCount');
   if (myBadge) myBadge.textContent = myCount;
+  if (ownBadge) ownBadge.textContent = ownCount;
   if (poolBadge) poolBadge.textContent = poolCount;
 }
 
@@ -1200,6 +1205,29 @@ window.refreshAll = refreshAll;
 
 // ── Başlatma ve Event Listener Bağlantıları ──────────────────
 function initListPage() {
+  let isAdmin = window.FrpAuth?.getUser()?.role === 'admin';
+  const mineTab = document.getElementById('tabWsMine');
+  const setWorkspaceTabState = (workspace) => {
+    ['personal', 'mine', 'pool'].forEach(name => {
+      const tab = document.querySelector(`[data-ws="${name}"]`);
+      tab?.classList.toggle('active', name === workspace);
+      tab?.classList.toggle('pool-active', name === 'pool' && name === workspace);
+    });
+  };
+  const refreshWorkspaceAccess = () => {
+    isAdmin = window.FrpAuth?.getUser()?.role === 'admin';
+    const personalTabLabel = document.querySelector('#tabWsPersonal > span:first-child');
+    if (personalTabLabel) personalTabLabel.textContent = isAdmin ? 'Tüm Kişisel Raporlar' : 'Kişisel Raporlarım';
+    if (mineTab) mineTab.hidden = !isAdmin;
+    if (!isAdmin && FrpStore.getActiveWorkspace?.() === 'mine') {
+      FrpStore.setActiveWorkspace?.('personal');
+    }
+    setWorkspaceTabState(FrpStore.getActiveWorkspace?.() || 'personal');
+    updateWorkspaceCounts();
+  };
+  refreshWorkspaceAccess();
+  window.addEventListener('frp:session-changed', refreshWorkspaceAccess);
+
   // Önce yerel depodaki mevcut verileri 0ms bekleme ile anında render et:
   refreshAll();
   setupContextMenu();
@@ -1230,8 +1258,7 @@ function initListPage() {
 
   // Çalışma Alanı Değiştirici
   document.getElementById('tabWsPersonal')?.addEventListener('click', () => {
-    document.getElementById('tabWsPersonal')?.classList.add('active');
-    document.getElementById('tabWsPool')?.classList.remove('active');
+    setWorkspaceTabState('personal');
     if (FrpStore.setActiveWorkspace) FrpStore.setActiveWorkspace('personal');
     const pn = document.getElementById('poolNotice');
     if (pn) pn.style.display = 'none';
@@ -1240,9 +1267,19 @@ function initListPage() {
     applySearch();
   });
 
+  document.getElementById('tabWsMine')?.addEventListener('click', () => {
+    if (!isAdmin) return;
+    setWorkspaceTabState('mine');
+    if (FrpStore.setActiveWorkspace) FrpStore.setActiveWorkspace('mine');
+    const pn = document.getElementById('poolNotice');
+    if (pn) pn.style.display = 'none';
+    updateAnalyticsVisibility();
+    updateUserList();
+    applySearch();
+  });
+
   document.getElementById('tabWsPool')?.addEventListener('click', async () => {
-    document.getElementById('tabWsPool')?.classList.add('active');
-    document.getElementById('tabWsPersonal')?.classList.remove('active');
+    setWorkspaceTabState('pool');
     if (FrpStore.setActiveWorkspace) FrpStore.setActiveWorkspace('pool');
     const pn = document.getElementById('poolNotice');
     if (pn) pn.style.display = 'block';
@@ -1685,10 +1722,9 @@ function initListPage() {
     const view = readSavedViews().find(item => item.id === savedViewSelect.value);
     if (!view) return;
     const f = view.filters || {};
-    const workspace = f.workspace === 'pool' ? 'pool' : 'personal';
+    const workspace = f.workspace === 'pool' ? 'pool' : (f.workspace === 'mine' && isAdmin ? 'mine' : 'personal');
     FrpStore.setActiveWorkspace?.(workspace);
-    document.getElementById('tabWsPersonal')?.classList.toggle('active', workspace === 'personal');
-    document.getElementById('tabWsPool')?.classList.toggle('active', workspace === 'pool');
+    setWorkspaceTabState(workspace);
     const poolNotice = document.getElementById('poolNotice');
     if (poolNotice) poolNotice.style.display = workspace === 'pool' ? 'block' : 'none';
     updateAnalyticsVisibility();
@@ -1736,7 +1772,7 @@ function initListPage() {
     if (!event.target.closest('#btnFavOnly, #btnPinnedOnly, #btnNotesOnly, #regexBtn, #btnResetFilters')) return;
     clearSavedViewSelection();
   });
-  document.querySelectorAll('#tabWsPersonal, #tabWsPool, #btnViewTable, #btnViewCards, #btnViewTimeline')
+  document.querySelectorAll('#tabWsPersonal, #tabWsMine, #tabWsPool, #btnViewTable, #btnViewCards, #btnViewTimeline')
     .forEach(button => button.addEventListener('click', clearSavedViewSelection));
   document.getElementById('tableHeaderRow')?.addEventListener('click', event => {
     if (event.target.closest('th.sortable')) clearSavedViewSelection();

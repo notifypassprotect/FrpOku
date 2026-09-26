@@ -1201,6 +1201,18 @@ td.col-fileSize {
 }
 
 /* ── TABLO SIKIŞIKLIĞI (DENSITY LEVELS) ───────────────────── */
+/* Çok Ferah (Airy - 56px) */
+:is([data-density="airy"], html[data-density="airy"], body[data-density="airy"]) :is(.report-table, table) thead th,
+.report-table[data-density="airy"] thead th {
+  padding: 1.2rem 1.2rem;
+  font-size: 0.84rem;
+}
+:is([data-density="airy"], html[data-density="airy"], body[data-density="airy"]) :is(.report-table, table) tbody td,
+.report-table[data-density="airy"] tbody td {
+  padding: 1.15rem 1.2rem;
+  font-size: 0.96rem;
+}
+
 /* 1. Rahat (Comfortable - 44px) */
 :is([data-density="comfortable"], html[data-density="comfortable"], body[data-density="comfortable"]) :is(.report-table, table) thead th,
 .report-table[data-density="comfortable"] thead th {
@@ -1248,7 +1260,20 @@ td.col-fileSize {
   font-size: 0.68rem;
 }
 
-/* 4. Ultra Sıkışık (Minimal - 22px) */
+/* Yoğun (Dense - 25px) */
+:is([data-density="dense"], html[data-density="dense"], body[data-density="dense"]) :is(.report-table, table) thead th,
+.report-table[data-density="dense"] thead th {
+  padding: 0.34rem 0.62rem;
+  font-size: 0.7rem;
+}
+:is([data-density="dense"], html[data-density="dense"], body[data-density="dense"]) :is(.report-table, table) tbody td,
+.report-table[data-density="dense"] tbody td {
+  padding: 0.24rem 0.58rem;
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+
+/* 6. Ultra Sıkışık (Minimal - 22px) */
 :is([data-density="minimal"], html[data-density="minimal"], body[data-density="minimal"]) :is(.report-table, table) thead th,
 .report-table[data-density="minimal"] thead th {
   padding: 0.22rem 0.5rem !important;

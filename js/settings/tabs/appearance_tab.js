@@ -86,10 +86,12 @@ window.FrpSettingsTabs.appearance = {
           <div style="font-weight:700;font-size:.85rem;margin-bottom:.6rem;">Yazı Tipi Kalınlığı (Font Weight)</div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:.5rem;">
             ${[
+              { id: 'thin', name: 'Çok İnce (Thin)', desc: 'Hafif 250', weight: '250' },
               { id: 'light', name: 'İnce (Light)', desc: 'Zarif 400', weight: '400' },
               { id: 'normal', name: 'Normal (Medium)', desc: 'Standart 500', weight: '500' },
               { id: 'bold', name: 'Kalın (Semi-Bold)', desc: 'Belirgin 600', weight: '600' },
-              { id: 'extrabold', name: 'Çok Kalın (Bold)', desc: 'Güçlü 700', weight: '700' }
+              { id: 'extrabold', name: 'Çok Kalın (Bold)', desc: 'Güçlü 700', weight: '700' },
+              { id: 'black', name: 'Ekstra Kalın (Black)', desc: 'Vurgulu 800', weight: '800' }
             ].map(w => `
               <label class="settings-radio-card ${(stagedPrefs.fontWeight || 'normal') === w.id ? 'active' : ''}">
                 <input type="radio" name="stagedFontWeight" value="${w.id}" ${(stagedPrefs.fontWeight || 'normal') === w.id ? 'checked' : ''} style="display:none;" />
@@ -105,11 +107,13 @@ window.FrpSettingsTabs.appearance = {
           <div style="font-weight:700;font-size:.85rem;margin-bottom:.6rem;">Arayüz & Yazı Boyutu (UI Scale)</div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:.5rem;">
             ${[
+              { id: 'tiny', name: 'Mini (%65)', desc: 'En küçük arayüz' },
               { id: 'micro', name: 'Mikro (%75)', desc: 'Ultra Kompakt' },
               { id: 'compact', name: 'Kompakt (%85)', desc: 'Küçük ekranlar' },
               { id: 'normal', name: 'Standart (%100)', desc: 'Varsayılan' },
               { id: 'spacious', name: 'Geniş (%115)', desc: 'Rahat okuma' },
-              { id: 'large', name: 'Büyük (%130)', desc: 'Büyük ekran' }
+              { id: 'large', name: 'Büyük (%130)', desc: 'Büyük ekran' },
+              { id: 'xlarge', name: 'Çok Büyük (%145)', desc: 'Erişilebilir görünüm' }
             ].map(s => `
               <label class="settings-radio-card ${stagedPrefs.fontSize === s.id ? 'active' : ''}">
                 <input type="radio" name="stagedFontSize" value="${s.id}" ${stagedPrefs.fontSize === s.id ? 'checked' : ''} style="display:none;" />
@@ -125,9 +129,11 @@ window.FrpSettingsTabs.appearance = {
           <div style="font-weight:700;font-size:.85rem;margin-bottom:.6rem;">Tablo & Liste Sıkışıklığı (Density)</div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:.5rem;">
             ${[
+              { id: 'airy',        name: 'Çok Ferah',      desc: 'Ekstra satır aralığı (56px)' },
               { id: 'comfortable', name: 'Rahat (Geniş)', desc: 'Ferah satır aralığı (44px)' },
               { id: 'normal',      name: 'Standart',      desc: 'Dengeli satır aralığı (36px)' },
               { id: 'compact',     name: 'Kompakt',       desc: 'Sıkışık satırlar (28px)' },
+              { id: 'dense',       name: 'Yoğun',          desc: 'Daha fazla veri (25px)' },
               { id: 'minimal',     name: 'Ultra Sıkışık', desc: 'Maksimum veri (22px)' }
             ].map(d => `
               <label class="settings-radio-card ${(stagedPrefs.density || 'normal') === d.id ? 'active' : ''}">
@@ -232,10 +238,12 @@ window.FrpSettingsTabs.appearance = {
         stagedPrefs.fontWeight = e.target.value;
         markDirty();
         const weightMap = {
+          'thin':      { base: '250', bold: '450', heading: '550' },
           'light':     { base: '300', bold: '500', heading: '600' },
           'normal':    { base: '400', bold: '600', heading: '700' },
           'bold':      { base: '500', bold: '700', heading: '800' },
-          'extrabold': { base: '600', bold: '800', heading: '900' }
+          'extrabold': { base: '600', bold: '800', heading: '900' },
+          'black':     { base: '700', bold: '850', heading: '900' }
         };
         const fwConfig = weightMap[e.target.value] || weightMap['normal'];
         document.documentElement.setAttribute('data-font-weight', e.target.value);
@@ -254,7 +262,7 @@ window.FrpSettingsTabs.appearance = {
     overlay.querySelectorAll('input[name="stagedFontSize"]').forEach(radio => {
       radio.addEventListener('change', (e) => {
         stagedPrefs.fontSize = e.target.value;
-        const fontSizeMap = { micro: '11px', compact: '12.5px', normal: '14px', spacious: '16px', large: '18px' };
+        const fontSizeMap = { tiny: '10px', micro: '11px', compact: '12.5px', normal: '14px', spacious: '16px', large: '18px', xlarge: '20px' };
         document.documentElement.setAttribute('data-ui-scale', e.target.value);
         if (fontSizeMap[e.target.value]) document.documentElement.style.setProperty('--font-size-base', fontSizeMap[e.target.value]);
         overlay.querySelectorAll('input[name="stagedFontSize"]').forEach(r => {
@@ -273,9 +281,15 @@ window.FrpSettingsTabs.appearance = {
         if (dVal === 'minimal') {
           document.documentElement.style.setProperty('--row-height', '24px');
           document.documentElement.style.setProperty('--cell-padding', '2px 6px');
+        } else if (dVal === 'dense') {
+          document.documentElement.style.setProperty('--row-height', '27px');
+          document.documentElement.style.setProperty('--cell-padding', '3px 7px');
         } else if (dVal === 'compact') {
           document.documentElement.style.setProperty('--row-height', '30px');
           document.documentElement.style.setProperty('--cell-padding', '5px 8px');
+        } else if (dVal === 'airy') {
+          document.documentElement.style.setProperty('--row-height', '56px');
+          document.documentElement.style.setProperty('--cell-padding', '15px 16px');
         } else if (dVal === 'comfortable') {
           document.documentElement.style.setProperty('--row-height', '48px');
           document.documentElement.style.setProperty('--cell-padding', '12px 14px');

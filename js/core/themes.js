@@ -32,19 +32,24 @@
     return user?.id ? `${key}:${encodeURIComponent(String(user.id))}` : key;
   }
 
+  function _readThemeValue(key) {
+    const user = window.FrpAuth && typeof window.FrpAuth.getUser === 'function' ? window.FrpAuth.getUser() : null;
+    return user?.id ? localStorage.getItem(_scopedUserKey(key)) : localStorage.getItem(key);
+  }
+
   function getCodeTheme() {
-    const saved = localStorage.getItem(_scopedUserKey(THEME_CODE_KEY)) || localStorage.getItem(THEME_CODE_KEY);
+    const saved = _readThemeValue(THEME_CODE_KEY);
     if (saved) return saved;
     const globalT = getGlobalTheme();
     return globalT === 'dark' ? 'frpoku-dark' : 'frpoku-light';
   }
 
   function getGlobalTheme() {
-    let t = localStorage.getItem(_scopedUserKey(THEME_GLOBAL_KEY)) || localStorage.getItem(THEME_GLOBAL_KEY);
+    let t = _readThemeValue(THEME_GLOBAL_KEY);
     if (!t) {
       try {
         const prefKey = _scopedUserKey('frpoku_preferences');
-        const p = JSON.parse(localStorage.getItem(prefKey) || localStorage.getItem('frpoku_preferences') || '{}');
+        const p = JSON.parse(_readThemeValue('frpoku_preferences') || '{}');
         if (p && p.theme) t = p.theme;
       } catch (e) {}
     }
@@ -91,7 +96,7 @@
         localStorage.setItem(_scopedUserKey(THEME_GLOBAL_KEY), uiTheme);
         localStorage.setItem(THEME_GLOBAL_KEY, uiTheme);
         const scopedPrefKey = _scopedUserKey('frpoku_preferences');
-        const prefs = JSON.parse(localStorage.getItem(scopedPrefKey) || localStorage.getItem('frpoku_preferences') || '{}');
+        const prefs = JSON.parse(_readThemeValue('frpoku_preferences') || '{}');
         prefs.theme = uiTheme;
         localStorage.setItem(scopedPrefKey, JSON.stringify(prefs));
         localStorage.setItem('frpoku_preferences', JSON.stringify(prefs));
@@ -127,7 +132,7 @@
   function initCodeTheme() {
     const savedGlobal = getGlobalTheme();
     const isDark = savedGlobal === 'dark';
-    const savedCode = localStorage.getItem(_scopedUserKey(THEME_CODE_KEY)) || localStorage.getItem(THEME_CODE_KEY);
+    const savedCode = _readThemeValue(THEME_CODE_KEY);
     
     if (savedCode) {
       applyCodeTheme(savedCode, true, false);

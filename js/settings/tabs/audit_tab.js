@@ -751,28 +751,13 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
     render() {
       if (window.FrpAuth?.getUser()?.role !== 'admin') return '';
       return `
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3rem 1.5rem;text-align:center;gap:1.25rem;">
-          <div style="width:64px;height:64px;border-radius:20px;background:var(--accent-light);color:var(--accent);display:flex;align-items:center;justify-content:center;">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-          </div>
-          <div>
-            <div style="font-size:1.2rem;font-weight:900;color:var(--text-primary);margin-bottom:.4rem;">Kullanıcı İşlem & Denetim Günlüğü</div>
-            <div style="font-size:.84rem;color:var(--text-muted);max-width:480px;line-height:1.5;">
-              Tüm sistem hareketleri, indirme, yükleme ve güvenlik kayıtları tam ekran genişletilmiş arayüzde sunulmaktadır.
-            </div>
-          </div>
-          <button type="button" class="btn btn-primary" id="btnOpenWideAuditModalDirect" style="font-weight:800;padding:.6rem 1.6rem;font-size:.9rem;box-shadow:0 4px 14px rgba(37,99,235,0.35);">
-            Denetim Günlüğünü Geniş Pencerede Aç
-          </button>
+        <div style="display:flex;align-items:center;justify-content:center;padding:3rem 1.5rem;color:var(--text-muted);font-weight:700;">
+          Denetim günlüğü açılıyor…
         </div>
       `;
     },
 
-    bind({ overlay }) {
-      overlay.querySelector('#btnOpenWideAuditModalDirect')?.addEventListener('click', () => {
-        window.openAuditLogModal();
-      });
-    }
+    bind() {}
   };
 
 })();

@@ -15,6 +15,7 @@
   const PREFS_KEY = 'frpoku_preferences';
   const PROFILE_KEY = 'frpoku_user_profile';
   const TRASH_KEY = 'frpoku_trash';
+  const CODE_HISTORY_KEY = 'frpoku_code_history_v2';
 
   const DB_NAME = 'FrpOkuDB';
   const DB_STORE = 'files';
@@ -223,6 +224,41 @@
       map[String(id)] = Boolean(isPinned);
       localStorage.setItem(_scopedStorageKey(USER_PIN_OVERRIDES_KEY), JSON.stringify(map));
     } catch {}
+  }
+
+  function _readCodeHistoryMap() {
+    try {
+      const raw = localStorage.getItem(_scopedStorageKey(CODE_HISTORY_KEY));
+      const parsed = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch { return {}; }
+  }
+
+  function _writeCodeHistoryMap(map) {
+    try { localStorage.setItem(_scopedStorageKey(CODE_HISTORY_KEY), JSON.stringify(map || {})); }
+    catch (error) { console.warn('Kod geçmişi yerel olarak saklanamadı:', error); }
+  }
+
+  function _saveCodeHistoryEntry(reportId, entry) {
+    const map = _readCodeHistoryMap();
+    const key = String(reportId);
+    const items = Array.isArray(map[key]) ? map[key] : [];
+    items.push(entry);
+    map[key] = items.slice(-50);
+    _writeCodeHistoryMap(map);
+  }
+
+  function getCodeHistory(reportId, field) {
+    const report = getById(reportId);
+    const embedded = Array.isArray(report?.editHistory) ? report.editHistory : (Array.isArray(report?.edit_history) ? report.edit_history : []);
+    const local = _readCodeHistoryMap()[String(reportId)] || [];
+    const unique = new Map();
+    [...embedded, ...local].forEach(entry => {
+      if (!entry || (field && entry.field !== field)) return;
+      const key = entry.id || `${entry.field}:${entry.editedAt}:${entry.fullOldValue}:${entry.fullNewValue}`;
+      unique.set(key, entry);
+    });
+    return [...unique.values()].sort((a, b) => new Date(a.editedAt || 0) - new Date(b.editedAt || 0));
   }
 
   function _savePendingSyncIds() {
@@ -1198,7 +1234,7 @@
 
   function updateCode(id, patch) {
     const files = _read();
-    const idx = files.findIndex(f => f.id === id);
+    const idx = files.findIndex(f => String(f.id) === String(id));
     if (idx < 0) return false;
 
     const file = files[idx];
@@ -1206,17 +1242,20 @@
     const history = Array.isArray(file.editHistory) ? file.editHistory : (Array.isArray(file.edit_history) ? file.edit_history : []);
     const recordCodeChange = (field, oldValue, newValue) => {
       if (String(oldValue || '') === String(newValue || '')) return;
-      history.push({
+      const entry = {
+        id: `hist_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         field,
         fullOldValue: String(oldValue || ''),
         fullNewValue: String(newValue || ''),
         editedAt: new Date().toISOString(),
         editedBy: curUser?.username || curUser?.full_name || curUser?.name || 'Kullanıcı',
         userId: curUser?.id || null
-      });
+      };
+      history.push(entry);
       if (history.length > 20) history.splice(0, history.length - 20);
       file.editHistory = history;
       file.edit_history = history;
+      _saveCodeHistoryEntry(file.id, entry);
     };
 
     if (typeof patch.sql === 'string' && typeof patch.queryIndex === 'number') {
@@ -1249,13 +1288,16 @@
     if (idx < 0) return null;
     const file = files[idx];
     const history = Array.isArray(file.editHistory) ? file.editHistory : (Array.isArray(file.edit_history) ? file.edit_history : []);
+    const localMap = _readCodeHistoryMap();
+    const localHistory = Array.isArray(localMap[String(id)]) ? localMap[String(id)] : [];
     let historyIndex = -1;
     for (let i = history.length - 1; i >= 0; i--) {
       if (history[i]?.field === field) { historyIndex = i; break; }
     }
-    if (historyIndex < 0) return null;
+    const localEntry = [...localHistory].reverse().find(item => item?.field === field);
+    if (historyIndex < 0 && !localEntry) return null;
 
-    const entry = history[historyIndex];
+    const entry = historyIndex >= 0 ? history[historyIndex] : localEntry;
     const restoredCode = String(entry.fullOldValue || '');
     if (field === 'pascalScript') file.pascalScript = restoredCode;
     else {
@@ -1265,7 +1307,9 @@
       file.queries[queryIndex].sql = restoredCode;
     }
 
-    history.splice(historyIndex, 1);
+    if (historyIndex >= 0) history.splice(historyIndex, 1);
+    localMap[String(id)] = localHistory.filter(item => (entry.id && item?.id) ? item.id !== entry.id : !(item?.field === entry.field && item?.editedAt === entry.editedAt));
+    _writeCodeHistoryMap(localMap);
     file.editHistory = history;
     file.edit_history = history;
     file.updated_at = new Date().toISOString();
@@ -1482,9 +1526,14 @@
     const list = getAll();
     const curUser = window.FrpAuth ? window.FrpAuth.getUser() : null;
     if (!curUser) return [];
+    const currentId = String(curUser.id || '');
+    const currentUsername = String(curUser.username || '').trim().toLocaleLowerCase('tr-TR');
     return list.filter(file => {
       const ownerId = file?.userId || file?.user_id || file?.data?.userId || file?.data?.user_id;
-      return ownerId && String(ownerId) === String(curUser.id);
+      const ownerUsername = String(file?.ownerUsername || file?.owner_username || file?.data?.ownerUsername || file?.data?.owner_username || '').trim().toLocaleLowerCase('tr-TR');
+      if (ownerId && String(ownerId) === currentId) return true;
+      if (currentUsername && ownerUsername && ownerUsername === currentUsername) return true;
+      return curUser.role === 'admin' && String(ownerId || '') === 'usr_admin_root';
     });
   }
 
@@ -2296,7 +2345,7 @@
   const FrpStore = {
     getSyncStatus, getSyncConflictDrafts,
     getAll, getById, ensureFullReport, add, addMany, deleteOne, deleteMany, deleteAll, resetAllUserData, clearSessionCache,
-    updateNote, updateMeta, updateCode, revertLastCodeEdit, updateReport, saveFile, updateFileName, restoreFromIndexedDB, hydrateFromIndexedDB,
+    updateNote, updateMeta, updateCode, getCodeHistory, revertLastCodeEdit, updateReport, saveFile, updateFileName, restoreFromIndexedDB, hydrateFromIndexedDB,
     exportBackup, importBackup,
     toggleFavorite, togglePin, setFavoriteMany, toggleFavoriteMany, addTag, removeTag, getAllTags, getCustomTags, addCustomTag, deleteCustomTag,
     setCategory, getCategories, getCategoryObjects, addCategory, updateCategory, deleteCategory,

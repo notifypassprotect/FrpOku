@@ -567,8 +567,39 @@
  }
 
  // 4. Standart Sözdizimi Kontrolleri
+ // GROUP BY yalnızca üst seviye SELECT listesinde aggregate ve düz kolon gerçekten
+ // birlikteyse gerekir. Sadece COUNT/SUM ifadelerinden oluşan sorguları uyarmayız.
+ function getTopLevelSelectItems(source) {
+ const clean = String(source || '')
+ .replace(/--[^\n]*/g, match => ' '.repeat(match.length))
+ .replace(/\/\*[\s\S]*?\*\//g, match => ' '.repeat(match.length))
+ .replace(/'(?:''|[^'])*'/g, match => ' '.repeat(match.length));
+ let depth = 0, selectStart = -1, fromStart = -1;
+ for (let i = 0; i < clean.length; i++) {
+ const ch = clean[i];
+ if (ch === '(') { depth++; continue; }
+ if (ch === ')') { depth = Math.max(0, depth - 1); continue; }
+ if (depth !== 0) continue;
+ if (selectStart < 0 && /^SELECT\b/i.test(clean.slice(i))) { selectStart = i + 6; i += 5; continue; }
+ if (selectStart >= 0 && /^FROM\b/i.test(clean.slice(i))) { fromStart = i; break; }
+ }
+ if (selectStart < 0 || fromStart < 0) return [];
+ const list = clean.slice(selectStart, fromStart);
+ const items = []; let start = 0; depth = 0;
+ for (let i = 0; i < list.length; i++) {
+ if (list[i] === '(') depth++;
+ else if (list[i] === ')') depth = Math.max(0, depth - 1);
+ else if (list[i] === ',' && depth === 0) { items.push(list.slice(start, i).trim()); start = i + 1; }
+ }
+ items.push(list.slice(start).trim());
+ return items.filter(Boolean);
+ }
  if (hasAggregates &&!hasGroupBy && hasSelect) {
- warnings.push("Aggregate fonksiyonu (SUM, COUNT vb.) ile normal kolonlar birlikte kullanılıyor olabilir ancak GROUP BY bulunamadı.");
+ const selectItems = getTopLevelSelectItems(sql);
+ const aggregatePattern = /\b(SUM|COUNT|AVG|MIN|MAX|LISTAGG|XMLAGG|LIST)\s*\(/i;
+ const hasAggregateItem = selectItems.some(item => aggregatePattern.test(item));
+ const hasPlainColumnItem = selectItems.some(item => !aggregatePattern.test(item) && /[A-Z_][\w$#]*(?:\s*\.\s*[A-Z_][\w$#]*)?/i.test(item) && !/^\s*(?:DISTINCT\s+)?(?:NULL|\d+(?:\.\d+)?)\s*(?:\w+)?\s*$/i.test(item));
+ if (hasAggregateItem && hasPlainColumnItem) warnings.push("Aggregate fonksiyonu ile normal kolon aynı SELECT listesinde kullanılıyor ancak GROUP BY bulunamadı.");
  }
 
  if (hasSelect &&!/\bFROM\b/i.test(upper)) {
