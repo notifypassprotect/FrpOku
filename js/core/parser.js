@@ -893,6 +893,9 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
           node = doc.createElement(model.type);
           node.setAttribute('Name', model.name);
           parent.appendChild(node);
+        } else if (node && parent && node.parentNode !== parent) {
+          // Tasarımcıda başka banda/sayfaya taşınan nesnenin XML ebeveynini de güncelle.
+          parent.appendChild(node);
         }
         return node;
       };
@@ -925,6 +928,8 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
           const synthetic = band.type === 'TfrxPageContent';
           const bandNode = synthetic ? pageNode : ensureNode(band, pageNode);
           if (!bandNode) return;
+          // Modeldeki bant sıralamasını XML düğüm sırasına yansıt.
+          if (!synthetic && bandNode.parentNode === pageNode) pageNode.appendChild(bandNode);
           if (!synthetic) setAttrs(bandNode, {
             Left: band.left, Top: band.top, Width: band.width, Height: band.height,
             DataSetName: band.dataSet, Condition: band.condition, Stretched: band.stretched, Vertical: band.vertical
