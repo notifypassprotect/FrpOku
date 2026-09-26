@@ -862,10 +862,14 @@
               <option value="approved">✅ Onay & Teslim</option>
             </select>
             <button type="button" id="tbChecklist" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Görev Listesi / Checklist Ekle">☑ Liste</button>
+            <button type="button" id="tbSqlSnippet" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem; font-family: monospace; font-weight: 800; color: var(--accent, #2563eb);" title="SQL Sorgusu Ekle">&lt;/&gt; SQL</button>
             <button type="button" id="tbTimestamp" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Tarih &amp; Zaman Damgası Ekle">📅 Zaman</button>
             <button type="button" id="tbTable" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Tablo Ekle">▦ Tablo</button>
             <button type="button" id="tbLink" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Bağlantı (Link) Ekle">🔗 Link</button>
             <button type="button" id="tbHr" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Yatay Çizgi Ekle">― Çizgi</button>
+            <button type="button" id="tbFindReplace" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Bul &amp; Değiştir (Ctrl+F)">🔍 Bul</button>
+            <button type="button" id="tbVoice" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem; color: #ef4444;" title="Sesli Not Kaydet">🎙️ Ses</button>
+            <button type="button" id="tbPrint" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Yazdır / PDF Olarak Kaydet">🖨️ Yazdır</button>
             <button type="button" id="tbFullscreen" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Tam Ekran Aç / Kapat">⛶</button>
             <button type="button" id="tbExportTxt" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem;" title="Notu İndir (.txt / .md)">💾 İndir</button>
             <button type="button" id="tbClearFormat" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.4rem; color: #ef4444;" title="Biçimlendirmeyi Temizle">🧹</button>
@@ -878,6 +882,27 @@
               <span>📎 Dosya / Belge Ekle</span>
             </button>
           </div>
+        </div>
+
+        <!-- BUL & DEĞİŞTİR ÇUBUĞU (FIND & REPLACE MINI-BAR) -->
+        <div id="noteFindReplaceBar" style="display: none; align-items: center; gap: 0.5rem; padding: 0.45rem 1.2rem; background: var(--bg-card, #f1f5f9); border-bottom: 1px solid var(--border-light, #e2e8f0); flex-wrap: wrap;">
+          <span style="font-size: 0.8rem; font-weight: 800; color: var(--text-secondary, #475569);">🔍 Bul &amp; Değiştir:</span>
+          <input type="text" id="findInput" placeholder="Aranacak metin..." style="padding: 0.25rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border, #cbd5e1); border-radius: 6px; width: 160px; background: var(--bg-surface, #fff); color: var(--text-primary, #0f172a);" />
+          <input type="text" id="replaceInput" placeholder="Yeni metin..." style="padding: 0.25rem 0.5rem; font-size: 0.8rem; border: 1px solid var(--border, #cbd5e1); border-radius: 6px; width: 160px; background: var(--bg-surface, #fff); color: var(--text-primary, #0f172a);" />
+          <button type="button" id="btnFindNext" class="btn btn-sm btn-ghost" style="font-size: 0.76rem; padding: 0.25rem 0.5rem;">Sonraki</button>
+          <button type="button" id="btnReplaceOne" class="btn btn-sm btn-ghost" style="font-size: 0.76rem; padding: 0.25rem 0.5rem;">Değiştir</button>
+          <button type="button" id="btnReplaceAll" class="btn btn-sm btn-ghost" style="font-size: 0.76rem; padding: 0.25rem 0.5rem; font-weight: 700;">Tümünü Değiştir</button>
+          <span id="findStatusMsg" style="font-size: 0.74rem; color: var(--text-muted, #64748b);"></span>
+          <button type="button" id="btnCloseFindBar" class="btn btn-sm btn-ghost" style="margin-left: auto; padding: 0.15rem 0.4rem; font-size: 0.85rem;" title="Kapat">✕</button>
+        </div>
+
+        <!-- SESLİ NOT KAYDEDİCİ ÇUBUĞU (VOICE RECORDER MINI-BAR) -->
+        <div id="noteVoiceBar" style="display: none; align-items: center; gap: 0.75rem; padding: 0.5rem 1.2rem; background: rgba(239,68,68,0.08); border-bottom: 1px solid rgba(239,68,68,0.25); color: var(--text-primary, #0f172a);">
+          <span style="width: 10px; height: 10px; border-radius: 50%; background: #ef4444; display: inline-block;"></span>
+          <span style="font-size: 0.82rem; font-weight: 800; color: #ef4444;">Ses Kaydediliyor...</span>
+          <span id="voiceTimer" style="font-family: monospace; font-size: 0.85rem; font-weight: 700;">00:00</span>
+          <button type="button" id="btnStopVoice" class="btn btn-sm" style="background: #ef4444; color: #ffffff; border: none; font-weight: 700; padding: 0.25rem 0.8rem; font-size: 0.78rem; border-radius: 6px;">⏹ Durdur ve Nota Ekle</button>
+          <button type="button" id="btnCancelVoice" class="btn btn-sm btn-ghost" style="font-size: 0.78rem; padding: 0.25rem 0.5rem;">İptal</button>
         </div>
 
         <!-- ORTA ALAN: BELGE DÜZENLEYİCİ CANVAS & EKLER ÇEKMECESİ -->
@@ -1286,8 +1311,8 @@
     // Görev Listesi / Checklist
     overlay.querySelector('#tbChecklist')?.addEventListener('click', () => {
       const checkHtml = `
-        <div style="margin: 0.6rem 0; padding: 0.5rem 0.8rem; background: var(--bg-card, #f8fafc); border: 1px solid var(--border, #cbd5e1); border-radius: 8px;">
-          <div style="display:flex; align-items:center; gap:8px; margin-bottom: 4px;">
+        <div class="note-todo-card" style="margin: 0.6rem 0; padding: 0.6rem 0.9rem; background: var(--bg-card, #f8fafc); border: 1px solid var(--border, #cbd5e1); border-radius: 8px;">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom: 6px;">
             <input type="checkbox" style="width:16px;height:16px;cursor:pointer;" />
             <span>Görev maddesi 1...</span>
           </div>
@@ -1300,6 +1325,239 @@
       `;
       formatDoc('insertHTML', checkHtml);
     });
+
+    // SQL Kod Parçacığı Ekleme & Kopyalama
+    overlay.querySelector('#tbSqlSnippet')?.addEventListener('click', () => {
+      const sqlHtml = `
+        <div class="note-sql-card" style="margin: 0.8rem 0; border: 1px solid var(--border, #cbd5e1); border-radius: 8px; overflow: hidden; background: #0f172a; color: #f8fafc; font-family: 'Fira Code', Consolas, monospace;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:0.35rem 0.75rem;background:#1e293b;border-bottom:1px solid #334155;font-size:0.75rem;font-weight:700;color:#94a3b8;" contenteditable="false">
+            <span>SQL SORGUSU</span>
+            <button type="button" class="btn-copy-sql" style="border:none;background:rgba(255,255,255,0.1);color:#38bdf8;cursor:pointer;font-size:0.72rem;font-weight:700;padding:2px 8px;border-radius:4px;">📋 Kopyala</button>
+          </div>
+          <pre contenteditable="true" style="margin:0;padding:0.75rem 1rem;font-size:0.85rem;line-height:1.5;overflow-x:auto;color:#38bdf8;white-space:pre-wrap;font-family:inherit;">SELECT ID, RAPOR_ADI, TARIH&#10;FROM TBL_RAPOR&#10;WHERE AKTIF = 1&#10;ORDER BY ID DESC;</pre>
+        </div>
+        <p><br></p>
+      `;
+      formatDoc('insertHTML', sqlHtml);
+    });
+
+    editor.addEventListener('click', (e) => {
+      const copyBtn = e.target.closest('.btn-copy-sql');
+      if (copyBtn) {
+        e.preventDefault();
+        const card = copyBtn.closest('.note-sql-card');
+        const pre = card?.querySelector('pre');
+        const text = pre ? (pre.innerText || pre.textContent || '') : '';
+        if (text && navigator.clipboard?.writeText) {
+          navigator.clipboard.writeText(text).then(() => {
+            const oldText = copyBtn.textContent;
+            copyBtn.textContent = '✓ Kopyalandı!';
+            setTimeout(() => { copyBtn.textContent = oldText; }, 2000);
+            window.toast?.('SQL panoya kopyalandı', 'success');
+          }).catch(() => {
+            window.toast?.('Panoya kopyalanamadı', 'error');
+          });
+        }
+      }
+    });
+
+    // Kontrol listesi kutucuklarının tıklanabilirliği ve kaydedilebilirliği
+    editor.addEventListener('click', (e) => {
+      if (e.target.matches('input[type="checkbox"]')) {
+        if (e.target.checked) e.target.setAttribute('checked', 'checked');
+        else e.target.removeAttribute('checked');
+        scheduleDraft();
+      }
+    });
+
+    // Yazdır & PDF Olarak Dışa Aktar
+    overlay.querySelector('#tbPrint')?.addEventListener('click', () => {
+      const printWin = window.open('', '_blank', 'width=850,height=750');
+      if (!printWin) {
+        window.toast?.('Yazdırma penceresi engellendi. Tarayıcı izinlerini kontrol edin.', 'error');
+        return;
+      }
+      const noteHtml = editor.innerHTML;
+      const attHtml = attachments.length ? `
+        <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px dashed #cbd5e1;">
+          <h4 style="margin: 0 0 0.5rem; font-size: 0.9rem; color: #475569;">Ekli Belgeler (${attachments.length}):</h4>
+          <ul style="margin: 0; padding-left: 1.2rem; font-size: 0.85rem; color: #334155;">
+            ${attachments.map(a => `<li>${escHtml(a.name)} (${formatFileSize(a.size)})</li>`).join('')}
+          </ul>
+        </div>` : '';
+
+      printWin.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>${escHtml(reportName)} - Rapor Notu</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 2rem; color: #0f172a; line-height: 1.6; max-width: 800px; margin: 0 auto; }
+            h2 { margin: 0 0 0.4rem; color: #1e3a8a; }
+            .header-meta { font-size: 0.82rem; color: #64748b; margin-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.75rem; }
+            .note-sql-card { background: #0f172a; color: #38bdf8; border-radius: 6px; padding: 0.75rem 1rem; margin: 1rem 0; font-family: monospace; }
+            .note-sql-card button { display: none; }
+            @media print { body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <h2>${escHtml(reportName)}</h2>
+          <div class="header-meta">Rapor Notu &amp; Dokümantasyon · Tarih: ${new Date().toLocaleString('tr-TR')}</div>
+          <div class="note-body">${noteHtml}</div>
+          ${attHtml}
+        </body>
+        </html>
+      `);
+      printWin.document.close();
+      printWin.focus();
+      setTimeout(() => { printWin.print(); }, 500);
+    });
+
+    // Bul & Değiştir Fonksiyonları
+    const findReplaceBar = overlay.querySelector('#noteFindReplaceBar');
+    const findInput = overlay.querySelector('#findInput');
+    const replaceInput = overlay.querySelector('#replaceInput');
+    const findStatusMsg = overlay.querySelector('#findStatusMsg');
+
+    function toggleFindBar(show) {
+      if (!findReplaceBar) return;
+      const willShow = (show !== undefined) ? show : (findReplaceBar.style.display === 'none');
+      findReplaceBar.style.display = willShow ? 'flex' : 'none';
+      if (willShow) {
+        findInput?.focus();
+        findInput?.select();
+      }
+    }
+
+    overlay.querySelector('#tbFindReplace')?.addEventListener('click', () => toggleFindBar());
+    overlay.querySelector('#btnCloseFindBar')?.addEventListener('click', () => toggleFindBar(false));
+
+    overlay.querySelector('#btnFindNext')?.addEventListener('click', () => {
+      const q = (findInput?.value || '').trim();
+      if (!q) return;
+      if (window.find) {
+        const found = window.find(q, false, false, true, false, true, false);
+        if (findStatusMsg) findStatusMsg.textContent = found ? 'Bulundu' : 'Sonuç yok';
+      }
+    });
+
+    overlay.querySelector('#btnReplaceOne')?.addEventListener('click', () => {
+      const q = (findInput?.value || '').trim();
+      const r = replaceInput?.value || '';
+      if (!q) return;
+      const html = editor.innerHTML;
+      if (html.includes(q)) {
+        editor.innerHTML = html.replace(q, r);
+        scheduleDraft();
+        if (findStatusMsg) findStatusMsg.textContent = '1 adet değiştirildi';
+      } else {
+        if (findStatusMsg) findStatusMsg.textContent = 'Eşleşme bulunamadı';
+      }
+    });
+
+    overlay.querySelector('#btnReplaceAll')?.addEventListener('click', () => {
+      const q = (findInput?.value || '').trim();
+      const r = replaceInput?.value || '';
+      if (!q) return;
+      const html = editor.innerHTML;
+      const parts = html.split(q);
+      const count = parts.length - 1;
+      if (count > 0) {
+        editor.innerHTML = parts.join(r);
+        scheduleDraft();
+        if (findStatusMsg) findStatusMsg.textContent = `${count} adet değiştirildi`;
+        window.toast?.(`${count} adet metin değiştirildi.`, 'success');
+      } else {
+        if (findStatusMsg) findStatusMsg.textContent = 'Eşleşme bulunamadı';
+      }
+    });
+
+    overlay.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        toggleFindBar(true);
+      }
+    });
+
+    // Sesli Not Kaydedici (MediaRecorder API)
+    const voiceBar = overlay.querySelector('#noteVoiceBar');
+    const voiceTimer = overlay.querySelector('#voiceTimer');
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let recordInterval = null;
+    let recordSeconds = 0;
+
+    function formatRecordTime(sec) {
+      const m = Math.floor(sec / 60).toString().padStart(2, '0');
+      const s = (sec % 60).toString().padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
+    overlay.querySelector('#tbVoice')?.addEventListener('click', async () => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        window.toast?.('Tarayıcınız ses kaydını desteklemiyor.', 'error');
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioChunks = [];
+        recordSeconds = 0;
+        if (voiceTimer) voiceTimer.textContent = '00:00';
+        if (voiceBar) voiceBar.style.display = 'flex';
+
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) audioChunks.push(e.data);
+        };
+        mediaRecorder.start();
+
+        recordInterval = setInterval(() => {
+          recordSeconds++;
+          if (voiceTimer) voiceTimer.textContent = formatRecordTime(recordSeconds);
+          if (recordSeconds >= 300) {
+            overlay.querySelector('#btnStopVoice')?.click();
+          }
+        }, 1000);
+      } catch (err) {
+        window.toast?.('Mikrofon erişimi sağlanamadı: ' + err.message, 'error');
+      }
+    });
+
+    const stopRecording = (discard = false) => {
+      clearInterval(recordInterval);
+      if (voiceBar) voiceBar.style.display = 'none';
+      if (!mediaRecorder) return;
+
+      const rec = mediaRecorder;
+      mediaRecorder = null;
+      rec.onstop = async () => {
+        rec.stream.getTracks().forEach(t => t.stop());
+        if (discard || !audioChunks.length) return;
+
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const audioUrl = reader.result;
+          const durationStr = formatRecordTime(recordSeconds);
+          const audioBlock = `
+            <div class="note-audio-block" contenteditable="false" style="margin: 0.8rem 0; padding: 0.6rem 0.85rem; background: var(--bg-card, #f8fafc); border: 1px solid var(--border, #cbd5e1); border-radius: 10px; display: inline-flex; align-items: center; gap: 0.75rem;">
+              <span style="font-size: 0.85rem; font-weight: 700; color: #ef4444;">🎙️ Sesli Not (${durationStr}):</span>
+              <audio controls src="${audioUrl}" style="height: 32px; vertical-align: middle;"></audio>
+            </div>
+            <p><br></p>
+          `;
+          formatDoc('insertHTML', audioBlock);
+          const voiceFile = new File([audioBlob], `sesli_not_${new Date().toISOString().slice(0, 10)}.webm`, { type: 'audio/webm' });
+          await processUploadedFile(voiceFile);
+        };
+        reader.readAsDataURL(audioBlob);
+      };
+      rec.stop();
+    };
+
+    overlay.querySelector('#btnStopVoice')?.addEventListener('click', () => stopRecording(false));
+    overlay.querySelector('#btnCancelVoice')?.addEventListener('click', () => stopRecording(true));
+
 
     // Zaman Damgası
     overlay.querySelector('#tbTimestamp')?.addEventListener('click', () => {
