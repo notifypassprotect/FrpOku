@@ -155,7 +155,7 @@
  }
 
  // ── FRAME (ÇERÇEVE & KENARLIK) HESAPLAYICI ──────────────────
- function getFrameBorderCss(frameTyp, frameColor = '-16777208', frameWidth = 1) {
+ function getFrameBorderCss(frameTyp, frameColor = '-16777208', frameWidth = 1, frameStyle = 'fsSolid') {
  const typ = parseInt(frameTyp, 10) || 0;
  let color = '#000000';
 
@@ -170,11 +170,12 @@
  }
 
  const w = Math.max(1, Math.round(frameWidth)) + 'px';
+ const cssStyle = ({ fsDash: 'dashed', fsDot: 'dotted', fsDashDot: 'dashed' })[frameStyle] || 'solid';
  return {
- borderLeft: (typ & 1)? `${w} solid ${color}`: 'none',
- borderRight: (typ & 2)? `${w} solid ${color}`: 'none',
- borderTop: (typ & 4)? `${w} solid ${color}`: 'none',
- borderBottom: (typ & 8)? `${w} solid ${color}`: 'none'
+ borderLeft: (typ & 1)? `${w} ${cssStyle} ${color}`: 'none',
+ borderRight: (typ & 2)? `${w} ${cssStyle} ${color}`: 'none',
+ borderTop: (typ & 4)? `${w} ${cssStyle} ${color}`: 'none',
+ borderBottom: (typ & 8)? `${w} ${cssStyle} ${color}`: 'none'
  };
  }
 
@@ -460,6 +461,56 @@ function esc(str) {
  const snapDesignerValue = value => gridSnapStep > 1 ? Math.round(value / gridSnapStep) * gridSnapStep : Math.round(value);
  const gridStateClass = () => gridSnapStep > 1 ? 'grid-snap-on' : 'grid-snap-off';
  const gridStateStyle = () => `--fr-designer-grid:${gridSnapStep > 1 ? gridSnapStep : 8}px;`;
+ const INSPECTOR_NUMBER_PROPS = new Set(['left', 'top', 'width', 'height', 'fontSize', 'frameWidth', 'rotation', 'paperWidth', 'paperHeight', 'leftMargin', 'rightMargin', 'topMargin', 'bottomMargin', 'columnWidth', 'zoom', 'lineSpacing', 'paragraphGap', 'rowCount']);
+ const INSPECTOR_BOOLEAN_PROPS = new Set(['isBold', 'isItalic', 'isUnderline', 'wordWrap', 'autoWidth', 'allowExpressions', 'allowHTMLTags', 'visible', 'enabled', 'printable', 'stretched', 'allowSplit', 'keepTogether', 'startNewPage', 'keepChild', 'keepFooter', 'keepHeader', 'printIfDetailEmpty', 'suppressRepeatedValues', 'hideZeros', 'clipped', 'keepAspectRatio', 'center', 'showText', 'calcCheckSum', 'checked']);
+
+ function normalizeInspectorValue(prop, value) {
+   if (INSPECTOR_NUMBER_PROPS.has(prop)) return toDesignerNumber(value, 0);
+   if (INSPECTOR_BOOLEAN_PROPS.has(prop)) return value === true || String(value).toLowerCase() === 'true';
+   if (prop === 'frameTyp') {
+     const masks = {
+       '[ftLeft, ftRight, ftTop, ftBottom]': 15,
+       '[ftLeft, ftRight]': 3,
+       '[ftTop, ftBottom]': 12,
+       '[ftLeft]': 1,
+       '[ftRight]': 2,
+       '[ftTop]': 4,
+       '[ftBottom]': 8,
+       '[]': 0
+     };
+     return Object.prototype.hasOwnProperty.call(masks, value) ? masks[value] : toDesignerNumber(value, 0);
+   }
+   return value;
+ }
+
+ function frameTypLabel(value) {
+   const labels = {
+     15: '[ftLeft, ftRight, ftTop, ftBottom]',
+     3: '[ftLeft, ftRight]',
+     12: '[ftTop, ftBottom]',
+     1: '[ftLeft]',
+     2: '[ftRight]',
+     4: '[ftTop]',
+     8: '[ftBottom]',
+     0: '[]'
+   };
+   return labels[toDesignerNumber(value, 0)] || String(value || '[]');
+ }
+
+ function getMemoRotationStyle(comp) {
+   const rotation = ((toDesignerNumber(comp?.rotation, 0) % 360) + 360) % 360;
+   if (!rotation) return '';
+   if (rotation === 90 || rotation === 270) {
+     const width = Math.max(1, toDesignerNumber(comp?.width, 100));
+     const height = Math.max(1, toDesignerNumber(comp?.height, 30));
+     return `position:absolute;left:50%;top:50%;width:${height}px;height:${width}px;transform:translate(-50%,-50%) rotate(${rotation}deg);transform-origin:center;`;
+   }
+   return `transform:rotate(${rotation}deg);transform-origin:center;`;
+ }
+
+ function isMemoComponent(component) {
+   return Boolean(component && ['TfrxMemoView', 'TfrxDMPMemoView', 'TfrxSysMemoView'].includes(component.type || 'TfrxMemoView'));
+ }
 
  // Rapor ilk açıldığında temiz önizleme gösterilir; düzenleme kullanıcı isteğiyle başlar.
  let isDesignEditing = false;
@@ -706,7 +757,7 @@ function esc(str) {
  <button type="button" class="fr-align-btn" id="btnMultiFront" title="Seçilileri en öne getir">Öne</button>
  <button type="button" class="fr-align-btn" id="btnMultiBack" title="Seçilileri en arkaya gönder">Arkaya</button>
  <div class="fr-align-sep"></div>
- <button type="button" class="fr-align-btn danger" id="btnDeleteMulti" title="Tüm Seçilileri Sil">🗑️ Sil</button>
+ <button type="button" class="fr-align-btn danger" id="btnDeleteMulti" title="Tüm seçili nesneleri sil">Sil</button>
  </div>
  `: ''}
 
@@ -847,37 +898,44 @@ function esc(str) {
  // ── DATA TREE HTML OLUŞTURUCU (Images 1, 2, 3) ────────────
  function renderDataTreeHtml(file) {
  const queries = file.queries || [];
- if (queries.length === 0) {
- return '<div style="color:var(--text-muted);font-style:italic;padding:1rem;">Veri seti (Query) bulunamadı.</div>';
- }
-
- return queries.map(q => {
+ const queryHtml = queries.length ? queries.map(q => {
  const fields = extractFieldsFromQuery(q, file);
  return `
- <div style="margin-bottom:.9rem;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:.5rem.7rem;">
- <div style="font-weight:800;color:var(--accent);display:flex;align-items:center;justify-content:space-between;gap:.35rem;margin-bottom:.4rem;padding-bottom:3px;border-bottom:1px solid rgba(37,99,235,0.25);">
- <span style="display:flex;align-items:center;gap:.35rem;font-size:.85rem;color:var(--accent);font-weight:800;font-family:var(--mono);">${esc(q.name)}</span>
- <span class="badge badge-blue" style="font-size:.68rem;background:rgba(37,99,235,0.15);color:#2563eb;font-weight:700;">${fields.length} Alan</span>
+ <section class="fr-datatree-query">
+ <div class="fr-datatree-query-title">
+ <span>${esc(q.name)}</span>
+ <span class="fr-datatree-count">${fields.length} alan</span>
  </div>
- <div style="padding-left:.6rem;display:flex;flex-direction:column;gap:.25rem;border-left:2px solid #3b82f6;margin-left:.25rem;">
+ <div class="fr-datatree-fields">
  ${fields.length > 0? fields.map(f => `
- <div class="fr-datatree-field-row"
- data-detail-action="copy-data-tree" data-query="${encodeInlineArg(q.name)}" data-field="${encodeInlineArg(f)}"
- style="display:flex;align-items:center;justify-content:space-between;gap:.4rem;color:var(--text-secondary);font-size:.76rem;font-family:var(--mono);cursor:pointer;padding:2px 4px;border-radius:4px;transition:background 0.1s;"
- title="İfadeyi kopyalamak için tıklayın: [${esc(q.name)}.&quot;${esc(f)}&quot;]">
- <div style="display:flex;align-items:center;gap:.4rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
- <span style="color:#d97706;font-weight:800;font-size:.7rem;">[A]</span>
- <span style="font-weight:600;">${esc(f)}</span>
- </div>
- <span class="fr-datatree-copy-hint" style="opacity:0.4;font-size:10px;"></span>
- </div>
+ <button type="button" draggable="true" class="fr-datatree-field-row"
+ data-query="${encodeInlineArg(q.name)}" data-field="${encodeInlineArg(f)}" data-expression="${encodeInlineArg(`[${q.name}."${f}"]`)}"
+ title="Çift tıklayarak veya sürükleyerek ekleyin: [${esc(q.name)}.&quot;${esc(f)}&quot;]">
+ <span class="fr-datatree-field-icon">A</span><span class="fr-datatree-field-name">${esc(f)}</span><span class="fr-datatree-drag-hint">⋮⋮</span>
+ </button>
  `).join(''): `
- <div style="color:var(--text-muted);font-size:.72rem;">(Sorgu tanımlı)</div>
+ <div class="fr-datatree-empty">Sorgu tanımlı, alan adı çözümlenemedi.</div>
  `}
  </div>
- </div>
+ </section>
  `;
- }).join('');
+ }).join('') : '<div class="fr-datatree-empty">Veri seti (Query) bulunamadı.</div>';
+
+ const systemFields = ['Date', 'Time', 'Page#', 'TotalPages#', 'Line', 'Line#'];
+ const variables = [...new Set(file.paramNames || [])];
+ return `
+ <div class="fr-datatree-guide"><strong>Alan ekleme</strong><span>Bir alanı memo üzerine sürükleyin veya çift tıklayın.</span></div>
+ ${queryHtml}
+ ${variables.length ? `<section class="fr-datatree-query fr-datatree-variables">
+   <div class="fr-datatree-query-title"><span>Rapor Değişkenleri</span><span class="fr-datatree-count">${variables.length}</span></div>
+   <div class="fr-datatree-fields">${variables.map(field => `<button type="button" draggable="true" class="fr-datatree-field-row" data-query="" data-field="${encodeInlineArg(field)}" data-expression="${encodeInlineArg(`[${field}]`)}" title="[${esc(field)}] ekle"><span class="fr-datatree-field-icon variable">V</span><span class="fr-datatree-field-name">${esc(field)}</span><span class="fr-datatree-drag-hint">⋮⋮</span></button>`).join('')}</div>
+ </section>` : ''}
+ <section class="fr-datatree-query fr-datatree-system">
+   <div class="fr-datatree-query-title"><span>Sistem Değişkenleri</span><span class="fr-datatree-count">${systemFields.length}</span></div>
+   <div class="fr-datatree-fields">
+   ${systemFields.map(field => `<button type="button" draggable="true" class="fr-datatree-field-row" data-query="" data-field="${encodeInlineArg(field)}" data-expression="${encodeInlineArg(`[${field}]`)}" title="[${esc(field)}] ekle"><span class="fr-datatree-field-icon system">S</span><span class="fr-datatree-field-name">${esc(field)}</span><span class="fr-datatree-drag-hint">⋮⋮</span></button>`).join('')}
+   </div>
+ </section>`;
  }
 
  function extractFieldsFromQuery(query, file) {
@@ -910,11 +968,383 @@ function esc(str) {
  });
  });
 
- return [...fieldSet].slice(0, 25);
+ return [...fieldSet].slice(0, 100);
+ }
+
+ function decodeDesignerValue(value) {
+   try { return decodeURIComponent(String(value || '')); } catch { return String(value || ''); }
+ }
+
+ function getDataFieldPayload(row) {
+   if (!row) return null;
+   return {
+     query: decodeDesignerValue(row.dataset.query),
+     field: decodeDesignerValue(row.dataset.field),
+     expression: decodeDesignerValue(row.dataset.expression)
+   };
+ }
+
+ function parseFieldExpression(expression) {
+   const value = String(expression || '').trim();
+   const match = value.match(/^\[([^\.\]]+)\."([^"]+)"\]$/);
+   return match ? { query: match[1], field: match[2] } : null;
+ }
+
+ function insertTextAtCursor(textarea, value) {
+   const start = textarea.selectionStart ?? textarea.value.length;
+   const end = textarea.selectionEnd ?? start;
+   textarea.value = `${textarea.value.slice(0, start)}${value}${textarea.value.slice(end)}`;
+   const cursor = start + value.length;
+   textarea.focus();
+   textarea.setSelectionRange(cursor, cursor);
+   textarea.dispatchEvent(new Event('input', { bubbles: true }));
+ }
+
+ function setMemoExpression(component, payload, append = false) {
+   if (!component || !payload?.expression) return;
+   const current = String(component.text || component.caption || '');
+   const next = append && current ? `${current} ${payload.expression}` : payload.expression;
+   component.text = next;
+   component.caption = next;
+   component.memo = next;
+   component.allowExpressions = true;
+   if (!append && payload.query) {
+     component.dataSet = payload.query;
+     component.dataField = payload.field;
+   }
+ }
+
+ function createDataFieldMemo(payload, band, left = 24, top = 12) {
+   const activePage = allPages[activePageIndex];
+   if (!isDesignEditing || activePage?.type !== 'report' || !payload?.expression) return null;
+   const targetBand = band || (activePage.data.bands || []).find(item => !item.vertical) || getOrCreatePageContentBand(activePage.data);
+   targetBand.components = targetBand.components || [];
+   const component = {
+     name: ensureUniqueComponentName(`Memo_${String(payload.field || 'Alan').replace(/[^a-zA-Z0-9_]/g, '_')}`),
+     type: 'TfrxMemoView', left: snapDesignerValue(left), top: snapDesignerValue(top), width: 150, height: 24,
+     text: payload.expression, caption: payload.expression, memo: payload.expression,
+     dataSet: payload.query || '', dataField: payload.query ? payload.field : '', allowExpressions: true,
+     fontName: 'Arial', fontSize: 10, fontColor: '-16777208', fillBackColor: 'clNone',
+     hAlign: 'haLeft', vAlign: 'vaCenter', wordWrap: true, visible: true, enabled: true, printable: true
+   };
+   pushUndoState();
+   targetBand.components.push(component);
+   targetBand.height = Math.max(toDesignerNumber(targetBand.height, 30), component.top + component.height + 8);
+   selectedItem = component;
+   selectedItems = [component];
+   renderCanvasOnly();
+   updateSelection();
+   pushUndoState();
+   window.FrpNotify?.success(`${payload.field || 'Alan'} memo olarak eklendi.`);
+   return component;
+ }
+
+ function openMemoEditor(component) {
+   if (!isDesignEditing || !isMemoComponent(component)) return;
+   document.querySelector('.fr-memo-editor-overlay')?.remove();
+   const initialText = String(component.text || component.caption || component.memo || '');
+   const overlay = document.createElement('div');
+   overlay.className = 'fr-memo-editor-overlay';
+   overlay.innerHTML = `
+     <div class="fr-memo-editor-dialog" role="dialog" aria-modal="true" aria-label="Memo metnini düzenle">
+       <header class="fr-memo-editor-header">
+         <div><strong>${esc(component.name || 'Memo')}</strong><span>Metin ve alan ifadesi düzenleyici</span></div>
+         <button type="button" class="fr-memo-editor-close" aria-label="Kapat">×</button>
+       </header>
+       <div class="fr-memo-editor-toolbar">
+         <button type="button" data-insert="[Date]">Tarih</button><button type="button" data-insert="[Time]">Saat</button><button type="button" data-insert="[Page#]">Sayfa No</button>
+         <button type="button" data-wrap="[]">İfade Parantezi</button><button type="button" data-clear="true" class="danger">İçeriği Temizle</button>
+         <span class="fr-memo-editor-binding">${component.dataSet ? `${esc(component.dataSet)}${component.dataField ? ` · ${esc(component.dataField)}` : ''}` : 'Serbest metin'}</span>
+       </div>
+       <div class="fr-memo-editor-body">
+         <section class="fr-memo-editor-main">
+           <label for="frMemoEditorText">Memo içeriği</label>
+           <textarea id="frMemoEditorText" spellcheck="false" placeholder="Metin veya [Query.&quot;ALAN&quot;] ifadesi yazın...">${esc(initialText)}</textarea>
+           <div class="fr-memo-editor-help"><span>Data Tree alanını buraya sürükleyebilir veya çift tıklayabilirsiniz.</span><span id="frMemoEditorCount">${initialText.length} karakter</span></div>
+         </section>
+         <aside class="fr-memo-editor-data">
+           <div class="fr-memo-editor-data-head"><strong>Data Tree</strong><input type="search" placeholder="Alan ara..." aria-label="Data Tree alanı ara"></div>
+           <div class="fr-memo-editor-data-scroll">${renderDataTreeHtml(file)}</div>
+         </aside>
+       </div>
+       <footer class="fr-memo-editor-footer"><span>Ctrl+Enter kaydet · Esc kapat</span><div><button type="button" data-cancel="true">İptal</button><button type="button" data-save="true" class="primary">Uygula</button></div></footer>
+     </div>`;
+   document.body.appendChild(overlay);
+
+   const textarea = overlay.querySelector('#frMemoEditorText');
+   const counter = overlay.querySelector('#frMemoEditorCount');
+   const close = () => overlay.remove();
+   const save = () => {
+     const next = textarea.value;
+     if (next !== initialText) {
+       pushUndoState();
+       component.text = next;
+       component.caption = next;
+       component.memo = next;
+       component.allowExpressions = true;
+       const binding = parseFieldExpression(next);
+       component.dataSet = binding?.query || '';
+       component.dataField = binding?.field || '';
+       renderCanvasOnly();
+       selectedItem = component;
+       selectedItems = [component];
+       updateSelection();
+       pushUndoState();
+     }
+     close();
+   };
+
+   textarea.addEventListener('input', () => { counter.textContent = `${textarea.value.length} karakter`; });
+   textarea.addEventListener('dragover', event => { event.preventDefault(); textarea.classList.add('is-drop-target'); });
+   textarea.addEventListener('dragleave', () => textarea.classList.remove('is-drop-target'));
+   textarea.addEventListener('drop', event => {
+     event.preventDefault();
+     textarea.classList.remove('is-drop-target');
+     const expression = event.dataTransfer?.getData('application/x-frp-expression') || event.dataTransfer?.getData('text/plain');
+     if (expression) insertTextAtCursor(textarea, expression);
+   });
+   overlay.querySelectorAll('.fr-datatree-field-row').forEach(row => {
+     row.addEventListener('dragstart', event => {
+       const payload = getDataFieldPayload(row);
+       event.dataTransfer.effectAllowed = 'copy';
+       event.dataTransfer.setData('application/x-frp-expression', payload.expression);
+       event.dataTransfer.setData('text/plain', payload.expression);
+     });
+     row.addEventListener('dblclick', event => { event.preventDefault(); event.stopPropagation(); insertTextAtCursor(textarea, getDataFieldPayload(row).expression); });
+   });
+   overlay.querySelectorAll('[data-insert]').forEach(button => button.addEventListener('click', () => insertTextAtCursor(textarea, button.dataset.insert)));
+   overlay.querySelector('[data-wrap]')?.addEventListener('click', () => {
+     const start = textarea.selectionStart ?? 0;
+     const end = textarea.selectionEnd ?? start;
+     const selected = textarea.value.slice(start, end);
+     insertTextAtCursor(textarea, `[${selected}]`);
+   });
+   overlay.querySelector('[data-clear]')?.addEventListener('click', () => { textarea.value = ''; textarea.dispatchEvent(new Event('input')); textarea.focus(); });
+   overlay.querySelector('input[type="search"]')?.addEventListener('input', event => {
+     const query = event.target.value.trim().toLowerCase();
+     overlay.querySelectorAll('.fr-datatree-field-row').forEach(row => { row.hidden = Boolean(query && !row.textContent.toLowerCase().includes(query)); });
+   });
+   overlay.querySelector('[data-save]')?.addEventListener('click', save);
+   overlay.querySelector('[data-cancel]')?.addEventListener('click', close);
+   overlay.querySelector('.fr-memo-editor-close')?.addEventListener('click', close);
+   overlay.addEventListener('keydown', event => {
+     if (event.key === 'Escape') { event.preventDefault(); close(); }
+     if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); save(); }
+   });
+   textarea.focus();
+   textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+ }
+
+ function bindDataTreeInteractions() {
+   containerEl.querySelectorAll('.fr-datatree-field-row').forEach(row => {
+     row.addEventListener('click', event => {
+       event.stopPropagation();
+       containerEl.querySelectorAll('.fr-datatree-field-row.is-active').forEach(item => item.classList.remove('is-active'));
+       row.classList.add('is-active');
+     });
+     row.addEventListener('dragstart', event => {
+       const payload = getDataFieldPayload(row);
+       event.dataTransfer.effectAllowed = 'copy';
+       event.dataTransfer.setData('application/x-frp-field', JSON.stringify(payload));
+       event.dataTransfer.setData('application/x-frp-expression', payload.expression);
+       event.dataTransfer.setData('text/plain', payload.expression);
+       row.classList.add('is-dragging');
+     });
+     row.addEventListener('dragend', () => row.classList.remove('is-dragging'));
+     row.addEventListener('dblclick', event => {
+       event.preventDefault();
+       event.stopPropagation();
+       if (!isDesignEditing) return window.FrpNotify?.info('Alan eklemek için Tasarımı Düzenle modunu açın.');
+       const payload = getDataFieldPayload(row);
+       if (isMemoComponent(selectedItem)) {
+         pushUndoState();
+         const hasText = Boolean(String(selectedItem.text || '').trim());
+         setMemoExpression(selectedItem, payload, hasText);
+         renderCanvasOnly();
+         updateSelection();
+         pushUndoState();
+         window.FrpNotify?.success(`${payload.field} seçili memoya eklendi.`);
+       } else {
+         const activePage = allPages[activePageIndex];
+         const band = isBandObject(selectedItem) ? selectedItem : (activePage?.data?.bands || []).find(item => !item.vertical);
+         createDataFieldMemo(payload, band);
+       }
+     });
+   });
+ }
+
+ function readDataFieldDrop(event) {
+   const json = event.dataTransfer?.getData('application/x-frp-field');
+   if (json) { try { return JSON.parse(json); } catch {} }
+   const expression = event.dataTransfer?.getData('application/x-frp-expression') || event.dataTransfer?.getData('text/plain');
+   if (!expression || !/^\[[^\]]+\]$/.test(expression.trim())) return null;
+   const parsed = parseFieldExpression(expression);
+   return { expression, query: parsed?.query || '', field: parsed?.field || expression.replace(/[\[\]"]/g, '') };
+ }
+
+ function bindCanvasDataDrops() {
+   if (!isDesignEditing || currentMode !== 'designer') return;
+   const targets = containerEl.querySelectorAll('.fr-view-item,.fr-band-body,.fr-page-free-dropzone');
+   targets.forEach(target => {
+     target.addEventListener('dragover', event => {
+       if (!(event.dataTransfer?.types || []).some(type => ['application/x-frp-field', 'application/x-frp-expression', 'text/plain'].includes(type))) return;
+       event.preventDefault();
+       event.dataTransfer.dropEffect = 'copy';
+       target.classList.add('fr-data-drop-target');
+     });
+     target.addEventListener('dragleave', () => target.classList.remove('fr-data-drop-target'));
+     target.addEventListener('drop', event => {
+       const payload = readDataFieldDrop(event);
+       if (!payload) return;
+       event.preventDefault();
+       event.stopPropagation();
+       target.classList.remove('fr-data-drop-target');
+       const component = target.matches('.fr-view-item') ? getCompFromElement(target) : null;
+       if (isMemoComponent(component)) {
+         pushUndoState();
+         setMemoExpression(component, payload, Boolean(String(component.text || '').trim()));
+         selectedItem = component;
+         selectedItems = [component];
+         renderCanvasOnly();
+         updateSelection();
+         pushUndoState();
+         return;
+       }
+       const activePage = allPages[activePageIndex];
+       if (activePage?.type !== 'report') return;
+       let band = null;
+       let body = target;
+       if (target.classList.contains('fr-page-free-dropzone')) band = getOrCreatePageContentBand(activePage.data);
+       else {
+         const bandElement = target.closest('.fr-band-container');
+         const bandIndex = Number.parseInt(bandElement?.dataset.bandIdx, 10);
+         band = activePage.data.bands?.[bandIndex] || null;
+         body = bandElement?.querySelector('.fr-band-body') || target;
+       }
+       const rect = body.getBoundingClientRect();
+       createDataFieldMemo(payload, band, Math.max(0, (event.clientX - rect.left) / currentZoom), Math.max(0, (event.clientY - rect.top) / currentZoom));
+     });
+   });
+ }
+
+ function openBandEditor(band) {
+   if (!isDesignEditing || !isBandObject(band)) return;
+   document.querySelector('.fr-band-editor-overlay')?.remove();
+   const overlay = document.createElement('div');
+   overlay.className = 'fr-band-editor-overlay';
+   overlay.innerHTML = `
+     <div class="fr-band-editor-dialog" role="dialog" aria-modal="true" aria-label="Bant ayarları">
+       <header><div><strong>${esc(band.name || 'Bant')}</strong><span>${esc(band.type || 'TfrxBand')} ayarları</span></div><button type="button" data-close="true">×</button></header>
+       <div class="fr-band-editor-grid">
+         <label><span>Bant adı</span><input name="name" value="${esc(band.name || '')}"></label>
+         <label><span>Veri seti</span><select name="dataSet"><option value="">Bağlı değil</option>${(file.queries || []).map(query => `<option value="${esc(query.name)}" ${query.name === band.dataSet ? 'selected' : ''}>${esc(query.name)}</option>`).join('')}</select></label>
+         <label><span>Yükseklik</span><input type="number" min="12" step="1" name="height" value="${toDesignerNumber(band.height, 30)}"></label>
+         <label><span>Koşul</span><input name="condition" value="${esc(band.condition || '')}" placeholder="Örn. &lt;qm.&quot;TUTAR&quot;&gt; &gt; 0"></label>
+       </div>
+       <div class="fr-band-editor-options">
+         ${[['stretched','Stretch'],['allowSplit','Sayfada bölünebilir'],['keepTogether','Birlikte tut'],['keepChild','Child bandı birlikte tut'],['keepHeader','Header ile birlikte tut'],['keepFooter','Footer ile birlikte tut'],['startNewPage','Yeni sayfada başlat'],['printIfDetailEmpty','Detay boşsa da yazdır']].map(([key,label]) => `<label><input type="checkbox" name="${key}" ${band[key] ? 'checked' : ''}><span>${label}</span></label>`).join('')}
+       </div>
+       <footer><button type="button" data-cancel="true">İptal</button><button type="button" data-save="true" class="primary">Uygula</button></footer>
+     </div>`;
+   document.body.appendChild(overlay);
+   const close = () => overlay.remove();
+   overlay.querySelector('[data-save]')?.addEventListener('click', () => {
+     pushUndoState();
+     const desiredName = overlay.querySelector('[name="name"]').value.trim();
+     if (desiredName) band.name = desiredName;
+     band.dataSet = overlay.querySelector('[name="dataSet"]').value;
+     band.height = Math.max(12, toDesignerNumber(overlay.querySelector('[name="height"]').value, 30));
+     band.condition = overlay.querySelector('[name="condition"]').value;
+     ['stretched','allowSplit','keepTogether','keepChild','keepHeader','keepFooter','startNewPage','printIfDetailEmpty'].forEach(key => { band[key] = overlay.querySelector(`[name="${key}"]`).checked; });
+     selectedItem = band;
+     selectedItems = [];
+     render();
+     pushUndoState();
+     close();
+   });
+   overlay.querySelector('[data-cancel]')?.addEventListener('click', close);
+   overlay.querySelector('[data-close]')?.addEventListener('click', close);
+   overlay.addEventListener('keydown', event => { if (event.key === 'Escape') close(); });
+   overlay.querySelector('[name="name"]')?.focus();
+ }
+
+ function addChildBand(parentBand) {
+   const activePage = allPages[activePageIndex];
+   if (!isDesignEditing || activePage?.type !== 'report') return;
+   const bands = activePage.data.bands || [];
+   const index = bands.indexOf(parentBand);
+   if (index < 0) return;
+   const child = { name: ensureUniqueComponentName('Child1'), type: 'TfrxChild', left: 0, top: 0, width: toDesignerNumber(parentBand.width, 794), height: 36, dataSet: parentBand.dataSet || '', components: [], keepTogether: true };
+   pushUndoState();
+   bands.splice(index + 1, 0, child);
+   selectedItem = child;
+   selectedItems = [];
+   render();
+   pushUndoState();
+ }
+
+ function showDesignerContextMenu(event, target) {
+   event.preventDefault();
+   event.stopPropagation();
+   if (!isDesignEditing || currentMode !== 'designer') return window.FrpNotify?.info('Sağ tık araçları için Tasarımı Düzenle modunu açın.');
+   document.querySelector('.fr-designer-context-menu')?.remove();
+   const isBand = isBandObject(target);
+   const isMemo = isMemoComponent(target);
+   selectedItem = target;
+   selectedItems = isBand ? [] : [target];
+   updateSelection();
+   const checked = key => ((['visible', 'printable', 'wordWrap', 'allowExpressions'].includes(key) ? target[key] !== false : Boolean(target[key])) ? '<span class="fr-context-check">✓</span>' : '<span class="fr-context-check"></span>');
+   const menu = document.createElement('div');
+   menu.className = 'fr-designer-context-menu';
+   menu.innerHTML = isBand ? `
+     <div class="fr-context-title"><strong>${esc(target.name || 'Bant')}</strong><span>${esc(target.type || 'TfrxBand')}</span></div>
+     <button data-action="band-edit">Bant ayarlarını düzenle</button><button data-action="add-child">Child band ekle</button>
+     <div class="fr-context-separator"></div>
+     <button data-action="toggle-stretched">${checked('stretched')}Stretch</button><button data-action="toggle-allowSplit">${checked('allowSplit')}Sayfada bölünebilir</button><button data-action="toggle-keepTogether">${checked('keepTogether')}Birlikte tut</button><button data-action="toggle-startNewPage">${checked('startNewPage')}Yeni sayfada başlat</button>
+     <div class="fr-context-separator"></div>
+     <button data-action="band-up">Yukarı taşı</button><button data-action="band-down">Aşağı taşı</button><button data-action="select-page">Sayfadaki tüm nesneleri seç</button>
+     <div class="fr-context-separator"></div><button data-action="delete" class="danger">Bandı ve içeriğini sil</button>` : `
+     <div class="fr-context-title"><strong>${esc(target.name || 'Nesne')}</strong><span>${esc(target.type || 'TfrxComponent')}</span></div>
+     ${isMemo ? '<button data-action="edit">Metni ve veri alanını düzenle</button><button data-action="display-format">Display Format ayarına git</button><button data-action="hyperlink">Hyperlink ayarına git</button><button data-action="clear">İçeriği temizle</button><div class="fr-context-separator"></div><button data-action="toggle-autoWidth">'+checked('autoWidth')+'Auto Width</button><button data-action="toggle-wordWrap">'+checked('wordWrap')+'Word Wrap</button><button data-action="toggle-allowExpressions">'+checked('allowExpressions')+'İfadelere izin ver</button><button data-action="toggle-suppressRepeatedValues">'+checked('suppressRepeatedValues')+'Tekrarlanan değerleri gizle</button><button data-action="toggle-hideZeros">'+checked('hideZeros')+'Sıfırları gizle</button><button data-action="toggle-visible">'+checked('visible')+'Visible</button><button data-action="toggle-printable">'+checked('printable')+'Printable</button>' : ''}
+     <div class="fr-context-separator"></div>
+     <div class="fr-context-rotation"><span>Döndür</span>${[0,90,180,270].map(value => `<button data-action="rotate" data-value="${value}" class="${toDesignerNumber(target.rotation) === value ? 'active' : ''}">${value}°</button>`).join('')}</div>
+     <div class="fr-context-separator"></div>
+     <button data-action="copy">Kopyala <kbd>Ctrl+C</kbd></button><button data-action="duplicate">Çoğalt <kbd>Ctrl+D</kbd></button><button data-action="paste">Yapıştır <kbd>Ctrl+V</kbd></button><button data-action="delete" class="danger">Sil <kbd>Del</kbd></button>
+     <div class="fr-context-separator"></div><button data-action="select-same">Aynı türdekileri seç</button><button data-action="select-page">Sayfadaki tüm nesneleri seç</button><button data-action="front">En öne getir</button><button data-action="back">En arkaya gönder</button>`;
+   document.body.appendChild(menu);
+   const rect = menu.getBoundingClientRect();
+   menu.style.left = `${Math.max(8, Math.min(event.clientX, window.innerWidth - rect.width - 8))}px`;
+   menu.style.top = `${Math.max(8, Math.min(event.clientY, window.innerHeight - rect.height - 8))}px`;
+
+   const mutate = callback => { pushUndoState(); callback(); renderCanvasOnly(); updateSelection(); pushUndoState(); };
+   menu.addEventListener('click', clickEvent => {
+     const button = clickEvent.target.closest('[data-action]');
+     if (!button) return;
+     const action = button.dataset.action;
+     menu.remove();
+     if (action === 'band-edit') return openBandEditor(target);
+     if (action === 'add-child') return addChildBand(target);
+     if (action === 'band-up' || action === 'band-down') return moveBand((allPages[activePageIndex]?.data?.bands || []).indexOf(target), action === 'band-up' ? -1 : 1);
+     if (action.startsWith('toggle-')) return mutate(() => { const key = action.slice(7); const current = ['visible', 'printable', 'wordWrap', 'allowExpressions'].includes(key) ? target[key] !== false : Boolean(target[key]); target[key] = !current; });
+     if (action === 'edit') return openMemoEditor(target);
+     if (action === 'display-format') { rightTab = 'inspector'; inspectorTab = 'properties'; inspectorSearchQuery = 'DisplayFormat'; showInspector = true; return render(); }
+     if (action === 'hyperlink') { rightTab = 'inspector'; inspectorTab = 'properties'; inspectorSearchQuery = 'Hyperlink'; showInspector = true; return render(); }
+     if (action === 'clear') return mutate(() => { target.text = ''; target.caption = ''; target.memo = ''; target.dataField = ''; });
+     if (action === 'rotate') return mutate(() => { target.rotation = toDesignerNumber(button.dataset.value); });
+     if (action === 'copy') return copySelectedComponents();
+     if (action === 'duplicate') return duplicateSelected();
+     if (action === 'paste') return pasteCopiedComponents();
+     if (action === 'delete') return isBand ? deleteBand(target) : deleteSelectedComponent();
+     if (action === 'front') return changeZOrder('front');
+     if (action === 'back') return changeZOrder('back');
+     if (action === 'select-page') { selectedItems = getPageComponents(); selectedItem = selectedItems.at(-1) || null; return updateSelection(); }
+     if (action === 'select-same') { selectedItems = getPageComponents().filter(item => item.type === target.type); selectedItem = selectedItems.at(-1) || null; return updateSelection(); }
+   });
+   const dismiss = dismissEvent => { if (!dismissEvent.target.closest('.fr-designer-context-menu')) menu.remove(); };
+   setTimeout(() => document.addEventListener('pointerdown', dismiss, { once: true }), 0);
  }
 
  // ── RAPOR SAYFASI HTML OLUŞTURUCU (Tam Kağıt Boyutu & Bantlar) ──
-   // ── RAPOR SAYFASI HTML OLUŞTURUCU (Tam Kağıt Boyutu & Bantlar) ──
   function renderReportPageHtml(page) {
     const isLandscape = (page.orientation || '').toLowerCase().includes('landscape');
     const paperWidthMm = page.paperWidth || (isLandscape ? 297 : 210);
@@ -985,13 +1415,14 @@ function esc(str) {
  const bHeight = Math.ceil(maxCompBottom);
 
  const componentsHtml = (band.components || []).map((comp, cIdx) => {
- const frameCss = getFrameBorderCss(comp.frameTyp, comp.frameColor, comp.frameWidth);
+ const frameCss = getFrameBorderCss(comp.frameTyp, comp.frameColor, comp.frameWidth, comp.frameStyle);
  const fillIsClear = /^(?:bsClear|clear)$/i.test(String(comp.fillStyle || '')) || comp.fillBackColor === 'clNone';
  const fillBg = fillIsClear ? 'transparent' : decodeDelphiColor(comp.fillBackColor, true);
  const textColor = decodeDelphiColor(comp.fontColor, false);
- const isBold = comp.fontStyle === '1' || String(comp.fontStyle).includes('fsBold');
- const isItalic = comp.fontStyle === '2' || String(comp.fontStyle).includes('fsItalic');
- const isUnderline = comp.fontStyle === '4' || String(comp.fontStyle).includes('fsUnderline');
+ const fontStyleMask = Number.parseInt(comp.fontStyle, 10);
+ const isBold = comp.isBold === true || (Number.isFinite(fontStyleMask) && Boolean(fontStyleMask & 1)) || String(comp.fontStyle).includes('fsBold');
+ const isItalic = comp.isItalic === true || (Number.isFinite(fontStyleMask) && Boolean(fontStyleMask & 2)) || String(comp.fontStyle).includes('fsItalic');
+ const isUnderline = comp.isUnderline === true || (Number.isFinite(fontStyleMask) && Boolean(fontStyleMask & 4)) || String(comp.fontStyle).includes('fsUnderline');
  
  let hAlign = 'flex-start';
  let textAlign = 'left';
@@ -1002,7 +1433,10 @@ function esc(str) {
  if (comp.vAlign === 'vaCenter') vAlign = 'center';
  else if (comp.vAlign === 'vaBottom') vAlign = 'flex-end';
 
- const isRotated90 = comp.rotation === 90;
+ const rotation = ((toDesignerNumber(comp.rotation, 0) % 360) + 360) % 360;
+ const rotationStyle = getMemoRotationStyle(comp);
+ const componentStateClass = `${comp.visible === false ? ' fr-component-hidden' : ''}${comp.enabled === false ? ' fr-component-disabled' : ''}${comp.printable === false ? ' fr-component-nonprintable' : ''}`;
+ const componentStateStyle = comp.visible === false ? (currentMode === 'designer' ? 'opacity:.34;' : 'display:none;') : '';
  // SEÇİM DURUMU: YALNIZCA VE YALNIZCA Tasarımcı Modunda Aktif!
  const isSelected = (currentMode === 'designer') && (
    (selectedItem && selectedItem.name === comp.name) ||
@@ -1072,7 +1506,7 @@ function esc(str) {
  // 2. Nokta Vuruşlu Memo (TfrxDMPMemoView)
  if (comp.type === 'TfrxDMPMemoView') {
  return `
- <div class="fr-view-item ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
+ <div class="fr-view-item${componentStateClass} ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
  data-band-idx="${bIdx}" data-comp-idx="${cIdx}" data-comp-name="${esc(comp.name || '')}"
  style="
  left:${comp.left}px;
@@ -1089,9 +1523,10 @@ function esc(str) {
  font-weight:${isBold? '700': '400'};
  color:${textColor};
  text-align:${textAlign};
+ ${componentStateStyle}
  "
  title="${esc(comp.name)}: ${esc(comp.text || comp.dataField)}${eventTitle}">
- <div class="fr-memo-content" style="justify-content:${hAlign}; align-items:${vAlign}; white-space:pre-wrap;">
+ <div class="fr-memo-content" style="justify-content:${hAlign}; align-items:${vAlign};white-space:${comp.wordWrap === false ? 'nowrap' : 'pre-wrap'};${rotationStyle}">
  ${esc(comp.text || (comp.dataField? `[${comp.dataSet? comp.dataSet + '.': ''}"${comp.dataField}"]`: ''))}
  </div>
  ${renderResizeHandles(isSelected)}
@@ -1417,7 +1852,7 @@ function esc(str) {
  if (comp.type === 'TfrxSysMemoView') {
  const sysText = comp.text || comp.dataField || '[PAGE#]';
  return `
- <div class="fr-view-item fr-sysmemo-view ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
+ <div class="fr-view-item fr-sysmemo-view${componentStateClass} ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
  data-band-idx="${bIdx}" data-comp-idx="${cIdx}" data-comp-name="${esc(comp.name || '')}"
  style="
  left:${comp.left}px; top:${comp.top}px; width:${comp.width}px; height:${comp.height}px;
@@ -1426,10 +1861,11 @@ function esc(str) {
  font-family:${safeFontFamily(comp.fontName)}, sans-serif; font-size:${comp.fontSize || 10}px;
  font-weight:${isBold? '700': '400'}; color:${textColor}; text-align:${textAlign};
  box-sizing:border-box;
+ ${componentStateStyle}
  "
  title="${esc(comp.name)} [TfrxSysMemoView: ${esc(sysText)}]${eventTitle}">
- <div class="fr-memo-content" style="justify-content:${hAlign}; align-items:${vAlign};">
- <span style="background:rgba(99,102,241,0.1);color:#4f46e5;padding:0 3px;border-radius:2px;font-weight:700;">⚙️ ${esc(sysText)}</span>
+ <div class="fr-memo-content" style="justify-content:${hAlign}; align-items:${vAlign};white-space:${comp.wordWrap === false ? 'nowrap' : 'pre-wrap'};${rotationStyle}">
+ <span style="background:rgba(99,102,241,0.1);color:#4f46e5;padding:0 3px;border-radius:2px;font-weight:700;">${esc(sysText)}</span>
  </div>
  ${renderResizeHandles(isSelected)}
  </div>
@@ -1465,7 +1901,7 @@ function esc(str) {
 
  // 7. Standart TfrxMemoView
  return `
- <div class="fr-view-item ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
+ <div class="fr-view-item${componentStateClass} ${hasEvent? 'fr-has-event': ''} ${isSelected? 'selected': ''}"
  data-band-idx="${bIdx}" data-comp-idx="${cIdx}" data-comp-name="${esc(comp.name || '')}"
  style="
  left:${comp.left}px;
@@ -1484,10 +1920,11 @@ function esc(str) {
  text-decoration:${isUnderline? 'underline': 'none'};
  color:${textColor};
  text-align:${textAlign};
+ ${componentStateStyle}
  "
  title="${esc(comp.name)}: ${esc(comp.text || comp.dataField)}${eventTitle}">
- <div class="fr-memo-content ${isRotated90? 'fr-rotated-90': ''}"
- style="justify-content:${hAlign}; align-items:${vAlign};">
+ <div class="fr-memo-content"
+ style="justify-content:${hAlign}; align-items:${vAlign};white-space:${comp.wordWrap === false ? 'nowrap' : 'pre-wrap'};${rotationStyle}">
  ${esc(comp.text || (comp.dataField? `[${comp.dataSet? comp.dataSet + '.': ''}"${comp.dataField}"]`: ''))}
  </div>
  ${renderResizeHandles(isSelected)}
@@ -1986,15 +2423,15 @@ function esc(str) {
     propList = [
       { name: 'Name', val: obj.name || 'Page1', propKey: 'name', editable: isDesignEditing },
       { name: 'Class', val: obj.type || 'TfrxReportPage', readOnly: true },
-      { name: 'PaperWidth', val: `${(pWidth / 10).toFixed(1)} cm (${pWidth} mm)`, propKey: 'paperWidth', isNumber: true, editable: isDesignEditing },
-      { name: 'PaperHeight', val: `${(pHeight / 10).toFixed(1)} cm (${pHeight} mm)`, propKey: 'paperHeight', isNumber: true, editable: isDesignEditing },
+      { name: 'PaperWidth (mm)', val: pWidth, propKey: 'paperWidth', isNumber: true, editable: isDesignEditing },
+      { name: 'PaperHeight (mm)', val: pHeight, propKey: 'paperHeight', isNumber: true, editable: isDesignEditing },
       { name: 'PaperSize', val: 'A4 (210 x 297 mm)', readOnly: true },
       { name: 'Orientation', val: orient, propKey: 'orientation', isSelect: isDesignEditing, options: ['poPortrait', 'poLandscape'] },
-      { name: 'LeftMargin', val: `${(lMarg / 10).toFixed(1)} cm (${lMarg} mm)`, propKey: 'leftMargin', isNumber: true, editable: isDesignEditing },
-      { name: 'RightMargin', val: `${(rMarg / 10).toFixed(1)} cm (${rMarg} mm)`, propKey: 'rightMargin', isNumber: true, editable: isDesignEditing },
-      { name: 'TopMargin', val: `${(tMarg / 10).toFixed(1)} cm (${tMarg} mm)`, propKey: 'topMargin', isNumber: true, editable: isDesignEditing },
-      { name: 'BottomMargin', val: `${(bMarg / 10).toFixed(1)} cm (${bMarg} mm)`, propKey: 'bottomMargin', isNumber: true, editable: isDesignEditing },
-      { name: 'ColumnWidth', val: `${obj.columnWidth || 0} mm`, propKey: 'columnWidth', isNumber: true, editable: isDesignEditing },
+      { name: 'LeftMargin (mm)', val: lMarg, propKey: 'leftMargin', isNumber: true, editable: isDesignEditing },
+      { name: 'RightMargin (mm)', val: rMarg, propKey: 'rightMargin', isNumber: true, editable: isDesignEditing },
+      { name: 'TopMargin (mm)', val: tMarg, propKey: 'topMargin', isNumber: true, editable: isDesignEditing },
+      { name: 'BottomMargin (mm)', val: bMarg, propKey: 'bottomMargin', isNumber: true, editable: isDesignEditing },
+      { name: 'ColumnWidth (mm)', val: obj.columnWidth || 0, propKey: 'columnWidth', isNumber: true, editable: isDesignEditing },
       { name: 'Duplex', val: 'dmNone', readOnly: true },
       { name: 'Visible', val: obj.visible !== false ? 'true' : 'false', propKey: 'visible', isSelect: isDesignEditing, options: ['true', 'false'] }
     ];
@@ -2013,9 +2450,11 @@ function esc(str) {
     ];
   } else {
     // BANT, MEMO (TfrxMemoView), VE DİĞER BİLEŞENLERİN TÜM DELPHI ÖZELLİKLERİ
-    const isBoldVal = (obj.fontStyle && (obj.fontStyle.includes('fsBold') || obj.fontStyle.includes('bold'))) || obj.isBold;
-    const isItalicVal = (obj.fontStyle && (obj.fontStyle.includes('fsItalic') || obj.fontStyle.includes('italic'))) || obj.isItalic;
-    const isUnderlineVal = (obj.fontStyle && (obj.fontStyle.includes('fsUnderline') || obj.fontStyle.includes('underline'))) || obj.isUnderline;
+    const styleText = String(obj.fontStyle || '');
+    const styleMask = Number.parseInt(styleText, 10);
+    const isBoldVal = obj.isBold === true || (Number.isFinite(styleMask) && Boolean(styleMask & 1)) || styleText.includes('fsBold') || styleText.includes('bold');
+    const isItalicVal = obj.isItalic === true || (Number.isFinite(styleMask) && Boolean(styleMask & 2)) || styleText.includes('fsItalic') || styleText.includes('italic');
+    const isUnderlineVal = obj.isUnderline === true || (Number.isFinite(styleMask) && Boolean(styleMask & 4)) || styleText.includes('fsUnderline') || styleText.includes('underline');
     const rawTextVal = obj.caption !== undefined ? obj.caption : (obj.text !== undefined ? obj.text : (Array.isArray(obj.memo) ? obj.memo.join('\n') : (obj.memo || '')));
 
     propList = [
@@ -2039,7 +2478,7 @@ function esc(str) {
       { name: 'Font.Color', rawVal: obj.fontColor, val: obj.fontColor || '-16777208', propKey: 'fontColor', isColor: true, editable: isDesignEditing },
       { name: 'Fill.BackColor', rawVal: (/^(?:bsClear|clear)$/i.test(String(obj.fillStyle || '')) ? 'clNone' : (obj.fillBackColor || obj.color)), val: /^(?:bsClear|clear)$/i.test(String(obj.fillStyle || '')) ? 'clNone' : (obj.fillBackColor || obj.color || 'clNone'), propKey: 'fillBackColor', isColor: true, editable: isDesignEditing },
       { name: 'Fill.Style', val: obj.fillStyle || 'bsSolid', propKey: 'fillStyle', isSelect: isDesignEditing, options: ['bsSolid', 'bsClear', 'bsHorizontal', 'bsVertical', 'bsFDiagonal', 'bsBDiagonal', 'bsCross', 'bsDiagCross'] },
-      { name: 'Frame.Typ', val: obj.frameTyp || '[ftLeft, ftRight, ftTop, ftBottom]', propKey: 'frameTyp', isSelect: isDesignEditing, options: ['[ftLeft, ftRight, ftTop, ftBottom]', '[ftLeft, ftRight]', '[ftTop, ftBottom]', '[]', '[ftLeft]', '[ftRight]', '[ftTop]', '[ftBottom]'] },
+      { name: 'Frame.Typ', val: frameTypLabel(obj.frameTyp), propKey: 'frameTyp', isSelect: isDesignEditing, options: ['[ftLeft, ftRight, ftTop, ftBottom]', '[ftLeft, ftRight]', '[ftTop, ftBottom]', '[]', '[ftLeft]', '[ftRight]', '[ftTop]', '[ftBottom]'] },
       { name: 'Frame.Width', val: obj.frameWidth || 1, propKey: 'frameWidth', isNumber: true, editable: isDesignEditing },
       { name: 'Frame.Style', val: obj.frameStyle || 'fsSolid', propKey: 'frameStyle', isSelect: isDesignEditing, options: ['fsSolid', 'fsDash', 'fsDot', 'fsDashDot'] },
       { name: 'Frame.Color', rawVal: obj.frameColor, val: obj.frameColor || '-16777208', propKey: 'frameColor', isColor: true, editable: isDesignEditing },
@@ -2050,6 +2489,7 @@ function esc(str) {
       { name: 'AllowExpressions', val: obj.allowExpressions !== false ? 'true' : 'false', propKey: 'allowExpressions', isSelect: isDesignEditing, options: ['true', 'false'] },
       { name: 'AllowHTMLTags', val: obj.allowHTMLTags ? 'true' : 'false', propKey: 'allowHTMLTags', isSelect: isDesignEditing, options: ['true', 'false'] },
       { name: 'DisplayFormat', val: obj.formatStr || obj.displayFormat || '', propKey: 'formatStr', editable: isDesignEditing },
+      { name: 'Hyperlink', val: obj.hyperlink || '', propKey: 'hyperlink', editable: isDesignEditing },
       { name: 'Rotation', val: String(obj.rotation || 0), propKey: 'rotation', isSelect: isDesignEditing, options: ['0', '90', '180', '270'] },
       { name: 'Visible', val: obj.visible !== false ? 'true' : 'false', propKey: 'visible', isSelect: isDesignEditing, options: ['true', 'false'] },
       { name: 'Enabled', val: obj.enabled !== false ? 'true' : 'false', propKey: 'enabled', isSelect: isDesignEditing, options: ['true', 'false'] },
@@ -2074,6 +2514,29 @@ function esc(str) {
     } else if (obj.type === 'TfrxShapeView') {
       propList.push(
         { name: 'Shape', val: obj.shape || 'skRectangle', propKey: 'shape', isSelect: isDesignEditing, options: ['skRectangle', 'skRoundRectangle', 'skEllipse', 'skTriangle', 'skDiamond'] }
+      );
+    }
+
+    if (isBand) {
+      propList.push(
+        { name: 'Condition', val: obj.condition || '', propKey: 'condition', editable: isDesignEditing },
+        { name: 'Stretched', val: obj.stretched ? 'true' : 'false', propKey: 'stretched', isSelect: isDesignEditing, options: ['true', 'false'] },
+        { name: 'AllowSplit', val: obj.allowSplit ? 'true' : 'false', propKey: 'allowSplit', isSelect: isDesignEditing, options: ['true', 'false'] },
+        { name: 'KeepTogether', val: obj.keepTogether ? 'true' : 'false', propKey: 'keepTogether', isSelect: isDesignEditing, options: ['true', 'false'] },
+        { name: 'KeepChild', val: obj.keepChild ? 'true' : 'false', propKey: 'keepChild', isSelect: isDesignEditing, options: ['true', 'false'] },
+        { name: 'KeepHeader', val: obj.keepHeader ? 'true' : 'false', propKey: 'keepHeader', isSelect: isDesignEditing, options: ['true', 'false'] },
+        { name: 'KeepFooter', val: obj.keepFooter ? 'true' : 'false', propKey: 'keepFooter', isSelect: isDesignEditing, options: ['true', 'false'] },
+        { name: 'StartNewPage', val: obj.startNewPage ? 'true' : 'false', propKey: 'startNewPage', isSelect: isDesignEditing, options: ['true', 'false'] },
+        { name: 'PrintIfDetailEmpty', val: obj.printIfDetailEmpty ? 'true' : 'false', propKey: 'printIfDetailEmpty', isSelect: isDesignEditing, options: ['true', 'false'] },
+        { name: 'RowCount', val: obj.rowCount || 0, propKey: 'rowCount', isNumber: true, editable: isDesignEditing }
+      );
+    } else if (isMemoComponent(obj)) {
+      propList.push(
+        { name: 'SuppressRepeatedValues', val: obj.suppressRepeatedValues ? 'true' : 'false', propKey: 'suppressRepeatedValues', isSelect: isDesignEditing, options: ['true', 'false'] },
+        { name: 'HideZeros', val: obj.hideZeros ? 'true' : 'false', propKey: 'hideZeros', isSelect: isDesignEditing, options: ['true', 'false'] },
+        { name: 'Clipped', val: obj.clipped !== false ? 'true' : 'false', propKey: 'clipped', isSelect: isDesignEditing, options: ['true', 'false'] },
+        { name: 'LineSpacing', val: obj.lineSpacing || 0, propKey: 'lineSpacing', isNumber: true, editable: isDesignEditing },
+        { name: 'ParagraphGap', val: obj.paragraphGap || 0, propKey: 'paragraphGap', isNumber: true, editable: isDesignEditing }
       );
     }
   }
@@ -2139,9 +2602,72 @@ function esc(str) {
  }).join('');
  }
 
+ function syncFontStyleFlags(component) {
+   const current = String(component.fontStyle || '');
+   const numeric = Number.parseInt(current, 10);
+   if (component.isBold === undefined) component.isBold = (Number.isFinite(numeric) && Boolean(numeric & 1)) || current.includes('fsBold');
+   if (component.isItalic === undefined) component.isItalic = (Number.isFinite(numeric) && Boolean(numeric & 2)) || current.includes('fsItalic');
+   if (component.isUnderline === undefined) component.isUnderline = (Number.isFinite(numeric) && Boolean(numeric & 4)) || current.includes('fsUnderline');
+   component.fontStyle = (component.isBold ? 1 : 0) + (component.isItalic ? 2 : 0) + (component.isUnderline ? 4 : 0);
+ }
+
+ function applyInspectorProperty(prop, rawValue, { record = true, refresh = true } = {}) {
+   const target = selectedItem || allPages[activePageIndex]?.data;
+   if (!target || !prop) return;
+   if (record) pushUndoState();
+   const previous = target[prop];
+   let value = normalizeInspectorValue(prop, rawValue);
+
+   if (prop === 'name') {
+     const desired = String(value || '').trim();
+     if (!desired) return;
+     const duplicate = getPageComponents().some(item => item !== target && String(item.name || '').toLowerCase() === desired.toLowerCase());
+     value = duplicate ? ensureUniqueComponentName(desired) : desired;
+   }
+
+   target[prop] = value;
+   if (prop === 'text' || prop === 'caption') {
+     target.text = String(value);
+     target.caption = String(value);
+     target.memo = String(value);
+   }
+   if (prop === 'expression') target.text = String(value);
+   if (prop === 'dataField' && value) {
+     const expression = `[${target.dataSet ? target.dataSet + '.' : ''}"${value}"]`;
+     if (!target.text || /^\[[^\]]+\]$/.test(String(target.text).trim())) {
+       target.text = expression;
+       target.caption = expression;
+       target.memo = expression;
+     }
+   }
+   if (prop === 'dataSet' && target.dataField && /^\[[^\]]+\]$/.test(String(target.text || '').trim())) {
+     const expression = `[${value ? value + '.' : ''}"${target.dataField}"]`;
+     target.text = expression;
+     target.caption = expression;
+     target.memo = expression;
+   }
+   if (prop === 'fillBackColor') target.color = value;
+   if (prop === 'color') target.fillBackColor = value;
+   if (['isBold', 'isItalic', 'isUnderline'].includes(prop)) syncFontStyleFlags(target);
+   if (prop === 'formatStr') target.displayFormat = value;
+   if (prop === 'orientation' && previous !== value && target.paperWidth && target.paperHeight) {
+     const width = target.paperWidth;
+     target.paperWidth = target.paperHeight;
+     target.paperHeight = width;
+   }
+
+   const element = selectedItem ? findElementForComponent(target) : null;
+   if (element && ['left', 'top', 'width', 'height'].includes(prop)) clampComponentGeometry(target, getElementBounds(element));
+   if (refresh) {
+     renderCanvasOnly();
+     updateSelection();
+   }
+   if (record) pushUndoState();
+ }
+
  // ── OBJECT INSPECTOR CANLI DÜZENLEME DİNLEYİCİSİ ──────────
  function bindInspectorInputs() {
- if (!isDesignEditing ||!selectedItem) return;
+ if (!isDesignEditing || !(selectedItem || allPages[activePageIndex]?.data)) return;
 
  const propTable = containerEl.querySelector('#propTableBody');
  if (!propTable) return;
@@ -2150,27 +2676,8 @@ function esc(str) {
  propTable.querySelectorAll('.designer-prop-input').forEach(inp => {
  inp.addEventListener('change', () => {
  const prop = inp.dataset.prop;
- const isColor = inp.dataset.isColor === 'true';
- let val = inp.value;
-
- if (isColor) {
- val = hexToDelphiColor(val);
- } else if (inp.type === 'number') {
- val = parseFloat(val) || 0;
- }
-
- pushUndoState();
- selectedItem[prop] = val;
-				if (prop === 'text' || prop === 'caption') {
-					selectedItem.text = val;
-					selectedItem.caption = val;
-					selectedItem.memo = val;
-				}
- if (prop === 'fillBackColor') selectedItem.color = val;
- if (prop === 'color') selectedItem.fillBackColor = val;
- renderCanvasOnly();
- updateSelection();
- pushUndoState();
+ const val = inp.dataset.isColor === 'true' ? hexToDelphiColor(inp.value) : inp.value;
+ applyInspectorProperty(prop, val);
  });
  });
 
@@ -2178,27 +2685,22 @@ function esc(str) {
  propTable.querySelectorAll('.designer-prop-select').forEach(sel => {
  sel.addEventListener('change', () => {
  const prop = sel.dataset.prop;
- let val = sel.value;
- if (val === 'true') val = true;
- else if (val === 'false') val = false;
-
- pushUndoState();
- selectedItem[prop] = val;
- renderCanvasOnly();
- updateSelection();
- pushUndoState();
+ applyInspectorProperty(prop, sel.value);
  });
  });
 
  // 3. Color Pickers (<input type="color">)
  propTable.querySelectorAll('.designer-color-picker').forEach(cp => {
+ cp.addEventListener('pointerdown', () => {
+ if (cp.dataset.undoStarted === 'true') return;
+ cp.dataset.undoStarted = 'true';
+ pushUndoState();
+ });
  cp.addEventListener('input', (e) => {
  const prop = cp.dataset.prop;
  const hex = e.target.value;
  const delphiVal = hexToDelphiColor(hex);
- selectedItem[prop] = delphiVal;
- if (prop === 'fillBackColor') selectedItem.color = delphiVal;
- if (prop === 'color') selectedItem.fillBackColor = delphiVal;
+ applyInspectorProperty(prop, delphiVal, { record: false, refresh: false });
  
  const textInp = cp.parentElement.querySelector('.designer-prop-input');
  if (textInp) textInp.value = delphiColorToRgb(delphiVal).label;
@@ -2207,15 +2709,10 @@ function esc(str) {
  });
 
  cp.addEventListener('change', (e) => {
- pushUndoState();
  const prop = cp.dataset.prop;
- const hex = e.target.value;
- const delphiVal = hexToDelphiColor(hex);
- selectedItem[prop] = delphiVal;
- if (prop === 'fillBackColor') selectedItem.color = delphiVal;
- if (prop === 'color') selectedItem.fillBackColor = delphiVal;
- renderCanvasOnly();
+ applyInspectorProperty(prop, hexToDelphiColor(e.target.value), { record: false });
  pushUndoState();
+ delete cp.dataset.undoStarted;
  });
  });
 
@@ -2227,10 +2724,7 @@ function esc(str) {
  const prop = sel.dataset.prop;
  const delphiVal = hexToDelphiColor(choice);
  
- pushUndoState();
- selectedItem[prop] = delphiVal;
- if (prop === 'fillBackColor') selectedItem.color = delphiVal;
- if (prop === 'color') selectedItem.fillBackColor = delphiVal;
+ applyInspectorProperty(prop, delphiVal, { refresh: false });
 
  const textInp = sel.parentElement.querySelector('.designer-prop-input');
  const cpInp = sel.parentElement.querySelector('.designer-color-picker');
@@ -2240,7 +2734,7 @@ function esc(str) {
 
  sel.value = '';
  renderCanvasOnly();
- pushUndoState();
+ updateSelection();
  });
  });
  }
@@ -2910,8 +3404,8 @@ function esc(str) {
    selectedItem = null;
    render();
    pushUndoState();
-   if (window.FrpNotify) window.FrpNotify.info(`${deletedCount} bileşen silindi 🗑️`);
-   else if (typeof toast === 'function') toast(`${deletedCount} bileşen silindi 🗑️`, 'info');
+   if (window.FrpNotify) window.FrpNotify.info(`${deletedCount} bileşen silindi.`);
+   else if (typeof toast === 'function') toast(`${deletedCount} bileşen silindi.`, 'info');
  }
 
  function alignSelected(type) {
@@ -3264,10 +3758,23 @@ function esc(str) {
  updateSelection();
  });
 
+ el.addEventListener('contextmenu', event => {
+   const component = getCompFromElement(el);
+   if (component) showDesignerContextMenu(event, component);
+ });
+
  // Çift Tıklama ile Metin Düzenleme (In-place Text Edit with Modern Modal)
  el.addEventListener('dblclick', async (e) => {
  e.stopPropagation();
  if (!isDesignEditing ||!selectedItem || currentMode!== 'designer') return;
+ const editTarget = getCompFromElement(el) || selectedItem;
+ if (isMemoComponent(editTarget)) {
+   selectedItem = editTarget;
+   selectedItems = [editTarget];
+   updateSelection();
+   openMemoEditor(editTarget);
+   return;
+ }
  const oldText = selectedItem.text || selectedItem.caption || '';
       let newText = null;
       if (typeof window.showPromptModal === 'function') {
@@ -3865,6 +4372,12 @@ function esc(str) {
  updateSelection();
  }
  });
+ bEl.addEventListener('contextmenu', event => {
+   if (event.target.closest('.fr-view-item,.fr-ctrl-item')) return;
+   const bandIdx = Number.parseInt(bEl.dataset.bandIdx ?? bEl.closest('[data-band-idx]')?.dataset.bandIdx, 10);
+   const band = allPages[activePageIndex]?.data?.bands?.[bandIdx];
+   if (band) showDesignerContextMenu(event, band);
+ });
  });
 
  // Also: clicking fr-band-body in preview mode (no fr-band-header rendered)
@@ -3889,6 +4402,7 @@ function esc(str) {
  }
  });
  }
+ bindCanvasDataDrops();
  }
 
  // ── OLAYLARI BAĞLA (EVENT LISTENERS & RESIZING) ───────────
@@ -4243,6 +4757,7 @@ function esc(str) {
  };
  window.addEventListener('keydown', designerKeydownHandler);
 
+ bindDataTreeInteractions();
  bindCanvasInteraction();
  bindInspectorInputs();
  }
