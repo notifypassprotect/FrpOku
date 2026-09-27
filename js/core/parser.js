@@ -453,10 +453,18 @@ function parseFrp(xmlText) {
     const onClick = getAttr(attrsChunk, 'OnClick') || '';
     const onAfterPrint = getAttr(attrsChunk, 'OnAfterPrint') || '';
     const onPreviewClick = getAttr(attrsChunk, 'OnPreviewClick') || '';
+    const onChange = getAttr(attrsChunk, 'OnChange') || '';
+    const onMasterDetail = getAttr(attrsChunk, 'OnMasterDetail') || '';
+    const onEnter = getAttr(attrsChunk, 'OnEnter') || '';
+    const onExit = getAttr(attrsChunk, 'OnExit') || '';
+    const onKeyDown = getAttr(attrsChunk, 'OnKeyDown') || '';
+    const onAfterData = getAttr(attrsChunk, 'OnAfterData') || '';
+    const onAfterCalcHeight = getAttr(attrsChunk, 'OnAfterCalcHeight') || '';
     
     // Additional Delphi Properties
     const allowExpressions = getAttr(attrsChunk, 'AllowExpressions') !== 'False';
     const autoWidth = getAttr(attrsChunk, 'AutoWidth') === 'True';
+    const autoSize = getAttr(attrsChunk, 'AutoSize') === 'True';
     const allowHTMLTags = getAttr(attrsChunk, 'AllowHTMLTags') === 'True';
     const wordWrap = getAttr(attrsChunk, 'WordWrap') !== 'False';
     const printable = getAttr(attrsChunk, 'Printable') !== 'False';
@@ -465,6 +473,10 @@ function parseFrp(xmlText) {
     const clipped = getAttr(attrsChunk, 'Clipped') !== 'False';
     const lineSpacing = numVal(getAttr(attrsChunk, 'LineSpacing'), 0);
     const paragraphGap = numVal(getAttr(attrsChunk, 'ParagraphGap'), 0);
+    const charSpacing = numVal(getAttr(attrsChunk, 'CharSpacing'), 0);
+    const gapX = numVal(getAttr(attrsChunk, 'GapX'), 0);
+    const gapY = numVal(getAttr(attrsChunk, 'GapY'), 0);
+    const expressionDelimiters = getAttr(attrsChunk, 'ExpressionDelimiters') || '[,]';
     const shiftMode = getAttr(attrsChunk, 'ShiftMode') || 'smAlways';
     const stretchMode = getAttr(attrsChunk, 'StretchMode') || 'smDontStretch';
     const visible = getAttr(attrsChunk, 'Visible') !== 'False';
@@ -546,8 +558,16 @@ function parseFrp(xmlText) {
       onClick,
       onAfterPrint,
       onPreviewClick,
+      onChange,
+      onMasterDetail,
+      onEnter,
+      onExit,
+      onKeyDown,
+      onAfterData,
+      onAfterCalcHeight,
       allowExpressions,
       autoWidth,
+      autoSize,
       allowHTMLTags,
       wordWrap,
       printable,
@@ -556,6 +576,10 @@ function parseFrp(xmlText) {
       clipped,
       lineSpacing,
       paragraphGap,
+      charSpacing,
+      gapX,
+      gapY,
+      expressionDelimiters,
       shiftMode,
       stretchMode,
       visible,
@@ -597,6 +621,9 @@ function parseFrp(xmlText) {
       bottomMargin: numVal(getAttr(pAttrs, 'BottomMargin'), 10),
       columnWidth: numVal(getAttr(pAttrs, 'ColumnWidth'), 0),
       visible: getAttr(pAttrs, 'Visible') !== 'False',
+      onClick: getAttr(pAttrs, 'OnClick') || '',
+      onBeforePrint: getAttr(pAttrs, 'OnBeforePrint') || '',
+      onAfterPrint: getAttr(pAttrs, 'OnAfterPrint') || '',
       bands: []
     };
 
@@ -627,6 +654,11 @@ function parseFrp(xmlText) {
         rowCount: numVal(getAttr(bAttrs, 'RowCount'), 0),
         vertical: getAttr(bAttrs, 'Vertical') === 'True',
         left: numVal(getAttr(bAttrs, 'Left'), 0),
+        onClick: getAttr(bAttrs, 'OnClick') || '',
+        onBeforePrint: getAttr(bAttrs, 'OnBeforePrint') || '',
+        onAfterPrint: getAttr(bAttrs, 'OnAfterPrint') || '',
+        onPreviewClick: getAttr(bAttrs, 'OnPreviewClick') || '',
+        onMasterDetail: getAttr(bAttrs, 'OnMasterDetail') || '',
         rawAttrs: bAttrs,
         components: []
       };
@@ -951,7 +983,8 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
         setAttrs(pageNode, {
           Orientation: page.orientation, PaperWidth: page.paperWidth, PaperHeight: page.paperHeight,
           LeftMargin: page.leftMargin, TopMargin: page.topMargin, RightMargin: page.rightMargin,
-          BottomMargin: page.bottomMargin, ColumnWidth: page.columnWidth, Visible: page.visible
+          BottomMargin: page.bottomMargin, ColumnWidth: page.columnWidth, Visible: page.visible,
+          OnClick: page.onClick, OnBeforePrint: page.onBeforePrint, OnAfterPrint: page.onAfterPrint
         });
         (page.bands || []).forEach(band => {
           const synthetic = band.type === 'TfrxPageContent';
@@ -964,7 +997,9 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
             DataSetName: band.dataSet, Condition: band.condition, Stretched: band.stretched,
             AllowSplit: band.allowSplit, KeepTogether: band.keepTogether, KeepChild: band.keepChild,
             KeepHeader: band.keepHeader, KeepFooter: band.keepFooter, StartNewPage: band.startNewPage,
-            PrintIfDetailEmpty: band.printIfDetailEmpty, RowCount: band.rowCount, Vertical: band.vertical
+            PrintIfDetailEmpty: band.printIfDetailEmpty, RowCount: band.rowCount, Vertical: band.vertical,
+            OnClick: band.onClick, OnBeforePrint: band.onBeforePrint, OnAfterPrint: band.onAfterPrint,
+            OnPreviewClick: band.onPreviewClick, OnMasterDetail: band.onMasterDetail
           });
           (band.components || []).forEach(component => {
             const componentNode = ensureNode(component, bandNode);
@@ -982,18 +1017,23 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
               Align: component.align, HAlign: component.hAlign, VAlign: component.vAlign, Rotation: component.rotation,
               DataSetName: component.dataSet, DataField: component.dataField, DisplayFormat: component.displayFormat,
               'Hyperlink.Value': component.hyperlink,
-              WordWrap: component.wordWrap, AutoWidth: component.autoWidth,
+              WordWrap: component.wordWrap, AutoWidth: component.autoWidth, AutoSize: component.autoSize,
               AllowExpressions: component.allowExpressions, AllowHTMLTags: component.allowHTMLTags,
               StretchMode: component.stretchMode, ShiftMode: component.shiftMode,
               Printable: component.printable, SuppressRepeatedValues: component.suppressRepeatedValues,
               HideZeros: component.hideZeros, Clipped: component.clipped,
               LineSpacing: component.lineSpacing, ParagraphGap: component.paragraphGap,
+              CharSpacing: component.charSpacing, GapX: component.gapX, GapY: component.gapY,
+              ExpressionDelimiters: component.expressionDelimiters,
               FileLink: component.fileLink, KeepAspectRatio: component.keepAspectRatio,
               Center: component.center, Stretched: component.stretched,
               BarType: component.barType, ShowText: component.showText,
               CalcCheckSum: component.calcCheckSum, Zoom: component.zoom, Shape: component.shape,
               Visible: component.visible, Enabled: component.enabled, OnBeforePrint: component.onBeforePrint,
-              OnAfterPrint: component.onAfterPrint, OnClick: component.onClick, OnPreviewClick: component.onPreviewClick
+              OnAfterPrint: component.onAfterPrint, OnClick: component.onClick, OnPreviewClick: component.onPreviewClick,
+              OnChange: component.onChange, OnMasterDetail: component.onMasterDetail,
+              OnEnter: component.onEnter, OnExit: component.onExit, OnKeyDown: component.onKeyDown,
+              OnAfterData: component.onAfterData, OnAfterCalcHeight: component.onAfterCalcHeight
             });
           });
 
