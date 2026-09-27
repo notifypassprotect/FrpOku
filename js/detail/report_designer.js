@@ -448,7 +448,7 @@ function esc(str) {
  let rightTab = 'inspector'; // 'inspector' | 'datatree'
  let inspectorSearchQuery = '';
  let inspectorTab = 'properties'; // 'properties' | 'events' | 'favorites'
- let inspectorWidth = parseInt(localStorage.getItem('frp_inspector_width') || '330', 10);
+ let inspectorWidth = parseInt(localStorage.getItem('frp_inspector_width_v2') || '292', 10);
  let designerKeydownHandler = null;
  let designerClipboard = [];
  let activeCanvasGestureCleanup = null;
@@ -461,8 +461,8 @@ function esc(str) {
  const snapDesignerValue = value => gridSnapStep > 1 ? Math.round(value / gridSnapStep) * gridSnapStep : Math.round(value);
  const gridStateClass = () => gridSnapStep > 1 ? 'grid-snap-on' : 'grid-snap-off';
  const gridStateStyle = () => `--fr-designer-grid:${gridSnapStep > 1 ? gridSnapStep : 8}px;`;
- const INSPECTOR_NUMBER_PROPS = new Set(['left', 'top', 'width', 'height', 'fontSize', 'frameWidth', 'rotation', 'paperWidth', 'paperHeight', 'leftMargin', 'rightMargin', 'topMargin', 'bottomMargin', 'columnWidth', 'zoom', 'lineSpacing', 'paragraphGap', 'rowCount']);
- const INSPECTOR_BOOLEAN_PROPS = new Set(['isBold', 'isItalic', 'isUnderline', 'wordWrap', 'autoWidth', 'allowExpressions', 'allowHTMLTags', 'visible', 'enabled', 'printable', 'stretched', 'allowSplit', 'keepTogether', 'startNewPage', 'keepChild', 'keepFooter', 'keepHeader', 'printIfDetailEmpty', 'suppressRepeatedValues', 'hideZeros', 'clipped', 'keepAspectRatio', 'center', 'showText', 'calcCheckSum', 'checked']);
+ const INSPECTOR_NUMBER_PROPS = new Set(['left', 'top', 'width', 'height', 'fontSize', 'frameWidth', 'rotation', 'paperWidth', 'paperHeight', 'leftMargin', 'rightMargin', 'topMargin', 'bottomMargin', 'columnWidth', 'zoom', 'lineSpacing', 'paragraphGap', 'charSpacing', 'gapX', 'gapY', 'rowCount']);
+ const INSPECTOR_BOOLEAN_PROPS = new Set(['isBold', 'isItalic', 'isUnderline', 'wordWrap', 'autoWidth', 'autoSize', 'allowExpressions', 'allowHTMLTags', 'visible', 'enabled', 'printable', 'stretched', 'allowSplit', 'keepTogether', 'startNewPage', 'keepChild', 'keepFooter', 'keepHeader', 'printIfDetailEmpty', 'suppressRepeatedValues', 'hideZeros', 'clipped', 'keepAspectRatio', 'center', 'showText', 'calcCheckSum', 'checked']);
 
  function normalizeInspectorValue(prop, value) {
    if (INSPECTOR_NUMBER_PROPS.has(prop)) return toDesignerNumber(value, 0);
@@ -898,14 +898,14 @@ function esc(str) {
  // ── DATA TREE HTML OLUŞTURUCU (Images 1, 2, 3) ────────────
  function renderDataTreeHtml(file) {
  const queries = file.queries || [];
- const queryHtml = queries.length ? queries.map(q => {
+ const queryHtml = queries.length ? queries.map((q, queryIndex) => {
  const fields = extractFieldsFromQuery(q, file);
  return `
- <section class="fr-datatree-query">
- <div class="fr-datatree-query-title">
- <span>${esc(q.name)}</span>
+ <section class="fr-datatree-query ${queryIndex > 0 ? 'is-collapsed' : ''}" data-tree-group data-tree-label="${esc(q.name)}">
+ <button type="button" class="fr-datatree-query-title" data-tree-toggle aria-expanded="${queryIndex === 0 ? 'true' : 'false'}">
+ <span class="fr-datatree-query-label"><span class="fr-datatree-chevron">⌄</span>${esc(q.name)}</span>
  <span class="fr-datatree-count">${fields.length} alan</span>
- </div>
+ </button>
  <div class="fr-datatree-fields">
  ${fields.length > 0? fields.map(f => `
  <button type="button" draggable="true" class="fr-datatree-field-row"
@@ -926,16 +926,35 @@ function esc(str) {
  return `
  <div class="fr-datatree-guide"><strong>Alan ekleme</strong><span>Bir alanı memo üzerine sürükleyin veya çift tıklayın.</span></div>
  ${queryHtml}
- ${variables.length ? `<section class="fr-datatree-query fr-datatree-variables">
-   <div class="fr-datatree-query-title"><span>Rapor Değişkenleri</span><span class="fr-datatree-count">${variables.length}</span></div>
+ ${variables.length ? `<section class="fr-datatree-query fr-datatree-variables is-collapsed" data-tree-group data-tree-label="Rapor Değişkenleri">
+   <button type="button" class="fr-datatree-query-title" data-tree-toggle aria-expanded="false"><span class="fr-datatree-query-label"><span class="fr-datatree-chevron">⌄</span>Rapor Değişkenleri</span><span class="fr-datatree-count">${variables.length}</span></button>
    <div class="fr-datatree-fields">${variables.map(field => `<button type="button" draggable="true" class="fr-datatree-field-row" data-query="" data-field="${encodeInlineArg(field)}" data-expression="${encodeInlineArg(`[${field}]`)}" title="[${esc(field)}] ekle"><span class="fr-datatree-field-icon variable">V</span><span class="fr-datatree-field-name">${esc(field)}</span><span class="fr-datatree-drag-hint">⋮⋮</span></button>`).join('')}</div>
  </section>` : ''}
- <section class="fr-datatree-query fr-datatree-system">
-   <div class="fr-datatree-query-title"><span>Sistem Değişkenleri</span><span class="fr-datatree-count">${systemFields.length}</span></div>
+ <section class="fr-datatree-query fr-datatree-system is-collapsed" data-tree-group data-tree-label="Sistem Değişkenleri">
+   <button type="button" class="fr-datatree-query-title" data-tree-toggle aria-expanded="false"><span class="fr-datatree-query-label"><span class="fr-datatree-chevron">⌄</span>Sistem Değişkenleri</span><span class="fr-datatree-count">${systemFields.length}</span></button>
    <div class="fr-datatree-fields">
    ${systemFields.map(field => `<button type="button" draggable="true" class="fr-datatree-field-row" data-query="" data-field="${encodeInlineArg(field)}" data-expression="${encodeInlineArg(`[${field}]`)}" title="[${esc(field)}] ekle"><span class="fr-datatree-field-icon system">S</span><span class="fr-datatree-field-name">${esc(field)}</span><span class="fr-datatree-drag-hint">⋮⋮</span></button>`).join('')}
    </div>
  </section>`;
+ }
+
+ function bindDataTreeGroupControls(root) {
+   if (!root) return;
+   const groups = () => [...root.querySelectorAll('[data-tree-group]')];
+   const setCollapsed = (group, collapsed) => {
+     group.classList.toggle('is-collapsed', collapsed);
+     group.querySelector('[data-tree-toggle]')?.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+   };
+   root.querySelectorAll('[data-tree-toggle]').forEach(button => {
+     button.addEventListener('click', event => {
+       event.preventDefault();
+       event.stopPropagation();
+       const group = button.closest('[data-tree-group]');
+       if (group) setCollapsed(group, !group.classList.contains('is-collapsed'));
+     });
+   });
+   root.querySelector('[data-tree-expand-all]')?.addEventListener('click', () => groups().forEach(group => setCollapsed(group, false)));
+   root.querySelector('[data-tree-collapse-all]')?.addEventListener('click', () => groups().forEach(group => setCollapsed(group, true)));
  }
 
  function extractFieldsFromQuery(query, file) {
@@ -1063,13 +1082,15 @@ function esc(str) {
            <div class="fr-memo-editor-help"><span>Data Tree alanını buraya sürükleyebilir veya çift tıklayabilirsiniz.</span><span id="frMemoEditorCount">${initialText.length} karakter</span></div>
          </section>
          <aside class="fr-memo-editor-data">
-           <div class="fr-memo-editor-data-head"><strong>Data Tree</strong><input type="search" placeholder="Alan ara..." aria-label="Data Tree alanı ara"></div>
+           <div class="fr-memo-editor-data-head"><div class="fr-memo-editor-data-title"><strong>Data Tree</strong><span>${(file.queries || []).length} sorgu</span></div><input type="search" placeholder="Sorgu veya alan ara..." aria-label="Data Tree alanı ara"></div>
+           <div class="fr-memo-editor-data-actions"><button type="button" data-tree-expand-all>Tümünü aç</button><button type="button" data-tree-collapse-all>Tümünü daralt</button><span data-tree-result-count></span></div>
            <div class="fr-memo-editor-data-scroll">${renderDataTreeHtml(file)}</div>
          </aside>
        </div>
        <footer class="fr-memo-editor-footer"><span>Ctrl+Enter kaydet · Esc kapat</span><div><button type="button" data-cancel="true">İptal</button><button type="button" data-save="true" class="primary">Uygula</button></div></footer>
      </div>`;
    document.body.appendChild(overlay);
+   bindDataTreeGroupControls(overlay);
 
    const textarea = overlay.querySelector('#frMemoEditorText');
    const counter = overlay.querySelector('#frMemoEditorCount');
@@ -1122,7 +1143,23 @@ function esc(str) {
    overlay.querySelector('[data-clear]')?.addEventListener('click', () => { textarea.value = ''; textarea.dispatchEvent(new Event('input')); textarea.focus(); });
    overlay.querySelector('input[type="search"]')?.addEventListener('input', event => {
      const query = event.target.value.trim().toLowerCase();
-     overlay.querySelectorAll('.fr-datatree-field-row').forEach(row => { row.hidden = Boolean(query && !row.textContent.toLowerCase().includes(query)); });
+     let visibleCount = 0;
+     overlay.querySelectorAll('[data-tree-group]').forEach(group => {
+       const labelMatch = (group.dataset.treeLabel || '').toLowerCase().includes(query);
+       let groupCount = 0;
+       group.querySelectorAll('.fr-datatree-field-row').forEach(row => {
+         const matched = !query || labelMatch || row.textContent.toLowerCase().includes(query);
+         row.hidden = !matched;
+         if (matched) { visibleCount += 1; groupCount += 1; }
+       });
+       group.hidden = Boolean(query && groupCount === 0);
+       if (query && groupCount > 0) {
+         group.classList.remove('is-collapsed');
+         group.querySelector('[data-tree-toggle]')?.setAttribute('aria-expanded', 'true');
+       }
+     });
+     const result = overlay.querySelector('[data-tree-result-count]');
+     if (result) result.textContent = query ? `${visibleCount} sonuç` : '';
    });
    overlay.querySelector('[data-save]')?.addEventListener('click', save);
    overlay.querySelector('[data-cancel]')?.addEventListener('click', close);
@@ -1136,6 +1173,7 @@ function esc(str) {
  }
 
  function bindDataTreeInteractions() {
+   bindDataTreeGroupControls(containerEl);
    containerEl.querySelectorAll('.fr-datatree-field-row').forEach(row => {
      row.addEventListener('click', event => {
        event.stopPropagation();
@@ -1293,21 +1331,24 @@ function esc(str) {
    selectedItem = target;
    selectedItems = isBand ? [] : [target];
    updateSelection();
-   const checked = key => ((['visible', 'printable', 'wordWrap', 'allowExpressions'].includes(key) ? target[key] !== false : Boolean(target[key])) ? '<span class="fr-context-check">✓</span>' : '<span class="fr-context-check"></span>');
+   const checked = key => ((['visible', 'enabled', 'printable', 'wordWrap', 'allowExpressions', 'clipped', 'keepAspectRatio'].includes(key) ? target[key] !== false : Boolean(target[key])) ? '<span class="fr-context-check">✓</span>' : '<span class="fr-context-check"></span>');
+   const isPicture = target.type === 'TfrxPictureView';
    const menu = document.createElement('div');
    menu.className = 'fr-designer-context-menu';
    menu.innerHTML = isBand ? `
      <div class="fr-context-title"><strong>${esc(target.name || 'Bant')}</strong><span>${esc(target.type || 'TfrxBand')}</span></div>
      <button data-action="band-edit">Bant ayarlarını düzenle</button><button data-action="add-child">Child band ekle</button>
      <div class="fr-context-separator"></div>
-     <button data-action="toggle-stretched">${checked('stretched')}Stretch</button><button data-action="toggle-allowSplit">${checked('allowSplit')}Sayfada bölünebilir</button><button data-action="toggle-keepTogether">${checked('keepTogether')}Birlikte tut</button><button data-action="toggle-startNewPage">${checked('startNewPage')}Yeni sayfada başlat</button>
+     <button data-action="toggle-stretched">${checked('stretched')}Stretch</button><button data-action="toggle-allowSplit">${checked('allowSplit')}Sayfada bölünebilir</button><button data-action="toggle-keepTogether">${checked('keepTogether')}Birlikte tut</button><button data-action="toggle-keepChild">${checked('keepChild')}Child ile birlikte tut</button><button data-action="toggle-keepHeader">${checked('keepHeader')}Header ile birlikte tut</button><button data-action="toggle-keepFooter">${checked('keepFooter')}Footer ile birlikte tut</button><button data-action="toggle-printIfDetailEmpty">${checked('printIfDetailEmpty')}Detay boşsa yazdır</button><button data-action="toggle-startNewPage">${checked('startNewPage')}Yeni sayfada başlat</button>
      <div class="fr-context-separator"></div>
      <button data-action="band-up">Yukarı taşı</button><button data-action="band-down">Aşağı taşı</button><button data-action="select-page">Sayfadaki tüm nesneleri seç</button>
      <div class="fr-context-separator"></div><button data-action="delete" class="danger">Bandı ve içeriğini sil</button>` : `
      <div class="fr-context-title"><strong>${esc(target.name || 'Nesne')}</strong><span>${esc(target.type || 'TfrxComponent')}</span></div>
-     ${isMemo ? '<button data-action="edit">Metni ve veri alanını düzenle</button><button data-action="display-format">Display Format ayarına git</button><button data-action="hyperlink">Hyperlink ayarına git</button><button data-action="clear">İçeriği temizle</button><div class="fr-context-separator"></div><button data-action="toggle-autoWidth">'+checked('autoWidth')+'Auto Width</button><button data-action="toggle-wordWrap">'+checked('wordWrap')+'Word Wrap</button><button data-action="toggle-allowExpressions">'+checked('allowExpressions')+'İfadelere izin ver</button><button data-action="toggle-suppressRepeatedValues">'+checked('suppressRepeatedValues')+'Tekrarlanan değerleri gizle</button><button data-action="toggle-hideZeros">'+checked('hideZeros')+'Sıfırları gizle</button><button data-action="toggle-visible">'+checked('visible')+'Visible</button><button data-action="toggle-printable">'+checked('printable')+'Printable</button>' : ''}
+     ${isMemo ? '<button data-action="edit">Metni ve veri alanını düzenle</button><button data-action="display-format">Display Format ayarına git</button><button data-action="hyperlink">Hyperlink ayarına git</button><button data-action="clear">İçeriği temizle</button><div class="fr-context-separator"></div><button data-action="toggle-autoWidth">'+checked('autoWidth')+'Auto Width</button><button data-action="toggle-wordWrap">'+checked('wordWrap')+'Word Wrap</button><button data-action="toggle-allowExpressions">'+checked('allowExpressions')+'İfadelere izin ver</button><button data-action="toggle-allowHTMLTags">'+checked('allowHTMLTags')+'HTML etiketlerine izin ver</button><button data-action="toggle-clipped">'+checked('clipped')+'Taşan metni kırp</button><button data-action="toggle-suppressRepeatedValues">'+checked('suppressRepeatedValues')+'Tekrarlanan değerleri gizle</button><button data-action="toggle-hideZeros">'+checked('hideZeros')+'Sıfırları gizle</button><button data-action="toggle-enabled">'+checked('enabled')+'Enabled</button><button data-action="toggle-visible">'+checked('visible')+'Visible</button><button data-action="toggle-printable">'+checked('printable')+'Printable</button>' : ''}
+     ${isPicture ? '<button data-action="toggle-autoSize">'+checked('autoSize')+'Auto Size</button><button data-action="toggle-stretched">'+checked('stretched')+'Stretch</button><button data-action="toggle-center">'+checked('center')+'Center</button><button data-action="toggle-keepAspectRatio">'+checked('keepAspectRatio')+'En-boy oranını koru</button>' : ''}
      <div class="fr-context-separator"></div>
-     <div class="fr-context-rotation"><span>Döndür</span>${[0,90,180,270].map(value => `<button data-action="rotate" data-value="${value}" class="${toDesignerNumber(target.rotation) === value ? 'active' : ''}">${value}°</button>`).join('')}</div>
+     <div class="fr-context-frame"><span>Çerçeve</span><button data-action="frame-none">Yok</button><button data-action="frame-all">Tümü</button></div>
+     <div class="fr-context-rotation"><span>Döndür</span>${[0,45,90,180,270].map(value => `<button data-action="rotate" data-value="${value}" class="${toDesignerNumber(target.rotation) === value ? 'active' : ''}">${value}°</button>`).join('')}</div>
      <div class="fr-context-separator"></div>
      <button data-action="copy">Kopyala <kbd>Ctrl+C</kbd></button><button data-action="duplicate">Çoğalt <kbd>Ctrl+D</kbd></button><button data-action="paste">Yapıştır <kbd>Ctrl+V</kbd></button><button data-action="delete" class="danger">Sil <kbd>Del</kbd></button>
      <div class="fr-context-separator"></div><button data-action="select-same">Aynı türdekileri seç</button><button data-action="select-page">Sayfadaki tüm nesneleri seç</button><button data-action="front">En öne getir</button><button data-action="back">En arkaya gönder</button>`;
@@ -1330,6 +1371,8 @@ function esc(str) {
      if (action === 'display-format') { rightTab = 'inspector'; inspectorTab = 'properties'; inspectorSearchQuery = 'DisplayFormat'; showInspector = true; return render(); }
      if (action === 'hyperlink') { rightTab = 'inspector'; inspectorTab = 'properties'; inspectorSearchQuery = 'Hyperlink'; showInspector = true; return render(); }
      if (action === 'clear') return mutate(() => { target.text = ''; target.caption = ''; target.memo = ''; target.dataField = ''; });
+     if (action === 'frame-none') return mutate(() => { target.frameTyp = 0; });
+     if (action === 'frame-all') return mutate(() => { target.frameTyp = 15; });
      if (action === 'rotate') return mutate(() => { target.rotation = toDesignerNumber(button.dataset.value); });
      if (action === 'copy') return copySelectedComponents();
      if (action === 'duplicate') return duplicateSelected();
@@ -2408,7 +2451,9 @@ function esc(str) {
  { name: 'OnMasterDetail', val: obj.onMasterDetail || '', propKey: 'onMasterDetail', editable: isDesignEditing },
  { name: 'OnEnter', val: obj.onEnter || '', propKey: 'onEnter', editable: isDesignEditing },
  { name: 'OnExit', val: obj.onExit || '', propKey: 'onExit', editable: isDesignEditing },
- { name: 'OnKeyDown', val: obj.onKeyDown || '', propKey: 'onKeyDown', editable: isDesignEditing }
+ { name: 'OnKeyDown', val: obj.onKeyDown || '', propKey: 'onKeyDown', editable: isDesignEditing },
+ { name: 'OnAfterData', val: obj.onAfterData || '', propKey: 'onAfterData', editable: isDesignEditing },
+ { name: 'OnAfterCalcHeight', val: obj.onAfterCalcHeight || '', propKey: 'onAfterCalcHeight', editable: isDesignEditing }
  ];
  } else if (isPage) {
     // RAPOR SAYFASI (PAGE1) ÖZELLİKLERİ (A4: 21x29.7cm & 1cm Kenar Boşlukları)
@@ -2490,7 +2535,7 @@ function esc(str) {
       { name: 'AllowHTMLTags', val: obj.allowHTMLTags ? 'true' : 'false', propKey: 'allowHTMLTags', isSelect: isDesignEditing, options: ['true', 'false'] },
       { name: 'DisplayFormat', val: obj.formatStr || obj.displayFormat || '', propKey: 'formatStr', editable: isDesignEditing },
       { name: 'Hyperlink', val: obj.hyperlink || '', propKey: 'hyperlink', editable: isDesignEditing },
-      { name: 'Rotation', val: String(obj.rotation || 0), propKey: 'rotation', isSelect: isDesignEditing, options: ['0', '90', '180', '270'] },
+      { name: 'Rotation', val: String(obj.rotation || 0), propKey: 'rotation', isNumber: true, editable: isDesignEditing },
       { name: 'Visible', val: obj.visible !== false ? 'true' : 'false', propKey: 'visible', isSelect: isDesignEditing, options: ['true', 'false'] },
       { name: 'Enabled', val: obj.enabled !== false ? 'true' : 'false', propKey: 'enabled', isSelect: isDesignEditing, options: ['true', 'false'] },
       { name: 'Printable', val: obj.printable !== false ? 'true' : 'false', propKey: 'printable', isSelect: isDesignEditing, options: ['true', 'false'] }
@@ -2535,8 +2580,12 @@ function esc(str) {
         { name: 'SuppressRepeatedValues', val: obj.suppressRepeatedValues ? 'true' : 'false', propKey: 'suppressRepeatedValues', isSelect: isDesignEditing, options: ['true', 'false'] },
         { name: 'HideZeros', val: obj.hideZeros ? 'true' : 'false', propKey: 'hideZeros', isSelect: isDesignEditing, options: ['true', 'false'] },
         { name: 'Clipped', val: obj.clipped !== false ? 'true' : 'false', propKey: 'clipped', isSelect: isDesignEditing, options: ['true', 'false'] },
+        { name: 'CharSpacing', val: obj.charSpacing || 0, propKey: 'charSpacing', isNumber: true, editable: isDesignEditing },
+        { name: 'GapX', val: obj.gapX || 0, propKey: 'gapX', isNumber: true, editable: isDesignEditing },
+        { name: 'GapY', val: obj.gapY || 0, propKey: 'gapY', isNumber: true, editable: isDesignEditing },
         { name: 'LineSpacing', val: obj.lineSpacing || 0, propKey: 'lineSpacing', isNumber: true, editable: isDesignEditing },
-        { name: 'ParagraphGap', val: obj.paragraphGap || 0, propKey: 'paragraphGap', isNumber: true, editable: isDesignEditing }
+        { name: 'ParagraphGap', val: obj.paragraphGap || 0, propKey: 'paragraphGap', isNumber: true, editable: isDesignEditing },
+        { name: 'ExpressionDelimiters', val: obj.expressionDelimiters || '[,]', propKey: 'expressionDelimiters', editable: isDesignEditing }
       );
     }
   }
@@ -2585,7 +2634,7 @@ function esc(str) {
  } else if (p.editable && isDesignEditing) {
  const typeAttr = p.isNumber? 'type="number"': 'type="text"';
  inputControl = `
- <input ${typeAttr} class="designer-prop-input" data-prop="${p.propKey}" value="${esc(String(p.val))}" />
+ <input ${typeAttr} class="designer-prop-input ${inspectorTab === 'events' ? 'designer-event-input' : ''}" data-prop="${p.propKey}" data-event-name="${inspectorTab === 'events' ? esc(p.name) : ''}" value="${esc(String(p.val))}" ${inspectorTab === 'events' ? 'title="Çift tıklayın: PascalScript olay yordamını aç"' : ''} />
  `;
  } else {
  inputControl = `<span style="font-weight:600;color:var(--text-primary,#f8fafc);">${esc(String(p.val))}</span>`;
@@ -2679,6 +2728,26 @@ function esc(str) {
  const val = inp.dataset.isColor === 'true' ? hexToDelphiColor(inp.value) : inp.value;
  applyInspectorProperty(prop, val);
  });
+ });
+
+ propTable.querySelectorAll('.designer-event-input').forEach(inp => {
+   inp.addEventListener('dblclick', event => {
+     event.preventDefault();
+     event.stopPropagation();
+     const target = selectedItem || allPages[activePageIndex]?.data;
+     if (!target) return;
+     const eventName = inp.dataset.eventName || '';
+     const componentName = String(target.name || target.type || 'Component').replace(/[^a-zA-Z0-9_]/g, '');
+     const handlerName = String(inp.value || `${componentName}${eventName}`).trim().replace(/[^a-zA-Z0-9_]/g, '');
+     if (!handlerName) return;
+     if (inp.value !== handlerName) {
+       applyInspectorProperty(inp.dataset.prop, handlerName, { refresh: false });
+       inp.value = handlerName;
+     }
+     const bridge = window.FrpDesignerScriptBridge;
+     if (bridge?.openEventHandler) bridge.openEventHandler({ componentName, eventName, handlerName });
+     else window.FrpNotify?.warning('PascalScript editörü hazır değil.');
+   });
  });
 
  // 2. Select Dropdowns
@@ -4635,7 +4704,7 @@ function esc(str) {
  const onInspectorMove = e => {
  if (!isResizing) return;
  const dx = startX - e.clientX;
- const newW = Math.max(220, Math.min(650, startW + dx));
+ const newW = Math.max(245, Math.min(540, startW + dx));
  inspectorWidth = newW;
  insp.style.width = newW + 'px';
  };
@@ -4645,7 +4714,7 @@ function esc(str) {
  isResizing = false;
  document.body.style.cursor = '';
  document.body.style.userSelect = '';
- localStorage.setItem('frp_inspector_width', inspectorWidth);
+ localStorage.setItem('frp_inspector_width_v2', inspectorWidth);
  window.removeEventListener('mousemove', onInspectorMove);
  window.removeEventListener('mouseup', stopInspectorResize);
  };
