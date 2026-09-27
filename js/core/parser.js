@@ -943,13 +943,28 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
     if (!doc.querySelector('parsererror') && doc.documentElement) {
       const root = doc.documentElement;
       const elements = () => Array.from(doc.getElementsByTagName('*'));
-      const byName = name => elements().find(node => node.getAttribute('Name') === String(name)) || null;
+      const managedComponentType = type => /^Tfrx(?:[A-Za-z0-9_]+View|Subreport)$/i.test(String(type || ''));
+      const managedBandType = type => /^Tfrx(?:MasterData|DetailData|SubdetailData|Header|Footer|PageHeader|PageFooter|GroupHeader|GroupFooter|ColumnHeader|ColumnFooter|ReportTitle|ReportSummary|DataBand|Child|Overlay|DMPHeader|DMPFooter|DMPGroupHeader|DMPGroupFooter|DMPMasterData|DMPDetailData|DMPSubdetailData)$/i.test(String(type || ''));
+      const managedStructuralType = type => /^(?:TfrxReport|TfrxDataPage|TfrxReportPage|TfrxDMPPage|TfrxPage|ReportPage|TfrxDialogPage|TfrxFOQuery|TfrxQuery)$/i.test(String(type || ''))
+        || /^Tfrx[A-Za-z0-9_]+(?:Control|Sheet|PageControl|TabSheet)$/i.test(String(type || ''));
+      const protectedNamedNodes = elements().filter(node => {
+        const name = node.getAttribute('Name') || node.getAttribute('UserName');
+        return name && !managedComponentType(node.nodeName) && !managedBandType(node.nodeName) && !managedStructuralType(node.nodeName);
+      }).map(node => ({ type: node.nodeName, name: node.getAttribute('Name') || node.getAttribute('UserName') }));
+      const byName = (name, type, parent) => {
+        const wantedName = String(name);
+        const wantedType = String(type || '');
+        const candidates = parent ? Array.from(parent.children || []) : elements();
+        return candidates.find(node => node.getAttribute('Name') === wantedName && (!wantedType || node.nodeName === wantedType))
+          || (!parent ? null : elements().find(node => node.getAttribute('Name') === wantedName && (!wantedType || node.nodeName === wantedType)))
+          || null;
+      };
       const setAttrs = (node, attrs) => Object.entries(attrs).forEach(([key, value]) => {
         if (value !== undefined && value !== null) node.setAttribute(key, typeof value === 'boolean' ? (value ? 'True' : 'False') : String(value));
       });
       const ensureNode = (model, parent) => {
         if (!model?.name || !model?.type) return null;
-        let node = byName(model.name);
+        let node = byName(model.name, model.type, parent);
         if (!node && parent) {
           node = doc.createElement(model.type);
           node.setAttribute('Name', model.name);
@@ -1042,7 +1057,10 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
           Array.from(bandNode.childNodes || []).forEach(child => {
             if (child.nodeType === 1) {
               const cName = child.getAttribute('Name');
-              if (cName && !activeCompNames.has(cName) && !/Band|Page|Report/i.test(child.nodeName)) {
+              // Yalnızca tasarımcının okuyup yönettiği nesneler silinebilir. Table,
+              // Map eklentileri veya özel FastReport bileşenleri modelde görünmese
+              // bile ham FRP içinde aynen korunur.
+              if (cName && managedComponentType(child.nodeName) && !activeCompNames.has(cName)) {
                 bandNode.removeChild(child);
               }
             }
@@ -1054,7 +1072,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
         Array.from(pageNode.childNodes || []).forEach(child => {
           if (child.nodeType === 1) {
             const bName = child.getAttribute('Name');
-            if (bName && !activeBandNames.has(bName) && /Band|Header|Footer|Data|Summary|Title|Group|Child/i.test(child.nodeName)) {
+            if (bName && managedBandType(child.nodeName) && !activeBandNames.has(bName)) {
               pageNode.removeChild(child);
             }
           }
@@ -1099,7 +1117,16 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
       });
 
       if (newVersionNumStr) root.setAttribute('ReportOptions.VersionBuild', String(newVersionNumStr));
-      xml = new SerializerClass().serializeToString(doc);
+      const serialized = new SerializerClass().serializeToString(doc);
+      const verifyDoc = new ParserClass().parseFromString(serialized, 'application/xml');
+      const verifyElements = verifyDoc.querySelector('parsererror') ? [] : Array.from(verifyDoc.getElementsByTagName('*'));
+      const missingProtected = protectedNamedNodes.filter(item => !verifyElements.some(node => node.nodeName === item.type && (node.getAttribute('Name') === item.name || node.getAttribute('UserName') === item.name)));
+      if (missingProtected.length > 0) {
+        console.warn('FRP güvenlik koruması: desteklenmeyen düğüm kaybı engellendi.', missingProtected);
+        if (typeof window !== 'undefined') window.FrpNotify?.warning?.('FRP içindeki özel bileşenler korundu; güvenli olmayan tasarım değişikliği uygulanmadı.');
+      } else {
+        xml = serialized;
+      }
     }
   } catch (error) {
     console.warn('FRP XML model senkronizasyonu başarısız:', error.message);
