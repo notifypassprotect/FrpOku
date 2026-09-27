@@ -1627,11 +1627,11 @@ function renderViewer(file) {
  });
  }
 
- if (file.pascalScript) {
+ if (totalPagesCount > 0 || file.pascalScript) {
  addTab({
  id: 'tab_pascal', label: 'PascalScript',
- badge: countLines(file.pascalScript) + ' satır',
- type: 'pascal', rawCode: file.pascalScript,
+ badge: countLines(file.pascalScript || '') + ' satır',
+ type: 'pascal', rawCode: file.pascalScript || '',
  highlightFn: highlightPascal,
  langClass: 'lang-pascal', langLabel: 'PascalScript'
  });
@@ -2375,6 +2375,35 @@ function scrollToPascalLine(lineNum) {
  }, 120);
 }
 window.scrollToPascalLine = scrollToPascalLine;
+
+function buildPascalEventHandler(source, handlerName) {
+ const code = String(source || '').replace(/\s+$/, '');
+ const handler = `procedure ${handlerName}(Sender: TfrxComponent);\nbegin\n  \nend;`;
+ if (!code) return `${handler}\n\nbegin\nend.`;
+ const mainBlock = /\nbegin\s*\nend\.\s*$/i;
+ if (mainBlock.test(code)) return code.replace(mainBlock, `\n\n${handler}\n\nbegin\nend.`);
+ return `${code}\n\n${handler}`;
+}
+
+function openDesignerEventHandler({ handlerName } = {}) {
+ if (!currentFile || !handlerName) return null;
+ const safeName = String(handlerName).replace(/[^a-zA-Z0-9_]/g, '');
+ if (!safeName) return null;
+ let code = String(currentFile.pascalScript || '');
+ const procedurePattern = new RegExp(`\\bprocedure\\s+${safeName}\\s*\\(`, 'i');
+ if (!procedurePattern.test(code)) code = buildPascalEventHandler(code, safeName);
+ applyCodeUpdateInTab('tab_pascal', code);
+ activateTab('tab_pascal');
+ const line = Math.max(1, code.slice(0, code.search(procedurePattern)).split('\n').length);
+ setTimeout(() => {
+   const editArea = document.getElementById('tab_pascal_editarea');
+   if (editArea && getComputedStyle(editArea).display === 'none') toggleEditMode('tab_pascal');
+   setTimeout(() => scrollToPascalLine(line), 50);
+ }, 30);
+ return { handlerName: safeName, line };
+}
+
+window.FrpDesignerScriptBridge = { openEventHandler: openDesignerEventHandler };
 
 function updateLastEditBtnState(tabId) {
  const btn = document.getElementById(tabId + '_lasteditbtn');
