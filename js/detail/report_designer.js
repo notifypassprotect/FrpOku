@@ -534,6 +534,160 @@ function esc(str) {
 
  let activePageIndex = 0;
 
+ function collectDesignerDiagnostics() {
+   const diagnostics = [];
+   const knownDataSets = new Set([
+     ...(file.datasets || []),
+     ...(file.queries || []).map(query => query.name)
+   ].filter(Boolean).map(name => String(name).toLowerCase()));
+   const script = String(file.pascalScript || '');
+   const namedObjects = new Map();
+   const eventProps = [
+     'onClick', 'onBeforePrint', 'onChange', 'onAfterPrint', 'onPreviewClick',
+     'onMasterDetail', 'onEnter', 'onExit', 'onKeyDown', 'onAfterData', 'onAfterCalcHeight'
+   ];
+
+   const add = (severity, code, path, message) => diagnostics.push({ severity, code, path, message });
+   const hasScriptHandler = handlerName => {
+     const safeName = String(handlerName || '').trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+     return safeName && new RegExp(`\\b(?:procedure|function)\\s+${safeName}\\b`, 'i').test(script);
+   };
+   const registerName = (item, path) => {
+     const name = String(item?.name || '').trim();
+     if (!name) {
+       add('warning', 'missing-name', path, 'Nesnenin adı boş. Olaylar ve script erişimi için benzersiz bir ad verin.');
+       return;
+     }
+     const key = name.toLowerCase();
+     if (namedObjects.has(key)) {
+       add('error', 'duplicate-name', path, `“${name}” adı daha önce ${namedObjects.get(key)} konumunda kullanılmış.`);
+     } else {
+       namedObjects.set(key, path);
+     }
+   };
+   const inspectBinding = (item, path) => {
+     const dataSet = String(item?.dataSet || item?.chartDataSet || '').trim();
+     const dataField = String(item?.dataField || '').trim();
+     if (dataSet && !knownDataSets.has(dataSet.toLowerCase())) {
+       add('warning', 'unknown-dataset', path, `“${dataSet}” veri seti rapor kaynaklarında bulunamadı.`);
+     }
+     if (dataField && !dataSet) {
+       add('warning', 'field-without-dataset', path, `“${dataField}” alanı bir veri setine bağlı değil.`);
+     }
+
+     const text = String(item?.text || item?.caption || item?.memo || item?.expression || '');
+     const openCount = (text.match(/\[/g) || []).length;
+     const closeCount = (text.match(/\]/g) || []).length;
+     if (item?.allowExpressions !== false && openCount !== closeCount) {
+       add('warning', 'expression-delimiter', path, 'Memo ifadesindeki köşeli parantezler dengeli değil.');
+     }
+     const expressionDataSetRx = /<?([A-Za-z_]\w*)\s*\.\s*"[^"]+"/g;
+     let expressionMatch;
+     while ((expressionMatch = expressionDataSetRx.exec(text)) !== null) {
+       const expressionDataSet = expressionMatch[1];
+       if (!knownDataSets.has(expressionDataSet.toLowerCase())) {
+         add('warning', 'unknown-expression-dataset', path, `İfadede geçen “${expressionDataSet}” veri seti bulunamadı.`);
+       }
+     }
+   };
+   const inspectEvents = (item, path) => {
+     eventProps.forEach(prop => {
+       const handler = String(item?.[prop] || '').trim();
+       if (handler && !hasScriptHandler(handler)) {
+         add('warning', 'missing-handler', path, `${prop.replace(/^on/, 'On')} olayı “${handler}” yordamına bağlı; PascalScript içinde yordam bulunamadı.`);
+       }
+     });
+   };
+   const inspectGeometry = (item, path, { isPage = false } = {}) => {
+     if (isPage) {
+       const width = toDesignerNumber(item.paperWidth, 210);
+       const height = toDesignerNumber(item.paperHeight, 297);
+       const left = toDesignerNumber(item.leftMargin, 10);
+       const right = toDesignerNumber(item.rightMargin, 10);
+       const top = toDesignerNumber(item.topMargin, 10);
+       const bottom = toDesignerNumber(item.bottomMargin, 10);
+       if (width <= 0 || height <= 0) add('error', 'invalid-page-size', path, 'Kağıt genişliği ve yüksekliği sıfırdan büyük olmalı.');
+       if ([left, right, top, bottom].some(value => value < 0)) add('error', 'negative-margin', path, 'Sayfa kenar boşlukları negatif olamaz.');
+       if (left + right >= width || top + bottom >= height) add('error', 'invalid-margin', path, 'Kenar boşlukları yazdırılabilir sayfa alanını tamamen kapatıyor.');
+       return;
+     }
+     if (Object.prototype.hasOwnProperty.call(item || {}, 'width') && toDesignerNumber(item.width, 0) <= 0) {
+       add('warning', 'zero-width', path, 'Nesne genişliği sıfır veya negatif.');
+     }
+     if (Object.prototype.hasOwnProperty.call(item || {}, 'height') && toDesignerNumber(item.height, 0) <= 0) {
+       add('warning', 'zero-height', path, 'Nesne yüksekliği sıfır veya negatif.');
+     }
+   };
+   const inspectObject = (item, path, options = {}) => {
+     if (!item) return;
+     registerName(item, path);
+     inspectGeometry(item, path, options);
+     inspectBinding(item, path);
+     inspectEvents(item, path);
+   };
+   const visitComponents = (items, parentPath) => {
+     (items || []).forEach((item, index) => {
+       const path = `${parentPath} / ${item.name || item.type || `Nesne ${index + 1}`}`;
+       inspectObject(item, path);
+       visitComponents(item.children || item.components, path);
+     });
+   };
+
+   allPages.forEach((entry, pageIndex) => {
+     const page = entry.data || {};
+     const pagePath = page.name || entry.name || `Sayfa ${pageIndex + 1}`;
+     inspectObject(page, pagePath, { isPage: entry.type === 'report' });
+     if (entry.type === 'report') {
+       (page.bands || []).forEach((band, bandIndex) => {
+         const bandPath = `${pagePath} / ${band.name || band.type || `Bant ${bandIndex + 1}`}`;
+         inspectObject(band, bandPath);
+         visitComponents(band.components, bandPath);
+       });
+       visitComponents(page.components, pagePath);
+     } else {
+       visitComponents(page.controls, pagePath);
+     }
+   });
+
+   return diagnostics;
+ }
+
+ async function confirmDesignerDiagnostics(diagnostics) {
+   if (!diagnostics.length) return true;
+   const errors = diagnostics.filter(item => item.severity === 'error').length;
+   const warnings = diagnostics.length - errors;
+   const rows = diagnostics.map(item => {
+     const isError = item.severity === 'error';
+     const color = isError ? '#dc2626' : '#d97706';
+     const background = isError ? 'rgba(220,38,38,.08)' : 'rgba(217,119,6,.08)';
+     return `<div style="padding:9px 10px;border:1px solid ${color}33;background:${background};border-radius:8px;display:grid;gap:3px;">
+       <div style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:800;color:${color};"><span>${isError ? 'Hata' : 'Uyarı'}</span><code style="font-size:10px;color:var(--text-muted);">${esc(item.code)}</code></div>
+       <div style="font-size:12px;font-weight:700;color:var(--text-primary);overflow-wrap:anywhere;">${esc(item.path)}</div>
+       <div style="font-size:12px;line-height:1.45;color:var(--text-secondary);">${esc(item.message)}</div>
+     </div>`;
+   }).join('');
+   const body = `<div style="display:grid;gap:12px;">
+     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"><span class="badge badge-red">${errors} hata</span><span class="badge badge-yellow">${warnings} uyarı</span><span style="font-size:12px;color:var(--text-muted);">Kaydetmeden önce rapor yapısı denetlendi.</span></div>
+     <div style="max-height:min(52vh,520px);overflow:auto;padding-right:4px;display:grid;gap:8px;">${rows}</div>
+     <div style="font-size:11px;line-height:1.45;color:var(--text-muted);">“Yine de Kaydet” seçeneği tanılamaları atlar; FRP dosyası yine oluşturulur.</div>
+   </div>`;
+
+   if (typeof window.showModal !== 'function') {
+     return window.confirm(`${errors} hata ve ${warnings} uyarı bulundu. Yine de kaydedilsin mi?`);
+   }
+   const result = await window.showModal({
+     title: 'Rapor Tanılamaları',
+     body,
+     maxWidth: '760px',
+     closeOnBackdrop: false,
+     buttons: [
+       { text: 'Düzeltmeye Dön', value: 'cancel', className: 'btn-secondary' },
+       { text: 'Yine de Kaydet', value: 'save', className: errors ? 'btn-danger' : 'btn-primary' }
+     ]
+   });
+   return result === 'save';
+ }
+
   // ── CETVEL (RULER) SVG ÇİZİCİLERİ ─────────────────────────
   function renderRulerTopSvg(widthPx, zoom) {
     const PX_PER_MM = 3.779527559;
@@ -4520,10 +4674,16 @@ function esc(str) {
  if (window.FrpNotify) window.FrpNotify.info('Tasarım düzenleme modu aktif. Değişiklikleri yaptıktan sonra "Tasarımı Kaydet" butonuna basınız.');
  });
 
- containerEl.querySelector('#btnSaveDesignEdit')?.addEventListener('click', () => {
+ containerEl.querySelector('#btnSaveDesignEdit')?.addEventListener('click', async () => {
  if (!isDesignEditing) return;
  if (window._isReportLockedByOther) {
    if (window.FrpNotify) window.FrpNotify.warning(`Bu rapor şu anda ${window._reportLockHolderName || 'başka bir kullanıcı'} tarafından düzenleniyor. Değişiklikler kaydedilemez.`);
+   return;
+ }
+ const diagnostics = collectDesignerDiagnostics();
+ const canSave = await confirmDesignerDiagnostics(diagnostics);
+ if (!canSave) {
+   window.FrpNotify?.info('Kayıt durduruldu. Tanılamalardaki sorunları düzeltebilirsiniz.');
    return;
  }
  file.pages = allPages.filter(p => p.type === 'report').map(p => p.data);
@@ -4538,7 +4698,7 @@ function esc(str) {
  window.FrpAudit.logAction({
  action: 'DESIGN_EDIT',
  target: file.name || 'Rapor',
- details: `Görsel rapor sayfası tasarımı (${file.pages.length} sayfa) düzenlendi ve kaydedildi.`
+ details: `Görsel rapor sayfası tasarımı (${file.pages.length} sayfa) düzenlendi ve kaydedildi. Tanılama: ${diagnostics.filter(item => item.severity === 'error').length} hata, ${diagnostics.filter(item => item.severity === 'warning').length} uyarı.`
  });
  }
 
@@ -4551,7 +4711,7 @@ function esc(str) {
  selectedItem = null;
  selectedItems = [];
  render();
- if (window.FrpNotify) window.FrpNotify.success('Rapor tasarımı başarıyla kaydedildi! ');
+ if (window.FrpNotify) window.FrpNotify.success(diagnostics.length ? 'Rapor tasarımı tanılamalarla birlikte kaydedildi.' : 'Rapor tasarımı başarıyla kaydedildi; tanılama temiz.');
  else if (typeof toast === 'function') toast('Rapor tasarımı kaydedildi! ', 'success');
  });
 
