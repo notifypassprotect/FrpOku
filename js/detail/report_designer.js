@@ -517,6 +517,160 @@ function esc(str) {
  let undoStack = [];
  let redoStack = [];
  let initialPagesBackup = null;
+ // Keep report options in the edit draft until the design is saved.
+ let reportSettings = JSON.parse(JSON.stringify(file.reportSettings || {}));
+ let initialReportSettingsBackup = JSON.parse(JSON.stringify(reportSettings));
+ const captureDesignState = () => JSON.stringify({ pages: allPages.map(p => p.data), reportSettings });
+ function restoreDesignState(serialized) {
+   const state = JSON.parse(serialized);
+   allPages.forEach((p, idx) => { if (state.pages[idx]) p.data = state.pages[idx]; });
+   reportSettings = state.reportSettings || {};
+ }
+
+
+ const PAGE_SETTING_FIELDS = [
+   ['paperWidth','Kağıt genişliği (mm)','number',210,0.1],
+   ['paperHeight','Kağıt yüksekliği (mm)','number',297,0.1],
+   ['leftMargin','Sol kenar (mm)','number',10,0],
+   ['rightMargin','Sağ kenar (mm)','number',10,0],
+   ['topMargin','Üst kenar (mm)','number',10,0],
+   ['bottomMargin','Alt kenar (mm)','number',10,0],
+   ['columns','Kolon sayısı (0: tek kolon)','number',0,0],
+   ['columnWidth','Kolon genişliği (mm)','number',0,0],
+   ['columnPositions','Kolon başlangıçları (mm, her satıra bir değer)','textarea',''],
+   ['mirrorMargins','Aynalı kenar boşlukları','checkbox',false],
+   ['endlessWidth','Sınırsız sayfa genişliği','checkbox',false],
+   ['endlessHeight','Sınırsız sayfa yüksekliği','checkbox',false],
+   ['printOnPreviousPage','Önceki sayfada yazdır','checkbox',false],
+   ['titleBeforeHeader','Rapor başlığını sayfa üstbilgisinden önce yazdır','checkbox',true]
+ ];
+ const REPORT_SETTING_FIELDS = [
+   ['name','Rapor adı','text',''],
+   ['author','Yazar','text',''],
+   ['description','Açıklama','textarea',''],
+   ['doublePass','İki geçişli rapor (DoublePass)','checkbox',false],
+   ['printIfEmpty','Veri boşken yazdır (PrintIfEmpty)','checkbox',true],
+   ['copies','Kopya sayısı','number',1,1],
+   ['printer','Yazıcı adı (boş: varsayılan)','text',''],
+   ['password','Rapor parolası','password','']
+ ];
+ // Older cached reports do not contain the newly modeled options.
+ if (file.rawXml) {
+   const source = new DOMParser().parseFromString(file.rawXml, 'application/xml');
+   if (!source.querySelector('parsererror')) {
+     const reportAttrs = {"doublePass":"EngineOptions.DoublePass","printIfEmpty":"EngineOptions.PrintIfEmpty","copies":"PrintOptions.Copies","printer":"PrintOptions.Printer","password":"ReportOptions.Password","name":"ReportOptions.Name","author":"ReportOptions.Author","description":"ReportOptions.Description.Text"};
+     Object.entries(reportAttrs).forEach(([key, attr]) => {
+       if (reportSettings[key] === undefined && source.documentElement.hasAttribute(attr))
+         reportSettings[key] = source.documentElement.getAttribute(attr);
+     });
+     reportSettings.parentReport = source.documentElement.getAttribute('ParentReport') || reportSettings.parentReport || '';
+     const pageAttrs = { paperSize:'PaperSize', columns:'Columns', columnPositions:'ColumnPositions.Text', mirrorMargins:'MirrorMargins', endlessWidth:'EndlessWidth', endlessHeight:'EndlessHeight', printOnPreviousPage:'PrintOnPreviousPage', titleBeforeHeader:'TitleBeforeHeader' };
+     (file.pages || []).forEach(page => {
+       const node = Array.from(source.documentElement.children).find(n => n.getAttribute('Name') === page.name && n.nodeName === page.type);
+       if (!node) return;
+       Object.entries(pageAttrs).forEach(([key, attr]) => {
+         if (page[key] !== undefined || !node.hasAttribute(attr)) return;
+         const value = node.getAttribute(attr);
+         page[key] = ['paperSize','columns'].includes(key) ? Number(value) :
+           key === 'columnPositions' ? value : value.toLowerCase() === 'true';
+       });
+     });
+   }
+ }
+
+ function openSettingsEditor(kind) {
+   if (!isDesignEditing || window._isReportLockedByOther) return;
+   const page = allPages[activePageIndex];
+   if (kind === 'page' && page?.type !== 'report') return;
+   const target = kind === 'page' ? page.data : reportSettings;
+   const fields = kind === 'page' ? PAGE_SETTING_FIELDS : REPORT_SETTING_FIELDS;
+   const previousFocus = document.activeElement;
+   const dialog = document.createElement('dialog');
+   dialog.style.cssText = 'width:min(680px,92vw);max-height:88vh;overflow:auto;border:1px solid var(--border,#777);border-radius:12px;padding:20px;background:var(--bg-card,#fff);color:var(--text,#222);';
+   const valueOf = ([key,,,fallback]) => target[key] ?? fallback;
+   dialog.innerHTML = `<form>
+     <h3 style="margin:0 0 16px">${kind === 'page' ? 'Sayfa Ayarları · ' + esc(page.data.name) : 'Rapor Ayarları'}</h3>
+     ${kind === 'page' ? `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+       <label>Kağıt <select name="paperSize"><option value="256">Özel / mevcut ölçüler</option><option value="9">A4</option><option value="8">A3</option><option value="11">A5</option><option value="1">Letter</option><option value="5">Legal</option></select></label>
+       <label>Yön <select name="orientation"><option value="poPortrait">Dikey</option><option value="poLandscape">Yatay</option></select></label>
+     </div>` : ''}
+     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px">
+     ${fields.map(field => {
+       const [key,label,type,,min] = field;
+       const value = valueOf(field);
+       if (type === 'checkbox') return `<label style="display:flex;align-items:center;gap:8px"><input name="${key}" type="checkbox" ${value === true || String(value).toLowerCase() === 'true' ? 'checked' : ''}>${esc(label)}</label>`;
+       return `<label style="display:flex;flex-direction:column;gap:4px">${esc(label)}${type === 'textarea' ?
+         `<textarea name="${key}" rows="3" style="width:100%;box-sizing:border-box">${esc(String(value))}</textarea>` :
+         `<input name="${key}" type="${type}" value="${esc(String(value))}" ${type === 'number' ? `required min="${min}" step="${['columns','copies'].includes(key) ? '1' : '0.01'}"` : ''} autocomplete="off" style="width:100%;box-sizing:border-box">`}</label>`;
+     }).join('')}
+     </div>
+     ${kind === 'report' ? `<p style="font-size:12px">Üst rapor: <strong>${esc(target.parentReport || 'Yok')}</strong><br>Miras bağlantısı korunur. Üst rapor seçimi ve birleştirme motoru henüz desteklenmiyor.</p>` : ''}
+     <p data-error role="alert" style="color:#dc2626"></p>
+     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px"><button type="button" data-cancel>İptal</button><button type="submit">Uygula</button></div>
+   </form>`;
+   document.body.appendChild(dialog);
+   const form = dialog.querySelector('form');
+   const input = key => form.elements.namedItem(key);
+   const close = () => { dialog.close(); dialog.remove(); if (previousFocus?.isConnected) previousFocus.focus(); };
+   dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
+   dialog.addEventListener('keydown', event => { event.stopPropagation(); });
+   dialog.querySelector('[data-cancel]').addEventListener('click', close);
+   if (kind === 'page') {
+     const paper = input('paperSize');
+     const savedSize = String(target.paperSize ?? 256);
+     if (!Array.from(paper.options).some(option => option.value === savedSize)) paper.add(new Option('Mevcut kağıt (' + savedSize + ')', savedSize));
+     paper.value = savedSize;
+     input('orientation').value = target.orientation || 'poPortrait';
+     paper.addEventListener('change', () => {
+       const sizes = {9:[210,297],8:[297,420],11:[148,210],1:[215.9,279.4],5:[215.9,355.6]};
+       let size = sizes[paper.value];
+       if (!size) return;
+       if (input('orientation').value === 'poLandscape') size = [...size].reverse();
+       input('paperWidth').value = size[0]; input('paperHeight').value = size[1];
+     });
+     input('orientation').addEventListener('change', () => {
+       const width = input('paperWidth').value;
+       input('paperWidth').value = input('paperHeight').value;
+       input('paperHeight').value = width;
+     });
+     ['paperWidth','paperHeight'].forEach(key => input(key).addEventListener('input', () => { paper.value = '256'; }));
+   }
+   form.addEventListener('submit', event => {
+     event.preventDefault();
+     if (window._isReportLockedByOther) { dialog.querySelector('[data-error]').textContent = 'Rapor başka bir kullanıcı tarafından kilitlendi.'; return; }
+     const draft = {};
+     fields.forEach(([key,,type]) => {
+       draft[key] = type === 'checkbox' ? input(key).checked : type === 'number' ? Number(input(key).value) : input(key).value;
+     });
+     let error = '';
+     if (kind === 'page') {
+       draft.paperSize = Number(input('paperSize').value);
+       draft.orientation = input('orientation').value;
+       const width = draft.paperWidth - draft.leftMargin - draft.rightMargin;
+       const height = draft.paperHeight - draft.topMargin - draft.bottomMargin;
+       if (width <= 0 || height <= 0) error = 'Kenar boşlukları kağıt ölçülerinden küçük olmalı.';
+       const positions = draft.columnPositions.trim() ? draft.columnPositions.trim().split(/\r?\n/).map(v => Number(v.trim().replace(',', '.'))) : [];
+       if (positions.some((v,i) => !Number.isFinite(v) || v < 0 || v >= width || (i > 0 && v <= positions[i-1])))
+         error = 'Kolon başlangıçları artan, sayfa alanı içinde kalan mm değerleri olmalı.';
+       if (draft.columns > 0 && (draft.columnWidth <= 0 || draft.columnWidth * draft.columns > width + 0.01))
+         error = 'Kolon genişliği pozitif olmalı ve kolonlar kullanılabilir genişliğe sığmalı.';
+       if (positions.length && (positions.length !== draft.columns || positions.some(v => v + draft.columnWidth > width + 0.01)))
+         error = 'Her kolon için bir başlangıç girin; kolonlar sayfa alanını aşmamalı.';
+       if (positions.some((v,i) => i > 0 && v < positions[i-1] + draft.columnWidth - 0.01))
+         error = 'Kolonlar birbiriyle çakışmamalı.';
+     }
+     if (error) { dialog.querySelector('[data-error]').textContent = error; return; }
+     if (kind === 'page' && draft.columns > 0 && !draft.columnPositions.trim())
+       draft.columnPositions = Array.from({length:draft.columns}, (_,i) => String(Number((i * draft.columnWidth).toFixed(4)))).join('\r\n');
+     pushUndoState();
+     Object.assign(target, draft);
+     pushUndoState();
+     close();
+     render();
+   });
+   dialog.showModal();
+   dialog.querySelector('input,select,textarea')?.focus();
+ }
 
  // Sayfaları hazırla
  const pages = Array.isArray(file.pages)? file.pages: [];
@@ -529,7 +683,7 @@ function esc(str) {
 
  if (allPages.length > 0) {
    initialPagesBackup = JSON.parse(JSON.stringify(allPages.map(p => p.data)));
-   undoStack = [JSON.stringify(allPages.map(p => p.data))];
+   undoStack = [captureDesignState()];
  }
 
  let activePageIndex = 0;
@@ -846,6 +1000,8 @@ function esc(str) {
  </button>
  `: `
  <div class="designer-edit-bar">
+ <button type="button" class="designer-palette-btn" id="btnPageSettings" ${allPages[activePageIndex]?.type !== 'report' ? 'disabled' : ''}>Sayfa Ayarları</button>
+ <button type="button" class="designer-palette-btn" id="btnReportSettings">Rapor Ayarları</button>
  <button type="button" class="designer-palette-btn success" id="btnSaveDesignEdit" title="Değişiklikleri Kalıcı Olarak Kaydet">
  Tasarımı Kaydet
  </button>
@@ -2965,7 +3121,7 @@ function esc(str) {
  // ── GERİ AL / İLERİ AL MOTORU (Undo / Redo Engine) ────────
  function pushUndoState() {
  if (!isDesignEditing) return;
- const stateStr = JSON.stringify(allPages.map(p => p.data));
+ const stateStr = captureDesignState();
  if (undoStack.length > 0 && undoStack[undoStack.length - 1] === stateStr) return;
  undoStack.push(stateStr);
  if (undoStack.length > 50) undoStack.shift();
@@ -2979,10 +3135,7 @@ function esc(str) {
  const cur = undoStack.pop();
  redoStack.push(cur);
  const prevStr = undoStack[undoStack.length - 1];
- const prevData = JSON.parse(prevStr);
- allPages.forEach((p, idx) => {
- if (prevData[idx]) p.data = prevData[idx];
- });
+ restoreDesignState(prevStr);
  selectedItems = getPageComponents().filter(item => selectedNames.has(item.name));
  selectedItem = selectedItems[selectedItems.length - 1] || null;
  renderCanvasOnly();
@@ -2997,10 +3150,7 @@ function esc(str) {
  const selectedNames = new Set((selectedItems.length ? selectedItems : (selectedItem ? [selectedItem] : [])).map(item => item?.name).filter(Boolean));
  const nextStr = redoStack.pop();
  undoStack.push(nextStr);
- const nextData = JSON.parse(nextStr);
- allPages.forEach((p, idx) => {
- if (nextData[idx]) p.data = nextData[idx];
- });
+ restoreDesignState(nextStr);
  selectedItems = getPageComponents().filter(item => selectedNames.has(item.name));
  selectedItem = selectedItems[selectedItems.length - 1] || null;
  renderCanvasOnly();
@@ -4658,6 +4808,9 @@ function esc(str) {
  });
  }
 
+ containerEl.querySelector('#btnPageSettings')?.addEventListener('click', () => openSettingsEditor('page'));
+ containerEl.querySelector('#btnReportSettings')?.addEventListener('click', () => openSettingsEditor('report'));
+
  // 3. Düzenleme / Kaydetme / İptal Etme Butonları
  containerEl.querySelector('#btnStartDesignEdit')?.addEventListener('click', () => {
  if (window._isReportLockedByOther) {
@@ -4667,8 +4820,9 @@ function esc(str) {
  currentMode = 'designer';
  showRulers = true;
  isDesignEditing = true;
+ initialReportSettingsBackup = JSON.parse(JSON.stringify(reportSettings));
  initialPagesBackup = JSON.parse(JSON.stringify(allPages.map(p => p.data)));
- undoStack = [JSON.stringify(allPages.map(p => p.data))];
+ undoStack = [captureDesignState()];
  redoStack = [];
  render();
  if (window.FrpNotify) window.FrpNotify.info('Tasarım düzenleme modu aktif. Değişiklikleri yaptıktan sonra "Tasarımı Kaydet" butonuna basınız.');
@@ -4686,6 +4840,11 @@ function esc(str) {
    window.FrpNotify?.info('Kayıt durduruldu. Tanılamalardaki sorunları düzeltebilirsiniz.');
    return;
  }
+ file.reportSettings = JSON.parse(JSON.stringify(reportSettings));
+ file.meta = { ...(file.meta || {}) };
+ if (reportSettings.name !== undefined) file.meta.reportName = reportSettings.name;
+ if (reportSettings.author !== undefined) file.meta.author = reportSettings.author;
+ if (reportSettings.description !== undefined) file.meta.description = reportSettings.description;
  file.pages = allPages.filter(p => p.type === 'report').map(p => p.data);
  file.dialogPages = allPages.filter(p => p.type === 'dialog').map(p => p.data);
  
@@ -4716,6 +4875,7 @@ function esc(str) {
  });
 
  containerEl.querySelector('#btnCancelDesignEdit')?.addEventListener('click', () => {
+ reportSettings = JSON.parse(JSON.stringify(initialReportSettingsBackup));
  if (initialPagesBackup) {
  allPages.forEach((p, idx) => {
  if (initialPagesBackup[idx]) p.data = initialPagesBackup[idx];

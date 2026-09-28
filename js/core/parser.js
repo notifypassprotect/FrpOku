@@ -191,6 +191,17 @@ function parseFrp(xmlText) {
     result.meta.scriptLang   = getAttr(chunk, 'ScriptLanguage');
     result.meta.versionBuild = getAttr(chunk, 'ReportOptions.VersionBuild');
     result.meta.guid         = getAttr(chunk, 'ReportOptions.GUID') || getAttr(chunk, 'GUID');
+    result.reportSettings = {};
+    if (getAttr(chunk, 'EngineOptions.DoublePass') !== '') result.reportSettings.doublePass = getAttr(chunk, 'EngineOptions.DoublePass');
+    if (getAttr(chunk, 'EngineOptions.PrintIfEmpty') !== '') result.reportSettings.printIfEmpty = getAttr(chunk, 'EngineOptions.PrintIfEmpty');
+    if (getAttr(chunk, 'PrintOptions.Copies') !== '') result.reportSettings.copies = getAttr(chunk, 'PrintOptions.Copies');
+    if (getAttr(chunk, 'PrintOptions.Printer') !== '') result.reportSettings.printer = getAttr(chunk, 'PrintOptions.Printer');
+    if (getAttr(chunk, 'ReportOptions.Password') !== '') result.reportSettings.password = getAttr(chunk, 'ReportOptions.Password');
+    if (getAttr(chunk, 'ReportOptions.Name') !== '') result.reportSettings.name = getAttr(chunk, 'ReportOptions.Name');
+    if (getAttr(chunk, 'ReportOptions.Author') !== '') result.reportSettings.author = getAttr(chunk, 'ReportOptions.Author');
+    if (getAttr(chunk, 'ReportOptions.Description.Text') !== '') result.reportSettings.description = getAttr(chunk, 'ReportOptions.Description.Text');
+    result.reportSettings.parentReport = getAttr(chunk, 'ParentReport');
+
   }
 
   // GUID Ayıklama (Gelişmiş Bütünsel Arama + Base64 & HTML Entity Dekode)
@@ -620,6 +631,14 @@ function parseFrp(xmlText) {
       rightMargin: numVal(getAttr(pAttrs, 'RightMargin'), 10),
       bottomMargin: numVal(getAttr(pAttrs, 'BottomMargin'), 10),
       columnWidth: numVal(getAttr(pAttrs, 'ColumnWidth'), 0),
+      paperSize: numVal(getAttr(pAttrs, 'PaperSize'), 256),
+      columns: numVal(getAttr(pAttrs, 'Columns'), 0),
+      columnPositions: getAttr(pAttrs, 'ColumnPositions.Text'),
+      mirrorMargins: getAttr(pAttrs, 'MirrorMargins') === 'True',
+      endlessWidth: getAttr(pAttrs, 'EndlessWidth') === 'True',
+      endlessHeight: getAttr(pAttrs, 'EndlessHeight') === 'True',
+      printOnPreviousPage: getAttr(pAttrs, 'PrintOnPreviousPage') === 'True',
+      titleBeforeHeader: getAttr(pAttrs, 'TitleBeforeHeader') !== 'False',
       visible: getAttr(pAttrs, 'Visible') !== 'False',
       onClick: getAttr(pAttrs, 'OnClick') || '',
       onBeforePrint: getAttr(pAttrs, 'OnBeforePrint') || '',
@@ -898,7 +917,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
       (file.queries || []).map(q => `    <TfrxFOQuery Name="${encodeFrpAttr(q.name)}" UserName="${encodeFrpAttr(q.name)}" SQL.Text="${encodeFrpAttr(q.sql)}"/>`).join('\n') + '\n' +
       `  </TfrxDataPage>\n` +
       `</TfrxReport>`;
-    return xml;
+    // Continue through the same model synchronization used for existing reports.
   }
 
   (file.queries || []).forEach(q => {
@@ -976,6 +995,17 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
         return node;
       };
 
+      if (file.reportSettings) setAttrs(root, {
+        'EngineOptions.DoublePass': file.reportSettings.doublePass,
+        'EngineOptions.PrintIfEmpty': file.reportSettings.printIfEmpty,
+        'PrintOptions.Copies': file.reportSettings.copies,
+        'PrintOptions.Printer': file.reportSettings.printer,
+        'ReportOptions.Password': file.reportSettings.password,
+        'ReportOptions.Name': file.reportSettings.name,
+        'ReportOptions.Author': file.reportSettings.author,
+        'ReportOptions.Description.Text': file.reportSettings.description
+      });
+
       let dataPage = elements().find(node => node.nodeName === 'TfrxDataPage') || null;
       if (!dataPage && (file.queries || []).length > 0) {
         dataPage = doc.createElement('TfrxDataPage');
@@ -999,6 +1029,9 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
           Orientation: page.orientation, PaperWidth: page.paperWidth, PaperHeight: page.paperHeight,
           LeftMargin: page.leftMargin, TopMargin: page.topMargin, RightMargin: page.rightMargin,
           BottomMargin: page.bottomMargin, ColumnWidth: page.columnWidth, Visible: page.visible,
+          PaperSize: page.paperSize, Columns: page.columns, 'ColumnPositions.Text': page.columnPositions,
+          MirrorMargins: page.mirrorMargins, EndlessWidth: page.endlessWidth, EndlessHeight: page.endlessHeight,
+          PrintOnPreviousPage: page.printOnPreviousPage, TitleBeforeHeader: page.titleBeforeHeader,
           OnClick: page.onClick, OnBeforePrint: page.onBeforePrint, OnAfterPrint: page.onAfterPrint
         });
         (page.bands || []).forEach(band => {
