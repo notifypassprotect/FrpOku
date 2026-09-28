@@ -949,9 +949,79 @@ function parseFrp(xmlText) {
     });
   }
 
+  if (typeof DOMParser !== 'undefined') {
+    const appearanceDoc = new DOMParser().parseFromString(xmlText, 'application/xml');
+    if (!appearanceDoc.querySelector('parsererror')) {
+      const nodes = Array.from(appearanceDoc.getElementsByTagName('*'));
+      result.pages.forEach(page => (page.bands || []).forEach(band => (band.components || []).forEach(component => {
+        const node = nodes.find(n => n.nodeName === component.type && n.getAttribute('Name') === component.name);
+        if (node) Object.assign(component, readFrpAppearance(node));
+      })));
+    }
+  }
   result.rawXml = xmlText;
   return result;
 }
+
+// Advanced VCL properties keep their XML names and preserve unknown attributes.
+const FRP_APPEARANCE_FIELDS = {
+ 'Font.Name':'fontName','Font.Height':'fontHeight','Font.Color':'fontColor','Font.Style':'fontStyle',
+ 'FillType':'fillType','Fill.BackColor':'fillBackColor','Fill.ForeColor':'fillForeColor','Fill.Style':'fillStyle',
+ 'Frame.Typ':'frameTyp','Frame.Color':'frameColor','Frame.Width':'frameWidth','Frame.Style':'frameStyle',
+ 'DisplayFormat.FormatStr':'displayFormat','Hyperlink.Value':'hyperlink'
+};
+function readFrpAppearance(node) {
+ const attrs={};
+ Array.from(node.attributes||[]).forEach(a=>{if(/^(Font\.|Frame\.|Fill\.|FillType$|DisplayFormat\.|Hyperlink\.)/.test(a.name))attrs[a.name]=a.value;});
+ const blocks=Array.from(node.children||[]).filter(n=>n.nodeName==='Highlights');
+ const rules=[];
+ let reason='';
+ if(node.hasAttribute('Highlights')||blocks.length>1)reason='Bu Highlight saklama biçimi henüz düzenlenemiyor; özgün içerik korunuyor.';
+ if(blocks.length){
+   if(Array.from(blocks[0].children).some(n=>n.nodeName!=='item'))reason='Tanınmayan Highlight öğeleri korunuyor; bu yapı salt okunur.';
+   Array.from(blocks[0].children).filter(n=>n.nodeName==='item').forEach(n=>rules.push({attrs:Object.fromEntries(Array.from(n.attributes).map(a=>[a.name,a.value])),xml:new XMLSerializer().serializeToString(n)}));
+ } else {
+   const legacy={};
+   Array.from(node.attributes||[]).forEach(a=>{if(a.name.startsWith('Highlight.'))legacy[a.name.slice(10)]=a.value;});
+   if(Object.keys(legacy).length)rules.push({attrs:legacy});
+ }
+ const formatCollection=node.hasAttribute('Formats')||Array.from(node.children||[]).some(n=>n.nodeName==='Formats');
+ return {_appearance:attrs,_appearanceReadOnly:formatCollection?{DisplayFormat:'Bu nesnede birden çok ifade için Formats koleksiyonu var. Özgün biçimler korunuyor; tek biçim editörü bu yapıyı değiştiremez.'}:{},_highlights:{rules,collection:blocks.length>0,reason}};
+}
+function writeFrpAppearance(node,model) {
+ Object.entries(model._appearanceEdits||{}).forEach(([key,value])=>{
+   if(/^(Font\.|Frame\.|Fill\.|FillType$|DisplayFormat\.|Hyperlink\.)/.test(key)){
+     if (value === '' && /^Frame\.(Left|Right|Top|Bottom)Line\./.test(key)) node.removeAttribute(key);
+     else node.setAttribute(key,String(value));
+   }
+ });
+ if(!model._highlightsEdited)return;
+ if(model._highlights?.reason)throw new Error(model._highlights.reason);
+ const rules=model._highlights?.rules||[], doc=node.ownerDocument;
+ Array.from(node.attributes).filter(a=>a.name.startsWith('Highlight.')).forEach(a=>node.removeAttribute(a.name));
+ const blocks=Array.from(node.children).filter(n=>n.nodeName==='Highlights');
+ if(rules.length===1&&!model._highlights.collection&&!rules[0].xml){
+   blocks.forEach(n=>n.remove());
+   Object.entries(rules[0].attrs).forEach(([k,v])=>{if(v!==''||!/^Frame\.(Left|Right|Top|Bottom)Line\./.test(k))node.setAttribute('Highlight.'+k,String(v));});
+ } else {
+   let block=blocks[0];
+   if(!block&&rules.length){block=doc.createElement('Highlights');node.appendChild(block);}
+   if(!block)return;
+   Array.from(block.children).filter(n=>n.nodeName==='item').forEach(n=>n.remove());
+   rules.forEach(rule=>{
+     let item=doc.createElement('item');
+     if(rule.xml){
+       const original=new DOMParser().parseFromString(rule.xml,'application/xml');
+       if(original.querySelector('parsererror'))throw new Error('Highlight XML okunamadı.');
+       item=doc.importNode(original.documentElement,true);
+     }
+     Object.entries(rule.attrs).forEach(([k,v])=>{if(v===''&&/^Frame\.(Left|Right|Top|Bottom)Line\./.test(k))item.removeAttribute(k);else item.setAttribute(k,String(v));});
+     block.appendChild(item);
+   });
+   if(!rules.length&&!block.attributes.length&&!block.children.length)block.remove();
+ }
+}
+
 
 function encodeFrpAttr(str) {
   if (!str) return '';
@@ -1134,6 +1204,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
             if (!componentNode) return;
             bandNode.appendChild(componentNode);
             const textAttr = component.rawAttrs && /\bMemo\.Text\s*=/.test(component.rawAttrs) ? 'Memo.Text' : 'Text';
+            writeFrpAppearance(componentNode, component);
             setAttrs(componentNode, {
               Left: component.left, Top: synthetic ? Number(component.top || 0) + Number(band.top || 0) : component.top, Width: component.width, Height: component.height,
               [textAttr]: component.text, 'Font.Name': component.fontName,
@@ -1144,7 +1215,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
               'Frame.Typ': component.frameTyp, 'Frame.Color': component.frameColor,
               'Frame.Width': component.frameWidth, 'Frame.Style': component.frameStyle,
               Align: component.align, HAlign: component.hAlign, VAlign: component.vAlign, Rotation: component.rotation,
-              DataSetName: component.dataSet, DataField: component.dataField, DisplayFormat: component.displayFormat,
+              DataSetName: component.dataSet, DataField: component.dataField, 'DisplayFormat.FormatStr': component.displayFormat,
               'Hyperlink.Value': component.hyperlink,
               WordWrap: component.wordWrap, AutoWidth: component.autoWidth, AutoSize: component.autoSize,
               AllowExpressions: component.allowExpressions, AllowHTMLTags: component.allowHTMLTags,
@@ -1259,6 +1330,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
       }
     }
   } catch (error) {
+    if ((file.pages || []).some(p => (p.bands || []).some(b => (b.components || []).some(c => c._highlightsEdited || Object.keys(c._appearanceEdits || {}).length)))) throw error;
     if (file.variablesEdited === true) throw error;
     console.warn('FRP XML model senkronizasyonu başarısız:', error.message);
   }
@@ -1269,6 +1341,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
 if (typeof window !== 'undefined') {
   window.renameFrpScriptIdentifiers = renameFrpScriptIdentifiers;
   window.readFrpVariables = readFrpVariables;
+  window.FrpAppearance = {read:readFrpAppearance, fields:FRP_APPEARANCE_FIELDS};
   window.parseFrp                 = parseFrp;
   window.decodeHtmlEntities       = decodeHtmlEntities;
   window.extractParamsFromSql     = extractParamsFromSql;

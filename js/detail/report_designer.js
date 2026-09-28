@@ -157,20 +157,10 @@
  // ── FRAME (ÇERÇEVE & KENARLIK) HESAPLAYICI ──────────────────
  function getFrameBorderCss(frameTyp, frameColor = '-16777208', frameWidth = 1, frameStyle = 'fsSolid') {
  const typ = parseInt(frameTyp, 10) || 0;
- let color = '#000000';
-
- if (frameColor === '16777215' || frameColor === 'clWhite') {
- color = '#ffffff';
- } else {
- const num = parseInt(frameColor, 10);
- if (!isNaN(num) && num > 0) {
- const r = num & 0xFF, g = (num >> 8) & 0xFF, b = (num >> 16) & 0xFF;
- color = `rgb(${r}, ${g}, ${b})`;
- }
- }
-
- const w = Math.max(1, Math.round(frameWidth)) + 'px';
- const cssStyle = ({ fsDash: 'dashed', fsDot: 'dotted', fsDashDot: 'dashed' })[frameStyle] || 'solid';
+ const color = decodeDelphiColor(frameColor, true);
+ const width = Number(frameWidth);
+ const w = (Number.isFinite(width) ? Math.max(0,width) : 1) + 'px';
+ const cssStyle = ({ fsDash: 'dashed', fsDot: 'dotted', fsDashDot: 'dashed', fsDashDotDot: 'dashed', fsDouble: 'double', fsAltDot: 'dotted', fsSquare: 'solid' })[frameStyle] || 'solid';
  return {
  borderLeft: (typ & 1)? `${w} ${cssStyle} ${color}`: 'none',
  borderRight: (typ & 2)? `${w} ${cssStyle} ${color}`: 'none',
@@ -941,6 +931,7 @@ function esc(str) {
      reportTreeEntries().forEach(({object}) => {
        const node = named.find(n => n.nodeName === object.type && n.getAttribute('Name') === object.name);
        if (!node) return;
+       if (!object._appearance && window.FrpAppearance) Object.assign(object, window.FrpAppearance.read(node));
        if (object.restrictions === undefined) object.restrictions = node.hasAttribute('Restrictions') ? node.getAttribute('Restrictions') : undefined;
        if (object.visible === undefined && node.hasAttribute('Visible')) object.visible = node.getAttribute('Visible') !== 'False';
        delete object._sourceName;
@@ -1902,7 +1893,7 @@ function esc(str) {
      <button data-action="band-up">Yukarı taşı</button><button data-action="band-down">Aşağı taşı</button><button data-action="select-page">Sayfadaki tüm nesneleri seç</button>
      <div class="fr-context-separator"></div><button data-action="delete" class="danger">Bandı ve içeriğini sil</button>` : `
      <div class="fr-context-title"><strong>${esc(target.name || 'Nesne')}</strong><span>${esc(target.type || 'TfrxComponent')}</span></div>
-     ${isMemo ? '<button data-action="edit">Metni ve veri alanını düzenle</button><button data-action="display-format">Display Format ayarına git</button><button data-action="hyperlink">Hyperlink ayarına git</button><button data-action="clear">İçeriği temizle</button><div class="fr-context-separator"></div><button data-action="toggle-autoWidth">'+checked('autoWidth')+'Auto Width</button><button data-action="toggle-wordWrap">'+checked('wordWrap')+'Word Wrap</button><button data-action="toggle-allowExpressions">'+checked('allowExpressions')+'İfadelere izin ver</button><button data-action="toggle-allowHTMLTags">'+checked('allowHTMLTags')+'HTML etiketlerine izin ver</button><button data-action="toggle-clipped">'+checked('clipped')+'Taşan metni kırp</button><button data-action="toggle-suppressRepeatedValues">'+checked('suppressRepeatedValues')+'Tekrarlanan değerleri gizle</button><button data-action="toggle-hideZeros">'+checked('hideZeros')+'Sıfırları gizle</button><button data-action="toggle-enabled">'+checked('enabled')+'Enabled</button><button data-action="toggle-visible">'+checked('visible')+'Visible</button><button data-action="toggle-printable">'+checked('printable')+'Printable</button>' : ''}
+     ${isMemo ? '<button data-action="edit">Metni ve veri alanını düzenle</button><button data-action="highlight">Koşullu biçimlendirme</button><button data-action="display-format">Display Format düzenle</button><button data-action="hyperlink">Hyperlink düzenle</button><button data-action="clear">İçeriği temizle</button><div class="fr-context-separator"></div><button data-action="toggle-autoWidth">'+checked('autoWidth')+'Auto Width</button><button data-action="toggle-wordWrap">'+checked('wordWrap')+'Word Wrap</button><button data-action="toggle-allowExpressions">'+checked('allowExpressions')+'İfadelere izin ver</button><button data-action="toggle-allowHTMLTags">'+checked('allowHTMLTags')+'HTML etiketlerine izin ver</button><button data-action="toggle-clipped">'+checked('clipped')+'Taşan metni kırp</button><button data-action="toggle-suppressRepeatedValues">'+checked('suppressRepeatedValues')+'Tekrarlanan değerleri gizle</button><button data-action="toggle-hideZeros">'+checked('hideZeros')+'Sıfırları gizle</button><button data-action="toggle-enabled">'+checked('enabled')+'Enabled</button><button data-action="toggle-visible">'+checked('visible')+'Visible</button><button data-action="toggle-printable">'+checked('printable')+'Printable</button>' : ''}
      ${isPicture ? '<button data-action="toggle-autoSize">'+checked('autoSize')+'Auto Size</button><button data-action="toggle-stretched">'+checked('stretched')+'Stretch</button><button data-action="toggle-center">'+checked('center')+'Center</button><button data-action="toggle-keepAspectRatio">'+checked('keepAspectRatio')+'En-boy oranını koru</button>' : ''}
      <div class="fr-context-separator"></div>
      <div class="fr-context-frame"><span>Çerçeve</span><button data-action="frame-none">Yok</button><button data-action="frame-all">Tümü</button></div>
@@ -1926,8 +1917,9 @@ function esc(str) {
      if (action === 'band-up' || action === 'band-down') return moveBand((allPages[activePageIndex]?.data?.bands || []).indexOf(target), action === 'band-up' ? -1 : 1);
      if (action.startsWith('toggle-')) return mutate(() => { const key = action.slice(7); const current = ['visible', 'printable', 'wordWrap', 'allowExpressions'].includes(key) ? target[key] !== false : Boolean(target[key]); target[key] = !current; });
      if (action === 'edit') return openMemoEditor(target);
-     if (action === 'display-format') { rightTab = 'inspector'; inspectorTab = 'properties'; inspectorSearchQuery = 'DisplayFormat'; showInspector = true; return render(); }
-     if (action === 'hyperlink') { rightTab = 'inspector'; inspectorTab = 'properties'; inspectorSearchQuery = 'Hyperlink'; showInspector = true; return render(); }
+     if (action === 'display-format') return openPropertyEditor('DisplayFormat', target);
+     if (action === 'hyperlink') return openPropertyEditor('Hyperlink', target);
+     if (action === 'highlight') return openPropertyEditor('Highlight', target);
      if (action === 'clear') return mutate(() => { target.text = ''; target.caption = ''; target.memo = ''; target.dataField = ''; });
      if (action === 'frame-none') return mutate(() => { target.frameTyp = 0; });
      if (action === 'frame-all') return mutate(() => { target.frameTyp = 15; });
@@ -2018,7 +2010,15 @@ function esc(str) {
  const componentsHtml = (band.components || []).map((comp, cIdx) => {
  const frameCss = getFrameBorderCss(comp.frameTyp, comp.frameColor, comp.frameWidth, comp.frameStyle);
  const fillIsClear = /^(?:bsClear|clear)$/i.test(String(comp.fillStyle || '')) || comp.fillBackColor === 'clNone';
- const fillBg = fillIsClear ? 'transparent' : decodeDelphiColor(comp.fillBackColor, true);
+ const appearance={...(comp._appearance||{}),'FillType':comp.fillType,'Fill.BackColor':comp.fillBackColor,'Fill.ForeColor':comp.fillForeColor,'Fill.Style':comp.fillStyle};
+ const fillBg = window.FrpPropertyEditors ? window.FrpPropertyEditors.background(appearance,v=>decodeDelphiColor(v,true)) : fillIsClear ? 'transparent' : decodeDelphiColor(comp.fillBackColor, true);
+ ['Left','Right','Top','Bottom'].forEach(side=>{
+   const prefix='Frame.'+side+'Line.',a=comp._appearance||{};
+   if (a[prefix+'Color'] || a[prefix+'Width'] || a[prefix+'Style']) {
+     const borders=getFrameBorderCss(comp.frameTyp,a[prefix+'Color']||comp.frameColor,a[prefix+'Width']||comp.frameWidth,a[prefix+'Style']||comp.frameStyle);
+     frameCss['border'+side]=borders['border'+side];
+   }
+ });
  const textColor = decodeDelphiColor(comp.fontColor, false);
  const fontStyleMask = Number.parseInt(comp.fontStyle, 10);
  const isBold = comp.isBold === true || (Number.isFinite(fontStyleMask) && Boolean(fontStyleMask & 1)) || String(comp.fontStyle).includes('fsBold');
@@ -2114,7 +2114,7 @@ function esc(str) {
  top:${comp.top}px;
  width:${comp.width}px;
  height:${comp.height}px;
- background-color:${fillBg};
+ background:${fillBg};
  border-left:${frameCss.borderLeft};
  border-right:${frameCss.borderRight};
  border-top:${frameCss.borderTop};
@@ -2348,7 +2348,7 @@ function esc(str) {
  `;
  } else {
  const borderRadius = isCircle? '50%': (isRound? '8px': '0px');
- shapeInlineStyle += ` background-color:${fillBg}; border:${fWidth}px solid ${textColor}; border-radius:${borderRadius};`;
+ shapeInlineStyle += ` background:${fillBg}; border:${fWidth}px solid ${textColor}; border-radius:${borderRadius};`;
  }
 
  return `
@@ -2373,7 +2373,7 @@ function esc(str) {
  data-band-idx="${bIdx}" data-comp-idx="${cIdx}" data-comp-name="${esc(comp.name || '')}"
  style="
  left:${comp.left}px; top:${comp.top}px; width:${comp.width}px; height:${comp.height}px;
- background-color:${fillBg}; border:${comp.frameWidth || 1}px solid ${textColor}; border-radius:3px;
+ background:${fillBg}; border:${comp.frameWidth || 1}px solid ${textColor}; border-radius:3px;
  display:flex; align-items:center; justify-content:center; box-sizing:border-box;
  font-weight:900; font-size:${Math.max(10, Math.min(comp.width, comp.height) * 0.7)}px; color:${checkColor};
  "
@@ -2457,7 +2457,7 @@ function esc(str) {
  data-band-idx="${bIdx}" data-comp-idx="${cIdx}" data-comp-name="${esc(comp.name || '')}"
  style="
  left:${comp.left}px; top:${comp.top}px; width:${comp.width}px; height:${comp.height}px;
- background-color:${fillBg}; border-left:${frameCss.borderLeft}; border-right:${frameCss.borderRight};
+ background:${fillBg}; border-left:${frameCss.borderLeft}; border-right:${frameCss.borderRight};
  border-top:${frameCss.borderTop}; border-bottom:${frameCss.borderBottom};
  font-family:${safeFontFamily(comp.fontName)}, sans-serif; font-size:${comp.fontSize || 10}px;
  font-weight:${isBold? '700': '400'}; color:${textColor}; text-align:${textAlign};
@@ -2509,7 +2509,7 @@ function esc(str) {
  top:${comp.top}px;
  width:${comp.width}px;
  height:${comp.height}px;
- background-color:${fillBg};
+ background:${fillBg};
  border-left:${frameCss.borderLeft};
  border-right:${frameCss.borderRight};
  border-top:${frameCss.borderTop};
@@ -2518,7 +2518,7 @@ function esc(str) {
  font-size:${comp.fontSize || 10}px;
  font-weight:${isBold? '700': '400'};
  font-style:${isItalic? 'italic': 'normal'};
- text-decoration:${isUnderline? 'underline': 'none'};
+ text-decoration:${[isUnderline?'underline':'',(fontStyleMask&8)||String(comp.fontStyle).includes('fsStrikeOut')?'line-through':''].filter(Boolean).join(' ')||'none'};
  color:${textColor};
  text-align:${textAlign};
  ${componentStateStyle}
@@ -3152,7 +3152,9 @@ function esc(str) {
 ? propList.filter(p => p.name.toLowerCase().includes(inspectorSearchQuery.toLowerCase()) || String(p.val).toLowerCase().includes(inspectorSearchQuery.toLowerCase()))
 : propList;
 
- return filtered.map(p => {
+ const advancedKinds = !isPage && !isDialogPage && !isBand && /View$/.test(obj.type || '') ? ['Font','Frame','Fill',...(isMemoComponent(obj)?['DisplayFormat','Highlight']:[]),'Hyperlink'] : [];
+ const editorButtons = isDesignEditing && inspectorTab !== 'events' ? '<div class="fr-property-launchers">'+advancedKinds.map(kind=>'<button type="button" data-property-editor="'+kind+'">'+kind+'…</button>').join('')+'</div>' : '';
+ return editorButtons + filtered.map(p => {
  let inputControl = '';
  if (p.isColor) {
  const cInfo = delphiColorToRgb(p.rawVal || p.val, true);
@@ -3209,13 +3211,37 @@ function esc(str) {
  }).join('');
  }
 
+ function openPropertyEditor(kind, component) {
+   if (!isDesignEditing || !component || window._isReportLockedByOther) return;
+   if (component._appearanceReadOnly?.[kind]) return window.FrpNotify?.warning(component._appearanceReadOnly[kind]);
+   const restrictions=String(component.restrictions||'');
+   if ((/^\d+$/.test(restrictions) && (Number(restrictions)&17)) || /rfDontModify|rfDontEdit/.test(restrictions)) return window.FrpNotify?.warning('Bu nesne özellik düzenlemeye karşı kilitli.');
+   if (!window.FrpPropertyEditors) return window.FrpNotify?.warning('Özellik editörü yüklenemedi. Sayfayı yenileyin.');
+   window.FrpPropertyEditors.open({kind,target:component,color:v=>decodeDelphiColor(v,true),toColor:hexToDelphiColor,context:expressionEditorContext(),onApply:({edits,highlights})=>{
+     if (!isDesignEditing || window._isReportLockedByOther) return false;
+     pushUndoState();
+     component._appearance={...(component._appearance||{}),...edits};
+     component._appearanceEdits={...(component._appearanceEdits||{}),...edits};
+     Object.entries(edits).forEach(([key,value])=>{
+       const prop=window.FrpAppearance.fields[key];
+       if(prop)component[prop]=['fontHeight','frameTyp','frameWidth'].includes(prop)?Number(value):value;
+     });
+     if(edits['Font.Height']!==undefined)component.fontSize=Math.abs(Number(edits['Font.Height']));
+     if(edits['Font.Style']!==undefined){const n=Number(edits['Font.Style']);component.isBold=!!(n&1);component.isItalic=!!(n&2);component.isUnderline=!!(n&4);}
+     if(edits['Fill.BackColor']!==undefined)component.color=edits['Fill.BackColor'];
+     if(edits['DisplayFormat.FormatStr']!==undefined)component.formatStr=edits['DisplayFormat.FormatStr'];
+     if(highlights){component._highlights=highlights;component._highlightsEdited=true;}
+     renderCanvasOnly();updateSelection();pushUndoState();
+   }});
+ }
+
  function syncFontStyleFlags(component) {
    const current = String(component.fontStyle || '');
    const numeric = Number.parseInt(current, 10);
    if (component.isBold === undefined) component.isBold = (Number.isFinite(numeric) && Boolean(numeric & 1)) || current.includes('fsBold');
    if (component.isItalic === undefined) component.isItalic = (Number.isFinite(numeric) && Boolean(numeric & 2)) || current.includes('fsItalic');
    if (component.isUnderline === undefined) component.isUnderline = (Number.isFinite(numeric) && Boolean(numeric & 4)) || current.includes('fsUnderline');
-   component.fontStyle = (component.isBold ? 1 : 0) + (component.isItalic ? 2 : 0) + (component.isUnderline ? 4 : 0);
+   component.fontStyle = ((Number.isFinite(numeric) ? numeric & 8 : current.includes('fsStrikeOut') ? 8 : 0)) + (component.isBold ? 1 : 0) + (component.isItalic ? 2 : 0) + (component.isUnderline ? 4 : 0);
  }
 
  function applyInspectorProperty(prop, rawValue, { record = true, refresh = true } = {}) {
@@ -3279,6 +3305,7 @@ function esc(str) {
  const propTable = containerEl.querySelector('#propTableBody');
  if (!propTable) return;
 
+ propTable.querySelectorAll('[data-property-editor]').forEach(button => button.addEventListener('click', () => openPropertyEditor(button.dataset.propertyEditor, selectedItem)));
  // 1. Text & Number Inputs
  propTable.querySelectorAll('.designer-prop-input').forEach(inp => {
  inp.addEventListener('change', () => {
