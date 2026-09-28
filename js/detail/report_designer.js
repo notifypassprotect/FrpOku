@@ -643,6 +643,7 @@ function esc(str) {
        draft[key] = type === 'checkbox' ? input(key).checked : type === 'number' ? Number(input(key).value) : input(key).value;
      });
      let error = '';
+     if (kind === 'page' && geometryLocked(target)) { dialog.querySelector('[data-error]').textContent = 'Önce sayfanın konum ve boyut kilidini kaldırın.'; return; }
      if (kind === 'page') {
        draft.paperSize = Number(input('paperSize').value);
        draft.orientation = input('orientation').value;
@@ -672,6 +673,252 @@ function esc(str) {
    dialog.querySelector('input,select,textarea')?.focus();
  }
 
+
+ let showReportTree = localStorage.getItem('frp_report_tree_visible') === null ? !window.matchMedia('(max-width: 768px)').matches : localStorage.getItem('frp_report_tree_visible') !== 'false';
+ const collapsedTreeNodes = new Set();
+ let treeDragPath = null;
+
+ function reportTreeEntries() {
+   const entries = [];
+   const visit = (object, path, parent, items, pageIndex, kind, depth) => {
+     const entry = { object, path, parent, items, pageIndex, kind, depth };
+     entries.push(entry);
+     const children = kind === 'page' ? (allPages[pageIndex].type === 'report' ? object.bands : object.controls) :
+       kind === 'band' ? object.components : object.children;
+     (children || []).forEach((child, index) => visit(child, path + '/' + index, entry, children, pageIndex,
+       kind === 'page' && allPages[pageIndex].type === 'report' ? 'band' : 'object', depth + 1));
+   };
+   allPages.forEach((page, index) => visit(page.data, String(index), null, allPages, index, 'page', 0));
+   return entries;
+ }
+
+ function geometryLocked(object, knownEntry) {
+   let entry = knownEntry || reportTreeEntries().find(e => e.object === object);
+   while (entry) {
+     const restrictions = String(entry.object.restrictions || '');
+     if (/rfDont(?:Move|Size|Modify)/i.test(restrictions) || (/^\d+$/.test(restrictions) && (Number(restrictions) & 7) !== 0)) return true;
+     entry = entry.parent;
+   }
+   return false;
+ }
+
+ function toggleTreeLock(object) {
+   const raw = String(object.restrictions || '');
+   if (!raw || /^\d+$/.test(raw)) {
+     const mask = Number(raw) || 0;
+     pushUndoState();
+     object.restrictions = String((mask & 6) === 6 ? mask & ~6 : mask | 6);
+     pushUndoState(); renderCanvasOnly(); updateSelection();
+     return;
+   }
+   const flags = raw.match(/rf[A-Za-z]+/g) || [];
+   const locked = flags.includes('rfDontMove') && flags.includes('rfDontSize');
+   const next = flags.filter(flag => !['rfDontMove','rfDontSize'].includes(flag));
+   if (!locked) next.push('rfDontMove','rfDontSize');
+   pushUndoState();
+   object.restrictions = '[' + next.join(',') + ']';
+   pushUndoState();
+   renderCanvasOnly();
+   updateSelection();
+ }
+
+ function renderReportTreeHtml() {
+   const entries = reportTreeEntries();
+   return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid var(--border-light)"><strong>Report Tree</strong><button type="button" data-tree-close title="Ağacı kapat">×</button></div>
+   <div style="display:flex;gap:4px;padding:6px"><button type="button" data-tree-expand>Tümünü aç</button><button type="button" data-tree-collapse>Daralt</button></div>
+   <div role="tree" aria-label="Rapor sayfa ve nesne ağacı" style="flex:1;overflow:auto;min-height:0;padding:4px">
+   ${entries.map(entry => {
+     let ancestor = entry.parent;
+     while (ancestor) { if (collapsedTreeNodes.has(ancestor.path)) return ''; ancestor = ancestor.parent; }
+     const {object,path,kind,depth} = entry;
+     const hasChildren = Boolean((kind === 'page' ? (object.bands || object.controls) : kind === 'band' ? object.components : object.children)?.length);
+     const synthetic = object.type === 'TfrxPageContent';
+     const selected = selectedItem === object || selectedItems.includes(object);
+     return `<div role="treeitem" tabindex="0" aria-level="${depth+1}" aria-selected="${selected}" ${hasChildren ? 'aria-expanded="' + !collapsedTreeNodes.has(path) + '"' : ''} data-tree-path="${path}" draggable="${isDesignEditing && !synthetic && !geometryLocked(object, entry)}"
+       style="display:flex;align-items:center;gap:3px;min-height:29px;padding:2px 3px 2px ${depth*13+3}px;border-radius:4px;background:${selected ? 'var(--bg-active,rgba(59,130,246,.18))' : 'transparent'};outline-offset:-1px">
+       <button type="button" data-tree-toggle aria-label="Alt nesneleri aç veya daralt" style="width:18px;padding:0;visibility:${hasChildren ? 'visible' : 'hidden'}">${collapsedTreeNodes.has(path) ? '▸' : '▾'}</button>
+       <span data-tree-label title="${esc(object.type || '')}" style="flex:1;min-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:${object.visible === false ? '.45' : '1'}">${kind === 'page' ? '▤' : kind === 'band' ? '▰' : '▫'} ${esc(synthetic ? 'Sayfa üzerindeki nesneler' : object.name || object.type)}</span>
+       ${!synthetic && isDesignEditing ? `<button type="button" data-tree-rename title="Yeniden adlandır (F2)" aria-label="Yeniden adlandır">✎</button><button type="button" data-tree-lock title="Konum ve boyut kilidi" aria-label="Konum ve boyut kilidi" aria-pressed="${geometryLocked(object, entry)}">${geometryLocked(object, entry) ? '🔒' : '🔓'}</button><button type="button" data-tree-visible title="Görünürlük" aria-label="Görünürlük" aria-pressed="${object.visible !== false}">${object.visible === false ? '○' : '●'}</button>` : ''}
+     </div>`;
+   }).join('')}
+   </div><div style="font-size:11px;padding:7px;border-top:1px solid var(--border-light)">Nesneyi banda veya sayfaya bırakın. Aynı tür satıra bırakmak o satırın önüne taşır. Kilit: konum ve boyut.</div>`;
+ }
+
+ function refreshReportTree() {
+   const panel = containerEl.querySelector('#reportTreePanel');
+   if (!panel) return;
+   const scroller = panel.querySelector('[role="tree"]');
+   const top = scroller?.scrollTop || 0;
+   const focusPath = panel.contains(document.activeElement) ? document.activeElement.closest('[data-tree-path]')?.dataset.treePath : null;
+   panel.innerHTML = renderReportTreeHtml();
+   bindReportTree();
+   const next = panel.querySelector('[role="tree"]');
+   if (next) next.scrollTop = top;
+   if (focusPath) panel.querySelector('[data-tree-path="' + focusPath + '"]')?.focus({preventScroll:true});
+ }
+
+ function selectTreeEntry(entry) {
+   if (!entry) return;
+   const changePage = activePageIndex !== entry.pageIndex;
+   activePageIndex = entry.pageIndex;
+   selectedItem = entry.object;
+   selectedItems = entry.kind === 'object' ? [entry.object] : [];
+   if (changePage) render();
+   updateSelection();
+   findElementForComponent(entry.object)?.scrollIntoView({block:'nearest',inline:'nearest'});
+ }
+
+ function renameDesignerObject(object, desired) {
+   desired = String(desired || '').trim();
+   if (object.type === 'TfrxPageContent' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(desired))
+     return 'Ad harfle veya alt çizgiyle başlamalı; yalnızca harf, rakam ve alt çizgi içermeli.';
+   if (reportTreeEntries().some(e => e.object !== object && String(e.object.name || '').toLowerCase() === desired.toLowerCase()) ||
+       (file.queries || []).some(q => String(q.name || '').toLowerCase() === desired.toLowerCase()))
+     return 'Bu ad raporda zaten kullanılıyor.';
+   if (file.rawXml) {
+     const sourceDoc = new DOMParser().parseFromString(file.rawXml, 'application/xml');
+     const occupied = Array.from(sourceDoc.getElementsByTagName('*')).some(node => {
+       const name = node.getAttribute('Name');
+       return name && name.toLowerCase() === desired.toLowerCase() &&
+         name.toLowerCase() !== String(object._sourceName || object.name).toLowerCase();
+     });
+     if (occupied) return 'Bu ad özgün FRP içinde başka bir nesneye ait. Farklı bir ad seçin.';
+   }
+   if (object.name === desired) return '';
+   const oldName = object.name;
+   object._sourceName = object._sourceName || oldName;
+   object.name = desired;
+   reportTreeEntries().forEach(({object: other}) => {
+     ['page','pageName','subreportPage','flowTo','child','parent'].forEach(key => {
+       if (typeof other[key] === 'string' && other[key].toLowerCase() === String(oldName).toLowerCase()) other[key] = desired;
+     });
+   });
+   allPages.forEach(page => { page.name = page.data.name; });
+   return '';
+ }
+
+ function openTreeRename(object) {
+   if (!isDesignEditing || window._isReportLockedByOther) return;
+   const dialog = document.createElement('dialog');
+   dialog.style.cssText = 'width:min(420px,90vw);padding:20px;border-radius:10px;border:1px solid var(--border);background:var(--bg-card,#fff);color:var(--text-primary,#222)';
+   dialog.innerHTML = `<form><h3>Yeniden adlandır</h3><label>Yeni ad<input name="objectName" required pattern="[A-Za-z_][A-Za-z0-9_]*" value="${esc(object.name)}" style="display:block;width:100%;box-sizing:border-box;margin:10px 0"></label><p data-error role="alert" style="color:#dc2626"></p><button type="button">İptal</button> <button type="submit">Uygula</button></form>`;
+   document.body.appendChild(dialog);
+   const close = () => { dialog.close(); dialog.remove(); };
+   dialog.querySelector('button[type="button"]').onclick = close;
+   dialog.addEventListener('cancel', e => { e.preventDefault(); close(); });
+   dialog.addEventListener('keydown', e => e.stopPropagation());
+   dialog.querySelector('form').onsubmit = e => {
+     e.preventDefault();
+     if (window._isReportLockedByOther) return;
+     pushUndoState();
+     const error = renameDesignerObject(object, dialog.querySelector('input').value);
+     if (error) { dialog.querySelector('[data-error]').textContent = error; return; }
+     pushUndoState(); close(); render(); updateSelection();
+   };
+   dialog.showModal();
+   dialog.querySelector('input').select();
+ }
+
+ function moveTreeEntry(source, target) {
+   if (!source || !target || source === target || !isDesignEditing || window._isReportLockedByOther) return false;
+   if (geometryLocked(source.object) || geometryLocked(target.object) || source.object.type === 'TfrxPageContent') return false;
+   for (let p = target; p; p = p.parent) if (p.object === source.object) return false;
+   let destination, before = null, destinationPage = target.pageIndex;
+   if (source.kind === 'page') {
+     if (target.kind !== 'page' || allPages[source.pageIndex].type !== allPages[target.pageIndex].type) return false;
+     destination = allPages; before = allPages[target.pageIndex];
+   } else if (source.kind === 'band') {
+     if (allPages[target.pageIndex].type !== 'report' || !['page','band'].includes(target.kind)) return false;
+     destination = allPages[target.pageIndex].data.bands;
+     before = target.kind === 'band' ? target.object : null;
+   } else if (allPages[source.pageIndex].type === 'report') {
+     if (allPages[target.pageIndex].type !== 'report') return false;
+     let band = target.kind === 'band' ? target.object : target.kind === 'object' ? target.parent.object : null;
+     if (!band) {
+       pushUndoState();
+       band = getOrCreatePageContentBand(allPages[target.pageIndex].data);
+     }
+     destination = band.components || (band.components = []);
+     before = target.kind === 'object' ? target.object : null;
+   } else {
+     if (allPages[target.pageIndex].type !== 'dialog') return false;
+     if (target.kind === 'page' && source.parent?.kind === 'page') destination = target.object.controls;
+     else if (target.parent && target.kind === 'object' && source.items === target.items) { destination = target.items; before = target.object; }
+     else return false;
+   }
+   const item = source.kind === 'page' ? allPages[source.pageIndex] : source.object;
+   const index = source.items.indexOf(item);
+   if (index < 0 || !destination) return false;
+   pushUndoState();
+   source.items.splice(index, 1);
+   const insertion = before ? destination.indexOf(before) : destination.length;
+   destination.splice(insertion < 0 ? destination.length : insertion, 0, item);
+   if (source.kind === 'band') {
+     let top = 0;
+     destination.forEach(band => { if (band.type !== 'TfrxPageContent' && !band.vertical) { band.top = top; top += Math.max(1, Number(band.height) || 30); } });
+   }
+   if (source.kind === 'page') activePageIndex = allPages.indexOf(item);
+   else activePageIndex = destinationPage;
+   selectedItem = source.object; selectedItems = source.kind === 'object' ? [source.object] : [];
+   collapsedTreeNodes.delete(String(activePageIndex));
+   collapsedTreeNodes.delete(target.path);
+   pushUndoState(); render(); updateSelection();
+   return true;
+ }
+
+ function bindReportTree() {
+   const panel = containerEl.querySelector('#reportTreePanel');
+   if (!panel) return;
+   panel.querySelector('[data-tree-close]')?.addEventListener('click', () => { showReportTree = false; localStorage.setItem('frp_report_tree_visible','false'); render(); });
+   panel.querySelector('[data-tree-expand]')?.addEventListener('click', () => { collapsedTreeNodes.clear(); refreshReportTree(); });
+   panel.querySelector('[data-tree-collapse]')?.addEventListener('click', () => { reportTreeEntries().forEach(e => collapsedTreeNodes.add(e.path)); refreshReportTree(); });
+   panel.querySelectorAll('[data-tree-path]').forEach(row => {
+     const entry = () => reportTreeEntries().find(e => e.path === row.dataset.treePath);
+     row.addEventListener('click', event => {
+       const e = entry(); if (!e) return;
+       if (event.target.closest('[data-tree-toggle]')) { collapsedTreeNodes.has(e.path) ? collapsedTreeNodes.delete(e.path) : collapsedTreeNodes.add(e.path); return refreshReportTree(); }
+       if (event.target.closest('[data-tree-rename]')) return openTreeRename(e.object);
+       if (event.target.closest('[data-tree-lock]')) { if (isDesignEditing && !window._isReportLockedByOther) toggleTreeLock(e.object); return; }
+       if (event.target.closest('[data-tree-visible]')) {
+         if (!isDesignEditing || window._isReportLockedByOther) return;
+         pushUndoState(); e.object.visible = e.object.visible === false; pushUndoState(); renderCanvasOnly(); updateSelection(); return;
+       }
+       selectTreeEntry(e);
+     });
+     row.addEventListener('dblclick', event => { if (!event.target.closest('button')) openTreeRename(entry().object); });
+     row.addEventListener('keydown', event => {
+       if (event.key === 'F2') { event.preventDefault(); event.stopPropagation(); openTreeRename(entry().object); }
+       if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); selectTreeEntry(entry()); }
+       if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(event.key)) {
+         event.preventDefault(); event.stopPropagation();
+         const e = entry();
+         if (event.key === 'ArrowLeft') { collapsedTreeNodes.add(e.path); refreshReportTree(); }
+         else if (event.key === 'ArrowRight') { collapsedTreeNodes.delete(e.path); refreshReportTree(); }
+         else (event.key === 'ArrowDown' ? row.nextElementSibling : row.previousElementSibling)?.focus();
+       }
+     });
+     row.addEventListener('dragstart', event => {
+       const e = entry();
+       if (!isDesignEditing || geometryLocked(e.object) || e.object.type === 'TfrxPageContent' || event.target.closest('button')) { event.preventDefault(); return; }
+       treeDragPath = e.path;
+       event.dataTransfer.setData('application/x-frp-report-tree', e.path);
+       event.dataTransfer.effectAllowed = 'move';
+     });
+     row.addEventListener('dragover', event => {
+       if (treeDragPath === null) return;
+       event.preventDefault(); event.dataTransfer.dropEffect = 'move'; row.style.outline = '1px solid #3b82f6';
+     });
+     row.addEventListener('dragleave', () => { row.style.outline = ''; });
+     row.addEventListener('dragend', () => { treeDragPath = null; panel.querySelectorAll('[data-tree-path]').forEach(r => r.style.outline = ''); });
+     row.addEventListener('drop', event => {
+       event.preventDefault(); event.stopPropagation(); row.style.outline = '';
+       const source = reportTreeEntries().find(e => e.path === treeDragPath);
+       treeDragPath = null;
+       if (!moveTreeEntry(source, entry())) window.FrpNotify?.info('Bu hedefe taşıma yapılamıyor. Uyumlu ve kilitsiz bir sayfa veya bant seçin.');
+     });
+   });
+ }
+
  // Sayfaları hazırla
  const pages = Array.isArray(file.pages)? file.pages: [];
  const dialogPages = Array.isArray(file.dialogPages)? file.dialogPages: [];
@@ -680,6 +927,21 @@ function esc(str) {
 ...pages.map((p, i) => ({ type: 'report', data: p, id: 'page_' + i, name: p.name || `Page${i + 1}` })),
 ...dialogPages.map((d, i) => ({ type: 'dialog', data: d, id: 'dialog_' + i, name: d.name || `DialogPage${i + 1}` }))
  ];
+
+ // Recover restrictions/visibility from older cached models without replacing edits.
+ if (file.rawXml) {
+   const sourceDoc = new DOMParser().parseFromString(file.rawXml, 'application/xml');
+   if (!sourceDoc.querySelector('parsererror')) {
+     const named = Array.from(sourceDoc.getElementsByTagName('*'));
+     reportTreeEntries().forEach(({object}) => {
+       const node = named.find(n => n.nodeName === object.type && n.getAttribute('Name') === object.name);
+       if (!node) return;
+       if (object.restrictions === undefined) object.restrictions = node.hasAttribute('Restrictions') ? node.getAttribute('Restrictions') : undefined;
+       if (object.visible === undefined && node.hasAttribute('Visible')) object.visible = node.getAttribute('Visible') !== 'False';
+       delete object._sourceName;
+     });
+   }
+ }
 
  if (allPages.length > 0) {
    initialPagesBackup = JSON.parse(JSON.stringify(allPages.map(p => p.data)));
@@ -943,6 +1205,7 @@ function esc(str) {
   }
 
  function render() {
+ allPages.forEach(page => { page.name = page.data.name; });
  if (activeCanvasGestureCleanup) activeCanvasGestureCleanup();
  if (allPages.length === 0) {
  containerEl.innerHTML = `
@@ -1083,6 +1346,7 @@ function esc(str) {
  <button type="button" class="designer-zoom-btn ${gridSnapStep > 1 ? 'active' : ''}" id="btnToggleGridSnap" title="Izgaraya yapışma: 4 / 8 / 12 px. Sürüklerken Alt ile geçici olarak kapatın." style="margin-left:.25rem;font-size:.75rem;padding:0 8px;">Izgara · ${gridSnapStep > 1 ? gridSnapStep + ' px' : 'Serbest'}</button>
  </div>
 
+ <button type="button" class="btn btn-sm ${showReportTree ? 'btn-primary' : 'btn-ghost'}" id="btnToggleReportTree" aria-pressed="${showReportTree}" style="padding:.24rem.55rem;font-size:.74rem">Report Tree</button>
  <!-- Sağ Panel Sekmeleri: Inspector vs Data Tree -->
  <div style="display:flex;align-items:center;background:var(--bg-raised);padding:2px;border-radius:6px;border:1px solid var(--border-light);">
  <button type="button" class="btn btn-sm ${rightTab === 'inspector' && showInspector? 'btn-primary': 'btn-ghost'}" id="btnTabInspector" style="padding:.24rem.55rem;font-size:.74rem;">
@@ -1098,6 +1362,7 @@ function esc(str) {
 
  <!-- ÇALIŞMA ALANI & SAHNE -->
  <div class="designer-stage-wrap">
+ ${showReportTree ? `<aside id="reportTreePanel" class="designer-report-tree" aria-label="Report Tree" style="width:250px;max-width:32vw;flex-shrink:0;display:flex;flex-direction:column;min-height:0;overflow:hidden;border-right:1px solid var(--border-light);font-size:12px;background:var(--bg-raised);">${renderReportTreeHtml()}</aside>` : ''}
  
  <div class="designer-canvas-area ${showRulers ? 'has-rulers' : ''}" id="designerCanvasArea">
  ${showRulers ? `
@@ -1599,9 +1864,9 @@ function esc(str) {
    overlay.querySelector('[data-save]')?.addEventListener('click', () => {
      pushUndoState();
      const desiredName = overlay.querySelector('[name="name"]').value.trim();
-     if (desiredName) band.name = desiredName;
+     if (desiredName) { const error = renameDesignerObject(band, desiredName); if (error) { window.FrpNotify?.warning(error); return; } }
      band.dataSet = overlay.querySelector('[name="dataSet"]').value;
-     band.height = Math.max(12, toDesignerNumber(overlay.querySelector('[name="height"]').value, 30));
+     if (!geometryLocked(band)) band.height = Math.max(12, toDesignerNumber(overlay.querySelector('[name="height"]').value, 30));
      band.condition = overlay.querySelector('[name="condition"]').value;
      ['stretched','allowSplit','keepTogether','keepChild','keepHeader','keepFooter','startNewPage','printIfDetailEmpty'].forEach(key => { band[key] = overlay.querySelector(`[name="${key}"]`).checked; });
      selectedItem = band;
@@ -2973,15 +3238,15 @@ function esc(str) {
  function applyInspectorProperty(prop, rawValue, { record = true, refresh = true } = {}) {
    const target = selectedItem || allPages[activePageIndex]?.data;
    if (!target || !prop) return;
+   if (geometryLocked(target) && ['left','top','width','height','orientation','paperWidth','paperHeight','columnWidth','leftMargin','rightMargin','topMargin','bottomMargin'].includes(prop)) { updateSelection(); return; }
    if (record) pushUndoState();
    const previous = target[prop];
    let value = normalizeInspectorValue(prop, rawValue);
 
    if (prop === 'name') {
-     const desired = String(value || '').trim();
-     if (!desired) return;
-     const duplicate = getPageComponents().some(item => item !== target && String(item.name || '').toLowerCase() === desired.toLowerCase());
-     value = duplicate ? ensureUniqueComponentName(desired) : desired;
+     const error = renameDesignerObject(target, value);
+     if (error) { window.FrpNotify?.warning(error); updateSelection(); return; }
+     value = target.name;
    }
 
    target[prop] = value;
@@ -3406,6 +3671,7 @@ function esc(str) {
    const activePage = allPages[activePageIndex];
    if (!isDesignEditing || activePage?.type !== 'report') return;
    const bands = activePage.data.bands || [];
+   if (geometryLocked(bands[index])) return;
    const nextIndex = index + direction;
    if (index < 0 || index >= bands.length || nextIndex < 0 || nextIndex >= bands.length) return;
    pushUndoState();
@@ -3418,7 +3684,7 @@ function esc(str) {
  }
 
  function moveVerticalBand(band, direction) {
-   if (!isDesignEditing || !band) return;
+   if (!isDesignEditing || !band || geometryLocked(band)) return;
    const step = Math.max(1, Number(gridSnapStep) || 5);
    pushUndoState();
    band.left = Math.max(0, snapDesignerValue(toDesignerNumber(band.left) + (direction * step)));
@@ -3785,7 +4051,7 @@ function esc(str) {
    if (!isDesignEditing || !selectedItems || selectedItems.length < 2) return;
    pushUndoState();
    let changed = false;
-   groupComponentsByCollection(selectedItems).forEach(group => {
+   groupComponentsByCollection(selectedItems.filter(c => !geometryLocked(c))).forEach(group => {
      if (group.length < 2) return;
      const left = c => toDesignerNumber(c.left);
      const top = c => toDesignerNumber(c.top);
@@ -3860,6 +4126,8 @@ function esc(str) {
      const location = findComponentCollection(orig);
      if (!location) return;
      const clone = JSON.parse(JSON.stringify(orig));
+     const forgetSource = item => { delete item._sourceName; (item.children || []).forEach(forgetSource); };
+     forgetSource(clone);
      clone.name = makeUniqueComponentName(orig.name);
      const offset = (gridSnapStep && gridSnapStep > 1) ? Math.max(gridSnapStep, 8) : 10;
      clone.left = snapDesignerValue(toDesignerNumber(clone.left) + offset);
@@ -3916,6 +4184,8 @@ function esc(str) {
    pushUndoState();
    const pasted = designerClipboard.map((source, index) => {
      const clone = JSON.parse(JSON.stringify(source));
+     const forgetSource = item => { delete item._sourceName; (item.children || []).forEach(forgetSource); };
+     forgetSource(clone);
      clone.name = makeUniqueComponentName(source.name);
      const offset = ((gridSnapStep > 1 ? gridSnapStep : 4) * (index + 2));
      clone.left = snapDesignerValue(toDesignerNumber(source.left) + offset);
@@ -4005,6 +4275,15 @@ function esc(str) {
 
  // ── SAHNE İÇİ İNTERAKTİF SÜRÜKLE / BOYUTLANDIR / DÜZENLE BAĞLAYICI ──
  function bindCanvasInteraction() {
+    reportTreeEntries().filter(entry => entry.pageIndex === activePageIndex).forEach(entry => {
+      let element = entry.kind === 'page' ? containerEl.querySelector('#frReportPage, #frDialogWindow') :
+        entry.kind === 'band' ? containerEl.querySelector('.fr-band-container[data-band-idx="' + entry.items.indexOf(entry.object) + '"], .fr-vertical-band-overlay[data-band-idx="' + entry.items.indexOf(entry.object) + '"]') :
+        findElementForComponent(entry.object);
+      if (element && entry.object.visible === false) {
+        if (currentMode === 'designer') element.style.opacity = '.34';
+        else element.style.display = 'none';
+      }
+    });
     const vpEl = containerEl.querySelector('#designerViewport');
     if (vpEl && !vpEl._clickBound) {
       vpEl._clickBound = true;
@@ -4227,6 +4506,7 @@ function esc(str) {
    return;
  }
 
+ if (geometryLocked(selectedItem) || selectedItems.some(item => geometryLocked(item))) return;
  const resizeHandle = e.target.closest('.fr-resize-handle');
  const handleType = resizeHandle ? resizeHandle.dataset.handle : null;
 
@@ -4519,7 +4799,7 @@ function esc(str) {
    if (!destinationBand && lastDropTarget.isPageArea) {
      destinationBand = getOrCreatePageContentBand(activePage.data);
    }
-   if (destinationBand) {
+   if (destinationBand && !geometryLocked(destinationBand)) {
      destinationBand.components = destinationBand.components || [];
      const anchor = getDropCoordinates(lastDropTarget, lastPointerX, lastPointerY, grabOffsetX, grabOffsetY);
      const targets = isMultiDrag ? multiStartPos : [{ comp: selectedItem, left: startLeft, top: startTop }];
@@ -4596,7 +4876,7 @@ function esc(str) {
      const band = activePage?.data?.bands?.[index];
      const container = grip.closest('.fr-band-container');
      const body = container?.querySelector('.fr-band-body');
-     if (!band || !body) return;
+     if (!band || !body || geometryLocked(band)) return;
      selectedItem = band;
      selectedItems = [];
      updateSelection();
@@ -4643,7 +4923,7 @@ function esc(str) {
      const activePage = allPages[activePageIndex];
      const band = activePage?.data?.bands?.[index];
      const overlayEl = header.closest('.fr-vertical-band-overlay');
-     if (!band || !overlayEl) return;
+     if (!band || !overlayEl || geometryLocked(band)) return;
      selectedItem = band;
      selectedItems = [];
      updateSelection();
@@ -4689,7 +4969,7 @@ function esc(str) {
      const activePage = allPages[activePageIndex];
      const band = activePage?.data?.bands?.[index];
      const overlayEl = grip.closest('.fr-vertical-band-overlay');
-     if (!band || !overlayEl) return;
+     if (!band || !overlayEl || geometryLocked(band)) return;
      selectedItem = band;
      selectedItems = [];
      updateSelection();
@@ -4780,6 +5060,10 @@ function esc(str) {
 
  // ── OLAYLARI BAĞLA (EVENT LISTENERS & RESIZING) ───────────
  function bindEvents() {
+ bindReportTree();
+ containerEl.querySelector('#btnToggleReportTree')?.addEventListener('click', () => {
+   showReportTree = !showReportTree; localStorage.setItem('frp_report_tree_visible', String(showReportTree)); render();
+ });
  // 1. Sayfa Sekmeleri Değiştirme
  containerEl.querySelectorAll('.designer-page-tab').forEach(btn => {
  btn.addEventListener('click', () => {
@@ -4850,7 +5134,7 @@ function esc(str) {
  
  if (window.FrpStore && typeof window.FrpStore.saveFile === 'function') {
  const savedFile = window.FrpStore.saveFile(file);
- if (savedFile) Object.assign(file, savedFile);
+ if (savedFile) { Object.assign(file, savedFile); reportTreeEntries().forEach(e => { delete e.object._sourceName; }); }
  }
 
  if (window.FrpAudit) {
@@ -5109,7 +5393,7 @@ function esc(str) {
  deleteSelectedComponent();
  } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
    const candidates = (selectedItems && selectedItems.length > 0) ? selectedItems : (selectedItem ? [selectedItem] : []);
-   const targets = candidates.filter(c => findComponentCollection(c));
+   const targets = candidates.filter(c => findComponentCollection(c) && !geometryLocked(c));
    if (targets.length > 0) {
      e.preventDefault();
      const step = e.altKey ? 1 : (e.shiftKey ? 10 : ((gridSnapStep && gridSnapStep > 1) ? gridSnapStep : 1));
@@ -5159,6 +5443,7 @@ function esc(str) {
  }
 
  function updateSelection() {
+ refreshReportTree();
  containerEl.querySelectorAll('.fr-resize-handle').forEach(h => h.remove());
  containerEl.querySelectorAll('.fr-view-item.selected,.fr-ctrl-item.selected,.fr-band-container.selected-band,.fr-band-header.selected-band,.fr-vertical-band-overlay.selected-band,.fr-vertical-band-header.selected-band,.fr-vband-box.selected-band').forEach(el => {
   el.classList.remove('selected', 'selected-band');

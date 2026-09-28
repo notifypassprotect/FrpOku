@@ -608,6 +608,7 @@ function parseFrp(xmlText) {
       keepAspectRatio,
       center,
       stretched: isStretched,
+      restrictions: getAttr(attrsChunk, 'Restrictions') || undefined,
       rawAttrs: attrsChunk
     };
   }
@@ -623,6 +624,7 @@ function parseFrp(xmlText) {
     const pageObj = {
       type: pType,
       name: getAttr(pAttrs, 'Name') || 'Page1',
+      restrictions: getAttr(pAttrs, 'Restrictions') || undefined,
       orientation: getAttr(pAttrs, 'Orientation') || 'poPortrait',
       paperWidth: numVal(getAttr(pAttrs, 'PaperWidth'), 210),
       paperHeight: numVal(getAttr(pAttrs, 'PaperHeight'), 297),
@@ -678,6 +680,8 @@ function parseFrp(xmlText) {
         onAfterPrint: getAttr(bAttrs, 'OnAfterPrint') || '',
         onPreviewClick: getAttr(bAttrs, 'OnPreviewClick') || '',
         onMasterDetail: getAttr(bAttrs, 'OnMasterDetail') || '',
+        visible: getAttr(bAttrs, 'Visible') !== 'False',
+        restrictions: getAttr(bAttrs, 'Restrictions') || undefined,
         rawAttrs: bAttrs,
         components: []
       };
@@ -828,6 +832,7 @@ function parseFrp(xmlText) {
       onEnter: getAttr(ctrlAttrs, 'OnEnter') || '',
       onExit: getAttr(ctrlAttrs, 'OnExit') || '',
       onKeyDown: getAttr(ctrlAttrs, 'OnKeyDown') || '',
+      restrictions: getAttr(ctrlAttrs, 'Restrictions') || undefined,
       rawAttrs: ctrlAttrs,
       children: []
     };
@@ -906,6 +911,13 @@ function encodeFrpAttr(str) {
     .replace(/\r/g, '&#13;&#10;');
 }
 
+
+function renameFrpScriptIdentifiers(script, names) {
+  // Preserve Pascal strings and comments; replace whole code identifiers only.
+  return String(script || '').replace(/'(?:''|[^'])*'|\{[\s\S]*?\}|\(\*[\s\S]*?\*\)|\/\/[^\r\n]*|[A-Za-z_][A-Za-z0-9_]*/g,
+    token => /^[A-Za-z_]/.test(token) ? (names.get(token.toLowerCase()) || token) : token);
+}
+
 function buildUpdatedFrpXml(file, newVersionNumStr) {
   let xml = file.rawXml || '';
   if (!xml) {
@@ -961,6 +973,8 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
     const doc = new ParserClass().parseFromString(xml, 'application/xml');
     if (!doc.querySelector('parsererror') && doc.documentElement) {
       const root = doc.documentElement;
+      const cleanupTasks = [];
+      const renamedObjects = new Map();
       const elements = () => Array.from(doc.getElementsByTagName('*'));
       const managedComponentType = type => /^Tfrx(?:[A-Za-z0-9_]+View|Subreport)$/i.test(String(type || ''));
       const managedBandType = type => /^Tfrx(?:MasterData|DetailData|SubdetailData|Header|Footer|PageHeader|PageFooter|GroupHeader|GroupFooter|ColumnHeader|ColumnFooter|ReportTitle|ReportSummary|DataBand|Child|Overlay|DMPHeader|DMPFooter|DMPGroupHeader|DMPGroupFooter|DMPMasterData|DMPDetailData|DMPSubdetailData)$/i.test(String(type || ''));
@@ -981,9 +995,17 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
       const setAttrs = (node, attrs) => Object.entries(attrs).forEach(([key, value]) => {
         if (value !== undefined && value !== null) node.setAttribute(key, typeof value === 'boolean' ? (value ? 'True' : 'False') : String(value));
       });
+      const originalNodes = new Map(elements().filter(node => node.hasAttribute('Name')).map(node => [node.nodeName + '\\0' + node.getAttribute('Name'), node]));
       const ensureNode = (model, parent) => {
         if (!model?.name || !model?.type) return null;
-        let node = byName(model.name, model.type, parent);
+        let node = model._sourceName && model._sourceName !== model.name ?
+          originalNodes.get(model.type + '\\0' + model._sourceName) : byName(model.name, model.type, parent);
+        if (node && model._sourceName && model._sourceName !== model.name) {
+          if (node) {
+            renamedObjects.set(model._sourceName.toLowerCase(), model.name);
+            node.setAttribute('Name', model.name);
+          }
+        }
         if (!node && parent) {
           node = doc.createElement(model.type);
           node.setAttribute('Name', model.name);
@@ -992,6 +1014,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
           // Tasarımcıda başka banda/sayfaya taşınan nesnenin XML ebeveynini de güncelle.
           parent.appendChild(node);
         }
+        if (node) setAttrs(node, { Restrictions: model.restrictions, Visible: model.visible });
         return node;
       };
 
@@ -1025,6 +1048,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
       (file.pages || []).forEach(page => {
         const pageNode = ensureNode(page, root);
         if (!pageNode) return;
+        root.appendChild(pageNode);
         setAttrs(pageNode, {
           Orientation: page.orientation, PaperWidth: page.paperWidth, PaperHeight: page.paperHeight,
           LeftMargin: page.leftMargin, TopMargin: page.topMargin, RightMargin: page.rightMargin,
@@ -1052,9 +1076,10 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
           (band.components || []).forEach(component => {
             const componentNode = ensureNode(component, bandNode);
             if (!componentNode) return;
+            bandNode.appendChild(componentNode);
             const textAttr = component.rawAttrs && /\bMemo\.Text\s*=/.test(component.rawAttrs) ? 'Memo.Text' : 'Text';
             setAttrs(componentNode, {
-              Left: component.left, Top: component.top, Width: component.width, Height: component.height,
+              Left: component.left, Top: synthetic ? Number(component.top || 0) + Number(band.top || 0) : component.top, Width: component.width, Height: component.height,
               [textAttr]: component.text, 'Font.Name': component.fontName,
               'Font.Height': component.fontSize ? -Math.abs(component.fontSize) : component.fontHeight,
               'Font.Color': component.fontColor, 'Font.Style': component.fontStyle,
@@ -1087,7 +1112,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
 
           // Tasarımda silinen bileşenleri XML band düğümünden kaldır
           const activeCompNames = new Set((band.components || []).map(c => c.name).filter(Boolean));
-          Array.from(bandNode.childNodes || []).forEach(child => {
+          cleanupTasks.push(() => Array.from(bandNode.childNodes || []).forEach(child => {
             if (child.nodeType === 1) {
               const cName = child.getAttribute('Name');
               // Yalnızca tasarımcının okuyup yönettiği nesneler silinebilir. Table,
@@ -1097,19 +1122,19 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
                 bandNode.removeChild(child);
               }
             }
-          });
+          }));
         });
 
         // Tasarımda silinen bandları XML sayfa düğümünden kaldır
         const activeBandNames = new Set((page.bands || []).filter(b => b.type !== 'TfrxPageContent').map(b => b.name).filter(Boolean));
-        Array.from(pageNode.childNodes || []).forEach(child => {
+        cleanupTasks.push(() => Array.from(pageNode.childNodes || []).forEach(child => {
           if (child.nodeType === 1) {
             const bName = child.getAttribute('Name');
             if (bName && managedBandType(child.nodeName) && !activeBandNames.has(bName)) {
               pageNode.removeChild(child);
             }
           }
-        });
+        }));
       });
 
       if (dataPage) {
@@ -1127,6 +1152,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
       const syncControls = (controls, parent) => (controls || []).forEach(control => {
         const node = ensureNode(control, parent);
         if (!node) return;
+        parent.appendChild(node);
         setAttrs(node, {
           Left: control.left, Top: control.top, Width: control.width, Height: control.height,
           Caption: control.caption, Text: control.text, 'Font.Name': control.fontName,
@@ -1142,6 +1168,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
       (file.dialogPages || []).forEach(dialog => {
         const dialogNode = ensureNode({ ...dialog, type: 'TfrxDialogPage' }, root);
         if (!dialogNode) return;
+        root.appendChild(dialogNode);
         setAttrs(dialogNode, {
           Caption: dialog.caption, Left: dialog.left, Top: dialog.top, Width: dialog.width,
           Height: dialog.height, Position: dialog.position, Color: dialog.color
@@ -1149,6 +1176,16 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
         syncControls(dialog.controls, dialogNode);
       });
 
+      cleanupTasks.forEach(cleanup => cleanup());
+      const referenceAttrs = new Set(['page', 'flowto', 'child', 'parent', 'subreportpage']);
+      elements().forEach(node => {
+        Array.from(node.attributes || []).forEach(attr => {
+          const replacement = renamedObjects.get(attr.value.toLowerCase());
+          if (replacement && referenceAttrs.has(attr.name.toLowerCase())) node.setAttribute(attr.name, replacement);
+        });
+      });
+      if (renamedObjects.size && root.hasAttribute('ScriptText.Text'))
+        root.setAttribute('ScriptText.Text', renameFrpScriptIdentifiers(root.getAttribute('ScriptText.Text'), renamedObjects));
       if (newVersionNumStr) root.setAttribute('ReportOptions.VersionBuild', String(newVersionNumStr));
       const serialized = new SerializerClass().serializeToString(doc);
       const verifyDoc = new ParserClass().parseFromString(serialized, 'application/xml');
@@ -1159,6 +1196,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
         if (typeof window !== 'undefined') window.FrpNotify?.warning?.('FRP içindeki özel bileşenler korundu; güvenli olmayan tasarım değişikliği uygulanmadı.');
       } else {
         xml = serialized;
+        if (renamedObjects.size && root.hasAttribute('ScriptText.Text')) file.pascalScript = root.getAttribute('ScriptText.Text');
       }
     }
   } catch (error) {
@@ -1169,6 +1207,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
 }
 
 if (typeof window !== 'undefined') {
+  window.renameFrpScriptIdentifiers = renameFrpScriptIdentifiers;
   window.parseFrp                 = parseFrp;
   window.decodeHtmlEntities       = decodeHtmlEntities;
   window.extractParamsFromSql     = extractParamsFromSql;
