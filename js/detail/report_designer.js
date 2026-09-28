@@ -520,11 +520,16 @@ function esc(str) {
  // Keep report options in the edit draft until the design is saved.
  let reportSettings = JSON.parse(JSON.stringify(file.reportSettings || {}));
  let initialReportSettingsBackup = JSON.parse(JSON.stringify(reportSettings));
- const captureDesignState = () => JSON.stringify({ pages: allPages.map(p => p.data), reportSettings });
+ const variableSource=typeof window.readFrpVariables==='function'?window.readFrpVariables(file.rawXml||''):{categories:[],editable:false,reason:'Değişken okuyucu yüklenemedi.'};
+ let variableCategories=JSON.parse(JSON.stringify(file.rawXml?variableSource.categories:(file.variableCategories||[])));
+ let variablesEdited=false, initialVariablesBackup=null, includeDataFieldTitle=false;
+ const dataTreeCollapsed=new Map();
+ const captureDesignState = () => JSON.stringify({ pages: allPages.map(p => p.data), reportSettings, variableCategories, variablesEdited });
  function restoreDesignState(serialized) {
    const state = JSON.parse(serialized);
    allPages.forEach((p, idx) => { if (state.pages[idx]) p.data = state.pages[idx]; });
    reportSettings = state.reportSettings || {};
+   variableCategories=state.variableCategories||[]; variablesEdited=state.variablesEdited===true;
  }
 
 
@@ -992,11 +997,8 @@ function esc(str) {
      }
 
      const text = String(item?.text || item?.caption || item?.memo || item?.expression || '');
-     const openCount = (text.match(/\[/g) || []).length;
-     const closeCount = (text.match(/\]/g) || []).length;
-     if (item?.allowExpressions !== false && openCount !== closeCount) {
-       add('warning', 'expression-delimiter', path, 'Memo ifadesindeki köşeli parantezler dengeli değil.');
-     }
+     const expressionError = isMemoComponent(item) && window.FrpExpressionEditors?.validate(text, 'memo', item?.allowExpressions !== false, item.expressionDelimiters || '[,]');
+     if (expressionError) add('warning', 'expression-delimiter', path, expressionError);
      const expressionDataSetRx = /<?([A-Za-z_]\w*)\s*\.\s*"[^"]+"/g;
      let expressionMatch;
      while ((expressionMatch = expressionDataSetRx.exec(text)) !== null) {
@@ -1265,6 +1267,7 @@ function esc(str) {
  <div class="designer-edit-bar">
  <button type="button" class="designer-palette-btn" id="btnPageSettings" ${allPages[activePageIndex]?.type !== 'report' ? 'disabled' : ''}>Sayfa Ayarları</button>
  <button type="button" class="designer-palette-btn" id="btnReportSettings">Rapor Ayarları</button>
+ <button type="button" class="designer-palette-btn" id="btnVariablesEditor">Variables</button>
  <button type="button" class="designer-palette-btn success" id="btnSaveDesignEdit" title="Değişiklikleri Kalıcı Olarak Kaydet">
  Tasarımı Kaydet
  </button>
@@ -1471,12 +1474,39 @@ function esc(str) {
  }
 
  // ── DATA TREE HTML OLUŞTURUCU (Images 1, 2, 3) ────────────
+
+ function renderVariableTree() {
+   const html=variableCategories.map(category=>'<section class="fr-datatree-query fr-datatree-variables is-collapsed" data-tree-group data-tree-label="'+esc(category.name)+'"><button type="button" class="fr-datatree-query-title" data-tree-toggle aria-expanded="false"><span class="fr-datatree-query-label"><span class="fr-datatree-chevron">⌄</span>'+esc(category.name)+'</span><span class="fr-datatree-count">'+category.variables.length+'</span></button><div class="fr-datatree-fields">'+category.variables.map(v=>'<button type="button" draggable="true" class="fr-datatree-field-row" data-query="" data-field="'+encodeInlineArg(v.name)+'" data-expression="'+encodeInlineArg('['+v.name+']')+'" title="'+esc(v.expression||'İfade boş')+'"><span class="fr-datatree-field-icon variable">V</span><span class="fr-datatree-field-name">'+esc(v.name)+'</span><span class="fr-datatree-drag-hint">⋮⋮</span></button>').join('')+'</div></section>').join('');
+   const params=[...new Set((file.queries||[]).flatMap(q=>typeof window.extractParamsFromSql==='function'?window.extractParamsFromSql(q.sql||''):[]))];
+   return (html||'<div class="fr-datatree-empty">Tanımlı rapor değişkeni yok. Variables penceresinden ekleyebilirsiniz.</div>')+(params.length?'<details class="fr-datatree-sql-params"><summary>SQL parametreleri ('+params.length+')</summary><p>Bu adlar SQL bağlama parametreleridir.</p><code>'+params.map(esc).join(', ')+'</code></details>':'');
+ }
+ function renderDataTreeTools() {
+   return '<div data-data-preview class="fr-data-field-preview">Alanı seçerek ifade önizlemesini görün.</div><div class="fr-data-tools"><input type="search" data-data-search placeholder="Sorgu, alan, tür veya değişken ara…" aria-label="Data Tree arama"><label><input type="checkbox" data-data-title '+(includeDataFieldTitle?'checked':'')+'> Başlıkla birlikte yeni memo ekle</label><div><button type="button" data-tree-expand-all>Tümünü aç</button><button type="button" data-tree-collapse-all>Daralt</button></div></div>';
+ }
+ function bindDataTreeTools() {
+   containerEl.querySelector('[data-data-title]')?.addEventListener('change',e=>{includeDataFieldTitle=e.target.checked;});
+   containerEl.querySelector('[data-data-search]')?.addEventListener('input',e=>{
+     const query=e.target.value.trim().toLocaleLowerCase();
+     containerEl.querySelectorAll('[data-tree-group]').forEach(group=>{
+       let count=0;
+       group.querySelectorAll('.fr-datatree-field-row').forEach(row=>{
+         const content=[group.dataset.treeLabel,group.dataset.queryAlias,row.dataset.fieldType,row.dataset.fieldAlias,row.textContent,row.title].join(' ').toLocaleLowerCase();
+         row.hidden=Boolean(query&&!content.includes(query));if(!row.hidden)count++;
+       });
+       group.hidden=Boolean(query&&!count);
+       group.classList.toggle('is-collapsed',query?false:(dataTreeCollapsed.get(group.dataset.treeLabel)??group.classList.contains('is-collapsed')));
+       group.querySelector('[data-tree-toggle]')?.setAttribute('aria-expanded',String(!group.classList.contains('is-collapsed')));
+     });
+   });
+ }
+
+
  function renderDataTreeHtml(file) {
  const queries = file.queries || [];
  const queryHtml = queries.length ? queries.map((q, queryIndex) => {
  const fields = extractFieldsFromQuery(q, file);
  return `
- <section class="fr-datatree-query ${queryIndex > 0 ? 'is-collapsed' : ''}" data-tree-group data-tree-label="${esc(q.name)}">
+ <section class="fr-datatree-query ${queryIndex > 0 ? 'is-collapsed' : ''}" data-tree-group data-tree-label="${esc(q.name)}" data-query-alias="${esc(q.alias || q.userName || '')}">
  <button type="button" class="fr-datatree-query-title" data-tree-toggle aria-expanded="${queryIndex === 0 ? 'true' : 'false'}">
  <span class="fr-datatree-query-label"><span class="fr-datatree-chevron">⌄</span>${esc(q.name)}</span>
  <span class="fr-datatree-count">${fields.length} alan</span>
@@ -1484,7 +1514,7 @@ function esc(str) {
  <div class="fr-datatree-fields">
  ${fields.length > 0? fields.map(f => `
  <button type="button" draggable="true" class="fr-datatree-field-row"
- data-query="${encodeInlineArg(q.name)}" data-field="${encodeInlineArg(f)}" data-expression="${encodeInlineArg(`[${q.name}."${f}"]`)}"
+ data-query="${encodeInlineArg(q.name)}" data-field="${encodeInlineArg(f)}" data-field-type="${esc(fieldMetadata(q,f).type || 'Tür bilinmiyor')}" data-field-alias="${esc(fieldMetadata(q,f).alias)}" data-expression="${encodeInlineArg(`[${q.name}."${f}"]`)}"
  title="Çift tıklayarak veya sürükleyerek ekleyin: [${esc(q.name)}.&quot;${esc(f)}&quot;]">
  <span class="fr-datatree-field-icon">A</span><span class="fr-datatree-field-name">${esc(f)}</span><span class="fr-datatree-drag-hint">⋮⋮</span>
  </button>
@@ -1497,14 +1527,11 @@ function esc(str) {
  }).join('') : '<div class="fr-datatree-empty">Veri seti (Query) bulunamadı.</div>';
 
  const systemFields = ['Date', 'Time', 'Page#', 'TotalPages#', 'Line', 'Line#'];
- const variables = [...new Set(file.paramNames || [])];
  return `
- <div class="fr-datatree-guide"><strong>Alan ekleme</strong><span>Bir alanı memo üzerine sürükleyin veya çift tıklayın.</span></div>
+ <div class="fr-datatree-guide"><strong>Alan ekleme</strong><span>Alanı memo üzerine sürükleyin veya çift tıklayın.</span></div>
+ ${renderDataTreeTools()}
  ${queryHtml}
- ${variables.length ? `<section class="fr-datatree-query fr-datatree-variables is-collapsed" data-tree-group data-tree-label="Rapor Değişkenleri">
-   <button type="button" class="fr-datatree-query-title" data-tree-toggle aria-expanded="false"><span class="fr-datatree-query-label"><span class="fr-datatree-chevron">⌄</span>Rapor Değişkenleri</span><span class="fr-datatree-count">${variables.length}</span></button>
-   <div class="fr-datatree-fields">${variables.map(field => `<button type="button" draggable="true" class="fr-datatree-field-row" data-query="" data-field="${encodeInlineArg(field)}" data-expression="${encodeInlineArg(`[${field}]`)}" title="[${esc(field)}] ekle"><span class="fr-datatree-field-icon variable">V</span><span class="fr-datatree-field-name">${esc(field)}</span><span class="fr-datatree-drag-hint">⋮⋮</span></button>`).join('')}</div>
- </section>` : ''}
+ ${renderVariableTree()}
  <section class="fr-datatree-query fr-datatree-system is-collapsed" data-tree-group data-tree-label="Sistem Değişkenleri">
    <button type="button" class="fr-datatree-query-title" data-tree-toggle aria-expanded="false"><span class="fr-datatree-query-label"><span class="fr-datatree-chevron">⌄</span>Sistem Değişkenleri</span><span class="fr-datatree-count">${systemFields.length}</span></button>
    <div class="fr-datatree-fields">
@@ -1517,10 +1544,12 @@ function esc(str) {
    if (!root) return;
    const groups = () => [...root.querySelectorAll('[data-tree-group]')];
    const setCollapsed = (group, collapsed) => {
+     dataTreeCollapsed.set(group.dataset.treeLabel,collapsed);
      group.classList.toggle('is-collapsed', collapsed);
      group.querySelector('[data-tree-toggle]')?.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
    };
-   root.querySelectorAll('[data-tree-toggle]').forEach(button => {
+   groups().forEach(group=>setCollapsed(group,dataTreeCollapsed.get(group.dataset.treeLabel) ?? group.classList.contains('is-collapsed')));
+   root.querySelectorAll('[data-tree-group] [data-tree-toggle]').forEach(button => {
      button.addEventListener('click', event => {
        event.preventDefault();
        event.stopPropagation();
@@ -1532,38 +1561,55 @@ function esc(str) {
    root.querySelector('[data-tree-collapse-all]')?.addEventListener('click', () => groups().forEach(group => setCollapsed(group, true)));
  }
 
- function extractFieldsFromQuery(query, file) {
- const fieldSet = new Set();
- 
- const sql = query.sql || '';
- const selectMatch = sql.match(/SELECT\s+([\s\S]*?)\s+FROM\b/i);
- if (selectMatch) {
- const colsStr = selectMatch[1];
- const cols = colsStr.split(/,(?![^(]*\))/g);
- cols.forEach(c => {
- const colClean = c.trim().replace(/--.*$/gm, '').trim();
- if (colClean) {
- const aliasMatch = colClean.match(/(?:AS\s+)?([a-zA-Z0-9_]+)$/i);
- if (aliasMatch) {
- const name = aliasMatch[1].toUpperCase();
- if (name!== 'DISTINCT' && name!== 'ALL') fieldSet.add(name);
- }
- }
- });
+
+ function extractFieldsFromQuery(query,file) {
+   const names=new Map(),add=name=>{if(name&&name!=='*')names.set(String(name).toLowerCase(),String(name));};
+   const schema=Array.isArray(query.fields)?query.fields:Array.isArray(query.columns)?query.columns:[];
+   schema.forEach(f=>add(typeof f==='string'?f:f.name||f.fieldName));
+   const raw=String(query.sql||'');let sql='',sq='';
+   for(let i=0;i<raw.length;i++){
+     const c=raw[i];
+     if(sq){sql+=c;if(c===sq){if(raw[i+1]===sq)sql+=raw[++i];else sq='';}continue;}
+     if(c==="'"||c==='"'){sq=c;sql+=c;continue;}
+     if(c==='-'&&raw[i+1]==='-'){while(i<raw.length&&raw[i]!=='\n')i++;sql+=' ';continue;}
+     if(c==='/'&&raw[i+1]==='*'){i+=2;while(i<raw.length&&!(raw[i]==='*'&&raw[i+1]==='/'))i++;i++;sql+=' ';continue;}
+     sql+=c;
+   }
+   let depth=0,quote='',start=-1,end=sql.length;
+   const word=(i,w)=>sql.slice(i,i+w.length).toUpperCase()===w&&!/[\w$#]/.test(sql[i-1]||'')&&!/[\w$#]/.test(sql[i+w.length]||'');
+   for(let i=0;i<sql.length;i++){
+     const c=sql[i];
+     if(quote){if(c===quote){if(sql[i+1]===quote)i++;else quote='';}continue;}
+     if(c==="'"||c==='"'){quote=c;continue;}
+     if(c==='('){depth++;continue;}if(c===')'){depth--;continue;}
+     if(depth===0&&start<0&&word(i,'SELECT')){start=i+6;i+=5;continue;}
+     if(depth===0&&start>=0&&word(i,'FROM')){end=i;break;}
+   }
+   if(start>=0){
+     const projection=sql.slice(start,end).replace(/^\s*(?:DISTINCT|ALL)\s+/i,'');
+     const columns=[];let from=0;depth=0;quote='';
+     for(let i=0;i<projection.length;i++){
+       const c=projection[i];
+       if(quote){if(c===quote){if(projection[i+1]===quote)i++;else quote='';}continue;}
+       if(c==="'"||c==='"'){quote=c;continue;}
+       if(c==='(')depth++;else if(c===')')depth--;
+       else if(c===','&&depth===0){columns.push(projection.slice(from,i));from=i+1;}
+     }
+     columns.push(projection.slice(from));
+     const identifier='(?:"(?:[^"]|"")+"|[A-Za-z_][A-Za-z0-9_$#]*)';
+     columns.forEach(column=>{
+       const text=column.trim(),explicit=text.match(new RegExp('\\s+AS\\s+('+identifier+')\\s*$','i')),direct=text.match(new RegExp('^(?:'+identifier+'\\.)?('+identifier+')$')),implicit=text.match(new RegExp('^([\\s\\S]+?)\\s+('+identifier+')$'));
+       let name=explicit?.[1]||direct?.[1];
+       if(!name&&implicit&&!/[+*\/%=<>|,-]\s*$/.test(implicit[1]))name=implicit[2];
+       if(name&&!/^(?:END|NULL|ASC|DESC)$/i.test(name))add(name.startsWith('"')?name.slice(1,-1).replace(/""/g,'"'):name.toUpperCase());
+     });
+   }
+   allPages.filter(p=>p.type==='report').forEach(p=>(p.data.bands||[]).forEach(b=>(b.components||[]).forEach(c=>{
+     if((c.dataSet===query.name||b.dataSet===query.name)&&c.dataField)add(c.dataField);
+   })));
+   return [...names.values()];
  }
 
- (file.pages || []).forEach(p => {
- (p.bands || []).forEach(b => {
- (b.components || []).forEach(comp => {
- if ((comp.dataSet === query.name || b.dataSet === query.name) && comp.dataField) {
- fieldSet.add(comp.dataField.toUpperCase());
- }
- });
- });
- });
-
- return [...fieldSet].slice(0, 100);
- }
 
  function decodeDesignerValue(value) {
    try { return decodeURIComponent(String(value || '')); } catch { return String(value || ''); }
@@ -1574,7 +1620,7 @@ function esc(str) {
    return {
      query: decodeDesignerValue(row.dataset.query),
      field: decodeDesignerValue(row.dataset.field),
-     expression: decodeDesignerValue(row.dataset.expression)
+     expression: decodeDesignerValue(row.dataset.expression), includeTitle:includeDataFieldTitle
    };
  }
 
@@ -1597,21 +1643,24 @@ function esc(str) {
  function setMemoExpression(component, payload, append = false) {
    if (!component || !payload?.expression) return;
    const current = String(component.text || component.caption || '');
-   const next = append && current ? `${current} ${payload.expression}` : payload.expression;
+   const pair=window.FrpExpressionEditors?.delimiters(component.expressionDelimiters||'[,]')||['[',']'];
+   const insertion=payload.expression.startsWith('[')&&payload.expression.endsWith(']')?pair[0]+payload.expression.slice(1,-1)+pair[1]:payload.expression;
+   const next=append&&current?current+' '+insertion:insertion;
    component.text = next;
    component.caption = next;
    component.memo = next;
-   component.allowExpressions = true;
-   if (!append && payload.query) {
+   if(component.allowExpressions===undefined)component.allowExpressions=true;
+   if (!append && payload.query && component.allowExpressions!==false) {
      component.dataSet = payload.query;
      component.dataField = payload.field;
-   }
+   } else { component.dataSet='';component.dataField=''; }
  }
 
  function createDataFieldMemo(payload, band, left = 24, top = 12) {
    const activePage = allPages[activePageIndex];
    if (!isDesignEditing || activePage?.type !== 'report' || !payload?.expression) return null;
    const targetBand = band || (activePage.data.bands || []).find(item => !item.vertical) || getOrCreatePageContentBand(activePage.data);
+   if(geometryLocked(targetBand)){window.FrpNotify?.info('Önce hedef bandın kilidini kaldırın.');return null;}
    targetBand.components = targetBand.components || [];
    const component = {
      name: ensureUniqueComponentName(`Memo_${String(payload.field || 'Alan').replace(/[^a-zA-Z0-9_]/g, '_')}`),
@@ -1622,6 +1671,10 @@ function esc(str) {
      hAlign: 'haLeft', vAlign: 'vaCenter', wordWrap: true, visible: true, enabled: true, printable: true
    };
    pushUndoState();
+   if(payload.includeTitle){
+     const title={...component,name:ensureUniqueComponentName(component.name+'_Baslik'),text:String(payload.field||'Başlık'),caption:String(payload.field||'Başlık'),memo:String(payload.field||'Başlık'),dataSet:'',dataField:'',allowExpressions:false,fontStyle:1,isBold:true};
+     targetBand.components.push(title);component.top+=component.height+2;
+   }
    targetBand.components.push(component);
    targetBand.height = Math.max(toDesignerNumber(targetBand.height, 30), component.top + component.height + 8);
    selectedItem = component;
@@ -1633,127 +1686,57 @@ function esc(str) {
    return component;
  }
 
- function openMemoEditor(component) {
-   if (!isDesignEditing || !isMemoComponent(component)) return;
-   document.querySelector('.fr-memo-editor-overlay')?.remove();
-   const initialText = String(component.text || component.caption || component.memo || '');
-   const overlay = document.createElement('div');
-   overlay.className = 'fr-memo-editor-overlay';
-   overlay.innerHTML = `
-     <div class="fr-memo-editor-dialog" role="dialog" aria-modal="true" aria-label="Memo metnini düzenle">
-       <header class="fr-memo-editor-header">
-         <div><strong>${esc(component.name || 'Memo')}</strong><span>Metin ve alan ifadesi düzenleyici</span></div>
-         <button type="button" class="fr-memo-editor-close" aria-label="Kapat">×</button>
-       </header>
-       <div class="fr-memo-editor-toolbar">
-         <button type="button" data-insert="[Date]">Tarih</button><button type="button" data-insert="[Time]">Saat</button><button type="button" data-insert="[Page#]">Sayfa No</button>
-         <button type="button" data-wrap="[]">İfade Parantezi</button><button type="button" data-clear="true" class="danger">İçeriği Temizle</button>
-         <span class="fr-memo-editor-binding">${component.dataSet ? `${esc(component.dataSet)}${component.dataField ? ` · ${esc(component.dataField)}` : ''}` : 'Serbest metin'}</span>
-       </div>
-       <div class="fr-memo-editor-body">
-         <section class="fr-memo-editor-main">
-           <label for="frMemoEditorText">Memo içeriği</label>
-           <textarea id="frMemoEditorText" spellcheck="false" placeholder="Metin veya [Query.&quot;ALAN&quot;] ifadesi yazın...">${esc(initialText)}</textarea>
-           <div class="fr-memo-editor-help"><span>Data Tree alanını buraya sürükleyebilir veya çift tıklayabilirsiniz.</span><span id="frMemoEditorCount">${initialText.length} karakter</span></div>
-         </section>
-         <aside class="fr-memo-editor-data">
-           <div class="fr-memo-editor-data-head"><div class="fr-memo-editor-data-title"><strong>Data Tree</strong><span>${(file.queries || []).length} sorgu</span></div><input type="search" placeholder="Sorgu veya alan ara..." aria-label="Data Tree alanı ara"></div>
-           <div class="fr-memo-editor-data-actions"><button type="button" data-tree-expand-all>Tümünü aç</button><button type="button" data-tree-collapse-all>Tümünü daralt</button><span data-tree-result-count></span></div>
-           <div class="fr-memo-editor-data-scroll">${renderDataTreeHtml(file)}</div>
-         </aside>
-       </div>
-       <footer class="fr-memo-editor-footer"><span>Ctrl+Enter kaydet · Esc kapat</span><div><button type="button" data-cancel="true">İptal</button><button type="button" data-save="true" class="primary">Uygula</button></div></footer>
-     </div>`;
-   document.body.appendChild(overlay);
-   bindDataTreeGroupControls(overlay);
 
-   const textarea = overlay.querySelector('#frMemoEditorText');
-   const counter = overlay.querySelector('#frMemoEditorCount');
-   const close = () => overlay.remove();
-   const save = () => {
-     const next = textarea.value;
-     if (next !== initialText) {
-       pushUndoState();
-       component.text = next;
-       component.caption = next;
-       component.memo = next;
-       component.allowExpressions = true;
-       const binding = parseFieldExpression(next);
-       component.dataSet = binding?.query || '';
-       component.dataField = binding?.field || '';
-       renderCanvasOnly();
-       selectedItem = component;
-       selectedItems = [component];
-       updateSelection();
-       pushUndoState();
-     }
-     close();
-   };
-
-   textarea.addEventListener('input', () => { counter.textContent = `${textarea.value.length} karakter`; });
-   textarea.addEventListener('dragover', event => { event.preventDefault(); textarea.classList.add('is-drop-target'); });
-   textarea.addEventListener('dragleave', () => textarea.classList.remove('is-drop-target'));
-   textarea.addEventListener('drop', event => {
-     event.preventDefault();
-     textarea.classList.remove('is-drop-target');
-     const expression = event.dataTransfer?.getData('application/x-frp-expression') || event.dataTransfer?.getData('text/plain');
-     if (expression) insertTextAtCursor(textarea, expression);
-   });
-   overlay.querySelectorAll('.fr-datatree-field-row').forEach(row => {
-     row.addEventListener('dragstart', event => {
-       const payload = getDataFieldPayload(row);
-       event.dataTransfer.effectAllowed = 'copy';
-       event.dataTransfer.setData('application/x-frp-expression', payload.expression);
-       event.dataTransfer.setData('text/plain', payload.expression);
-     });
-     row.addEventListener('dblclick', event => { event.preventDefault(); event.stopPropagation(); insertTextAtCursor(textarea, getDataFieldPayload(row).expression); });
-   });
-   overlay.querySelectorAll('[data-insert]').forEach(button => button.addEventListener('click', () => insertTextAtCursor(textarea, button.dataset.insert)));
-   overlay.querySelector('[data-wrap]')?.addEventListener('click', () => {
-     const start = textarea.selectionStart ?? 0;
-     const end = textarea.selectionEnd ?? start;
-     const selected = textarea.value.slice(start, end);
-     insertTextAtCursor(textarea, `[${selected}]`);
-   });
-   overlay.querySelector('[data-clear]')?.addEventListener('click', () => { textarea.value = ''; textarea.dispatchEvent(new Event('input')); textarea.focus(); });
-   overlay.querySelector('input[type="search"]')?.addEventListener('input', event => {
-     const query = event.target.value.trim().toLowerCase();
-     let visibleCount = 0;
-     overlay.querySelectorAll('[data-tree-group]').forEach(group => {
-       const labelMatch = (group.dataset.treeLabel || '').toLowerCase().includes(query);
-       let groupCount = 0;
-       group.querySelectorAll('.fr-datatree-field-row').forEach(row => {
-         const matched = !query || labelMatch || row.textContent.toLowerCase().includes(query);
-         row.hidden = !matched;
-         if (matched) { visibleCount += 1; groupCount += 1; }
-       });
-       group.hidden = Boolean(query && groupCount === 0);
-       if (query && groupCount > 0) {
-         group.classList.remove('is-collapsed');
-         group.querySelector('[data-tree-toggle]')?.setAttribute('aria-expanded', 'true');
-       }
-     });
-     const result = overlay.querySelector('[data-tree-result-count]');
-     if (result) result.textContent = query ? `${visibleCount} sonuç` : '';
-   });
-   overlay.querySelector('[data-save]')?.addEventListener('click', save);
-   overlay.querySelector('[data-cancel]')?.addEventListener('click', close);
-   overlay.querySelector('.fr-memo-editor-close')?.addEventListener('click', close);
-   overlay.addEventListener('keydown', event => {
-     if (event.key === 'Escape') { event.preventDefault(); close(); }
-     if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); save(); }
-   });
-   textarea.focus();
-   textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+ function fieldMetadata(query,name) {
+   const fields=Array.isArray(query.fields)?query.fields:Array.isArray(query.columns)?query.columns:[];
+   const metadata=fields.find(f=>typeof f==='object'&&String(f.name||f.fieldName).toLowerCase()===String(name).toLowerCase());
+   return {name,type:metadata?.type||metadata?.dataType||'',alias:metadata?.alias||''};
  }
+ function expressionEditorContext() {
+   return {
+     queries:file.queries||[],getFields:query=>extractFieldsFromQuery(query,file).map(name=>fieldMetadata(query,name)),categories:variableCategories,
+     objects:reportTreeEntries().map(e=>e.object).filter(o=>o.name&&o.type!=='TfrxPageContent'),
+     bands:allPages.flatMap(p=>p.type==='report'?(p.data.bands||[]).filter(b=>/(?:MasterData|DetailData|SubdetailData|DataBand)$/.test(b.type||'')):[])
+   };
+ }
+ function openVariablesEditor() {
+   if(!isDesignEditing||window._isReportLockedByOther)return;
+   if(!variableSource.editable)return window.FrpNotify?.warning(variableSource.reason);
+   if(!window.FrpExpressionEditors)return window.FrpNotify?.warning('Expression Builder yüklenemedi. Sayfayı yenileyin.');
+   window.FrpExpressionEditors.variablesEditor({...expressionEditorContext(),onApply:categories=>{
+     if(!isDesignEditing||window._isReportLockedByOther)return false;
+     pushUndoState();variableCategories=JSON.parse(JSON.stringify(categories));variablesEdited=true;pushUndoState();render();
+   }});
+ }
+ function openMemoEditor(component) {
+   if(!isDesignEditing||!isMemoComponent(component)||window._isReportLockedByOther)return;
+   if(!window.FrpExpressionEditors)return window.FrpNotify?.warning('Expression Builder yüklenemedi. Sayfayı yenileyin.');
+   window.FrpExpressionEditors.expressionBuilder({
+     ...expressionEditorContext(),mode:'memo',value:String(component.text??component.caption??component.memo??''),
+     allowExpressions:component.allowExpressions!==false,delimiters:component.expressionDelimiters||'[,]',
+     onApply:result=>{
+       if(!isDesignEditing||window._isReportLockedByOther)return false;
+       pushUndoState();component.text=result.value;component.caption=result.value;component.memo=result.value;
+       component.allowExpressions=result.allowExpressions;component.expressionDelimiters=result.delimiters;
+       const pair=window.FrpExpressionEditors.delimiters(result.delimiters),content=result.value.trim();
+       const canonical=pair&&content.startsWith(pair[0])&&content.endsWith(pair[1])?'['+content.slice(pair[0].length,-pair[1].length)+']':content;
+       const binding=result.allowExpressions?parseFieldExpression(canonical):null;
+       component.dataSet=binding?.query||'';component.dataField=binding?.field||'';
+       selectedItem=component;selectedItems=[component];renderCanvasOnly();updateSelection();pushUndoState();
+     }
+   });
+ }
+
 
  function bindDataTreeInteractions() {
    bindDataTreeGroupControls(containerEl);
+   bindDataTreeTools();
    containerEl.querySelectorAll('.fr-datatree-field-row').forEach(row => {
      row.addEventListener('click', event => {
        event.stopPropagation();
        containerEl.querySelectorAll('.fr-datatree-field-row.is-active').forEach(item => item.classList.remove('is-active'));
        row.classList.add('is-active');
+       const preview=containerEl.querySelector('[data-data-preview]');if(preview)preview.textContent=(row.dataset.fieldType||'Değişken')+' · '+getDataFieldPayload(row).expression;
      });
      row.addEventListener('dragstart', event => {
        const payload = getDataFieldPayload(row);
@@ -3403,7 +3386,7 @@ function esc(str) {
  restoreDesignState(prevStr);
  selectedItems = getPageComponents().filter(item => selectedNames.has(item.name));
  selectedItem = selectedItems[selectedItems.length - 1] || null;
- renderCanvasOnly();
+ render();
  updateSelection();
  updateUndoRedoButtonStates();
  if (window.FrpNotify) window.FrpNotify.info('İşlem geri alındı (Undo) ↩️');
@@ -3418,7 +3401,7 @@ function esc(str) {
  restoreDesignState(nextStr);
  selectedItems = getPageComponents().filter(item => selectedNames.has(item.name));
  selectedItem = selectedItems[selectedItems.length - 1] || null;
- renderCanvasOnly();
+ render();
  updateSelection();
  updateUndoRedoButtonStates();
  if (window.FrpNotify) window.FrpNotify.info('İşlem ileri alındı (Redo) ↪️');
@@ -5094,6 +5077,7 @@ function esc(str) {
 
  containerEl.querySelector('#btnPageSettings')?.addEventListener('click', () => openSettingsEditor('page'));
  containerEl.querySelector('#btnReportSettings')?.addEventListener('click', () => openSettingsEditor('report'));
+ containerEl.querySelector('#btnVariablesEditor')?.addEventListener('click', openVariablesEditor);
 
  // 3. Düzenleme / Kaydetme / İptal Etme Butonları
  containerEl.querySelector('#btnStartDesignEdit')?.addEventListener('click', () => {
@@ -5105,6 +5089,7 @@ function esc(str) {
  showRulers = true;
  isDesignEditing = true;
  initialReportSettingsBackup = JSON.parse(JSON.stringify(reportSettings));
+ initialVariablesBackup=JSON.parse(JSON.stringify({variableCategories,variablesEdited}));
  initialPagesBackup = JSON.parse(JSON.stringify(allPages.map(p => p.data)));
  undoStack = [captureDesignState()];
  redoStack = [];
@@ -5118,12 +5103,14 @@ function esc(str) {
    if (window.FrpNotify) window.FrpNotify.warning(`Bu rapor şu anda ${window._reportLockHolderName || 'başka bir kullanıcı'} tarafından düzenleniyor. Değişiklikler kaydedilemez.`);
    return;
  }
+ if (!window.FrpStore || typeof window.FrpStore.saveFile !== 'function') { window.FrpNotify?.warning('Kayıt hizmeti yüklenemedi. Değişiklikler düzenleyicide duruyor.'); return; }
  const diagnostics = collectDesignerDiagnostics();
  const canSave = await confirmDesignerDiagnostics(diagnostics);
  if (!canSave) {
    window.FrpNotify?.info('Kayıt durduruldu. Tanılamalardaki sorunları düzeltebilirsiniz.');
    return;
  }
+ file.variableCategories=JSON.parse(JSON.stringify(variableCategories)); file.variablesEdited=variablesEdited;
  file.reportSettings = JSON.parse(JSON.stringify(reportSettings));
  file.meta = { ...(file.meta || {}) };
  if (reportSettings.name !== undefined) file.meta.reportName = reportSettings.name;
@@ -5133,8 +5120,12 @@ function esc(str) {
  file.dialogPages = allPages.filter(p => p.type === 'dialog').map(p => p.data);
  
  if (window.FrpStore && typeof window.FrpStore.saveFile === 'function') {
- const savedFile = window.FrpStore.saveFile(file);
- if (savedFile) { Object.assign(file, savedFile); reportTreeEntries().forEach(e => { delete e.object._sourceName; }); }
+ let savedFile;
+ try { savedFile=window.FrpStore.saveFile(file); } catch(error) { window.FrpNotify?.warning('FRP kaydı tamamlanamadı: '+error.message); return; }
+ if(!savedFile){window.FrpNotify?.warning('Rapor kaydedilemedi. Değişiklikler düzenleyicide duruyor.');return;}
+ Object.assign(file,savedFile);
+ variableCategories=JSON.parse(JSON.stringify(file.variableCategories||variableCategories));variablesEdited=false;
+ reportTreeEntries().forEach(e=>{delete e.object._sourceName;});
  }
 
  if (window.FrpAudit) {
@@ -5160,6 +5151,7 @@ function esc(str) {
 
  containerEl.querySelector('#btnCancelDesignEdit')?.addEventListener('click', () => {
  reportSettings = JSON.parse(JSON.stringify(initialReportSettingsBackup));
+ if(initialVariablesBackup){variableCategories=initialVariablesBackup.variableCategories;variablesEdited=initialVariablesBackup.variablesEdited;}
  if (initialPagesBackup) {
  allPages.forEach((p, idx) => {
  if (initialPagesBackup[idx]) p.data = initialPagesBackup[idx];
@@ -5579,3 +5571,4 @@ function esc(str) {
  };
 
 })(window);
+

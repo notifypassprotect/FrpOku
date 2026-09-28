@@ -171,6 +171,60 @@ function extractSqlFromElementBody(body) {
   return decodeHtmlEntities(content).replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
 }
 
+function readFrpVariables(xmlText) {
+  const P = typeof DOMParser !== 'undefined' ? DOMParser : (typeof global !== 'undefined' ? global.DOMParser : null);
+  if (!P) return {categories:[],editable:false,reason:'XML okuyucu bulunamadı.'};
+  if (!xmlText) return {categories:[],editable:true};
+  const doc = new P().parseFromString(xmlText,'application/xml');
+  if (doc.querySelector('parsererror')) return {categories:[],editable:false,reason:'FRP XML okunamadı.'};
+  const blocks = Array.from(doc.documentElement.children).filter(n=>n.nodeName==='Variables');
+  if (blocks.length>1) return {categories:[],editable:false,reason:'Birden çok Variables bloğu var; özgün yapı korunuyor.'};
+  if (!blocks.length) {
+    const legacy=doc.documentElement.hasAttribute('Variables') || doc.documentElement.hasAttribute('Variables.Text') || doc.getElementsByTagName('TfrxVariable').length;
+    return {categories:[],editable:!legacy,reason:legacy?'Bu değişken biçimi henüz düzenlenemiyor; özgün içerik korunuyor.':''};
+  }
+  const categories=[], names=new Set(), categoryNames=new Set(); let category=null,reason='';
+  Array.from(blocks[0].children).forEach((node,index)=>{
+    if(node.nodeName!=='item'||!node.hasAttribute('Name'))return;
+    const raw=node.getAttribute('Name'),name=raw.trim();
+    if(!name){reason='Adsız değişken veya kategori var; özgün yapı korunuyor.';return;}
+    if(/^\s/.test(raw)){
+      if(categoryNames.has(name.toLowerCase()))reason='Mükerrer kategori adı var; özgün yapı korunuyor.';
+      categoryNames.add(name.toLowerCase()); category={name,_sourceIndex:index,variables:[]};categories.push(category);
+    }else{
+      if(!node.hasAttribute('Value')&&node.children.length)reason='Bu değişkenin değer biçimi henüz desteklenmiyor.';
+      if(names.has(name.toLowerCase()))reason='Mükerrer değişken adı var; özgün yapı korunuyor.';
+      names.add(name.toLowerCase());
+      if(!category){category={name:'Genel',variables:[]};categories.push(category);categoryNames.add('genel');}
+      category.variables.push({name,expression:node.getAttribute('Value')??'',_sourceIndex:index});
+    }
+  });
+  return {categories,editable:!reason,reason};
+}
+
+function syncFrpVariables(doc,categories) {
+  const S=typeof XMLSerializer!=='undefined'?XMLSerializer:global.XMLSerializer;
+  const info=readFrpVariables(new S().serializeToString(doc));
+  if(!info.editable)throw new Error(info.reason);
+  const root=doc.documentElement;
+  let block=Array.from(root.children).find(n=>n.nodeName==='Variables');
+  if(!block&&!categories.length)return;
+  if(!block){block=doc.createElement('Variables');root.appendChild(block);}
+  const original=Array.from(block.children),used=new Set();
+  const append=(model,name,isCategory)=>{
+    let node=Number.isInteger(model._sourceIndex)?original[model._sourceIndex]:null;
+    if(!node||node.nodeName!=='item'||!node.hasAttribute('Name')||used.has(node))node=doc.createElement('item');
+    used.add(node);node.setAttribute('Name',name);
+    if(!isCategory)node.setAttribute('Value',String(model.expression??''));
+    block.appendChild(node);
+  };
+  categories.forEach(category=>{
+    append(category,' '+category.name.trim(),true);
+    (category.variables||[]).forEach(variable=>append(variable,variable.name.trim(),false));
+  });
+  original.forEach(node=>{if(node.nodeName==='item'&&node.hasAttribute('Name')&&!used.has(node))block.removeChild(node);});
+}
+
 function parseFrp(xmlText) {
   const result = {
     meta: {},
@@ -379,6 +433,7 @@ function parseFrp(xmlText) {
     });
   });
   result.paramNames = [...allParams].sort();
+  result.variableCategories = readFrpVariables(xmlText).categories;
 
   // ── VERİTABANI TABLOLARI ─────────────────────────────────
   const SQL_RESERVED = new Set([
@@ -981,6 +1036,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
       const managedStructuralType = type => /^(?:TfrxReport|TfrxDataPage|TfrxReportPage|TfrxDMPPage|TfrxPage|ReportPage|TfrxDialogPage|TfrxFOQuery|TfrxQuery)$/i.test(String(type || ''))
         || /^Tfrx[A-Za-z0-9_]+(?:Control|Sheet|PageControl|TabSheet)$/i.test(String(type || ''));
       const protectedNamedNodes = elements().filter(node => {
+        if (file.variablesEdited === true && node.nodeName === 'item' && node.parentNode?.nodeName === 'Variables') return false;
         const name = node.getAttribute('Name') || node.getAttribute('UserName');
         return name && !managedComponentType(node.nodeName) && !managedBandType(node.nodeName) && !managedStructuralType(node.nodeName);
       }).map(node => ({ type: node.nodeName, name: node.getAttribute('Name') || node.getAttribute('UserName') }));
@@ -1177,6 +1233,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
       });
 
       cleanupTasks.forEach(cleanup => cleanup());
+      if (file.variablesEdited === true && Array.isArray(file.variableCategories)) syncFrpVariables(doc,file.variableCategories);
       const referenceAttrs = new Set(['page', 'flowto', 'child', 'parent', 'subreportpage']);
       elements().forEach(node => {
         Array.from(node.attributes || []).forEach(attr => {
@@ -1192,14 +1249,17 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
       const verifyElements = verifyDoc.querySelector('parsererror') ? [] : Array.from(verifyDoc.getElementsByTagName('*'));
       const missingProtected = protectedNamedNodes.filter(item => !verifyElements.some(node => node.nodeName === item.type && (node.getAttribute('Name') === item.name || node.getAttribute('UserName') === item.name)));
       if (missingProtected.length > 0) {
+        if (file.variablesEdited === true) throw new Error('Değişken kaydı bilinmeyen XML içeriğini etkiliyor; özgün FRP korundu.');
         console.warn('FRP güvenlik koruması: desteklenmeyen düğüm kaybı engellendi.', missingProtected);
         if (typeof window !== 'undefined') window.FrpNotify?.warning?.('FRP içindeki özel bileşenler korundu; güvenli olmayan tasarım değişikliği uygulanmadı.');
       } else {
         xml = serialized;
+        if (file.variablesEdited === true) { file.variableCategories=readFrpVariables(serialized).categories; file.variablesEdited=false; }
         if (renamedObjects.size && root.hasAttribute('ScriptText.Text')) file.pascalScript = root.getAttribute('ScriptText.Text');
       }
     }
   } catch (error) {
+    if (file.variablesEdited === true) throw error;
     console.warn('FRP XML model senkronizasyonu başarısız:', error.message);
   }
 
@@ -1208,6 +1268,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
 
 if (typeof window !== 'undefined') {
   window.renameFrpScriptIdentifiers = renameFrpScriptIdentifiers;
+  window.readFrpVariables = readFrpVariables;
   window.parseFrp                 = parseFrp;
   window.decodeHtmlEntities       = decodeHtmlEntities;
   window.extractParamsFromSql     = extractParamsFromSql;
@@ -1224,3 +1285,4 @@ if (typeof module !== 'undefined' && module.exports) {
     buildUpdatedFrpXml
   };
 }
+
