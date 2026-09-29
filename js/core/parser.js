@@ -591,13 +591,19 @@ function parseFrp(xmlText) {
     const center = getAttr(attrsChunk, 'Center') === 'True';
     const isStretched = getAttr(attrsChunk, 'Stretched') === 'True';
     
+    let tableModel;
+    if(type==='TfrxTableObject'&&typeof window!=='undefined'&&window.FrpTable){
+      const tableDoc=new DOMParser().parseFromString('<TfrxTableObject '+attrsChunk+'>'+innerContent+'</TfrxTableObject>','application/xml');
+      tableModel=window.FrpTable.read(tableDoc.documentElement);
+    }
     return {
       type,
       name,
+      _table:tableModel,
       left,
       top,
-      width,
-      height,
+      width:tableModel?.width??width,
+      height:tableModel?.height??height,
       text,
       fontName,
       fontHeight,
@@ -743,7 +749,7 @@ function parseFrp(xmlText) {
         components: []
       };
 
-      const compRx = /<(Tfrx[A-Za-z0-9_]+View|TfrxChartView|TfrxShapeView|TfrxDMPMemoView|TfrxBarCodeView|TfrxPictureView|TfrxLineView|TfrxMemoView|TfrxSubreport)\b([\s\S]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi;
+      const compRx = /<(Tfrx[A-Za-z0-9_]+View|TfrxChartView|TfrxShapeView|TfrxDMPMemoView|TfrxBarCodeView|TfrxPictureView|TfrxLineView|TfrxMemoView|TfrxSubreport|TfrxTableObject)\b([\s\S]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi;
       let cMatch;
       while ((cMatch = compRx.exec(bContent)) !== null) {
         const cType = cMatch[1];
@@ -757,7 +763,7 @@ function parseFrp(xmlText) {
 
     // Doğrudan Sayfa Üzerine Eklenmiş Bileşenler (Page-Level Direct Components - örn. DONOR_REAKSIYON, pgApache)
     const directPContent = pContent.replace(bandTagRx, '');
-    const directCompRx = /<(Tfrx[A-Za-z0-9_]+View|TfrxChartView|TfrxShapeView|TfrxDMPMemoView|TfrxBarCodeView|TfrxPictureView|TfrxLineView|TfrxMemoView|TfrxSubreport)\b([\s\S]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi;
+    const directCompRx = /<(Tfrx[A-Za-z0-9_]+View|TfrxChartView|TfrxShapeView|TfrxDMPMemoView|TfrxBarCodeView|TfrxPictureView|TfrxLineView|TfrxMemoView|TfrxSubreport|TfrxTableObject)\b([\s\S]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi;
     let dcMatch;
     const directComponents = [];
     while ((dcMatch = directCompRx.exec(directPContent)) !== null) {
@@ -818,7 +824,7 @@ function parseFrp(xmlText) {
   // Sayfa sarmalayıcısı olmayan eski/özel FRP çıktılarında görsel nesneleri kaybetme.
   if (result.pages.length === 0) {
     const fallbackComponents = [];
-    const fallbackCompRx = /<(Tfrx[A-Za-z0-9_]+View|TfrxChartView|TfrxShapeView|TfrxDMPMemoView|TfrxBarCodeView|TfrxPictureView|TfrxLineView|TfrxMemoView|TfrxSubreport)\b([\s\S]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi;
+    const fallbackCompRx = /<(Tfrx[A-Za-z0-9_]+View|TfrxChartView|TfrxShapeView|TfrxDMPMemoView|TfrxBarCodeView|TfrxPictureView|TfrxLineView|TfrxMemoView|TfrxSubreport|TfrxTableObject)\b([\s\S]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi;
     let fallbackMatch;
     while ((fallbackMatch = fallbackCompRx.exec(xmlText)) !== null) {
       fallbackComponents.push(parseComponentNode(fallbackMatch[1], fallbackMatch[2], fallbackMatch[3]));
@@ -1107,12 +1113,13 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
       const cleanupTasks = [];
       const renamedObjects = new Map();
       const elements = () => Array.from(doc.getElementsByTagName('*'));
-      const managedComponentType = type => /^Tfrx(?:[A-Za-z0-9_]+View|Subreport)$/i.test(String(type || ''));
+      const managedComponentType = type => /^Tfrx(?:[A-Za-z0-9_]+View|Subreport|TableObject)$/i.test(String(type || ''));
       const managedBandType = type => /^Tfrx(?:MasterData|DetailData|SubdetailData|Header|Footer|PageHeader|PageFooter|GroupHeader|GroupFooter|ColumnHeader|ColumnFooter|ReportTitle|ReportSummary|DataBand|Child|Overlay|DMPHeader|DMPFooter|DMPGroupHeader|DMPGroupFooter|DMPMasterData|DMPDetailData|DMPSubdetailData)$/i.test(String(type || ''));
       const managedStructuralType = type => /^(?:TfrxReport|TfrxDataPage|TfrxReportPage|TfrxDMPPage|TfrxPage|ReportPage|TfrxDialogPage|TfrxFOQuery|TfrxQuery)$/i.test(String(type || ''))
         || /^Tfrx[A-Za-z0-9_]+(?:Control|Sheet|PageControl|TabSheet)$/i.test(String(type || ''));
       const protectedNamedNodes = elements().filter(node => {
         if (file.variablesEdited === true && node.nodeName === 'item' && node.parentNode?.nodeName === 'Variables') return false;
+        if (/^TfrxTable(Column|Row|Cell)$/.test(node.nodeName)) return false;
         const name = node.getAttribute('Name') || node.getAttribute('UserName');
         return name && !managedComponentType(node.nodeName) && !managedBandType(node.nodeName) && !managedStructuralType(node.nodeName);
       }).map(node => ({ type: node.nodeName, name: node.getAttribute('Name') || node.getAttribute('UserName') }));
@@ -1210,6 +1217,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
             if (!componentNode) return;
             bandNode.appendChild(componentNode);
             const textAttr = component.rawAttrs && /\bMemo\.Text\s*=/.test(component.rawAttrs) ? 'Memo.Text' : 'Text';
+            if(component.type==='TfrxTableObject'&&window.FrpTable)window.FrpTable.write(componentNode,component);
             writeFrpAppearance(componentNode, component);
             if (component._complexEdited) {
               if (!component._complex || component._complex.reason || !window.FrpComplexCodec) throw new Error('Nesnenin ikili kayıt biçimi düzenlenemiyor.');
@@ -1344,7 +1352,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
       const verifyElements = verifyDoc.querySelector('parsererror') ? [] : Array.from(verifyDoc.getElementsByTagName('*'));
       const missingProtected = protectedNamedNodes.filter(item => !verifyElements.some(node => node.nodeName === item.type && (node.getAttribute('Name') === item.name || node.getAttribute('UserName') === item.name)));
       if (missingProtected.length > 0) {
-        if ((file.pages||[]).some(p=>(p.bands||[]).some(b=>(b.components||[]).some(c=>c._complexEdited||c._highlightsEdited||c._subreportEdited||Object.keys(c._appearanceEdits||{}).length)))) throw new Error('FRP güvenlik koruması: özel XML içeriği etkileniyor; kayıt uygulanmadı.');
+        if ((file.pages||[]).some(p=>(p.bands||[]).some(b=>(b.components||[]).some(c=>c._tableEdited||c._complexEdited||c._highlightsEdited||c._subreportEdited||Object.keys(c._appearanceEdits||{}).length)))) throw new Error('FRP güvenlik koruması: özel XML içeriği etkileniyor; kayıt uygulanmadı.');
         if (file.variablesEdited === true) throw new Error('Değişken kaydı bilinmeyen XML içeriğini etkiliyor; özgün FRP korundu.');
         console.warn('FRP güvenlik koruması: desteklenmeyen düğüm kaybı engellendi.', missingProtected);
         if (typeof window !== 'undefined') window.FrpNotify?.warning?.('FRP içindeki özel bileşenler korundu; güvenli olmayan tasarım değişikliği uygulanmadı.');
@@ -1355,7 +1363,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
       }
     }
   } catch (error) {
-    if ((file.pages || []).some(p => (p.bands || []).some(b => (b.components || []).some(c => c._complexEdited || c._subreportEdited || c._highlightsEdited || Object.keys(c._appearanceEdits || {}).length)))) throw error;
+    if ((file.pages || []).some(p => (p.bands || []).some(b => (b.components || []).some(c => c._tableEdited || c._complexEdited || c._subreportEdited || c._highlightsEdited || Object.keys(c._appearanceEdits || {}).length)))) throw error;
     if (file.variablesEdited === true) throw error;
     console.warn('FRP XML model senkronizasyonu başarısız:', error.message);
   }

@@ -917,6 +917,24 @@ function esc(str) {
  // Sayfaları hazırla
  const pages = Array.isArray(file.pages)? file.pages: [];
  const dialogPages = Array.isArray(file.dialogPages)? file.dialogPages: [];
+ // Recover tables omitted by older cached parsers without replacing edited models.
+ if(file.rawXml&&window.FrpTable&&window.parseFrp){
+   const fresh=window.parseFrp(file.rawXml);
+   for(const sourcePage of fresh.pages||[]){
+     const page=pages.find(p=>p.name===sourcePage.name);if(!page)continue;
+     for(const sourceBand of sourcePage.bands||[]){
+       const tables=(sourceBand.components||[]).filter(c=>c.type==='TfrxTableObject');if(!tables.length)continue;
+       page.bands=page.bands||[];
+       let band=page.bands.find(b=>b.name===sourceBand.name)||(sourceBand.type==='TfrxPageContent'?page.bands.find(b=>b.type==='TfrxPageContent'):null);
+       if(!band){band={...sourceBand,components:[]};page.bands.push(band);}
+       for(const table of tables){
+         if((band.components||[]).some(c=>c.name===table.name))continue;
+         const xml=window.FrpTable.parse(table._table.xml),nested=new Set(Array.from(xml.documentElement.getElementsByTagName('*')).map(n=>n.getAttribute('Name')).filter(Boolean));
+         band.components=(band.components||[]).filter(c=>!nested.has(c.name));band.components.push(table);
+       }
+     }
+   }
+ }
  
  const allPages = [
 ...pages.map((p, i) => ({ type: 'report', data: p, id: 'page_' + i, name: p.name || `Page${i + 1}` })),
@@ -934,6 +952,9 @@ function esc(str) {
        if (object.type === 'TfrxSubreport') {
          if(object.subreportPage===undefined)object.subreportPage=node.getAttribute('Page')||object.pageName||'';
          if(object.printOnParent===undefined)object.printOnParent=node.getAttribute('PrintOnParent')==='True';
+       }
+       if(object.type==='TfrxTableObject'&&!object._table&&window.FrpTable){
+         object._table=window.FrpTable.read(node);object.width=object._table.width;object.height=object._table.height;
        }
        if (!object._complex && window.FrpComplexCodec) {
          if(object.type==='TfrxChartView')object._complex=window.FrpComplexCodec.readChart(node);
@@ -1041,6 +1062,13 @@ function esc(str) {
      inspectGeometry(item, path, options);
      inspectBinding(item, path);
      inspectEvents(item, path);
+     if(item._table&&!item._table.reason&&window.FrpTable){
+       const table=window.FrpTable.parse(item._table.xml);
+       Array.from(table.documentElement.getElementsByTagName('*')).filter(n=>/^TfrxTable(Column|Row|Cell)$/.test(n.nodeName)).forEach(n=>{
+         const model={name:n.getAttribute('Name'),dataSet:n.getAttribute('DataSetName')||n.getAttribute('DataSet'),dataField:n.getAttribute('DataField'),text:n.getAttribute('Text')||n.getAttribute('Memo.Text')};
+         registerName(model,path+' / '+(model.name||n.nodeName));inspectBinding(model,path);
+       });
+     }
      if(item._complex?.reason)add('warning','unsupported-object-format',path,'Özgün nesne korunuyor: '+item._complex.reason);
      if(item.type==='TfrxChartView'&&item._complex&&!item._complex.reason){
        if(!item._complex.series.length)add('warning','chart-empty',path,'Grafiğe seri eklenmemiş.');
@@ -1086,7 +1114,7 @@ function esc(str) {
      }
    });
 
-   return diagnostics;
+   return diagnostics.concat(window.FrpDesignValidator?.inspect(allPages)||[]);
  }
 
  async function confirmDesignerDiagnostics(diagnostics) {
@@ -1278,6 +1306,7 @@ function esc(str) {
 
  <!-- DÜZENLEME & KAYIT BUTONLARI -->
  <div class="designer-toolbar-group">
+ <button type="button" class="designer-palette-btn" id="btnDesignValidator">Tasarımı Denetle</button>
  ${!isDesignEditing? `
  <button type="button" class="btn btn-sm btn-primary" id="btnStartDesignEdit" style="font-weight:700;display:inline-flex;align-items:center;gap:5px;padding:.32rem.85rem;border-radius:6px;" title="Tasarımı düzenleme moduna al">
  Tasarımı Düzenle
@@ -1312,6 +1341,7 @@ function esc(str) {
   <button type="button" class="designer-palette-btn" id="btnToolAddGradient" title="Yeni Gradyan Dolgu Ekle">Gradient</button>
   <button type="button" class="designer-palette-btn" id="btnToolAddSubreport" title="Yeni Alt Rapor Ekle">Subreport</button>
   <button type="button" class="designer-palette-btn" id="btnToolAddCrosstab" title="Yeni Çapraz Tablo Ekle">CrossTab</button>
+ <button type="button" class="designer-palette-btn" id="btnToolAddTable">Table</button>
  <button type="button" class="designer-palette-btn" id="btnToolAddPicture" title="Yeni Resim / Logo Ekle">Resim</button>
  <button type="button" class="designer-palette-btn" id="btnToolAddLine" title="Yeni Çizgi Ekle">Çizgi</button>
  <button type="button" class="designer-palette-btn" id="btnToolAddBarcode" title="Yeni Barkod Ekle">Barkod</button>
@@ -2078,6 +2108,10 @@ function esc(str) {
  // Event Durumu (Sol üstte kırmızı ok/üçgen - Image 3)
  const hasEvent = Boolean(comp.onBeforePrint || comp.onClick || comp.onAfterPrint || comp.onPreviewClick || comp.onKeyDown || (comp.rawAttrs && /\bOn[A-Z]\w+=/i.test(comp.rawAttrs)));
  const eventTitle = hasEvent? ` [Olay/Event: ${esc(comp.onBeforePrint || comp.onClick || 'Tanımlı')}]`: '';
+
+ if(comp.type==='TfrxTableObject'){
+   return '<div class="fr-view-item '+(isSelected?'selected':'')+'" data-band-idx="'+bIdx+'" data-comp-idx="'+cIdx+'" data-comp-name="'+esc(comp.name)+'" style="position:absolute;left:'+comp.left+'px;top:'+comp.top+'px;width:'+comp.width+'px;height:'+comp.height+'px;overflow:hidden;box-sizing:border-box;'+componentStateStyle+'" title="'+esc(comp.name)+'">'+window.FrpTable.preview(comp._table,v=>decodeDelphiColor(v,true))+renderResizeHandles(isSelected)+'</div>';
+ }
 
  // 1. Barkod Bileşeni (TfrxBarCodeView)
  if (comp.type === 'TfrxBarCodeView') {
@@ -3083,6 +3117,16 @@ function esc(str) {
       { name: 'Color', rawVal: obj.color, val: obj.color || 'clBtnFace', propKey: 'color', isColor: true, editable: isDesignEditing },
       { name: 'Controls', val: String((obj.controls || []).length), readOnly: true }
     ];
+  } else if(obj.type==='TfrxTableObject') {
+    const table=obj._table&&!obj._table.reason?window.FrpTable.shape(window.FrpTable.parse(obj._table.xml).documentElement):null;
+    propList=[
+      {name:'Name',val:obj.name||'',propKey:'name',editable:isDesignEditing},
+      {name:'Class',val:obj.type,readOnly:true},
+      ...['left','top','width','height'].map(key=>({name:key[0].toUpperCase()+key.slice(1),val:obj[key]??0,propKey:key,isNumber:true,editable:isDesignEditing})),
+      {name:'Rows',val:table?.rows.length??'?',readOnly:true},
+      {name:'Columns',val:table?.columns.length??'?',readOnly:true},
+      {name:'Visible',val:obj.visible!==false?'true':'false',propKey:'visible',isSelect:isDesignEditing,options:['true','false']}
+    ];
   } else {
     // BANT, MEMO (TfrxMemoView), VE DİĞER BİLEŞENLERİN TÜM DELPHI ÖZELLİKLERİ
     const styleText = String(obj.fontStyle || '');
@@ -3184,7 +3228,7 @@ function esc(str) {
 ? propList.filter(p => p.name.toLowerCase().includes(inspectorSearchQuery.toLowerCase()) || String(p.val).toLowerCase().includes(inspectorSearchQuery.toLowerCase()))
 : propList;
 
- const advancedKinds = obj.type==='TfrxSubreport' ? ['Subreport','OpenSubreport'] : !isPage && !isDialogPage && !isBand && /View$/.test(obj.type || '') ? [...(obj.type==='TfrxChartView'?['Chart']:/^(TfrxCrossView|TfrxDBCrossView)$/.test(obj.type)?['CrossTab']:[]),'Font','Frame','Fill',...(isMemoComponent(obj)?['DisplayFormat','Highlight']:[]),'Hyperlink'] : [];
+ const advancedKinds = obj.type==='TfrxTableObject'?['Table']:obj.type==='TfrxSubreport' ? ['Subreport','OpenSubreport'] : !isPage && !isDialogPage && !isBand && /View$/.test(obj.type || '') ? [...(obj.type==='TfrxChartView'?['Chart']:/^(TfrxCrossView|TfrxDBCrossView)$/.test(obj.type)?['CrossTab']:[]),'Font','Frame','Fill',...(isMemoComponent(obj)?['DisplayFormat','Highlight']:[]),'Hyperlink'] : [];
  const editorButtons = isDesignEditing && inspectorTab !== 'events' ? '<div class="fr-property-launchers">'+advancedKinds.map(kind=>'<button type="button" data-property-editor="'+kind+'">'+(kind==='Subreport'?'Alt rapor ayarları':kind==='OpenSubreport'?'Bağlı sayfayı aç':kind+'…')+'</button>').join('')+'</div>' : '';
  return editorButtons + filtered.map(p => {
  let inputControl = '';
@@ -3298,6 +3342,55 @@ function esc(str) {
    if(index<0)return window.FrpNotify?.warning('Bağlı rapor sayfası bulunamadı.');
    activePageIndex=index;selectedItem=null;selectedItems=[];render();
  }
+ function tableNameGenerator() {
+   const names=getDesignerObjectNames();
+   if(file.rawXml){
+     const doc=new DOMParser().parseFromString(file.rawXml,'application/xml');
+     Array.from(doc.getElementsByTagName('*')).forEach(n=>{const name=n.getAttribute('Name');if(name)names.add(name.toLowerCase());});
+   }
+   return base=>{let index=1,name=base+index;while(names.has(name.toLowerCase()))name=base+(++index);names.add(name.toLowerCase());return name;};
+ }
+ function renameCopiedTable(component){
+   if(!component._table||!window.FrpTable)return;
+   const doc=window.FrpTable.parse(component._table.xml),unique=tableNameGenerator(),renames=new Map();
+   doc.documentElement.setAttribute('Name',component.name);
+   Array.from(doc.documentElement.getElementsByTagName('*')).forEach(n=>{
+     const name=n.getAttribute('Name');if(name){const fresh=unique(name.replace(/\d+$/,'')||'TableItem');renames.set(name,fresh);n.setAttribute('Name',fresh);}
+   });
+   Array.from(doc.getElementsByTagName('*')).forEach(n=>Array.from(n.attributes).forEach(a=>{if(['FlowTo','Parent','Child'].includes(a.name)&&renames.has(a.value))n.setAttribute(a.name,renames.get(a.value));}));
+   component._table=window.FrpTable.read(doc.documentElement);component._tableEdited=true;
+ }
+ function openTableEditor(component) {
+   if(!isDesignEditing||window._isReportLockedByOther||!component?._table)return;
+   if(component._table.reason)return window.FrpNotify?.warning(component._table.reason);
+   const restrictions=String(component.restrictions||'');
+   if((/^\d+$/.test(restrictions)&&(Number(restrictions)&17))||/rfDontModify|rfDontEdit/.test(restrictions))return window.FrpNotify?.warning('Tablo düzenlemeye karşı kilitli.');
+   const doc=window.FrpTable.parse(component._table.xml);
+   window.FrpTable.write(doc.documentElement,component);
+   window.FrpTable.open({name:component.name,model:window.FrpTable.read(doc.documentElement),unique:tableNameGenerator(),context:expressionEditorContext(),color:v=>decodeDelphiColor(v,true),toColor:hexToDelphiColor,onApply:table=>{
+     if(!isDesignEditing||window._isReportLockedByOther)return false;
+     pushUndoState();component._table=table;component._tableEdited=true;component.width=table.width;component.height=table.height;
+     renderCanvasOnly();updateSelection();pushUndoState();
+   }});
+ }
+ function openDesignValidator(){
+   const diagnostics=collectDesignerDiagnostics(),dialog=document.createElement('dialog'),previous=document.activeElement;
+   dialog.className='fr-property-dialog';dialog.style.width='min(900px,95vw)';
+   dialog.innerHTML='<header><strong>Tasarım doğrulayıcı · '+diagnostics.length+' bulgu</strong><button data-close aria-label="Kapat">×</button></header><div style="overflow:auto;padding:16px"><p>Çakışmalar ve dışa aktarma riskleri tasarım geometrisine göre değerlendirilir. Kasıtlı yerleşimleri raporunuzla birlikte değerlendirin.</p>'+
+   (diagnostics.length?diagnostics.map((issue,i)=>'<div style="border-bottom:1px solid var(--border,#cbd5e1);padding:9px 0"><strong>'+esc(issue.severity==='error'?'Hata':'Uyarı')+' · '+esc(issue.path)+'</strong><p>'+esc(issue.message)+'</p><button data-issue="'+i+'">Nesneye git</button></div>').join(''):'<p>Bu denetimlerde sorun bulunamadı.</p>')+'</div><footer><button data-done>Kapat</button></footer>';
+   document.body.appendChild(dialog);dialog.querySelector('[data-close]').onclick=dialog.querySelector('[data-done]').onclick=()=>dialog.close();
+   dialog.addEventListener('close',()=>{dialog.remove();if(previous?.isConnected)previous.focus();},{once:true});dialog.addEventListener('keydown',e=>e.stopPropagation());
+   dialog.querySelectorAll('[data-issue]').forEach(button=>button.onclick=()=>{
+     const issue=diagnostics[Number(button.dataset.issue)],names=String(issue.path).split(' / ').reverse();
+     const entries=reportTreeEntries().filter(e=>issue.pageIndex===undefined||e.pageIndex===issue.pageIndex);
+     const entry=issue.objectName?entries.find(e=>e.object.name===issue.objectName):names.map(name=>entries.find(e=>e.object.name===name)).find(Boolean);
+     if(!entry)return;
+     activePageIndex=entry.pageIndex;selectedItem=entry.object;selectedItems=entry.kind==='object'?[entry.object]:[];currentMode='designer';dialog.close();render();updateSelection();
+   });
+   dialog.showModal();
+ }
+
+
  function openComplexEditor(component) {
    if(!isDesignEditing||window._isReportLockedByOther||!component)return;
    const restrictions=String(component.restrictions||'');
@@ -3365,6 +3458,7 @@ function esc(str) {
 
  function openPropertyEditor(kind, component) {
    if (!isDesignEditing || !component || window._isReportLockedByOther) return;
+   if (kind === 'Table') return openTableEditor(component);
    if (kind === 'CrossTab' || kind === 'Chart') return openComplexEditor(component);
    if (kind === 'Subreport') return openSubreportEditor(component);
    if (kind === 'OpenSubreport') return openSubreportPage(component);
@@ -3647,6 +3741,10 @@ function esc(str) {
    });
    walkDesignerComponents(comp => {
      if (comp?.name) names.add(String(comp.name).toLowerCase());
+     if(comp?._table&&window.FrpTable){
+       const root=window.FrpTable.parse(comp._table.xml).documentElement;
+       Array.from(root.getElementsByTagName('*')).forEach(n=>{if(n.hasAttribute('Name'))names.add(n.getAttribute('Name').toLowerCase());});
+     }
    });
    return names;
  }
@@ -3895,7 +3993,7 @@ function esc(str) {
  if (!isDesignEditing) return;
  const activePage = allPages[activePageIndex];
  if (!activePage) return;
- if (['subreport','crosstab','chart'].includes(type) && activePage.type !== 'report') return window.FrpNotify?.warning('Alt rapor yalnızca rapor sayfasına eklenebilir.');
+ if (['subreport','crosstab','chart','table'].includes(type) && activePage.type !== 'report') return window.FrpNotify?.warning('Alt rapor yalnızca rapor sayfasına eklenebilir.');
 
  pushUndoState();
 
@@ -3956,6 +4054,9 @@ function esc(str) {
  printOnParent: false,
  _subreportEdited: true
  };
+ } else if (type === 'table') {
+ const name=ensureUniqueComponentName('Table1'),table=window.FrpTable.make(name,tableNameGenerator());
+ newComp={name,type:'TfrxTableObject',left:60,top:30,width:table.width,height:table.height,_table:table,_tableEdited:true};
  } else if (type === 'crosstab') {
  newComp = {
  name: `CrossTab${randomId}`,
@@ -4297,6 +4398,7 @@ function esc(str) {
      const forgetSource = item => { delete item._sourceName; (item.children || []).forEach(forgetSource); };
      forgetSource(clone);
      clone.name = makeUniqueComponentName(orig.name);
+     renameCopiedTable(clone);
      const offset = (gridSnapStep && gridSnapStep > 1) ? Math.max(gridSnapStep, 8) : 10;
      clone.left = snapDesignerValue(toDesignerNumber(clone.left) + offset);
      clone.top = snapDesignerValue(toDesignerNumber(clone.top) + offset);
@@ -4355,6 +4457,7 @@ function esc(str) {
      const forgetSource = item => { delete item._sourceName; (item.children || []).forEach(forgetSource); };
      forgetSource(clone);
      clone.name = makeUniqueComponentName(source.name);
+     renameCopiedTable(clone);
      const offset = ((gridSnapStep > 1 ? gridSnapStep : 4) * (index + 2));
      clone.left = snapDesignerValue(toDesignerNumber(source.left) + offset);
      clone.top = snapDesignerValue(toDesignerNumber(source.top) + offset);
@@ -4596,6 +4699,7 @@ function esc(str) {
    return;
  }
  if(/^(TfrxChartView|TfrxCrossView|TfrxDBCrossView)$/.test(editTarget.type))return openComplexEditor(editTarget);
+ if(editTarget.type==='TfrxTableObject')return openTableEditor(editTarget);
  if(editTarget.type==='TfrxSubreport')return openSubreportEditor(editTarget);
  const oldText = selectedItem.text || selectedItem.caption || '';
       let newText = null;
@@ -5265,6 +5369,8 @@ function esc(str) {
  containerEl.querySelector('#btnPageSettings')?.addEventListener('click', () => openSettingsEditor('page'));
  containerEl.querySelector('#btnReportSettings')?.addEventListener('click', () => openSettingsEditor('report'));
  containerEl.querySelector('#btnVariablesEditor')?.addEventListener('click', openVariablesEditor);
+ containerEl.querySelector('#btnDesignValidator')?.addEventListener('click', openDesignValidator);
+ containerEl.querySelector('#btnToolAddTable')?.addEventListener('click', () => addNewComponent('table'));
 
  // 3. Düzenleme / Kaydetme / İptal Etme Butonları
  containerEl.querySelector('#btnStartDesignEdit')?.addEventListener('click', () => {
