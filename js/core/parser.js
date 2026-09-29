@@ -663,6 +663,8 @@ function parseFrp(xmlText) {
       keepAspectRatio,
       center,
       stretched: isStretched,
+      subreportPage: type === 'TfrxSubreport' ? getAttr(attrsChunk, 'Page') || '' : undefined,
+      printOnParent: type === 'TfrxSubreport' ? getAttr(attrsChunk, 'PrintOnParent') === 'True' : undefined,
       restrictions: getAttr(attrsChunk, 'Restrictions') || undefined,
       rawAttrs: attrsChunk
     };
@@ -1208,6 +1210,8 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
             setAttrs(componentNode, {
               Left: component.left, Top: synthetic ? Number(component.top || 0) + Number(band.top || 0) : component.top, Width: component.width, Height: component.height,
               [textAttr]: component.text, 'Font.Name': component.fontName,
+              Page: component.type === 'TfrxSubreport' ? (component.subreportPage ?? component.pageName ?? component.page) : undefined,
+              PrintOnParent: component.type === 'TfrxSubreport' ? component.printOnParent : undefined,
               'Font.Height': component.fontSize ? -Math.abs(component.fontSize) : component.fontHeight,
               'Font.Color': component.fontColor, 'Font.Style': component.fontStyle,
               'Fill.BackColor': component.fillBackColor, 'Fill.ForeColor': component.fillForeColor,
@@ -1330,7 +1334,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
       }
     }
   } catch (error) {
-    if ((file.pages || []).some(p => (p.bands || []).some(b => (b.components || []).some(c => c._highlightsEdited || Object.keys(c._appearanceEdits || {}).length)))) throw error;
+    if ((file.pages || []).some(p => (p.bands || []).some(b => (b.components || []).some(c => c._subreportEdited || c._highlightsEdited || Object.keys(c._appearanceEdits || {}).length)))) throw error;
     if (file.variablesEdited === true) throw error;
     console.warn('FRP XML model senkronizasyonu başarısız:', error.message);
   }

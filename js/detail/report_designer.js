@@ -517,7 +517,7 @@ function esc(str) {
  const captureDesignState = () => JSON.stringify({ pages: allPages.map(p => p.data), reportSettings, variableCategories, variablesEdited });
  function restoreDesignState(serialized) {
    const state = JSON.parse(serialized);
-   allPages.forEach((p, idx) => { if (state.pages[idx]) p.data = state.pages[idx]; });
+   restorePageModels(state.pages);
    reportSettings = state.reportSettings || {};
    variableCategories=state.variableCategories||[]; variablesEdited=state.variablesEdited===true;
  }
@@ -931,6 +931,10 @@ function esc(str) {
      reportTreeEntries().forEach(({object}) => {
        const node = named.find(n => n.nodeName === object.type && n.getAttribute('Name') === object.name);
        if (!node) return;
+       if (object.type === 'TfrxSubreport') {
+         if(object.subreportPage===undefined)object.subreportPage=node.getAttribute('Page')||object.pageName||'';
+         if(object.printOnParent===undefined)object.printOnParent=node.getAttribute('PrintOnParent')==='True';
+       }
        if (!object._appearance && window.FrpAppearance) Object.assign(object, window.FrpAppearance.read(node));
        if (object.restrictions === undefined) object.restrictions = node.hasAttribute('Restrictions') ? node.getAttribute('Restrictions') : undefined;
        if (object.visible === undefined && node.hasAttribute('Visible')) object.visible = node.getAttribute('Visible') !== 'False';
@@ -1033,6 +1037,16 @@ function esc(str) {
      inspectGeometry(item, path, options);
      inspectBinding(item, path);
      inspectEvents(item, path);
+     if(item.type==='TfrxSubreport'){
+       const linked=subreportDestination(item),error=subreportLinkError(item,linked);
+       if(!linked)add('warning','subreport-unlinked',path,'Alt rapor bir sayfaya bağlı değil.');
+       else if(error)add('error','subreport-link',path,error);
+       else {
+         const child=allPages.find(p=>p.type==='report'&&p.data.name.toLowerCase()===linked.toLowerCase());
+         const ignored=(child?.data.bands||[]).filter(b=>/^(TfrxReportTitle|TfrxReportSummary|TfrxPageHeader|TfrxPageFooter|TfrxColumnHeader|TfrxColumnFooter|TfrxOverlay)$/.test(b.type));
+         if(ignored.length)add('warning','subreport-bands',path,'Alt raporda üst sayfa tarafından yönetilen başlık/altbilgi bantları var: '+ignored.map(b=>b.name).join(', '));
+       }
+     }
    };
    const visitComponents = (items, parentPath) => {
      (items || []).forEach((item, index) => {
@@ -1896,6 +1910,7 @@ function esc(str) {
      ${isMemo ? '<button data-action="edit">Metni ve veri alanını düzenle</button><button data-action="highlight">Koşullu biçimlendirme</button><button data-action="display-format">Display Format düzenle</button><button data-action="hyperlink">Hyperlink düzenle</button><button data-action="clear">İçeriği temizle</button><div class="fr-context-separator"></div><button data-action="toggle-autoWidth">'+checked('autoWidth')+'Auto Width</button><button data-action="toggle-wordWrap">'+checked('wordWrap')+'Word Wrap</button><button data-action="toggle-allowExpressions">'+checked('allowExpressions')+'İfadelere izin ver</button><button data-action="toggle-allowHTMLTags">'+checked('allowHTMLTags')+'HTML etiketlerine izin ver</button><button data-action="toggle-clipped">'+checked('clipped')+'Taşan metni kırp</button><button data-action="toggle-suppressRepeatedValues">'+checked('suppressRepeatedValues')+'Tekrarlanan değerleri gizle</button><button data-action="toggle-hideZeros">'+checked('hideZeros')+'Sıfırları gizle</button><button data-action="toggle-enabled">'+checked('enabled')+'Enabled</button><button data-action="toggle-visible">'+checked('visible')+'Visible</button><button data-action="toggle-printable">'+checked('printable')+'Printable</button>' : ''}
      ${isPicture ? '<button data-action="toggle-autoSize">'+checked('autoSize')+'Auto Size</button><button data-action="toggle-stretched">'+checked('stretched')+'Stretch</button><button data-action="toggle-center">'+checked('center')+'Center</button><button data-action="toggle-keepAspectRatio">'+checked('keepAspectRatio')+'En-boy oranını koru</button>' : ''}
      <div class="fr-context-separator"></div>
+     ${target.type === 'TfrxSubreport' ? '<button data-action="subreport-edit">Alt rapor ayarları</button><button data-action="subreport-open">Bağlı sayfayı aç</button>' : ''}
      <div class="fr-context-frame"><span>Çerçeve</span><button data-action="frame-none">Yok</button><button data-action="frame-all">Tümü</button></div>
      <div class="fr-context-rotation"><span>Döndür</span>${[0,45,90,180,270].map(value => `<button data-action="rotate" data-value="${value}" class="${toDesignerNumber(target.rotation) === value ? 'active' : ''}">${value}°</button>`).join('')}</div>
      <div class="fr-context-separator"></div>
@@ -1912,6 +1927,8 @@ function esc(str) {
      if (!button) return;
      const action = button.dataset.action;
      menu.remove();
+     if (action === 'subreport-edit') return openSubreportEditor(target);
+     if (action === 'subreport-open') return openSubreportPage(target);
      if (action === 'band-edit') return openBandEditor(target);
      if (action === 'add-child') return addChildBand(target);
      if (action === 'band-up' || action === 'band-down') return moveBand((allPages[activePageIndex]?.data?.bands || []).indexOf(target), action === 'band-up' ? -1 : 1);
@@ -2416,7 +2433,7 @@ function esc(str) {
  box-sizing: border-box;
  "
  title="${esc(comp.name)} [Alt Rapor: ${esc(comp.subreportPage || 'Sayfa')}]${eventTitle}">
- <span>📑</span> <span>[Subreport: ${esc(comp.subreportPage || comp.name)}]</span>
+ <span>📑</span> <span>[Subreport: ${esc(subreportDestination(comp) || 'Bağlantı yok')}]</span>
  ${renderResizeHandles(isSelected)}
  </div>
  `;
@@ -3152,8 +3169,8 @@ function esc(str) {
 ? propList.filter(p => p.name.toLowerCase().includes(inspectorSearchQuery.toLowerCase()) || String(p.val).toLowerCase().includes(inspectorSearchQuery.toLowerCase()))
 : propList;
 
- const advancedKinds = !isPage && !isDialogPage && !isBand && /View$/.test(obj.type || '') ? ['Font','Frame','Fill',...(isMemoComponent(obj)?['DisplayFormat','Highlight']:[]),'Hyperlink'] : [];
- const editorButtons = isDesignEditing && inspectorTab !== 'events' ? '<div class="fr-property-launchers">'+advancedKinds.map(kind=>'<button type="button" data-property-editor="'+kind+'">'+kind+'…</button>').join('')+'</div>' : '';
+ const advancedKinds = obj.type==='TfrxSubreport' ? ['Subreport','OpenSubreport'] : !isPage && !isDialogPage && !isBand && /View$/.test(obj.type || '') ? ['Font','Frame','Fill',...(isMemoComponent(obj)?['DisplayFormat','Highlight']:[]),'Hyperlink'] : [];
+ const editorButtons = isDesignEditing && inspectorTab !== 'events' ? '<div class="fr-property-launchers">'+advancedKinds.map(kind=>'<button type="button" data-property-editor="'+kind+'">'+(kind==='Subreport'?'Alt rapor ayarları':kind==='OpenSubreport'?'Bağlı sayfayı aç':kind+'…')+'</button>').join('')+'</div>' : '';
  return editorButtons + filtered.map(p => {
  let inputControl = '';
  if (p.isColor) {
@@ -3211,8 +3228,102 @@ function esc(str) {
  }).join('');
  }
 
+ function restorePageModels(models) {
+   const selectedPageName=allPages[activePageIndex]?.data?.name;
+   allPages.splice(0,allPages.length,...models.map((data,index)=>({
+     data,type:data.type==='TfrxDialogPage'||Array.isArray(data.controls)?'dialog':'report',
+     id:'page_'+index,name:data.name||'Page'+(index+1)
+   })));
+   const same=allPages.findIndex(p=>p.data.name===selectedPageName);
+   activePageIndex=same>=0?same:Math.max(0,Math.min(activePageIndex,allPages.length-1));
+ }
+ function subreportDestination(component) {
+   return String(component.subreportPage??component.pageName??component.page??'').trim();
+ }
+ function subreportOwner(component) {
+   return allPages.find(p=>p.type==='report'&&(p.data.bands||[]).some(b=>(b.components||[]).includes(component)));
+ }
+ function subreportLinkError(component,destination) {
+   if(!destination)return '';
+   const owner=subreportOwner(component);
+   const target=allPages.find(p=>p.type==='report'&&p.data.name.toLowerCase()===destination.toLowerCase());
+   if(!target)return 'Bağlı rapor sayfası bulunamadı.';
+   if(!owner)return 'Alt raporun bulunduğu sayfa bulunamadı.';
+   const seen=new Set();
+   const reachesOwner=page=>{
+     if(page===owner)return true;
+     if(seen.has(page))return false;seen.add(page);
+     return (page.data.bands||[]).some(b=>(b.components||[]).some(c=>{
+       if(c===component||c.type!=='TfrxSubreport')return false;
+       const name=subreportDestination(c).toLowerCase(),next=allPages.find(p=>p.type==='report'&&p.data.name.toLowerCase()===name);
+       return next&&reachesOwner(next);
+     }));
+   };
+   return reachesOwner(target)?'Bu bağlantı kendine dönen bir alt rapor zinciri oluşturuyor. Başka bir sayfa seçin.':'';
+ }
+ function createSubreportPage(parentPage) {
+   const occupied=getDesignerObjectNames();
+   (file.queries||[]).forEach(q=>{if(q.name)occupied.add(q.name.toLowerCase());});
+   if(file.rawXml){
+     const doc=new DOMParser().parseFromString(file.rawXml,'application/xml');
+     Array.from(doc.getElementsByTagName('*')).forEach(n=>{if(n.hasAttribute('Name'))occupied.add(n.getAttribute('Name').toLowerCase());});
+   }
+   let index=1;while(occupied.has(('SubreportPage'+index).toLowerCase()))index++;
+   const name='SubreportPage'+index,base=parentPage?.data||{};
+   const data={name,type:'TfrxReportPage',paperWidth:210,paperHeight:297,leftMargin:10,rightMargin:10,topMargin:10,bottomMargin:10,bands:[]};
+   ['paperWidth','paperHeight','paperSize','orientation','leftMargin','rightMargin','topMargin','bottomMargin'].forEach(k=>{if(base[k]!==undefined)data[k]=base[k];});
+   allPages.push({type:'report',data,id:'subreport_'+name,name});
+   const width=Math.max(10,(Number(data.paperWidth)-Number(data.leftMargin)-Number(data.rightMargin))*96/25.4);
+   let bandIndex=1;while(occupied.has(('MasterData'+bandIndex).toLowerCase()))bandIndex++;
+   data.bands.push({name:'MasterData'+bandIndex,type:'TfrxMasterData',left:0,top:0,width,height:100,rowCount:1,components:[]});
+   return data;
+ }
+ function openSubreportPage(component) {
+   const name=subreportDestination(component),index=allPages.findIndex(p=>p.type==='report'&&p.data.name.toLowerCase()===name.toLowerCase());
+   if(index<0)return window.FrpNotify?.warning('Bağlı rapor sayfası bulunamadı.');
+   activePageIndex=index;selectedItem=null;selectedItems=[];render();
+ }
+ function openSubreportEditor(component) {
+   if(!isDesignEditing||window._isReportLockedByOther||component?.type!=='TfrxSubreport')return;
+   const restriction=String(component.restrictions||'');
+   if((/^\d+$/.test(restriction)&&(Number(restriction)&17))||/rfDontModify|rfDontEdit/.test(restriction))return window.FrpNotify?.warning('Bu nesne düzenlemeye karşı kilitli.');
+   const previous=document.activeElement,dialog=document.createElement('dialog'),current=subreportDestination(component);
+   dialog.className='fr-property-dialog';
+   const candidates=allPages.filter(p=>p.type==='report');
+   dialog.innerHTML='<header><strong>Alt rapor · '+esc(component.name)+'</strong><button type="button" data-close aria-label="Kapat">×</button></header><div class="fr-property-fields">'+
+     '<label><span>Bağlı sayfa</span><select data-page><option value="">Bağlantı yok</option><option value="__new__">Yeni alt rapor sayfası oluştur</option>'+
+     (current&&!candidates.some(p=>p.data.name===current)?'<option value="'+esc(current)+'">'+esc(current)+' (bulunamadı)</option>':'')+
+     candidates.map(p=>'<option value="'+esc(p.data.name)+'">'+esc(p.data.name)+'</option>').join('')+'</select></label>'+
+     '<label><span>PrintOnParent</span><span><input type="checkbox" data-parent '+(component.printOnParent?'checked':'')+'> İçeriği üst bandın üzerinde yazdır</span></label>'+
+     '<p>Yeni sayfa, Uygula ile oluşturulur. Sayfa bağlantısı ve PrintOnParent FRP dosyasına kaydedilir.</p>'+
+     '<label><span>Uyguladıktan sonra</span><span><input type="checkbox" data-open> Bağlı sayfayı aç</span></label></div>'+
+     '<p data-error role="alert"></p><footer><button data-cancel>İptal</button><button data-apply>Uygula</button></footer>';
+   document.body.appendChild(dialog);dialog.querySelector('[data-page]').value=current;
+   const close=()=>dialog.close();
+   dialog.querySelector('[data-close]').onclick=close;dialog.querySelector('[data-cancel]').onclick=close;
+   dialog.addEventListener('close',()=>{dialog.remove();if(previous?.isConnected)previous.focus();},{once:true});
+   dialog.addEventListener('keydown',e=>e.stopPropagation());
+   dialog.querySelector('[data-apply]').onclick=()=>{
+     if(!isDesignEditing||window._isReportLockedByOther)return;
+     let page=dialog.querySelector('[data-page]').value;
+     const error=page==='__new__'?'':subreportLinkError(component,page);
+     if(error){dialog.querySelector('[data-error]').textContent=error;return;}
+     pushUndoState();
+     if(page==='__new__')page=createSubreportPage(subreportOwner(component)).name;
+     component.subreportPage=page;component.pageName=page;component.page=page;
+     component.printOnParent=dialog.querySelector('[data-parent]').checked;component._subreportEdited=true;
+     const jump=dialog.querySelector('[data-open]').checked&&page;
+     pushUndoState();close();
+     if(jump)openSubreportPage(component);else{render();updateSelection();}
+   };
+   dialog.showModal();
+ }
+
+
  function openPropertyEditor(kind, component) {
    if (!isDesignEditing || !component || window._isReportLockedByOther) return;
+   if (kind === 'Subreport') return openSubreportEditor(component);
+   if (kind === 'OpenSubreport') return openSubreportPage(component);
    if (component._appearanceReadOnly?.[kind]) return window.FrpNotify?.warning(component._appearanceReadOnly[kind]);
    const restrictions=String(component.restrictions||'');
    if ((/^\d+$/.test(restrictions) && (Number(restrictions)&17)) || /rfDontModify|rfDontEdit/.test(restrictions)) return window.FrpNotify?.warning('Bu nesne özellik düzenlemeye karşı kilitli.');
@@ -3740,6 +3851,7 @@ function esc(str) {
  if (!isDesignEditing) return;
  const activePage = allPages[activePageIndex];
  if (!activePage) return;
+ if (type === 'subreport' && activePage.type !== 'report') return window.FrpNotify?.warning('Alt rapor yalnızca rapor sayfasına eklenebilir.');
 
  pushUndoState();
 
@@ -3796,7 +3908,9 @@ function esc(str) {
  width: 220,
  height: 80,
  text: 'Alt Rapor',
- pageName: ''
+ subreportPage: createSubreportPage(activePage).name,
+ printOnParent: false,
+ _subreportEdited: true
  };
  } else if (type === 'crosstab') {
  newComp = {
@@ -3978,7 +4092,7 @@ function esc(str) {
  targetBand.components.push(newComp);
  } else {
  activePage.data.bands = [{
- name: 'MasterData1',
+ name: ensureUniqueComponentName('MasterData1'),
  type: 'TfrxMasterData',
  left: 0,
  top: 0,
@@ -4437,6 +4551,7 @@ function esc(str) {
    openMemoEditor(editTarget);
    return;
  }
+ if(editTarget.type==='TfrxSubreport')return openSubreportEditor(editTarget);
  const oldText = selectedItem.text || selectedItem.caption || '';
       let newText = null;
       if (typeof window.showPromptModal === 'function') {
@@ -5179,11 +5294,7 @@ function esc(str) {
  containerEl.querySelector('#btnCancelDesignEdit')?.addEventListener('click', () => {
  reportSettings = JSON.parse(JSON.stringify(initialReportSettingsBackup));
  if(initialVariablesBackup){variableCategories=initialVariablesBackup.variableCategories;variablesEdited=initialVariablesBackup.variablesEdited;}
- if (initialPagesBackup) {
- allPages.forEach((p, idx) => {
- if (initialPagesBackup[idx]) p.data = initialPagesBackup[idx];
- });
- }
+ if (initialPagesBackup) restorePageModels(initialPagesBackup);
  isDesignEditing = false;
  currentMode = 'preview';
  showRulers = false;
