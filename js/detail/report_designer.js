@@ -935,6 +935,10 @@ function esc(str) {
          if(object.subreportPage===undefined)object.subreportPage=node.getAttribute('Page')||object.pageName||'';
          if(object.printOnParent===undefined)object.printOnParent=node.getAttribute('PrintOnParent')==='True';
        }
+       if (!object._complex && window.FrpComplexCodec) {
+         if(object.type==='TfrxChartView')object._complex=window.FrpComplexCodec.readChart(node);
+         else if(/^(TfrxCrossView|TfrxDBCrossView)$/.test(object.type))object._complex=window.FrpComplexCodec.readCross(node);
+       }
        if (!object._appearance && window.FrpAppearance) Object.assign(object, window.FrpAppearance.read(node));
        if (object.restrictions === undefined) object.restrictions = node.hasAttribute('Restrictions') ? node.getAttribute('Restrictions') : undefined;
        if (object.visible === undefined && node.hasAttribute('Visible')) object.visible = node.getAttribute('Visible') !== 'False';
@@ -1037,6 +1041,16 @@ function esc(str) {
      inspectGeometry(item, path, options);
      inspectBinding(item, path);
      inspectEvents(item, path);
+     if(item._complex?.reason)add('warning','unsupported-object-format',path,'Özgün nesne korunuyor: '+item._complex.reason);
+     if(item.type==='TfrxChartView'&&item._complex&&!item._complex.reason){
+       if(!item._complex.series.length)add('warning','chart-empty',path,'Grafiğe seri eklenmemiş.');
+       item._complex.series.forEach((series,index)=>{
+         const source=series.attrs.DataSetName||series.attrs.DataSet||'';
+         if(source&&!knownDataSets.has(source.toLowerCase()))add('warning','chart-dataset',path,'Seri '+(index+1)+': '+source+' veri seti bulunamadı.');
+         if(!series.attrs.Source2)add('warning','chart-source',path,'Seri '+(index+1)+': Y / değer kaynağı boş.');
+       });
+     }
+     if(item.type==='TfrxDBCrossView'&&item._complex&&!item._complex.reason&&!item._complex.cells.length)add('warning','cross-empty',path,'Çapraz tabloya hücre alanı eklenmemiş.');
      if(item.type==='TfrxSubreport'){
        const linked=subreportDestination(item),error=subreportLinkError(item,linked);
        if(!linked)add('warning','subreport-unlinked',path,'Alt rapor bir sayfaya bağlı değil.');
@@ -2208,7 +2222,7 @@ function esc(str) {
  if (comp.type === 'TfrxChartView') {
  const isPie = (comp.seriesType || '').toLowerCase().includes('pie');
  const isBar = (comp.seriesType || '').toLowerCase().includes('bar');
- const seriesName = comp.seriesType || 'FastLineSeries';
+ const seriesName = comp._complex?.series?.map(s=>s.title||s.type).join(', ') || comp.seriesType || 'Seri eklenmedi';
  const dsName = comp.dataSet || comp.chartDataSet || '';
  const xLabel = comp.xField? `X: [${comp.xField}]`: '';
  const yLabel = comp.yField? `Y: [${comp.yField}]`: '';
@@ -2314,6 +2328,7 @@ function esc(str) {
  ${yLabel? `<span style="background:#f1f5f9;padding:1px 4px;border-radius:2px;">${esc(yLabel)}</span>`: ''}
  </div>
  </div>
+ <div style="font-size:9px;padding:2px 6px;color:#64748b;background:#f8fafc;">Tasarım şeması · gerçek veri önizlemesi değildir</div>
  <!-- Chart Canvas Area -->
  <div style="flex:1;width:100%;position:relative;background:#ffffff;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:6px;">
  ${chartSvg}
@@ -2451,14 +2466,14 @@ function esc(str) {
  "
  title="${esc(comp.name)} [Çapraz Tablo: ${esc(comp.type)}]${eventTitle}">
  <div style="background:#f1f5f9; padding:2px 6px; font-size:9px; font-weight:700; color:#475569; border-bottom:1px solid #cbd5e1; display:flex; align-items:center; gap:4px;">
- <span>▦</span> <span>${esc(comp.name)} [Cross-Tab]</span>
+ <span>▦</span> <span>${esc(comp.name)} [${esc(comp.dataSet||'Veri seti yok')}]</span>
  </div>
  <div style="flex:1; display:grid; grid-template-columns:1fr 1fr 1fr; grid-template-rows:1fr 1fr; gap:1px; background:#e2e8f0; padding:1px; font-size:8.5px; text-align:center;">
  <div style="background:#f8fafc; font-weight:700; display:flex; align-items:center; justify-content:center;">Başlık</div>
- <div style="background:#f8fafc; font-weight:700; display:flex; align-items:center; justify-content:center;">Kolon 1</div>
+ <div style="background:#f8fafc; font-weight:700; display:flex; align-items:center; justify-content:center;">${esc(comp._complex?.columns?.join(' / ')||comp.columnFields||'Kolon alanları')}</div>
  <div style="background:#f8fafc; font-weight:700; display:flex; align-items:center; justify-content:center;">Toplam</div>
- <div style="background:#ffffff; display:flex; align-items:center; justify-content:center;">Satır 1</div>
- <div style="background:#ffffff; display:flex; align-items:center; justify-content:center;">[Veri]</div>
+ <div style="background:#ffffff; display:flex; align-items:center; justify-content:center;">${esc(comp._complex?.rows?.join(' / ')||comp.rowFields||'Satır alanları')}</div>
+ <div style="background:#ffffff; display:flex; align-items:center; justify-content:center;">${esc(comp._complex?.cells?.join(', ')||comp.cellFields||'Hücre alanları')}</div>
  <div style="background:#f8fafc; font-weight:700; display:flex; align-items:center; justify-content:center;">[∑]</div>
  </div>
  ${renderResizeHandles(isSelected)}
@@ -3169,7 +3184,7 @@ function esc(str) {
 ? propList.filter(p => p.name.toLowerCase().includes(inspectorSearchQuery.toLowerCase()) || String(p.val).toLowerCase().includes(inspectorSearchQuery.toLowerCase()))
 : propList;
 
- const advancedKinds = obj.type==='TfrxSubreport' ? ['Subreport','OpenSubreport'] : !isPage && !isDialogPage && !isBand && /View$/.test(obj.type || '') ? ['Font','Frame','Fill',...(isMemoComponent(obj)?['DisplayFormat','Highlight']:[]),'Hyperlink'] : [];
+ const advancedKinds = obj.type==='TfrxSubreport' ? ['Subreport','OpenSubreport'] : !isPage && !isDialogPage && !isBand && /View$/.test(obj.type || '') ? [...(obj.type==='TfrxChartView'?['Chart']:/^(TfrxCrossView|TfrxDBCrossView)$/.test(obj.type)?['CrossTab']:[]),'Font','Frame','Fill',...(isMemoComponent(obj)?['DisplayFormat','Highlight']:[]),'Hyperlink'] : [];
  const editorButtons = isDesignEditing && inspectorTab !== 'events' ? '<div class="fr-property-launchers">'+advancedKinds.map(kind=>'<button type="button" data-property-editor="'+kind+'">'+(kind==='Subreport'?'Alt rapor ayarları':kind==='OpenSubreport'?'Bağlı sayfayı aç':kind+'…')+'</button>').join('')+'</div>' : '';
  return editorButtons + filtered.map(p => {
  let inputControl = '';
@@ -3283,6 +3298,34 @@ function esc(str) {
    if(index<0)return window.FrpNotify?.warning('Bağlı rapor sayfası bulunamadı.');
    activePageIndex=index;selectedItem=null;selectedItems=[];render();
  }
+ function openComplexEditor(component) {
+   if(!isDesignEditing||window._isReportLockedByOther||!component)return;
+   const restrictions=String(component.restrictions||'');
+   if((/^\d+$/.test(restrictions)&&(Number(restrictions)&17))||/rfDontModify|rfDontEdit/.test(restrictions))return window.FrpNotify?.warning('Nesne düzenlemeye karşı kilitli.');
+   const chart=component.type==='TfrxChartView';
+   if(!window.FrpComplexCodec||!window.FrpComplexEditors)return window.FrpNotify?.warning('Nesne editörü yüklenemedi. Sayfayı yenileyin.');
+   let model=component._complex;
+   if(!model){
+     const node=new DOMParser().parseFromString('<'+component.type+'/>','application/xml').documentElement;
+     if(component.dataSet)node.setAttribute('DataSetName',component.dataSet);
+     model=chart?window.FrpComplexCodec.readChart(node):window.FrpComplexCodec.readCross(node);
+   }
+   if(model.reason)return window.FrpNotify?.warning('Özgün nesne korundu. '+model.reason);
+   try{
+     window.FrpComplexEditors[chart?'chart':'cross']({model,name:component.name,type:component.type,context:expressionEditorContext(),color:v=>decodeDelphiColor(v,true),toColor:hexToDelphiColor,onApply:({model:next,propData})=>{
+       if(!isDesignEditing||window._isReportLockedByOther)return false;
+       const node=new DOMParser().parseFromString('<'+component.type+'/>','application/xml').documentElement;
+       if(!chart)Object.entries(next.attrs).forEach(([key,value])=>node.setAttribute(key,String(value)));
+       node.setAttribute('PropData',propData);
+       const persisted=chart?window.FrpComplexCodec.readChart(node):window.FrpComplexCodec.readCross(node);
+       if(persisted.reason)throw new Error(persisted.reason);
+       pushUndoState();component._complex=persisted;component._complexEdited=true;
+       if(chart){const first=next.series[0];component.seriesType=first?.type||'';component.xField=first?.attrs.Source1||'';component.yField=first?.attrs.Source2||'';}
+       else {component.dataSet=next.attrs.DataSetName||next.attrs.DataSet||'';component.rowFields=next.rows.join(', ');component.columnFields=next.columns.join(', ');component.cellFields=next.cells.join(', ');component.autoSize=next.attrs.AutoSize!=='False';}
+       renderCanvasOnly();updateSelection();pushUndoState();
+     }});
+   }catch(error){window.FrpNotify?.warning('Nesne değiştirilmedi: '+error.message);}
+ }
  function openSubreportEditor(component) {
    if(!isDesignEditing||window._isReportLockedByOther||component?.type!=='TfrxSubreport')return;
    const restriction=String(component.restrictions||'');
@@ -3322,6 +3365,7 @@ function esc(str) {
 
  function openPropertyEditor(kind, component) {
    if (!isDesignEditing || !component || window._isReportLockedByOther) return;
+   if (kind === 'CrossTab' || kind === 'Chart') return openComplexEditor(component);
    if (kind === 'Subreport') return openSubreportEditor(component);
    if (kind === 'OpenSubreport') return openSubreportPage(component);
    if (component._appearanceReadOnly?.[kind]) return window.FrpNotify?.warning(component._appearanceReadOnly[kind]);
@@ -3851,7 +3895,7 @@ function esc(str) {
  if (!isDesignEditing) return;
  const activePage = allPages[activePageIndex];
  if (!activePage) return;
- if (type === 'subreport' && activePage.type !== 'report') return window.FrpNotify?.warning('Alt rapor yalnızca rapor sayfasına eklenebilir.');
+ if (['subreport','crosstab','chart'].includes(type) && activePage.type !== 'report') return window.FrpNotify?.warning('Alt rapor yalnızca rapor sayfasına eklenebilir.');
 
  pushUndoState();
 
@@ -3915,7 +3959,7 @@ function esc(str) {
  } else if (type === 'crosstab') {
  newComp = {
  name: `CrossTab${randomId}`,
- type: 'TfrxCrossView',
+ type: 'TfrxDBCrossView',
  left: 60,
  top: 30,
  width: 280,
@@ -4551,6 +4595,7 @@ function esc(str) {
    openMemoEditor(editTarget);
    return;
  }
+ if(/^(TfrxChartView|TfrxCrossView|TfrxDBCrossView)$/.test(editTarget.type))return openComplexEditor(editTarget);
  if(editTarget.type==='TfrxSubreport')return openSubreportEditor(editTarget);
  const oldText = selectedItem.text || selectedItem.caption || '';
       let newText = null;

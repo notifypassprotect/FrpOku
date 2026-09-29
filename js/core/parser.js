@@ -957,7 +957,11 @@ function parseFrp(xmlText) {
       const nodes = Array.from(appearanceDoc.getElementsByTagName('*'));
       result.pages.forEach(page => (page.bands || []).forEach(band => (band.components || []).forEach(component => {
         const node = nodes.find(n => n.nodeName === component.type && n.getAttribute('Name') === component.name);
-        if (node) Object.assign(component, readFrpAppearance(node));
+        if (node) {
+          Object.assign(component, readFrpAppearance(node));
+          if (typeof window !== 'undefined' && window.FrpComplexCodec && component.type==='TfrxChartView') component._complex=window.FrpComplexCodec.readChart(node);
+          if (typeof window !== 'undefined' && window.FrpComplexCodec && /^(TfrxCrossView|TfrxDBCrossView)$/.test(component.type)) component._complex=window.FrpComplexCodec.readCross(node);
+        }
       })));
     }
   }
@@ -1207,6 +1211,17 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
             bandNode.appendChild(componentNode);
             const textAttr = component.rawAttrs && /\bMemo\.Text\s*=/.test(component.rawAttrs) ? 'Memo.Text' : 'Text';
             writeFrpAppearance(componentNode, component);
+            if (component._complexEdited) {
+              if (!component._complex || component._complex.reason || !window.FrpComplexCodec) throw new Error('Nesnenin ikili kayıt biçimi düzenlenemiyor.');
+              const chart=component.type==='TfrxChartView';
+              const propData=chart?window.FrpComplexCodec.writeChart(component._complex):window.FrpComplexCodec.writeCross(component._complex);
+              if (!chart) {
+                if(component._complex.attrs.DataSet===undefined)componentNode.removeAttribute('DataSet');
+                const keys=['RowLevels','ColumnLevels','CellLevels','RowFields.Text','ColumnFields.Text','CellFields.Text','ShowRowTotal','ShowColumnTotal','RepeatHeaders','ShowRowHeader','ShowColumnHeader','ShowTitle','ShowCorner','AutoSize','KeepTogether','KeepRowsTogether','JoinEqualCells','SuppressNullRecords'];
+                keys.forEach(k=>{if(component._complex.attrs[k]!==undefined)componentNode.setAttribute(k,String(component._complex.attrs[k]));});
+              }
+              componentNode.setAttribute('PropData',propData);
+            }
             setAttrs(componentNode, {
               Left: component.left, Top: synthetic ? Number(component.top || 0) + Number(band.top || 0) : component.top, Width: component.width, Height: component.height,
               [textAttr]: component.text, 'Font.Name': component.fontName,
@@ -1239,6 +1254,11 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
               OnEnter: component.onEnter, OnExit: component.onExit, OnKeyDown: component.onKeyDown,
               OnAfterData: component.onAfterData, OnAfterCalcHeight: component.onAfterCalcHeight
             });
+            if(component._complexEdited){
+              // VCL reads attributes in order: dimensions must precede the embedded templates.
+              const propData=componentNode.getAttribute('PropData');
+              componentNode.removeAttribute('PropData');componentNode.setAttribute('PropData',propData);
+            }
           });
 
           // Tasarımda silinen bileşenleri XML band düğümünden kaldır
@@ -1324,6 +1344,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
       const verifyElements = verifyDoc.querySelector('parsererror') ? [] : Array.from(verifyDoc.getElementsByTagName('*'));
       const missingProtected = protectedNamedNodes.filter(item => !verifyElements.some(node => node.nodeName === item.type && (node.getAttribute('Name') === item.name || node.getAttribute('UserName') === item.name)));
       if (missingProtected.length > 0) {
+        if ((file.pages||[]).some(p=>(p.bands||[]).some(b=>(b.components||[]).some(c=>c._complexEdited||c._highlightsEdited||c._subreportEdited||Object.keys(c._appearanceEdits||{}).length)))) throw new Error('FRP güvenlik koruması: özel XML içeriği etkileniyor; kayıt uygulanmadı.');
         if (file.variablesEdited === true) throw new Error('Değişken kaydı bilinmeyen XML içeriğini etkiliyor; özgün FRP korundu.');
         console.warn('FRP güvenlik koruması: desteklenmeyen düğüm kaybı engellendi.', missingProtected);
         if (typeof window !== 'undefined') window.FrpNotify?.warning?.('FRP içindeki özel bileşenler korundu; güvenli olmayan tasarım değişikliği uygulanmadı.');
@@ -1334,7 +1355,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
       }
     }
   } catch (error) {
-    if ((file.pages || []).some(p => (p.bands || []).some(b => (b.components || []).some(c => c._subreportEdited || c._highlightsEdited || Object.keys(c._appearanceEdits || {}).length)))) throw error;
+    if ((file.pages || []).some(p => (p.bands || []).some(b => (b.components || []).some(c => c._complexEdited || c._subreportEdited || c._highlightsEdited || Object.keys(c._appearanceEdits || {}).length)))) throw error;
     if (file.variablesEdited === true) throw error;
     console.warn('FRP XML model senkronizasyonu başarısız:', error.message);
   }
