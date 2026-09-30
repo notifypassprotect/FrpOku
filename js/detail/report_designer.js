@@ -437,6 +437,7 @@ function esc(str) {
  let showInspector = !window.matchMedia('(max-width: 768px)').matches;
  let rightTab = 'inspector'; // 'inspector' | 'datatree'
  let inspectorSearchQuery = '';
+ const inspectorClosedGroups = new Set();
  let inspectorTab = 'properties'; // 'properties' | 'events' | 'favorites'
  let inspectorWidth = parseInt(localStorage.getItem('frp_inspector_width_v2') || '292', 10);
  let designerKeydownHandler = null;
@@ -1338,7 +1339,7 @@ function esc(str) {
  <div class="designer-comp-palette" role="toolbar" aria-label="Rapor araçları">
  <div class="designer-tool-group"><span class="designer-tool-label">Rapor</span> <button type="button" class="designer-palette-btn" id="btnPageSettings" ${allPages[activePageIndex]?.type !== 'report' ? 'disabled' : ''}>Sayfa Ayarları</button>
  <button type="button" class="designer-palette-btn" id="btnReportSettings">Rapor Ayarları</button>
- <button type="button" class="designer-palette-btn" id="btnVariablesEditor">Variables</button>
+ <button type="button" class="designer-palette-btn" id="btnVariablesEditor">Değişkenler</button>
 </div>
  <div class="designer-tool-group"><span class="designer-tool-label">Nesneler</span>
  <button type="button" class="designer-palette-btn" id="btnToolAddMemo" title="Yeni Metin / Memo Ekle">Memo</button>
@@ -1405,14 +1406,14 @@ function esc(str) {
  <button type="button" class="designer-zoom-btn ${gridSnapStep > 1 ? 'active' : ''}" id="btnToggleGridSnap" title="Izgaraya yapışma: 4 / 8 / 12 px. Sürüklerken Alt ile geçici olarak kapatın." style="margin-left:.25rem;font-size:.75rem;padding:0 8px;">Izgara · ${gridSnapStep > 1 ? gridSnapStep + ' px' : 'Serbest'}</button>
  </div>
 
- <button type="button" class="btn btn-sm ${showReportTree ? 'btn-primary' : 'btn-ghost'}" id="btnToggleReportTree" aria-pressed="${showReportTree}" style="padding:.24rem.55rem;font-size:.74rem">Report Tree</button>
+ <button type="button" class="btn btn-sm ${showReportTree ? 'btn-primary' : 'btn-ghost'}" id="btnToggleReportTree" aria-pressed="${showReportTree}" style="padding:.24rem.55rem;font-size:.74rem">Rapor yapısı</button>
  <!-- Sağ Panel Sekmeleri: Inspector vs Data Tree -->
  <div style="display:flex;align-items:center;background:var(--bg-raised);padding:2px;border-radius:6px;border:1px solid var(--border-light);">
  <button type="button" class="btn btn-sm ${rightTab === 'inspector' && showInspector? 'btn-primary': 'btn-ghost'}" id="btnTabInspector" style="padding:.24rem.55rem;font-size:.74rem;">
- Object Inspector
+ Özellikler
  </button>
  <button type="button" class="btn btn-sm ${rightTab === 'datatree' && showInspector? 'btn-primary': 'btn-ghost'}" id="btnTabDataTree" style="padding:.24rem.55rem;font-size:.74rem;">
- Data Tree
+ Veri ağacı
  </button>
  </div>
  </div>
@@ -1479,7 +1480,7 @@ function esc(str) {
  <!-- DATA TREE (Images 1, 2, 3) -->
  <div class="designer-inspector-header">
  <div class="designer-inspector-title">
- <span>Data Tree (Veri Ağacı)</span>
+ <span>Veri ağacı</span>
  </div>
  <button type="button" class="designer-inspector-close-btn" id="btnCollapseInspector" title="Kapat">✕</button>
  </div>
@@ -3230,8 +3231,19 @@ function esc(str) {
 : propList;
 
  const advancedKinds = obj.type==='TfrxTableObject'?['Table']:obj.type==='TfrxSubreport' ? ['Subreport','OpenSubreport'] : !isPage && !isDialogPage && !isBand && /View$/.test(obj.type || '') ? [...(obj.type==='TfrxChartView'?['Chart']:/^(TfrxCrossView|TfrxDBCrossView)$/.test(obj.type)?['CrossTab']:[]),'Font','Frame','Fill',...(isMemoComponent(obj)?['DisplayFormat','Highlight']:[]),'Hyperlink'] : [];
- const editorButtons = isDesignEditing && inspectorTab !== 'events' ? '<div class="fr-property-launchers">'+advancedKinds.map(kind=>'<button type="button" data-property-editor="'+kind+'">'+(kind==='Subreport'?'Alt rapor ayarları':kind==='OpenSubreport'?'Bağlı sayfayı aç':kind+'…')+'</button>').join('')+'</div>' : '';
- return editorButtons + filtered.map(p => {
+ const editorLabels = {Font:'Yazı tipi',Frame:'Çerçeve',Fill:'Dolgu',DisplayFormat:'Sayı biçimi',Highlight:'Koşullu vurgu',Hyperlink:'Bağlantı',Table:'Tablo',Chart:'Grafik',CrossTab:'Çapraz tablo',Subreport:'Alt rapor ayarları',OpenSubreport:'Bağlı sayfayı aç'};
+ const editorButtons = isDesignEditing && inspectorTab !== 'events' && advancedKinds.length ? '<div class="fr-property-launchers" aria-label="Gelişmiş düzenleyiciler">'+advancedKinds.map(kind=>'<button type="button" title="'+editorLabels[kind]+' düzenleyicisi" data-property-editor="'+kind+'">'+editorLabels[kind]+'</button>').join('')+'</div>' : '';
+ if (!filtered.length) return editorButtons + '<div class="designer-prop-empty" role="status"><strong>Eşleşen özellik yok</strong><span>Başka bir özellik adı veya değer arayın.</span></div>';
+ const propertyGroup = p => {
+   if(inspectorTab==='events') return 'Olaylar';
+   if(/^(Name|Class)$/.test(p.name)) return 'Kimlik';
+   if(/^(Data|Expression|Caption|Text|Condition|SQL|SysData|Picture.File|FileLink)/.test(p.name)) return 'Veri ve içerik';
+   if(/^(Font|Frame|Fill|Color|Brush|HAlign|VAlign|DisplayFormat|Highlight|Shape|Gradient|Rotation|CharSpacing|LineSpacing|ParagraphGap|Gap)/.test(p.name)) return 'Görünüm';
+   if(/^(Left|Top|Width|Height|Align|Paper|Orientation|.*Margin|Columns|ColumnWidth|ColumnPositions|Zoom)/.test(p.name)) return 'Konum ve boyut';
+   if(/^(Print|Reprint|StartNewPage|Keep|AllowSplit|RowCount|ResetPage|FooterAfter|TitleBefore)/.test(p.name)) return 'Baskı';
+   return 'Davranış';
+ };
+ const renderedRows = filtered.map(p => {
  let inputControl = '';
  if (p.isColor) {
  const cInfo = delphiColorToRgb(p.rawVal || p.val, true);
@@ -3285,6 +3297,12 @@ function esc(str) {
  </div>
  </div>
  `;
+ });
+ const groupOrder = ['Kimlik','Konum ve boyut','Veri ve içerik','Görünüm','Davranış','Baskı','Olaylar'];
+ return editorButtons + groupOrder.map(group => {
+   const rows = renderedRows.filter((_, index) => propertyGroup(filtered[index]) === group);
+   if(!rows.length) return '';
+   return `<details class="designer-prop-group" data-prop-group="${group}" ${inspectorSearchQuery || !inspectorClosedGroups.has(group) ? 'open' : ''}><summary><span>${group}</span><small>${rows.length}</small></summary>${rows.join('')}</details>`;
  }).join('');
  }
 
@@ -3550,6 +3568,13 @@ function esc(str) {
 
  // ── OBJECT INSPECTOR CANLI DÜZENLEME DİNLEYİCİSİ ──────────
  function bindInspectorInputs() {
+ containerEl.querySelectorAll('[data-prop-group]').forEach(group => {
+   group.ontoggle = () => {
+     if(inspectorSearchQuery || !group.isConnected) return;
+     if(group.open) inspectorClosedGroups.delete(group.dataset.propGroup);
+     else inspectorClosedGroups.add(group.dataset.propGroup);
+   };
+ });
  if (!isDesignEditing || !(selectedItem || allPages[activePageIndex]?.data)) return;
 
  const propTable = containerEl.querySelector('#propTableBody');
