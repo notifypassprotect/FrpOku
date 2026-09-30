@@ -5885,6 +5885,11 @@ function esc(str) {
  switchDialogTab: window.switchDialogTab,
  copyDataTreeField: window.copyDataTreeField
  };
+ // BANT, MEMO (TfrxMemoView), VE DİĞER BİLEŞENLERİN TÜM DELPHI ÖZELLİKLERİ
+ // Caption / Text
+ // selectedItem.memo = val;
+ const _legacyMemoCompat = {
+ };
 
 })(window);
 

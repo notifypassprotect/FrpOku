@@ -5,143 +5,168 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FrpOku — İstatistik Paneli</title>
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet" />
  <link rel="stylesheet" href="css/style.css?v=5.10.1" />
  <link rel="stylesheet" href="css/themes.css?v=5.2" />
  <link rel="stylesheet" href="css/list.css?v=5.3" />
-  <link rel="stylesheet" href="css/ui_polish.css?v=5.23.1" />
+  <link rel="stylesheet" href="css/ui_polish.css?v=5.25.0" />
  <script src="js/core/theme_bootstrap.js?v=4.4"></script>
  <style>
- body { margin: 0; overflow: auto; }
+ body { margin: 0; overflow: auto; background: var(--bg-app); font-family: var(--font); }
 .dash-wrap {
- max-width: 1400px; margin: 0 auto;
- padding: 1.5rem;
- display: flex; flex-direction: column; gap: 1.5rem;
+ max-width: 1440px; margin: 0 auto;
+ padding: 2rem 1.5rem;
+ display: flex; flex-direction: column; gap: 2rem;
  }
 
  /* Header */
 .dash-header {
  display: flex; align-items: center; justify-content: space-between;
- gap: 1rem; flex-wrap: wrap;
+ gap: 1.25rem; flex-wrap: wrap;
+ padding-bottom: 0.5rem;
+ border-bottom: 1px solid var(--ui-border-subtle);
  }
-.dash-title { font-size: 1.5rem; font-weight: 800; color: var(--text-primary); }
-.dash-sub { font-size:.82rem; color: var(--text-muted); margin-top:.15rem; }
+.dash-title { font-size: 1.65rem; font-weight: 800; color: var(--text-primary); letter-spacing: -0.025em; }
+.dash-sub { font-size: .84rem; color: var(--text-muted); margin-top: .2rem; }
 
  /* Summary cards */
 .dash-cards {
  display: grid;
- grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
- gap: 1rem;
+ grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+ gap: 1.25rem;
  }
 .dash-card {
  background: var(--bg-surface);
- border: 1px solid var(--border-light);
- border-radius: 14px;
- padding: 1.2rem 1rem 1rem;
+ border: 1px solid var(--ui-border-subtle);
+ border-radius: 16px;
+ padding: 1.4rem 1.25rem 1.25rem;
  box-shadow: var(--shadow-sm);
- display: flex; flex-direction: column; gap:.3rem;
+ display: flex; flex-direction: column; gap: .35rem;
  position: relative; overflow: hidden;
+ transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+ }
+.dash-card:hover {
+ transform: translateY(-3px);
+ box-shadow: var(--shadow-md);
+ border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
  }
 .dash-card::before {
  content: '';
- position: absolute; top: 0; left: 0; right: 0; height: 3px;
- background: var(--card-accent, var(--accent));
+ position: absolute; top: 0; left: 0; right: 0; height: 4px;
+ background: linear-gradient(90deg, var(--card-accent, var(--accent)), #6366f1);
+ border-radius: 4px 4px 0 0;
  }
-.dash-card-icon { font-size: 1.8rem; }
-.dash-card-value { font-size: 2rem; font-weight: 800; color: var(--text-primary); }
-.dash-card-label { font-size:.72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing:.05em; }
-.dash-card-trend { font-size:.72rem; color: var(--green); margin-top:.1rem; }
+.dash-card-icon { font-size: 1.85rem; margin-bottom: .2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.06)); }
+.dash-card-value { font-size: 2.2rem; font-weight: 800; color: var(--text-primary); letter-spacing: -0.03em; font-feature-settings: "tnum"; }
+.dash-card-label { font-size: .74rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.dash-card-trend { font-size: .74rem; color: var(--green); margin-top: .15rem; font-weight: 600; display: flex; align-items: center; gap: .25rem; }
 
  /* Chart grid */
 .dash-charts {
  display: grid;
- grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+ grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
  gap: 1.5rem;
  }
 .chart-box {
  background: var(--bg-surface);
- border: 1px solid var(--border-light);
- border-radius: 14px;
- padding: 1.25rem;
+ border: 1px solid var(--ui-border-subtle);
+ border-radius: 16px;
+ padding: 1.5rem;
  box-shadow: var(--shadow-sm);
+ transition: box-shadow 0.2s ease, border-color 0.2s ease;
+ }
+.chart-box:hover {
+ box-shadow: var(--shadow-md);
+ border-color: color-mix(in srgb, var(--accent) 25%, var(--border));
  }
 .chart-title {
- font-size:.9rem; font-weight: 700; color: var(--text-primary);
- margin-bottom: 1rem; display: flex; align-items: center; gap:.4rem;
+ font-size: .95rem; font-weight: 750; color: var(--text-primary);
+ margin-bottom: 1.25rem; display: flex; align-items: center; gap: .5rem;
+ letter-spacing: -0.01em;
  }
 .chart-canvas { width: 100%!important; }
 
  /* Gösterge tablosundaki tablolar */
 .dash-table-wrap {
  background: var(--bg-surface);
- border: 1px solid var(--border-light);
- border-radius: 14px;
+ border: 1px solid var(--ui-border-subtle);
+ border-radius: 16px;
  overflow: hidden;
  box-shadow: var(--shadow-sm);
  }
 .dash-table-header {
- padding: 1rem 1.25rem;
- font-weight: 700; font-size:.9rem;
- border-bottom: 1px solid var(--border);
+ padding: 1.1rem 1.35rem;
+ font-weight: 750; font-size: .92rem;
+ border-bottom: 1px solid var(--ui-border-subtle);
  background: var(--bg-raised);
+ color: var(--text-primary);
+ letter-spacing: -0.01em;
  }
 .dash-tbl {
- width: 100%; border-collapse: collapse; font-size:.82rem;
+ width: 100%; border-collapse: collapse; font-size: .84rem;
  }
 .dash-tbl th {
- text-align: left; padding:.55rem 1rem;
+ text-align: left; padding: .75rem 1.15rem;
  background: var(--bg-raised);
- font-size:.72rem; font-weight: 700; text-transform: uppercase;
- letter-spacing:.04em; color: var(--text-muted);
- border-bottom: 1px solid var(--border);
+ font-size: .72rem; font-weight: 750; text-transform: uppercase;
+ letter-spacing: .06em; color: var(--text-muted);
+ border-bottom: 1px solid var(--ui-border-subtle);
  }
 .dash-tbl td {
- padding:.55rem 1rem;
- border-bottom: 1px solid var(--border-light);
+ padding: .75rem 1.15rem;
+ border-bottom: 1px solid var(--ui-border-subtle);
  color: var(--text-primary);
+ font-feature-settings: "tnum";
  }
 .dash-tbl tr:last-child td { border-bottom: none; }
-.dash-tbl tr:hover td { background: var(--bg-raised); }
+.dash-tbl tr:hover td { background: color-mix(in srgb, var(--accent-light) 65%, var(--bg-surface)); }
 
  /* Progress bar */
-.pbar-wrap { display: flex; align-items: center; gap:.5rem; }
+.pbar-wrap { display: flex; align-items: center; gap: .6rem; }
 .pbar {
- flex: 1; height: 6px; background: var(--border);
- border-radius: 3px; overflow: hidden;
+ flex: 1; height: 7px; background: var(--border-light);
+ border-radius: 4px; overflow: hidden;
  }
-.pbar-fill { height: 100%; border-radius: 3px; transition: width.4s ease; }
+.pbar-fill { height: 100%; border-radius: 4px; transition: width .4s cubic-bezier(0.16, 1, 0.3, 1); }
 
  /* Health distribution */
 .health-dist {
- display: flex; gap:.5rem; flex-wrap: wrap;
+ display: flex; gap: .75rem; flex-wrap: wrap;
  }
 .health-dist-item {
- flex: 1; min-width: 70px;
+ flex: 1; min-width: 80px;
  background: var(--bg-raised);
- border-radius: 10px; padding:.7rem;
+ border-radius: 12px; padding: .85rem .75rem;
  text-align: center;
- border: 1px solid var(--border-light);
+ border: 1px solid var(--ui-border-subtle);
+ transition: transform 0.18s ease;
  }
-.health-dist-score { font-size: 1.4rem; font-weight: 800; }
-.health-dist-count { font-size:.82rem; color: var(--text-muted); }
-.health-dist-label { font-size:.7rem; color: var(--text-muted); }
+.health-dist-item:hover { transform: translateY(-2px); }
+.health-dist-score { font-size: 1.5rem; font-weight: 800; font-feature-settings: "tnum"; }
+.health-dist-count { font-size: .84rem; color: var(--text-muted); font-weight: 600; margin-top: .15rem; }
+.health-dist-label { font-size: .72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
 .dash-action-btn {
- display: inline-flex; align-items: center; gap:.45rem;
- padding:.5rem 1.1rem; border-radius: 10px; font-weight: 700; font-size:.84rem;
- border: 1px solid var(--border-light); cursor: pointer; transition: all.2s ease;
+ display: inline-flex; align-items: center; gap: .45rem;
+ padding: .45rem 1rem; border-radius: 10px; font-weight: 700; font-size: .84rem;
+ border: 1px solid var(--ui-border-subtle); cursor: pointer; transition: all .2s cubic-bezier(0.16, 1, 0.3, 1);
  background: var(--bg-surface); color: var(--text-primary);
  box-shadow: var(--shadow-sm);
  }
 .dash-action-btn:hover {
- transform: translateY(-1px); box-shadow: var(--shadow-md);
+ transform: translateY(-1.5px); box-shadow: var(--ui-shadow-lift);
  border-color: var(--accent); color: var(--accent);
  }
 .dash-action-btn.back-btn {
- background: linear-gradient(135deg, var(--accent), #2563eb);
- color: #fff; border: none;
+ background: linear-gradient(135deg, var(--accent), #1d4ed8);
+ color: #fff; border: 1px solid color-mix(in srgb, var(--accent) 80%, #fff);
+ box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 30%, transparent);
  }
 .dash-action-btn.back-btn:hover {
- background: linear-gradient(135deg, #2563eb, #1d4ed8);
+ background: linear-gradient(135deg, #2563eb, #1e40af);
  color: #fff;
+ box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 42%, transparent);
  }
 
  /* Responsive */
@@ -189,10 +214,16 @@
         <div class="brand-sub">FrpOku Analiz Merkezi</div>
       </div>
     </div>
- <div class="topbar-right" style="display:flex;align-items:center;gap:.75rem;">
- <button class="dash-action-btn" id="btnRefresh"> Yenile</button>
- <button class="dash-action-btn back-btn" data-dashboard-action="open-index">⬅️ Listeye Dön</button>
- </div>
+  <div class="topbar-right" style="display:flex;align-items:center;gap:.75rem;">
+    <button class="dash-action-btn" id="btnRefresh">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+      <span>Yenile</span>
+    </button>
+    <button class="dash-action-btn back-btn" data-dashboard-action="open-index">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      <span>Listeye Dön</span>
+    </button>
+  </div>
  </nav>
 
  <div class="dash-wrap" id="dashWrap">

@@ -160,14 +160,16 @@ function readFrpVariables(xmlText) {
   if (!xmlText) return {categories:[],editable:true};
   const doc = new P().parseFromString(xmlText,'application/xml');
   if (doc.querySelector('parsererror')) return {categories:[],editable:false,reason:'FRP XML okunamadı.'};
-  const blocks = Array.from(doc.documentElement.children).filter(n=>n.nodeName==='Variables');
+  const rootNodes = doc.documentElement?.children || doc.documentElement?.childNodes || [];
+  const blocks = Array.from(rootNodes).filter(n => n.nodeName === 'Variables');
   if (blocks.length>1) return {categories:[],editable:false,reason:'Birden çok Variables bloğu var; özgün yapı korunuyor.'};
   if (!blocks.length) {
-    const legacy=doc.documentElement.hasAttribute('Variables') || doc.documentElement.hasAttribute('Variables.Text') || doc.getElementsByTagName('TfrxVariable').length;
+    const legacy=doc.documentElement?.hasAttribute?.('Variables') || doc.documentElement?.hasAttribute?.('Variables.Text') || doc.getElementsByTagName('TfrxVariable').length;
     return {categories:[],editable:!legacy,reason:legacy?'Bu değişken biçimi henüz düzenlenemiyor; özgün içerik korunuyor.':''};
   }
   const categories=[], names=new Set(), categoryNames=new Set(); let category=null,reason='';
-  Array.from(blocks[0].children).forEach((node,index)=>{
+  const varNodes = blocks[0]?.children || blocks[0]?.childNodes || [];
+  Array.from(varNodes).forEach((node,index)=>{
     if(node.nodeName!=='item'||!node.hasAttribute('Name'))return;
     const raw=node.getAttribute('Name'),name=raw.trim();
     if(!name){reason='Adsız değişken veya kategori var; özgün yapı korunuyor.';return;}
@@ -981,20 +983,22 @@ const FRP_APPEARANCE_FIELDS = {
 };
 function readFrpAppearance(node) {
  const attrs={};
- Array.from(node.attributes||[]).forEach(a=>{if(/^(Font\.|Frame\.|Fill\.|FillType$|DisplayFormat\.|Hyperlink\.)/.test(a.name))attrs[a.name]=a.value;});
- const blocks=Array.from(node.children||[]).filter(n=>n.nodeName==='Highlights');
+ Array.from(node.attributes||[]).forEach(a=>{if(a?.name && /^(Font\.|Frame\.|Fill\.|FillType$|DisplayFormat\.|Hyperlink\.)/.test(a.name))attrs[a.name]=a.value;});
+ const childNodes = node?.children || node?.childNodes || [];
+ const blocks = Array.from(childNodes).filter(n => n.nodeName === 'Highlights');
  const rules=[];
  let reason='';
- if(node.hasAttribute('Highlights')||blocks.length>1)reason='Bu Highlight saklama biçimi henüz düzenlenemiyor; özgün içerik korunuyor.';
+ if((node?.hasAttribute && node.hasAttribute('Highlights')) || blocks.length > 1) reason='Bu Highlight saklama biçimi henüz düzenlenemiyor; özgün içerik korunuyor.';
  if(blocks.length){
-   if(Array.from(blocks[0].children).some(n=>n.nodeName!=='item'))reason='Tanınmayan Highlight öğeleri korunuyor; bu yapı salt okunur.';
-   Array.from(blocks[0].children).filter(n=>n.nodeName==='item').forEach(n=>rules.push({attrs:Object.fromEntries(Array.from(n.attributes).map(a=>[a.name,a.value])),xml:new XMLSerializer().serializeToString(n)}));
+   const blockKids = blocks[0]?.children || blocks[0]?.childNodes || [];
+   if(Array.from(blockKids).some(n=>n.nodeName!=='item'))reason='Tanınmayan Highlight öğeleri korunuyor; bu yapı salt okunur.';
+   Array.from(blockKids).filter(n=>n.nodeName==='item').forEach(n=>rules.push({attrs:Object.fromEntries(Array.from(n.attributes||[]).filter(a=>a?.name).map(a=>[a.name,a.value])),xml:new XMLSerializer().serializeToString(n)}));
  } else {
    const legacy={};
-   Array.from(node.attributes||[]).forEach(a=>{if(a.name.startsWith('Highlight.'))legacy[a.name.slice(10)]=a.value;});
+   Array.from(node.attributes||[]).forEach(a=>{if(a?.name && a.name.startsWith('Highlight.'))legacy[a.name.slice(10)]=a.value;});
    if(Object.keys(legacy).length)rules.push({attrs:legacy});
  }
- const formatCollection=node.hasAttribute('Formats')||Array.from(node.children||[]).some(n=>n.nodeName==='Formats');
+ const formatCollection=(node?.hasAttribute && node.hasAttribute('Formats'))||Array.from(node?.children||node?.childNodes||[]).some(n=>n.nodeName==='Formats');
  return {_appearance:attrs,_appearanceReadOnly:formatCollection?{DisplayFormat:'Bu nesnede birden çok ifade için Formats koleksiyonu var. Özgün biçimler korunuyor; tek biçim editörü bu yapıyı değiştiremez.'}:{},_highlights:{rules,collection:blocks.length>0,reason}};
 }
 function writeFrpAppearance(node,model) {
@@ -1105,7 +1109,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
         if (original && attrText(value) === attrText(original[key])) return;
         if (value !== undefined && value !== null) node.setAttribute(key, typeof value === 'boolean' ? (value ? 'True' : 'False') : String(value));
       });
-      const originalNodes = new Map(elements().filter(node => node.hasAttribute('Name')).map(node => [node.nodeName + '\\0' + node.getAttribute('Name'), node]));
+      const originalNodes = new Map(elements().filter(node => node && typeof node.hasAttribute === 'function' && node.hasAttribute('Name')).map(node => [node.nodeName + '\\0' + node.getAttribute('Name'), node]));
       const ensureNode = (model, parent) => {
         if (!model?.name || !model?.type) return null;
         let node = model._sourceName && model._sourceName !== model.name ?
@@ -1348,8 +1352,9 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
       const referenceAttrs = new Set(['page', 'flowto', 'child', 'parent', 'subreportpage']);
       elements().forEach(node => {
         Array.from(node.attributes || []).forEach(attr => {
+          if (!attr?.value || typeof attr.value !== 'string') return;
           const replacement = renamedObjects.get(attr.value.toLowerCase());
-          if (replacement && referenceAttrs.has(attr.name.toLowerCase())) node.setAttribute(attr.name, replacement);
+          if (replacement && attr.name && referenceAttrs.has(attr.name.toLowerCase())) node.setAttribute(attr.name, replacement);
         });
       });
       if (renamedObjects.size && root.hasAttribute('ScriptText.Text'))

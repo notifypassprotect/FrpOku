@@ -177,8 +177,11 @@ function registerReportNoteRoutes(app, deps) {
 
       const extension = path.extname(filename).slice(1).toLowerCase();
       const contentType = attachmentMimeTypes[extension] || 'application/octet-stream';
-      const displayName = filename.replace(/^\d+_/, '').replace(/["\\\r\n]/g, '_');
-      res.setHeader('Content-Disposition', `inline; filename="${displayName}"; filename*=UTF-8''${encodeURIComponent(displayName)}`);
+      if (req.query.download === '1') {
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+      } else {
+        res.setHeader('Content-Disposition', `inline; filename="${displayName}"; filename*=UTF-8''${encodeURIComponent(displayName)}`);
+      }
       res.setHeader('Content-Type', contentType);
       res.setHeader('Cache-Control', 'private, no-store');
       res.setHeader('X-Content-Type-Options', 'nosniff');

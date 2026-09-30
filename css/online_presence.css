@@ -939,7 +939,7 @@
 .frp-chat-window {
   position: fixed;
   bottom: 14px;
-  width: min(380px, calc(100vw - 32px));
+  width: min(410px, calc(100vw - 32px));
   height: min(700px, calc(100vh - 28px));
   max-height: calc(100vh - 28px);
   background: var(--bg-surface, #ffffff);
@@ -1988,20 +1988,27 @@
 .frp-chat-input {
   display: block;
   width: 100%;
+  min-width: 120px;
   min-height: 38px;
   max-height: 112px;
-  padding: 0.52rem 2.8rem 0.52rem 0.62rem;
-  font-size: 0.8rem;
+  padding: 0.52rem 0.75rem;
+  font-size: 0.82rem;
   line-height: 1.35;
   border-radius: 18px;
-  border: 0;
-  background: transparent;
+  border: 0 !important;
+  background: transparent !important;
   color: var(--text-primary, #0f172a);
   outline: none;
   resize: none;
   overflow-y: auto;
   box-sizing: border-box;
   font-family: inherit;
+  white-space: normal;
+  word-break: normal;
+}
+
+.frp-chat-composer-field:has(.frp-chat-char-count:not([hidden])) .frp-chat-input {
+  padding-right: 2.6rem;
 }
 
 .frp-chat-input:focus {

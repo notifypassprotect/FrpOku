@@ -2022,7 +2022,7 @@
       return;
     }
     const href = `https://fonts.googleapis.com/css2?${selected.map(value => `family=${value}`).join('&')}&display=swap`;
-    if (existing?.href === href) return;
+    if (typeof document?.createElement !== 'function' || !document?.head?.appendChild) return;
     const link = existing || document.createElement('link');
     link.id = 'frpokuSelectedFonts';
     link.rel = 'stylesheet';

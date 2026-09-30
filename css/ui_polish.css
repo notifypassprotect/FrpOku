@@ -1,16 +1,16 @@
 /* FrpOku ortak görsel sistem — tüm uygulama sayfaları */
 :root {
-  --ui-radius-sm: 7px;
-  --ui-radius-md: 10px;
-  --ui-radius-lg: 12px;
-  --ui-radius-xl: 16px;
+  --ui-radius-sm: 8px;
+  --ui-radius-md: 12px;
+  --ui-radius-lg: 14px;
+  --ui-radius-xl: 18px;
   --ui-control-h: 38px;
-  --ui-focus: 0 0 0 3px rgba(37, 99, 235, 0.17);
-  --ui-shadow-soft: 0 1px 3px rgba(15, 23, 42, 0.035);
-  --ui-shadow-lift: 0 2px 8px rgba(15, 23, 42, 0.06);
-  --ui-shadow-panel: 0 1px 3px rgba(15, 23, 42, 0.04);
-  --ui-border-subtle: color-mix(in srgb, var(--border) 76%, transparent);
-  --ui-surface-glass: var(--bg-surface);
+  --ui-focus: 0 0 0 3px rgba(37, 99, 235, 0.22);
+  --ui-shadow-soft: 0 1px 3px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03);
+  --ui-shadow-lift: 0 6px 20px -4px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+  --ui-shadow-panel: 0 4px 16px -2px rgba(15, 23, 42, 0.06);
+  --ui-border-subtle: color-mix(in srgb, var(--border) 60%, transparent);
+  --ui-surface-glass: color-mix(in srgb, var(--bg-surface) 86%, transparent);
 }
 
 /* Görünüm ayarları gerçek bir ölçek sistemi olarak çalışır. Rem tabanlı
@@ -72,8 +72,11 @@ textarea:focus-visible {
 
 .topbar,
 .cmp-topbar {
-  border-bottom-color: var(--ui-border-subtle) !important;
-  box-shadow: none !important;
+  background: var(--ui-surface-glass) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border-bottom: 1px solid var(--ui-border-subtle) !important;
+  box-shadow: 0 2px 12px -2px rgba(15, 23, 42, 0.04) !important;
 }
 
 .topbar .brand,
@@ -95,7 +98,7 @@ textarea:focus-visible {
   border-radius: var(--ui-radius-sm) !important;
   font-weight: var(--bold-weight, 700);
   line-height: 1.15;
-  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease !important;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
 .btn:not(:disabled):hover,
@@ -104,7 +107,8 @@ textarea:focus-visible {
 .workspace-tab-btn:not(:disabled):hover,
 .filter-chip:not(:disabled):hover,
 .mobile-drawer-item:not(:disabled):hover {
-  transform: none;
+  transform: translateY(-1.5px);
+  box-shadow: var(--ui-shadow-lift);
 }
 
 .btn:not(:disabled):active,
@@ -113,7 +117,7 @@ textarea:focus-visible {
 .workspace-tab-btn:not(:disabled):active,
 .filter-chip:not(:disabled):active,
 .mobile-drawer-item:not(:disabled):active {
-  transform: none;
+  transform: translateY(0) scale(0.98);
 }
 
 button:disabled,
@@ -126,10 +130,16 @@ button:disabled,
 .btn-primary,
 .dash-action-btn.back-btn,
 .view-btn.active {
-  background: var(--accent, #2563eb) !important;
-  border-color: transparent !important;
+  background: linear-gradient(135deg, var(--accent) 0%, #1d4ed8 100%) !important;
+  border-color: color-mix(in srgb, var(--accent) 80%, #fff) !important;
   color: #fff !important;
-  box-shadow: none !important;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 32%, transparent) !important;
+}
+
+.btn-primary:hover,
+.dash-action-btn.back-btn:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%) !important;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 44%, transparent) !important;
 }
 
 .btn-danger, .btn-success { box-shadow: none; }
@@ -165,9 +175,10 @@ select:focus {
 .workspace-bar,
 .toolbar,
 .cmp-selector-bar {
-  background: var(--bg-surface) !important;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  background: var(--ui-surface-glass) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border-bottom: 1px solid var(--ui-border-subtle) !important;
 }
 
 .workspace-switcher,
@@ -186,7 +197,7 @@ select:focus {
 .detail-group-card,
 .modal,
 .cmp-picker-modal {
-  border-color: color-mix(in srgb, var(--border) 88%, transparent) !important;
+  border-color: var(--ui-border-subtle) !important;
   box-shadow: var(--ui-shadow-soft) !important;
 }
 
@@ -248,9 +259,9 @@ html[data-ui-scale="micro"][data-density="minimal"] :is(.badge, .tag-pill, .pool
 .dash-card:hover,
 .chart-box:hover,
 .detail-group-card:hover {
-  border-color: color-mix(in srgb, var(--accent) 28%, var(--border)) !important;
-  box-shadow: var(--ui-shadow-soft) !important;
-  transform: none;
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border)) !important;
+  box-shadow: 0 10px 25px -4px rgba(15, 23, 42, 0.08), 0 4px 10px -2px rgba(15, 23, 42, 0.04) !important;
+  transform: translateY(-2px);
 }
 
 .dash-card,
@@ -283,14 +294,14 @@ html[data-ui-scale="micro"][data-density="minimal"] :is(.badge, .tag-pill, .pool
 .cmp-pane { background: var(--bg-surface); }
 
 .modal-overlay {
-  background: rgba(15, 23, 42, 0.48) !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
+  background: rgba(15, 23, 42, 0.55) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
 }
 
 .modal {
   border-radius: var(--ui-radius-lg) !important;
-  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.14) !important;
+  box-shadow: 0 20px 50px -10px rgba(15, 23, 42, 0.25), 0 10px 20px -5px rgba(15, 23, 42, 0.1) !important;
 }
 
 .modal-title { letter-spacing: -0.02em; }
@@ -1572,13 +1583,103 @@ select:hover {
 .designer-root .designer-prop-name { color: var(--text-secondary) !important; border-right-color: var(--ui-border-subtle) !important; }
 .designer-root .designer-prop-val { color: var(--text-primary) !important; }
 
-@media (min-width: 861px) and (max-width: 1280px) {
-  .topbar:has(.detail-topbar-left) { height: auto; min-height: 58px; padding-block: .5rem; flex-wrap: wrap; row-gap: .45rem; }
-  .topbar .detail-topbar-left { flex: 1 1 100%; }
-  .topbar:has(.detail-topbar-left) .topbar-right { min-width: 0; flex: 1 1 100%; justify-content: flex-end; }
-  .topbar .code-search-box { margin-right: auto; }
-  .designer-root .designer-page-tabs { max-width: 36vw; }
+.topbar:has(.detail-topbar-left) {
+  min-height: 58px !important;
+  height: 58px !important;
+  max-height: 58px !important;
+  overflow: hidden !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 0.75rem !important;
+  flex-wrap: nowrap !important;
 }
+.detail-topbar-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  flex-shrink: 0 !important;
+  min-width: 0 !important;
+}
+.topbar:has(.detail-topbar-left) .topbar-right {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+  flex-shrink: 1 !important;
+  min-width: 0 !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+}
+.topbar:has(.detail-topbar-left) .topbar-right::-webkit-scrollbar {
+  display: none !important;
+}
+
+.topbar:has(.detail-topbar-left) .topbar-right :is(.btn, .theme-switch-pill, .frp-command-trigger) {
+  height: 34px !important;
+  min-height: 34px !important;
+  padding: 0.3rem 0.65rem !important;
+  font-size: 0.76rem !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+}
+
+.topbar:has(.detail-topbar-left) .code-search-box {
+  height: 34px !important;
+  max-width: 175px !important;
+  padding: 0 0.45rem !important;
+  flex-shrink: 0 !important;
+}
+.topbar:has(.detail-topbar-left) .code-search-box .search-input {
+  width: 80px !important;
+  font-size: 0.76rem !important;
+}
+
+.topbar:has(.detail-topbar-left) .font-size-controls {
+  height: 34px !important;
+  padding: 0 0.35rem !important;
+  flex-shrink: 0 !important;
+}
+
+.topbar:has(.detail-topbar-left) .theme-selector-wrap {
+  flex-shrink: 0 !important;
+}
+.topbar:has(.detail-topbar-left) .theme-selector-select {
+  height: 34px !important;
+  max-width: 140px !important;
+  font-size: 0.75rem !important;
+  padding: 0.2rem 0.45rem !important;
+}
+
+/* GUID Kopyalama Butonu Metin Bölünmesi Düzeltmesi */
+.meta-row .meta-value button[data-detail-action="copy-guid"] {
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  min-width: max-content !important;
+  padding: 3px 8px !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  font-size: 11px !important;
+  border-radius: 6px !important;
+  line-height: 1 !important;
+}
+
+/* Canlı Sohbet Giriş Alanı Placeholder Düzeltmesi */
+.frp-chat-window {
+  width: min(410px, calc(100vw - 32px)) !important;
+}
+.frp-chat-composer-field {
+  flex: 1 1 auto !important;
+  min-width: 130px !important;
+}
+.frp-chat-input {
+  white-space: normal !important;
+  word-break: normal !important;
+  width: 100% !important;
+  padding: 0.52rem 0.65rem !important;
+  box-sizing: border-box !important;
+}
+
 .workspace-sync-controls { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
 .report-sync-status { font-size: .76rem; color: var(--text-muted); white-space: nowrap; }
 .report-sync-status::before { content: ''; display: inline-block; width: .45rem; height: .45rem; margin-right: .4rem; border-radius: 50%; background: currentColor; vertical-align: .08rem; }
@@ -1604,11 +1705,11 @@ select:hover {
   .saved-view-controls .select-field { flex: 1 1 150px; max-width: none; }
 }
 
-/* Ana liste üst alanı — dengeli, hizalı ve modern SaaS kabuğu */
-body:has(#workspaceSwitcher) .topbar {
-  min-height: 64px;
-  height: auto;
-  padding: .6rem clamp(1rem, 1.6vw, 1.8rem);
+/* Tüm Sayfalar İçin Modern SaaS Üst Alanı (Topbar) */
+.topbar, .cmp-topbar {
+  min-height: 62px;
+  height: 62px;
+  padding: .5rem clamp(1rem, 1.6vw, 1.8rem);
   gap: 1.25rem;
   background: color-mix(in srgb, var(--bg-surface) 92%, transparent);
   backdrop-filter: blur(14px);
@@ -1616,16 +1717,16 @@ body:has(#workspaceSwitcher) .topbar {
   border-bottom: 1px solid var(--ui-border-subtle);
   box-shadow: 0 4px 20px -2px rgba(15, 23, 42, .04);
 }
-body:has(#workspaceSwitcher) .topbar .brand { min-width: max-content; }
-body:has(#workspaceSwitcher) .topbar .brand > svg { width: 34px; height: 34px; filter: drop-shadow(0 2px 8px rgba(37,99,235,0.25)) !important; }
-body:has(#workspaceSwitcher) .topbar-right { margin-left: auto; gap: .45rem; display: flex; align-items: center; }
-body:has(#workspaceSwitcher) .topbar-right > span[style*="width:1px"] { height: 24px !important; margin-inline: .35rem !important; opacity: 0.6; }
+.topbar .brand, .cmp-brand { min-width: max-content; }
+.topbar .brand > svg, .cmp-brand > svg { width: 34px; height: 34px; filter: drop-shadow(0 2px 8px rgba(37,99,235,0.25)) !important; }
+.topbar-right, .cmp-topbar-right { margin-left: auto; gap: .45rem; display: flex; align-items: center; }
+.topbar-right > span[style*="width:1px"], .cmp-topbar-right > span[style*="width:1px"] { height: 24px !important; margin-inline: .35rem !important; opacity: 0.6; }
 
 /* Genel Modern Buton Tabanı */
-body:has(#workspaceSwitcher) .topbar-right :is(.btn, .theme-switch-pill, .btn-admin-pending, .btn-logout-compact) {
-  min-height: 38px;
-  height: 38px !important;
-  padding: .45rem .85rem;
+:is(.topbar-right, .cmp-topbar-right) :is(.btn, .theme-switch-pill, .btn-admin-pending, .btn-logout-compact) {
+  min-height: 36px;
+  height: 36px !important;
+  padding: .4rem .85rem;
   border: 1px solid color-mix(in srgb, var(--border) 75%, transparent) !important;
   border-radius: 10px !important;
   background: color-mix(in srgb, var(--bg-surface) 96%, transparent) !important;
@@ -1642,14 +1743,14 @@ body:has(#workspaceSwitcher) .topbar-right :is(.btn, .theme-switch-pill, .btn-ad
   transition: all .2s cubic-bezier(0.16, 1, 0.3, 1);
   cursor: pointer;
 }
-body:has(#workspaceSwitcher) .topbar-right :is(.btn, .theme-switch-pill, .btn-admin-pending, .btn-logout-compact):hover {
+:is(.topbar-right, .cmp-topbar-right) :is(.btn, .theme-switch-pill, .btn-admin-pending, .btn-logout-compact):hover {
   color: var(--text-primary) !important;
   border-color: color-mix(in srgb, var(--accent) 45%, var(--border)) !important;
   background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface)) !important;
   transform: translateY(-1.5px);
   box-shadow: 0 4px 12px rgba(15, 23, 42, .08) !important;
 }
-body:has(#workspaceSwitcher) .topbar-right :is(.btn, .theme-switch-pill, .btn-admin-pending, .btn-logout-compact):active {
+:is(.topbar-right, .cmp-topbar-right) :is(.btn, .theme-switch-pill, .btn-admin-pending, .btn-logout-compact):active {
   transform: translateY(0) scale(0.98);
 }
 
