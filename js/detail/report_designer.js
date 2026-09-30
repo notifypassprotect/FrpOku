@@ -582,6 +582,7 @@ function esc(str) {
    const previousFocus = document.activeElement;
    const dialog = document.createElement('dialog');
    dialog.style.cssText = 'width:min(680px,92vw);max-height:88vh;overflow:auto;border:1px solid var(--border,#777);border-radius:12px;padding:20px;background:var(--bg-card,#fff);color:var(--text,#222);';
+   dialog.className = 'fr-settings-dialog';
    const valueOf = ([key,,,fallback]) => target[key] ?? fallback;
    dialog.innerHTML = `<form>
      <h3 style="margin:0 0 16px">${kind === 'page' ? 'Sayfa Ayarları · ' + esc(page.data.name) : 'Rapor Ayarları'}</h3>
@@ -719,8 +720,8 @@ function esc(str) {
 
  function renderReportTreeHtml() {
    const entries = reportTreeEntries();
-   return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid var(--border-light)"><strong>Report Tree</strong><button type="button" data-tree-close title="Ağacı kapat">×</button></div>
-   <div style="display:flex;gap:4px;padding:6px"><button type="button" data-tree-expand>Tümünü aç</button><button type="button" data-tree-collapse>Daralt</button></div>
+   return `<div class="designer-tree-header"><div><strong>Rapor yapısı</strong><span>Sayfalar, bantlar ve nesneler</span></div><button type="button" data-tree-close title="Ağacı kapat">×</button></div>
+   <div class="designer-tree-tools"><button type="button" data-tree-expand>Tümünü aç</button><button type="button" data-tree-collapse>Daralt</button></div>
    <div role="tree" aria-label="Rapor sayfa ve nesne ağacı" style="flex:1;overflow:auto;min-height:0;padding:4px">
    ${entries.map(entry => {
      let ancestor = entry.parent;
@@ -732,11 +733,11 @@ function esc(str) {
      return `<div role="treeitem" tabindex="0" aria-level="${depth+1}" aria-selected="${selected}" ${hasChildren ? 'aria-expanded="' + !collapsedTreeNodes.has(path) + '"' : ''} data-tree-path="${path}" draggable="${isDesignEditing && !synthetic && !geometryLocked(object, entry)}"
        style="display:flex;align-items:center;gap:3px;min-height:29px;padding:2px 3px 2px ${depth*13+3}px;border-radius:4px;background:${selected ? 'var(--bg-active,rgba(59,130,246,.18))' : 'transparent'};outline-offset:-1px">
        <button type="button" data-tree-toggle aria-label="Alt nesneleri aç veya daralt" style="width:18px;padding:0;visibility:${hasChildren ? 'visible' : 'hidden'}">${collapsedTreeNodes.has(path) ? '▸' : '▾'}</button>
-       <span data-tree-label title="${esc(object.type || '')}" style="flex:1;min-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:${object.visible === false ? '.45' : '1'}">${kind === 'page' ? '▤' : kind === 'band' ? '▰' : '▫'} ${esc(synthetic ? 'Sayfa üzerindeki nesneler' : object.name || object.type)}</span>
-       ${!synthetic && isDesignEditing ? `<button type="button" data-tree-rename title="Yeniden adlandır (F2)" aria-label="Yeniden adlandır">✎</button><button type="button" data-tree-lock title="Konum ve boyut kilidi" aria-label="Konum ve boyut kilidi" aria-pressed="${geometryLocked(object, entry)}">${geometryLocked(object, entry) ? '🔒' : '🔓'}</button><button type="button" data-tree-visible title="Görünürlük" aria-label="Görünürlük" aria-pressed="${object.visible !== false}">${object.visible === false ? '○' : '●'}</button>` : ''}
+       <span data-tree-label title="${esc(object.type || '')}" style="flex:1;min-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:${object.visible === false ? '.45' : '1'}"><span class="designer-tree-icon" aria-hidden="true">${kind === 'page' ? '▤' : kind === 'band' ? '▰' : '▫'}</span> ${esc(synthetic ? 'Sayfa üzerindeki nesneler' : object.name || object.type)}</span>
+       ${!synthetic && isDesignEditing ? `<button type="button" data-tree-rename title="Yeniden adlandır (F2)" aria-label="Yeniden adlandır">✎</button><button type="button" data-tree-lock title="Konum ve boyut kilidi" aria-label="Konum ve boyut kilidi" aria-pressed="${geometryLocked(object, entry)}">${geometryLocked(object, entry) ? '▣' : '▢'}</button><button type="button" data-tree-visible title="Görünürlük" aria-label="Görünürlük" aria-pressed="${object.visible !== false}">${object.visible === false ? '○' : '●'}</button>` : ''}
      </div>`;
    }).join('')}
-   </div><div style="font-size:11px;padding:7px;border-top:1px solid var(--border-light)">Nesneyi banda veya sayfaya bırakın. Aynı tür satıra bırakmak o satırın önüne taşır. Kilit: konum ve boyut.</div>`;
+   </div><div class="designer-tree-hint">Taşımak için sürükleyin · Yeniden adlandırmak için F2</div>`;
  }
 
  function refreshReportTree() {
@@ -1272,13 +1273,13 @@ function esc(str) {
  const activePage = allPages[activePageIndex] || allPages[0];
 
  containerEl.innerHTML = `
- <div class="designer-root">
+ <div class="designer-root" data-editing="${isDesignEditing}">
  
  <!-- ÜST ARAÇ ÇUBUĞU -->
  <div class="designer-toolbar">
  
- <!-- Sayfa Sekmeleri (FastReport Code, Data, Page1, DialogPage1) -->
- <div class="designer-toolbar-group">
+ <!-- Sayfa sekmeleri -->
+ <div class="designer-toolbar-group designer-pages-group">
  <div class="designer-page-tabs">
  ${allPages.map((p, idx) => `
  <button type="button" class="designer-page-tab ${idx === activePageIndex? 'active': ''}" data-idx="${idx}">
@@ -1288,8 +1289,8 @@ function esc(str) {
  </div>
  </div>
 
- <!-- Mod Değiştirici (Tasarımcı vs Baskı Önizleme) -->
- <div class="designer-toolbar-group">
+ <!-- Görünüm -->
+ <div class="designer-toolbar-group designer-mode-group">
  ${activePage.type === 'report'? `
  <div class="designer-mode-toggle">
  <button type="button" class="designer-mode-btn ${currentMode === 'designer'? 'active': ''}" id="btnModeDesigner" title="Tasarımcı Görünümü (Bantlar &amp; Izgara)">
@@ -1306,8 +1307,8 @@ function esc(str) {
  `}
  </div>
 
- <!-- DÜZENLEME & KAYIT BUTONLARI -->
- <div class="designer-toolbar-group">
+ <!-- Düzenleme ve kayıt -->
+ <div class="designer-toolbar-group designer-actions-group">
  <button type="button" class="designer-palette-btn" id="btnDesignValidator">Tasarımı Denetle</button>
  ${!isDesignEditing? `
  <button type="button" class="btn btn-sm btn-primary" id="btnStartDesignEdit" style="font-weight:700;display:inline-flex;align-items:center;gap:5px;padding:.32rem.85rem;border-radius:6px;" title="Tasarımı düzenleme moduna al">
@@ -1315,9 +1316,6 @@ function esc(str) {
  </button>
  `: `
  <div class="designer-edit-bar">
- <button type="button" class="designer-palette-btn" id="btnPageSettings" ${allPages[activePageIndex]?.type !== 'report' ? 'disabled' : ''}>Sayfa Ayarları</button>
- <button type="button" class="designer-palette-btn" id="btnReportSettings">Rapor Ayarları</button>
- <button type="button" class="designer-palette-btn" id="btnVariablesEditor">Variables</button>
  <button type="button" class="designer-palette-btn success" id="btnSaveDesignEdit" title="Değişiklikleri Kalıcı Olarak Kaydet">
  Tasarımı Kaydet
  </button>
@@ -1337,7 +1335,12 @@ function esc(str) {
 
  <!-- GENİŞLETİLMİŞ BİLEŞEN PALETİ (YALNIZCA Düzenleme Modunda Aktif) -->
  ${(currentMode === 'designer' && isDesignEditing)? `
- <div class="designer-comp-palette">
+ <div class="designer-comp-palette" role="toolbar" aria-label="Rapor araçları">
+ <div class="designer-tool-group"><span class="designer-tool-label">Rapor</span> <button type="button" class="designer-palette-btn" id="btnPageSettings" ${allPages[activePageIndex]?.type !== 'report' ? 'disabled' : ''}>Sayfa Ayarları</button>
+ <button type="button" class="designer-palette-btn" id="btnReportSettings">Rapor Ayarları</button>
+ <button type="button" class="designer-palette-btn" id="btnVariablesEditor">Variables</button>
+</div>
+ <div class="designer-tool-group"><span class="designer-tool-label">Nesneler</span>
  <button type="button" class="designer-palette-btn" id="btnToolAddMemo" title="Yeni Metin / Memo Ekle">Memo</button>
   <button type="button" class="designer-palette-btn" id="btnToolAddSysMemo" title="Sayfa No / Tarih / Saat (System Text)">SysText</button>
   <button type="button" class="designer-palette-btn" id="btnToolAddGradient" title="Yeni Gradyan Dolgu Ekle">Gradient</button>
@@ -1351,19 +1354,21 @@ function esc(str) {
  <button type="button" class="designer-palette-btn" id="btnToolAddShape" title="Yeni Şekil Ekle">Şekil</button>
  <button type="button" class="designer-palette-btn" id="btnToolAddChart" title="Yeni Grafik Ekle">Grafik</button>
  <button type="button" class="designer-palette-btn" id="btnToolAddBand" title="Yeni Bant Ekle">Bant</button>
+ </div><div class="designer-tool-group"><span class="designer-tool-label">Form</span>
  <button type="button" class="designer-palette-btn" id="btnToolAddCheckbox" title="Yeni Onay Kutusu Ekle">CheckBox</button>
  <button type="button" class="designer-palette-btn" id="btnToolAddRadio" title="Yeni Radyo Butonu Ekle">Radio</button>
  <button type="button" class="designer-palette-btn" id="btnToolAddEdit" title="Yeni Metin Girişi Ekle">Edit</button>
  <button type="button" class="designer-palette-btn" id="btnToolAddDateEdit" title="Yeni Tarih Seçici Ekle">Tarih</button>
  <button type="button" class="designer-palette-btn" id="btnToolAddCombobox" title="Yeni Açılır Liste Ekle">Combo</button>
  <button type="button" class="designer-palette-btn" id="btnToolAddPanel" title="Yeni Panel Ekle">Panel</button>
+ </div><div class="designer-tool-group"><span class="designer-tool-label">Düzenle</span>
  <button type="button" class="designer-palette-btn" id="btnDuplicateSelected" title="Seçili bileşenleri çoğalt (Ctrl+D)">Çoğalt</button>
  <button type="button" class="designer-palette-btn" id="btnCopySelected" title="Seçili bileşenleri kopyala (Ctrl+C)">Kopyala</button>
  <button type="button" class="designer-palette-btn" id="btnPasteSelected" title="Kopyalanan bileşenleri yapıştır (Ctrl+V)" ${designerClipboard.length ? '' : 'disabled'}>Yapıştır</button>
  <button type="button" class="designer-palette-btn" id="btnBringToFront" title="Seçimi en öne getir">Öne Getir</button>
  <button type="button" class="designer-palette-btn" id="btnSendToBack" title="Seçimi en arkaya gönder">Arkaya Gönder</button>
  <button type="button" class="designer-palette-btn danger" id="btnToolDeleteSelected" title="Seçili Bileşeni Sil (Delete)">Sil</button>
- </div>
+ </div></div>
 
  <div class="fr-multi-align-bar" id="frMultiAlignBar" style="${(selectedItems && selectedItems.length > 1) ? 'display:flex;' : 'display:none;'}">
  <span class="fr-align-badge" id="frAlignBadge">${selectedItems ? selectedItems.length : 0} Seçili</span>
@@ -1388,8 +1393,8 @@ function esc(str) {
  </div>
  `: ''}
 
- <!-- Zoom & Panel Kontrolleri -->
- <div class="designer-toolbar-group">
+ <!-- Zoom ve paneller -->
+ <div class="designer-toolbar-group designer-view-group">
  <div class="designer-zoom-ctrl">
  <button type="button" class="designer-zoom-btn" id="btnZoomOut" title="Küçült">−</button>
  <span class="designer-zoom-val" id="zoomValText">${Math.round(currentZoom * 100)}%</span>
@@ -1446,7 +1451,7 @@ function esc(str) {
  <!-- OBJECT INSPECTOR (Images 3, 4, 5) -->
  <div class="designer-inspector-header">
  <div class="designer-inspector-title">
- <span>Object Inspector</span>
+ <span>Nesne özellikleri</span>
  </div>
  <div style="display:flex;align-items:center;gap:.4rem;">
  <span class="badge badge-blue" style="font-size:.68rem;padding:.15rem.45rem;" id="inspectorCompType">
@@ -1458,13 +1463,13 @@ function esc(str) {
 
  <!-- Object Inspector Tabs (Properties, Events, Favorites) -->
  <div class="designer-inspector-subtabs">
- <button type="button" class="designer-subtab ${inspectorTab === 'properties'? 'active': ''}" data-subtab="properties">Properties</button>
- <button type="button" class="designer-subtab ${inspectorTab === 'events'? 'active': ''}" data-subtab="events">Events</button>
- <button type="button" class="designer-subtab ${inspectorTab === 'favorites'? 'active': ''}" data-subtab="favorites">Favorites</button>
+ <button type="button" class="designer-subtab ${inspectorTab === 'properties'? 'active': ''}" data-subtab="properties">Özellikler</button>
+ <button type="button" class="designer-subtab ${inspectorTab === 'events'? 'active': ''}" data-subtab="events">Olaylar</button>
+ <button type="button" class="designer-subtab ${inspectorTab === 'favorites'? 'active': ''}" data-subtab="favorites">Favoriler</button>
  </div>
 
  <div class="designer-prop-search">
- <input type="text" id="propSearchInput" placeholder="Özellik ara (Property / Event)..." value="${esc(inspectorSearchQuery)}" />
+ <input type="text" id="propSearchInput" aria-label="Özellik veya olay ara" placeholder="Özellik veya olay ara…" value="${esc(inspectorSearchQuery)}" />
  </div>
 
  <div class="designer-prop-table" id="propTableBody">
@@ -2194,9 +2199,7 @@ function esc(str) {
  ${componentStateStyle}
  "
  title="${esc(comp.name)}: ${esc(comp.text || comp.dataField)}${eventTitle}">
- <div class="fr-memo-content" style="justify-content:${hAlign}; align-items:${vAlign};white-space:${comp.wordWrap === false ? 'nowrap' : 'pre-wrap'};${rotationStyle}">
- ${esc(comp.text || (comp.dataField? `[${comp.dataSet? comp.dataSet + '.': ''}"${comp.dataField}"]`: ''))}
- </div>
+ <div class="fr-memo-content" style="justify-content:${hAlign}; align-items:${vAlign};white-space:${comp.wordWrap === false ? 'nowrap' : 'pre-wrap'};${rotationStyle}">${esc(comp.text || (comp.dataField? `[${comp.dataSet? comp.dataSet + '.': ''}"${comp.dataField}"]`: ''))}</div>
  ${renderResizeHandles(isSelected)}
  </div>
  `;
@@ -2533,9 +2536,7 @@ function esc(str) {
  ${componentStateStyle}
  "
  title="${esc(comp.name)} [TfrxSysMemoView: ${esc(sysText)}]${eventTitle}">
- <div class="fr-memo-content" style="justify-content:${hAlign}; align-items:${vAlign};white-space:${comp.wordWrap === false ? 'nowrap' : 'pre-wrap'};${rotationStyle}">
- <span style="background:rgba(99,102,241,0.1);color:#4f46e5;padding:0 3px;border-radius:2px;font-weight:700;">${esc(sysText)}</span>
- </div>
+ <div class="fr-memo-content" style="justify-content:${hAlign}; align-items:${vAlign};white-space:${comp.wordWrap === false ? 'nowrap' : 'pre-wrap'};${rotationStyle}"><span style="background:rgba(99,102,241,0.1);color:#4f46e5;padding:0 3px;border-radius:2px;font-weight:700;">${esc(sysText)}</span></div>
  ${renderResizeHandles(isSelected)}
  </div>
  `;
@@ -2593,9 +2594,7 @@ function esc(str) {
  "
  title="${esc(comp.name)}: ${esc(comp.text || comp.dataField)}${eventTitle}">
  <div class="fr-memo-content"
- style="justify-content:${hAlign}; align-items:${vAlign};white-space:${comp.wordWrap === false ? 'nowrap' : 'pre-wrap'};${rotationStyle}">
- ${esc(comp.text || (comp.dataField? `[${comp.dataSet? comp.dataSet + '.': ''}"${comp.dataField}"]`: ''))}
- </div>
+ style="justify-content:${hAlign}; align-items:${vAlign};white-space:${comp.wordWrap === false ? 'nowrap' : 'pre-wrap'};${rotationStyle}">${esc(comp.text || (comp.dataField? `[${comp.dataSet? comp.dataSet + '.': ''}"${comp.dataField}"]`: ''))}</div>
  ${renderResizeHandles(isSelected)}
  </div>
  `;
