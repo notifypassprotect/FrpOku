@@ -28,14 +28,18 @@ function read(node){
  }catch(e){const size=dimensions(node);return {xml,reason:e.message,width:size.width||num(node.getAttribute('Width'),240),height:size.height||num(node.getAttribute('Height'),100)};}
 }
 function write(node,model){
- if(!model._table||model._table.reason)return;
+ if(!model._table)return;
  const doc=parse(model._table.xml),root=doc.documentElement,s=shape(root),size=dimensions(root);
  Array.from(root.attributes).forEach(a=>{if(!['Name','Left','Top','Width','Height'].includes(a.name)&&!node.hasAttribute(a.name))node.setAttribute(a.name,a.value);});
  const x=num(model.width,size.width)/size.width,y=num(model.height,size.height)/size.height;
- if(!(x>0&&y>0&&Number.isFinite(x)&&Number.isFinite(y)))throw Error('Tablo boyutu geçersiz.');
- if(Math.abs(x-1)>0.00001)s.columns.forEach(c=>c.setAttribute('Width',String(num(c.getAttribute('Width'),80)*x)));
- if(Math.abs(y-1)>0.00001)s.rows.forEach(r=>r.node.setAttribute('Height',String(num(r.node.getAttribute('Height'),28)*y)));
- coverage(root);
+ if(!model._table.reason){
+  if(!(x>0&&y>0&&Number.isFinite(x)&&Number.isFinite(y)))throw Error('Tablo boyutu geçersiz.');
+  if(Math.abs(x-1)>0.00001)s.columns.forEach(c=>c.setAttribute('Width',String(num(c.getAttribute('Width'),80)*x)));
+  if(Math.abs(y-1)>0.00001)s.rows.forEach(r=>r.node.setAttribute('Height',String(num(r.node.getAttribute('Height'),28)*y)));
+  coverage(root);
+ }else if(num(model.width,model._table.width)!==model._table.width||num(model.height,model._table.height)!==model._table.height){
+  throw Error('Salt okunur tablonun boyutları değiştirilemez.');
+ }
  // Replace only with the retained full table subtree; unknown cell contents survive.
  while(node.firstChild)node.removeChild(node.firstChild);
  Array.from(root.childNodes).forEach(child=>node.appendChild(node.ownerDocument.importNode(child,true)));

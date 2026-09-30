@@ -915,8 +915,8 @@ function esc(str) {
  }
 
  // Sayfaları hazırla
- const pages = Array.isArray(file.pages)? file.pages: [];
- const dialogPages = Array.isArray(file.dialogPages)? file.dialogPages: [];
+ const pages = JSON.parse(JSON.stringify(Array.isArray(file.pages) ? file.pages : []));
+ const dialogPages = JSON.parse(JSON.stringify(Array.isArray(file.dialogPages) ? file.dialogPages : []));
  // Recover tables omitted by older cached parsers without replacing edited models.
  if(file.rawXml&&window.FrpTable&&window.parseFrp){
    const fresh=window.parseFrp(file.rawXml);
@@ -977,8 +977,9 @@ function esc(str) {
 
  function collectDesignerDiagnostics() {
    const diagnostics = [];
+   const declaredDatasets = file.declaredDatasets || (file.rawXml && window.parseFrp ? window.parseFrp(file.rawXml).declaredDatasets : file.datasets) || [];
    const knownDataSets = new Set([
-     ...(file.datasets || []),
+     ...declaredDatasets,
      ...(file.queries || []).map(query => query.name)
    ].filter(Boolean).map(name => String(name).toLowerCase()));
    const script = String(file.pascalScript || '');
@@ -994,6 +995,7 @@ function esc(str) {
      return safeName && new RegExp(`\\b(?:procedure|function)\\s+${safeName}\\b`, 'i').test(script);
    };
    const registerName = (item, path) => {
+     if (item?.type === 'TfrxPageContent') return;
      const name = String(item?.name || '').trim();
      if (!name) {
        add('warning', 'missing-name', path, 'Nesnenin adı boş. Olaylar ve script erişimi için benzersiz bir ad verin.');
@@ -5403,18 +5405,19 @@ function esc(str) {
    window.FrpNotify?.info('Kayıt durduruldu. Tanılamalardaki sorunları düzeltebilirsiniz.');
    return;
  }
- file.variableCategories=JSON.parse(JSON.stringify(variableCategories)); file.variablesEdited=variablesEdited;
- file.reportSettings = JSON.parse(JSON.stringify(reportSettings));
- file.meta = { ...(file.meta || {}) };
- if (reportSettings.name !== undefined) file.meta.reportName = reportSettings.name;
- if (reportSettings.author !== undefined) file.meta.author = reportSettings.author;
- if (reportSettings.description !== undefined) file.meta.description = reportSettings.description;
- file.pages = allPages.filter(p => p.type === 'report').map(p => p.data);
- file.dialogPages = allPages.filter(p => p.type === 'dialog').map(p => p.data);
+ const candidate = { ...file,
+   variableCategories: JSON.parse(JSON.stringify(variableCategories)), variablesEdited,
+   reportSettings: JSON.parse(JSON.stringify(reportSettings)), meta: { ...(file.meta || {}) },
+   pages: JSON.parse(JSON.stringify(allPages.filter(p => p.type === 'report').map(p => p.data))),
+   dialogPages: JSON.parse(JSON.stringify(allPages.filter(p => p.type === 'dialog').map(p => p.data)))
+ };
+ if (reportSettings.name !== undefined) candidate.meta.reportName = reportSettings.name;
+ if (reportSettings.author !== undefined) candidate.meta.author = reportSettings.author;
+ if (reportSettings.description !== undefined) candidate.meta.description = reportSettings.description;
  
  if (window.FrpStore && typeof window.FrpStore.saveFile === 'function') {
  let savedFile;
- try { savedFile=window.FrpStore.saveFile(file); } catch(error) { window.FrpNotify?.warning('FRP kaydı tamamlanamadı: '+error.message); return; }
+ try { savedFile=await window.FrpStore.saveFile(candidate); } catch(error) { window.FrpNotify?.warning('FRP kaydı tamamlanamadı: '+error.message); return; }
  if(!savedFile){window.FrpNotify?.warning('Rapor kaydedilemedi. Değişiklikler düzenleyicide duruyor.');return;}
  Object.assign(file,savedFile);
  variableCategories=JSON.parse(JSON.stringify(file.variableCategories||variableCategories));variablesEdited=false;

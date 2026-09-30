@@ -20,27 +20,14 @@ const CP1254_ENTITY_MAP = {
 
 function decodeHtmlEntities(str) {
   if (!str) return '';
-  let res = str
-    .replace(/&#13;&#10;/g, '\n')
-    .replace(/&#13;/g, '\n')
-    .replace(/&#10;/g, '\n')
-    .replace(/&#9;/g,  '\t')
-    .replace(/&#60;/g, '<')
-    .replace(/&#62;/g, '>')
-    .replace(/&#34;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g,  '<')
-    .replace(/&gt;/g,  '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => {
-      const num = parseInt(h, 16);
-      return CP1254_ENTITY_MAP[num] || (num > 0 ? String.fromCodePoint(num) : '');
-    })
-    .replace(/&#(\d+);/g, (_, n) => {
-      const num = Number(n);
-      return CP1254_ENTITY_MAP[num] || (num > 0 ? String.fromCodePoint(num) : '');
-    });
+  // Decode one XML layer only; escaped entity text must remain literal text.
+  let res = String(str).replace(/&(?:amp|lt|gt|quot|apos|#x[0-9a-f]+|#\d+);/gi, entity => {
+    const named = {'&amp;':'&','&lt;':'<','&gt;':'>','&quot;':'"','&apos;':"'"};
+    if (named[entity] !== undefined) return named[entity];
+    if (!entity.startsWith('&#')) return entity;
+    const value = /^&#x/i.test(entity) ? parseInt(entity.slice(3,-1),16) : Number(entity.slice(2,-1));
+    return CP1254_ENTITY_MAP[value] || (value > 0 && value <= 0x10ffff ? String.fromCodePoint(value) : entity);
+  }).replace(/\r\n?/g, '\n');
 
   if (typeof fixTurkishMojibake === 'function') {
     res = fixTurkishMojibake(res);
@@ -50,10 +37,7 @@ function decodeHtmlEntities(str) {
 
 function getAttr(chunk, name) {
   const escaped = typeof escapeRegex === 'function' ? escapeRegex(name) : name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const rx = new RegExp(
-    '(?:^|\\s)' + escaped + "\\s*=\\s*(?:\"((?:[^\"\\\\]|\\\\.)*?)\"|'((?:[^'\\\\]|\\\\.)*?)')",
-    'is'
-  );
+  const rx = new RegExp('(?:^|\\s)' + escaped + '\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\')', 'is');
   const m = chunk.match(rx);
   const value = m ? (m[1] ?? m[2]) : null;
   return value ? decodeHtmlEntities(value) : null;
@@ -90,8 +74,7 @@ function findTagAttributes(xmlText, tagName) {
         if (ch === quoteChar) {
           inQuote = false;
           quoteChar = '';
-        } else if (ch === '\\') {
-          pos += 1;
+
         }
       }
 
@@ -394,6 +377,19 @@ function parseFrp(xmlText) {
   }
   result.queries.forEach(q => { if (q.name) dsSet.add(q.name); });
   result.datasets = [...dsSet].filter(d => d && d.length < 50).sort();
+  // References alone are not evidence that a dataset exists.
+  const declared = new Set(result.queries.map(q => q.name));
+  if (typeof DOMParser !== 'undefined') {
+    const source = new DOMParser().parseFromString(xmlText, 'application/xml');
+    if (!source.querySelector('parsererror')) Array.from(source.getElementsByTagName('*')).forEach(node => {
+      if (/^Tfrx.*(?:DataSet|Query|Table)$/i.test(node.nodeName)) {
+        ['Name','UserName'].forEach(key => { if (node.getAttribute(key)) declared.add(node.getAttribute(key)); });
+      } else if (node.parentNode?.nodeName.toLowerCase() === 'datasets') {
+        ['DataSet','DataSetName','Name'].forEach(key => { if (node.getAttribute(key)) declared.add(node.getAttribute(key)); });
+      }
+    });
+  }
+  result.declaredDatasets = [...declared];
 
   // ── PARAMETRELER & DEĞİŞKENLER (XML <Params> & <Variables> & SQL Parametreleri) ──
   const allParams = new Set();
@@ -677,12 +673,12 @@ function parseFrp(xmlText) {
   }
 
   // 1. Rapor sayfaları (FastReport sürümleri farklı sayfa sınıf adları kullanabilir)
-  const pageRx = /<(TfrxReportPage|TfrxDMPPage|TfrxPage|ReportPage)\b([\s\S]*?)>([\s\S]*?)<\/\1>/gi;
+  const pageRx = /<(TfrxReportPage|TfrxDMPPage|TfrxPage|ReportPage)\b((?:"[^"]*"|'[^']*'|[^"'<>])*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi;
   let pMatch;
   while ((pMatch = pageRx.exec(xmlText)) !== null) {
     const pType = pMatch[1];
     const pAttrs = pMatch[2];
-    const pContent = pMatch[3];
+    const pContent = pMatch[3] || ''; 
 
     const pageObj = {
       type: pType,
@@ -712,7 +708,7 @@ function parseFrp(xmlText) {
     };
 
     // Bantlar
-    const bandTagRx = /<(Tfrx(?:MasterData|DetailData|SubdetailData|Header|Footer|PageHeader|PageFooter|GroupHeader|GroupFooter|ColumnHeader|ColumnFooter|ReportTitle|ReportSummary|DataBand|Child|Overlay|DMPHeader|DMPFooter|DMPGroupHeader|DMPGroupFooter|DMPMasterData|DMPDetailData|DMPSubdetailData))\b([\s\S]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi;
+    const bandTagRx = /<(Tfrx(?:MasterData|DetailData|SubdetailData|Header|Footer|PageHeader|PageFooter|GroupHeader|GroupFooter|ColumnHeader|ColumnFooter|ReportTitle|ReportSummary|DataBand|Child|Overlay|DMPHeader|DMPFooter|DMPGroupHeader|DMPGroupFooter|DMPMasterData|DMPDetailData|DMPSubdetailData))\b((?:"[^"]*"|'[^']*'|[^"'<>])*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi;
     let bMatch;
     while ((bMatch = bandTagRx.exec(pContent)) !== null) {
       const bType = bMatch[1];
@@ -749,7 +745,7 @@ function parseFrp(xmlText) {
         components: []
       };
 
-      const compRx = /<(Tfrx[A-Za-z0-9_]+View|TfrxChartView|TfrxShapeView|TfrxDMPMemoView|TfrxBarCodeView|TfrxPictureView|TfrxLineView|TfrxMemoView|TfrxSubreport|TfrxTableObject)\b([\s\S]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi;
+      const compRx = /<(Tfrx[A-Za-z0-9_]+View|TfrxChartView|TfrxShapeView|TfrxDMPMemoView|TfrxBarCodeView|TfrxPictureView|TfrxLineView|TfrxMemoView|TfrxSubreport|TfrxTableObject)\b((?:"[^"]*"|'[^']*'|[^"'<>])*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi;
       let cMatch;
       while ((cMatch = compRx.exec(bContent)) !== null) {
         const cType = cMatch[1];
@@ -763,7 +759,7 @@ function parseFrp(xmlText) {
 
     // Doğrudan Sayfa Üzerine Eklenmiş Bileşenler (Page-Level Direct Components - örn. DONOR_REAKSIYON, pgApache)
     const directPContent = pContent.replace(bandTagRx, '');
-    const directCompRx = /<(Tfrx[A-Za-z0-9_]+View|TfrxChartView|TfrxShapeView|TfrxDMPMemoView|TfrxBarCodeView|TfrxPictureView|TfrxLineView|TfrxMemoView|TfrxSubreport|TfrxTableObject)\b([\s\S]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi;
+    const directCompRx = /<(Tfrx[A-Za-z0-9_]+View|TfrxChartView|TfrxShapeView|TfrxDMPMemoView|TfrxBarCodeView|TfrxPictureView|TfrxLineView|TfrxMemoView|TfrxSubreport|TfrxTableObject)\b((?:"[^"]*"|'[^']*'|[^"'<>])*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi;
     let dcMatch;
     const directComponents = [];
     while ((dcMatch = directCompRx.exec(directPContent)) !== null) {
@@ -824,7 +820,7 @@ function parseFrp(xmlText) {
   // Sayfa sarmalayıcısı olmayan eski/özel FRP çıktılarında görsel nesneleri kaybetme.
   if (result.pages.length === 0) {
     const fallbackComponents = [];
-    const fallbackCompRx = /<(Tfrx[A-Za-z0-9_]+View|TfrxChartView|TfrxShapeView|TfrxDMPMemoView|TfrxBarCodeView|TfrxPictureView|TfrxLineView|TfrxMemoView|TfrxSubreport|TfrxTableObject)\b([\s\S]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi;
+    const fallbackCompRx = /<(Tfrx[A-Za-z0-9_]+View|TfrxChartView|TfrxShapeView|TfrxDMPMemoView|TfrxBarCodeView|TfrxPictureView|TfrxLineView|TfrxMemoView|TfrxSubreport|TfrxTableObject)\b((?:"[^"]*"|'[^']*'|[^"'<>])*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi;
     let fallbackMatch;
     while ((fallbackMatch = fallbackCompRx.exec(xmlText)) !== null) {
       fallbackComponents.push(parseComponentNode(fallbackMatch[1], fallbackMatch[2], fallbackMatch[3]));
@@ -901,7 +897,7 @@ function parseFrp(xmlText) {
     };
 
     if (innerContent && innerContent.trim()) {
-      const childCtrlRx = /<(Tfrx[A-Za-z0-9_]+(?:Control|Sheet|PageControl|TabSheet))\b([\s\S]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi;
+      const childCtrlRx = /<(Tfrx[A-Za-z0-9_]+(?:Control|Sheet|PageControl|TabSheet))\b((?:"[^"]*"|'[^']*'|[^"'<>])*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi;
       let cMatch;
       while ((cMatch = childCtrlRx.exec(innerContent)) !== null) {
         ctrlObj.children.push(parseControlNode(cMatch[1], cMatch[2], cMatch[3] || ''));
@@ -911,11 +907,11 @@ function parseFrp(xmlText) {
     return ctrlObj;
   }
 
-  const dialogRx = /<TfrxDialogPage\b([\s\S]*?)>([\s\S]*?)<\/TfrxDialogPage>/gi;
+  const dialogRx = /<TfrxDialogPage\b((?:"[^"]*"|'[^']*'|[^"'<>])*?)(?:\/>|>([\s\S]*?)<\/TfrxDialogPage>)/gi;
   let dMatch;
   while ((dMatch = dialogRx.exec(xmlText)) !== null) {
     const dAttrs = dMatch[1];
-    const dContent = dMatch[2];
+    const dContent = dMatch[2] || ''; 
 
     const dialogObj = {
       type: 'TfrxDialogPage',
@@ -931,7 +927,7 @@ function parseFrp(xmlText) {
       controls: []
     };
 
-    const ctrlRx = /<(Tfrx[A-Za-z0-9_]+(?:Control|Sheet|PageControl|TabSheet))\b([\s\S]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi;
+    const ctrlRx = /<(Tfrx[A-Za-z0-9_]+(?:Control|Sheet|PageControl|TabSheet))\b((?:"[^"]*"|'[^']*'|[^"'<>])*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi;
     let ctrlMatch;
     while ((ctrlMatch = ctrlRx.exec(dContent)) !== null) {
       const ctrlType = ctrlMatch[1];
@@ -965,6 +961,7 @@ function parseFrp(xmlText) {
         const node = nodes.find(n => n.nodeName === component.type && n.getAttribute('Name') === component.name);
         if (node) {
           Object.assign(component, readFrpAppearance(node));
+          if (component.type !== 'TfrxTableObject') component._sourceXml = new XMLSerializer().serializeToString(node);
           if (typeof window !== 'undefined' && window.FrpComplexCodec && component.type==='TfrxChartView') component._complex=window.FrpComplexCodec.readChart(node);
           if (typeof window !== 'undefined' && window.FrpComplexCodec && /^(TfrxCrossView|TfrxDBCrossView)$/.test(component.type)) component._complex=window.FrpComplexCodec.readCross(node);
         }
@@ -1069,47 +1066,18 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
     // Continue through the same model synchronization used for existing reports.
   }
 
-  (file.queries || []).forEach(q => {
-    const encodedSql = encodeFrpAttr(q.sql);
-    const escapedName = typeof escapeRegex === 'function' ? escapeRegex(q.name) : q.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const tagRx = new RegExp(`(<Tfrx(?:FOQuery|Query)\\b[^>]*?\\b(?:Name|UserName)=["']${escapedName}["'][^>]*?>)`, 'gi');
-    xml = xml.replace(tagRx, match => {
-      if (/\bSQL\.Text=["']/i.test(match)) {
-        return match.replace(/(\bSQL\.Text=)"[^"]*?"/gi, (m, g1) => `${g1}"${encodedSql}"`)
-                    .replace(/(\bSQL\.Text=)'[^']*?'/gi, (m, g1) => `${g1}"${encodedSql}"`);
-      }
-      return match;
-    });
-  });
-
-  if (file.pascalScript !== undefined && file.pascalScript !== null) {
-    const encodedScript = encodeFrpAttr(file.pascalScript);
-    if (/<TfrxReport\b[^>]*?\bScriptText\.Text=/.test(xml)) {
-      xml = xml.replace(/(<TfrxReport\b[^>]*?\bScriptText\.Text=)"([^"]*?)"/gi, (m, g1) => `${g1}"${encodedScript}"`)
-               .replace(/(<TfrxReport\b[^>]*?\bScriptText\.Text=)'([^']*?)'/gi, (m, g1) => `${g1}"${encodedScript}"`);
-    } else {
-      xml = xml.replace(/(<TfrxReport\b[^>]*?)(\/?>)/i, (m, g1, g2) => {
-        return `${g1} ScriptText.Text="${encodedScript}"${g2}`;
-      });
-    }
-  }
-
-  if (newVersionNumStr) {
-    if (/\bReportOptions\.VersionBuild="[^"]*"/.test(xml)) {
-      xml = xml.replace(/(\bReportOptions\.VersionBuild=)"[^"]*"/gi, (m, g1) => `${g1}"${newVersionNumStr}"`);
-    }
-  }
-
   // Yeni sorgular ile görsel tasarım modelini gerçek FRP XML DOM'una uygula.
   // Bu katman yalnızca mevcut alanları güncellemez; editörde eklenen query,
   // band ve component düğümlerini de doğru parent altına oluşturur.
   try {
     const ParserClass = typeof DOMParser !== 'undefined' ? DOMParser : (typeof global !== 'undefined' ? global.DOMParser : null);
     const SerializerClass = typeof XMLSerializer !== 'undefined' ? XMLSerializer : (typeof global !== 'undefined' ? global.XMLSerializer : null);
-    if (!ParserClass || !SerializerClass) return xml;
+    if (!ParserClass || !SerializerClass) throw new Error('XML kayıt hizmeti bulunamadı; kayıt uygulanmadı.');
     const doc = new ParserClass().parseFromString(xml, 'application/xml');
-    if (!doc.querySelector('parsererror') && doc.documentElement) {
+    if (doc.querySelector('parsererror') || !doc.documentElement || doc.documentElement.nodeName !== 'TfrxReport') throw new Error('FRP XML geçersiz; kayıt uygulanmadı.');
+    if (doc.documentElement) {
       const root = doc.documentElement;
+      if (file.pascalScript !== undefined && file.pascalScript !== null) root.setAttribute('ScriptText.Text', String(file.pascalScript));
       const cleanupTasks = [];
       const renamedObjects = new Map();
       const elements = () => Array.from(doc.getElementsByTagName('*'));
@@ -1131,7 +1099,10 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
           || (!parent ? null : elements().find(node => node.getAttribute('Name') === wantedName && (!wantedType || node.nodeName === wantedType)))
           || null;
       };
-      const setAttrs = (node, attrs) => Object.entries(attrs).forEach(([key, value]) => {
+      const attrText = value => typeof value === 'boolean' ? (value ? 'True' : 'False') : String(value);
+      const setAttrs = (node, attrs, original) => Object.entries(attrs).forEach(([key, value]) => {
+        // Unedited properties (including inferred defaults) keep their original XML.
+        if (original && attrText(value) === attrText(original[key])) return;
         if (value !== undefined && value !== null) node.setAttribute(key, typeof value === 'boolean' ? (value ? 'True' : 'False') : String(value));
       });
       const originalNodes = new Map(elements().filter(node => node.hasAttribute('Name')).map(node => [node.nodeName + '\\0' + node.getAttribute('Name'), node]));
@@ -1139,6 +1110,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
         if (!model?.name || !model?.type) return null;
         let node = model._sourceName && model._sourceName !== model.name ?
           originalNodes.get(model.type + '\\0' + model._sourceName) : byName(model.name, model.type, parent);
+        if (!node && model._sourceName) node = byName(model.name, model.type, parent);
         if (node && model._sourceName && model._sourceName !== model.name) {
           if (node) {
             renamedObjects.set(model._sourceName.toLowerCase(), model.name);
@@ -1146,7 +1118,18 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
           }
         }
         if (!node && parent) {
-          node = doc.createElement(model.type);
+          const sourceName = model.rawAttrs && getAttr(model.rawAttrs, 'Name');
+          const existingSource = sourceName && originalNodes.get(model.type + '\\0' + sourceName);
+          const template = model._sourceXml || model._table?.xml;
+          if (existingSource) {
+            node = existingSource.cloneNode(true);
+          } else if (template) {
+            const source = new ParserClass().parseFromString(template, 'application/xml');
+            if (source.querySelector('parsererror') || source.documentElement.nodeName !== model.type) throw new Error('Kopyalanan nesnenin XML içeriği geçersiz.');
+            node = doc.importNode(source.documentElement, true);
+          } else {
+            node = doc.createElement(model.type);
+          }
           node.setAttribute('Name', model.name);
           parent.appendChild(node);
         } else if (node && parent && node.parentNode !== parent) {
@@ -1168,27 +1151,20 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
         'ReportOptions.Description.Text': file.reportSettings.description
       });
 
-      let dataPage = elements().find(node => node.nodeName === 'TfrxDataPage') || null;
-      if (!dataPage && (file.queries || []).length > 0) {
-        dataPage = doc.createElement('TfrxDataPage');
-        setAttrs(dataPage, { Name: 'Data', Height: 1000, Left: 0, Top: 0, Width: 1000 });
-        root.insertBefore(dataPage, root.firstChild);
+      const sourceModels = new Map();
+      if (file.rawXml) {
+        const original = parseFrp(file.rawXml);
+        const visit = (model, band) => {
+          if (model.name) sourceModels.set(model.type + '\0' + model.name, {model, band});
+          (model.bands || []).forEach(child => visit(child));
+          (model.components || []).forEach(child => visit(child, model));
+          (model.controls || model.children || []).forEach(child => visit(child));
+        };
+        [...(original.pages || []), ...(original.dialogPages || [])].forEach(model => visit(model));
       }
-      (file.queries || []).forEach(query => {
-        let queryNode = elements().find(node => /^(TfrxFOQuery|TfrxQuery)$/i.test(node.nodeName) &&
-          (node.getAttribute('Name') === query.name || node.getAttribute('UserName') === query.name));
-        if (!queryNode && dataPage) {
-          queryNode = doc.createElement('TfrxFOQuery');
-          dataPage.appendChild(queryNode);
-        }
-        if (queryNode) setAttrs(queryNode, { Name: query.name, UserName: query.name, 'SQL.Text': query.sql || '' });
-      });
-
-      (file.pages || []).forEach(page => {
-        const pageNode = ensureNode(page, root);
-        if (!pageNode) return;
-        root.appendChild(pageNode);
-        setAttrs(pageNode, {
+      const sourceFor = model => sourceModels.get(model.type + '\0' + (model._sourceName || model.name))
+        || (model.rawAttrs ? sourceModels.get(model.type + '\0' + getAttr(model.rawAttrs, 'Name')) : null);
+      const pageAttrs = page => ({
           Orientation: page.orientation, PaperWidth: page.paperWidth, PaperHeight: page.paperHeight,
           LeftMargin: page.leftMargin, TopMargin: page.topMargin, RightMargin: page.rightMargin,
           BottomMargin: page.bottomMargin, ColumnWidth: page.columnWidth, Visible: page.visible,
@@ -1197,13 +1173,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
           PrintOnPreviousPage: page.printOnPreviousPage, TitleBeforeHeader: page.titleBeforeHeader,
           OnClick: page.onClick, OnBeforePrint: page.onBeforePrint, OnAfterPrint: page.onAfterPrint
         });
-        (page.bands || []).forEach(band => {
-          const synthetic = band.type === 'TfrxPageContent';
-          const bandNode = synthetic ? pageNode : ensureNode(band, pageNode);
-          if (!bandNode) return;
-          // Modeldeki bant sıralamasını XML düğüm sırasına yansıt.
-          if (!synthetic && bandNode.parentNode === pageNode) pageNode.appendChild(bandNode);
-          if (!synthetic) setAttrs(bandNode, {
+      const bandAttrs = band => ({
             Left: band.left, Top: band.top, Width: band.width, Height: band.height,
             DataSetName: band.dataSet, Condition: band.condition, Stretched: band.stretched,
             AllowSplit: band.allowSplit, KeepTogether: band.keepTogether, KeepChild: band.keepChild,
@@ -1212,30 +1182,12 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
             OnClick: band.onClick, OnBeforePrint: band.onBeforePrint, OnAfterPrint: band.onAfterPrint,
             OnPreviewClick: band.onPreviewClick, OnMasterDetail: band.onMasterDetail
           });
-          (band.components || []).forEach(component => {
-            const componentNode = ensureNode(component, bandNode);
-            if (!componentNode) return;
-            bandNode.appendChild(componentNode);
-            const textAttr = component.rawAttrs && /\bMemo\.Text\s*=/.test(component.rawAttrs) ? 'Memo.Text' : 'Text';
-            if(component.type==='TfrxTableObject'&&window.FrpTable)window.FrpTable.write(componentNode,component);
-            writeFrpAppearance(componentNode, component);
-            if (component._complexEdited) {
-              if (!component._complex || component._complex.reason || !window.FrpComplexCodec) throw new Error('Nesnenin ikili kayıt biçimi düzenlenemiyor.');
-              const chart=component.type==='TfrxChartView';
-              const propData=chart?window.FrpComplexCodec.writeChart(component._complex):window.FrpComplexCodec.writeCross(component._complex);
-              if (!chart) {
-                if(component._complex.attrs.DataSet===undefined)componentNode.removeAttribute('DataSet');
-                const keys=['RowLevels','ColumnLevels','CellLevels','RowFields.Text','ColumnFields.Text','CellFields.Text','ShowRowTotal','ShowColumnTotal','RepeatHeaders','ShowRowHeader','ShowColumnHeader','ShowTitle','ShowCorner','AutoSize','KeepTogether','KeepRowsTogether','JoinEqualCells','SuppressNullRecords'];
-                keys.forEach(k=>{if(component._complex.attrs[k]!==undefined)componentNode.setAttribute(k,String(component._complex.attrs[k]));});
-              }
-              componentNode.setAttribute('PropData',propData);
-            }
-            setAttrs(componentNode, {
+      const componentAttrs = (component, band) => { const synthetic = band?.type === 'TfrxPageContent'; const textAttr = /\bMemo\.Text\s*=/.test(component.rawAttrs || '') ? 'Memo.Text' : 'Text'; return {
               Left: component.left, Top: synthetic ? Number(component.top || 0) + Number(band.top || 0) : component.top, Width: component.width, Height: component.height,
               [textAttr]: component.text, 'Font.Name': component.fontName,
               Page: component.type === 'TfrxSubreport' ? (component.subreportPage ?? component.pageName ?? component.page) : undefined,
               PrintOnParent: component.type === 'TfrxSubreport' ? component.printOnParent : undefined,
-              'Font.Height': component.fontSize ? -Math.abs(component.fontSize) : component.fontHeight,
+              'Font.Height': component.fontHeight !== undefined && Math.abs(Number(component.fontHeight)) === Number(component.fontSize) ? component.fontHeight : component.fontSize ? -Math.abs(component.fontSize) : component.fontHeight,
               'Font.Color': component.fontColor, 'Font.Style': component.fontStyle,
               'Fill.BackColor': component.fillBackColor, 'Fill.ForeColor': component.fillForeColor,
               'Fill.Style': component.fillStyle, FillType: component.fillType,
@@ -1261,7 +1213,72 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
               OnChange: component.onChange, OnMasterDetail: component.onMasterDetail,
               OnEnter: component.onEnter, OnExit: component.onExit, OnKeyDown: component.onKeyDown,
               OnAfterData: component.onAfterData, OnAfterCalcHeight: component.onAfterCalcHeight
-            });
+            }; };
+      const controlAttrs = control => ({
+          Left: control.left, Top: control.top, Width: control.width, Height: control.height,
+          Caption: control.caption, Text: control.text, 'Font.Name': control.fontName,
+          'Font.Height': control.fontSize ? -Math.abs(control.fontSize) : undefined,
+          'Font.Style': control.fontStyle, 'Font.Color': control.fontColor, Color: control.color,
+          Checked: control.checked, Enabled: control.enabled, Visible: control.visible,
+          ModalResult: control.modalResult, ListField: control.listField, KeyField: control.keyField,
+          ListSource: control.listSource, 'Items.Text': control.items, OnClick: control.onClick,
+          OnChange: control.onChange, OnEnter: control.onEnter, OnExit: control.onExit, OnKeyDown: control.onKeyDown
+        });
+
+      let dataPage = elements().find(node => node.nodeName === 'TfrxDataPage') || null;
+      if (!dataPage && (file.queries || []).length > 0) {
+        dataPage = doc.createElement('TfrxDataPage');
+        setAttrs(dataPage, { Name: 'Data', Height: 1000, Left: 0, Top: 0, Width: 1000 });
+        root.insertBefore(dataPage, root.firstChild);
+      }
+      (file.queries || []).forEach(query => {
+        let queryNode = elements().find(node => /^Tfrx/i.test(node.nodeName) && (/(?:Query|Table)$/i.test(node.nodeName) || node.hasAttribute('SQL.Text') || node.hasAttribute('SQL')) &&
+          (node.getAttribute('Name') === query.name || node.getAttribute('UserName') === query.name));
+        if (!queryNode && dataPage) {
+          queryNode = doc.createElement('TfrxFOQuery');
+          setAttrs(queryNode, {Name:query.name, UserName:query.name});
+          dataPage.appendChild(queryNode);
+        }
+        if (queryNode) {
+          const sqlAttr = queryNode.getAttribute('SQL.Text') ?? queryNode.getAttribute('SQL');
+          const original = sqlAttr !== null ? sqlAttr.trim() : queryNode.children.length ? extractSqlFromElementBody(new SerializerClass().serializeToString(queryNode)).trim() : null;
+          if (original === null || original !== String(query.sql || '').trim()) {
+            setAttrs(queryNode, { [queryNode.hasAttribute('SQL') ? 'SQL' : 'SQL.Text']: query.sql || '' });
+          }
+        }
+      });
+
+      (file.pages || []).forEach(page => {
+        const pageNode = ensureNode(page, root);
+        if (!pageNode) return;
+        root.appendChild(pageNode);
+        setAttrs(pageNode, pageAttrs(page), sourceFor(page) ? pageAttrs(sourceFor(page).model) : null);
+        (page.bands || []).forEach(band => {
+          const synthetic = band.type === 'TfrxPageContent';
+          const bandNode = synthetic ? pageNode : ensureNode(band, pageNode);
+          if (!bandNode) return;
+          // Modeldeki bant sıralamasını XML düğüm sırasına yansıt.
+          if (!synthetic && bandNode.parentNode === pageNode) pageNode.appendChild(bandNode);
+          if (!synthetic) setAttrs(bandNode, bandAttrs(band), sourceFor(band) ? bandAttrs(sourceFor(band).model) : null);
+          (band.components || []).forEach(component => {
+            const componentNode = ensureNode(component, bandNode);
+            if (!componentNode) return;
+            bandNode.appendChild(componentNode);
+            const textAttr = component.rawAttrs && /\bMemo\.Text\s*=/.test(component.rawAttrs) ? 'Memo.Text' : 'Text';
+            if(component.type==='TfrxTableObject'&&window.FrpTable)window.FrpTable.write(componentNode,component);
+            writeFrpAppearance(componentNode, component);
+            if (component._complexEdited) {
+              if (!component._complex || component._complex.reason || !window.FrpComplexCodec) throw new Error('Nesnenin ikili kayıt biçimi düzenlenemiyor.');
+              const chart=component.type==='TfrxChartView';
+              const propData=chart?window.FrpComplexCodec.writeChart(component._complex):window.FrpComplexCodec.writeCross(component._complex);
+              if (!chart) {
+                if(component._complex.attrs.DataSet===undefined)componentNode.removeAttribute('DataSet');
+                const keys=['RowLevels','ColumnLevels','CellLevels','RowFields.Text','ColumnFields.Text','CellFields.Text','ShowRowTotal','ShowColumnTotal','RepeatHeaders','ShowRowHeader','ShowColumnHeader','ShowTitle','ShowCorner','AutoSize','KeepTogether','KeepRowsTogether','JoinEqualCells','SuppressNullRecords'];
+                keys.forEach(k=>{if(component._complex.attrs[k]!==undefined)componentNode.setAttribute(k,String(component._complex.attrs[k]));});
+              }
+              componentNode.setAttribute('PropData',propData);
+            }
+            setAttrs(componentNode, componentAttrs(component, band), sourceFor(component) ? componentAttrs(sourceFor(component).model, sourceFor(component).band) : null);
             if(component._complexEdited){
               // VCL reads attributes in order: dimensions must precede the embedded templates.
               const propData=componentNode.getAttribute('PropData');
@@ -1312,16 +1329,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
         const node = ensureNode(control, parent);
         if (!node) return;
         parent.appendChild(node);
-        setAttrs(node, {
-          Left: control.left, Top: control.top, Width: control.width, Height: control.height,
-          Caption: control.caption, Text: control.text, 'Font.Name': control.fontName,
-          'Font.Height': control.fontSize ? -Math.abs(control.fontSize) : undefined,
-          'Font.Style': control.fontStyle, 'Font.Color': control.fontColor, Color: control.color,
-          Checked: control.checked, Enabled: control.enabled, Visible: control.visible,
-          ModalResult: control.modalResult, ListField: control.listField, KeyField: control.keyField,
-          ListSource: control.listSource, 'Items.Text': control.items, OnClick: control.onClick,
-          OnChange: control.onChange, OnEnter: control.onEnter, OnExit: control.onExit, OnKeyDown: control.onKeyDown
-        });
+        setAttrs(node, controlAttrs(control), sourceFor(control) ? controlAttrs(sourceFor(control).model) : null);
         syncControls(control.children, node);
       });
       (file.dialogPages || []).forEach(dialog => {
@@ -1352,10 +1360,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
       const verifyElements = verifyDoc.querySelector('parsererror') ? [] : Array.from(verifyDoc.getElementsByTagName('*'));
       const missingProtected = protectedNamedNodes.filter(item => !verifyElements.some(node => node.nodeName === item.type && (node.getAttribute('Name') === item.name || node.getAttribute('UserName') === item.name)));
       if (missingProtected.length > 0) {
-        if ((file.pages||[]).some(p=>(p.bands||[]).some(b=>(b.components||[]).some(c=>c._tableEdited||c._complexEdited||c._highlightsEdited||c._subreportEdited||Object.keys(c._appearanceEdits||{}).length)))) throw new Error('FRP güvenlik koruması: özel XML içeriği etkileniyor; kayıt uygulanmadı.');
-        if (file.variablesEdited === true) throw new Error('Değişken kaydı bilinmeyen XML içeriğini etkiliyor; özgün FRP korundu.');
-        console.warn('FRP güvenlik koruması: desteklenmeyen düğüm kaybı engellendi.', missingProtected);
-        if (typeof window !== 'undefined') window.FrpNotify?.warning?.('FRP içindeki özel bileşenler korundu; güvenli olmayan tasarım değişikliği uygulanmadı.');
+        throw new Error('FRP güvenlik koruması: desteklenmeyen XML içeriği silineceği için kayıt durduruldu.');
       } else {
         xml = serialized;
         if (file.variablesEdited === true) { file.variableCategories=readFrpVariables(serialized).categories; file.variablesEdited=false; }
@@ -1363,9 +1368,7 @@ function buildUpdatedFrpXml(file, newVersionNumStr) {
       }
     }
   } catch (error) {
-    if ((file.pages || []).some(p => (p.bands || []).some(b => (b.components || []).some(c => c._tableEdited || c._complexEdited || c._subreportEdited || c._highlightsEdited || Object.keys(c._appearanceEdits || {}).length)))) throw error;
-    if (file.variablesEdited === true) throw error;
-    console.warn('FRP XML model senkronizasyonu başarısız:', error.message);
+    throw error;
   }
 
   return xml;
