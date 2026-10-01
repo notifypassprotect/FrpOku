@@ -1555,3 +1555,7 @@ td.col-fileSize {
  gap: 0.5rem;
  }
 }
+
+/* Nonblocking bulk import status stays visible while the file list is usable. */
+.fr-import-progress { position:fixed; right:20px; bottom:20px; z-index:12000; width:min(440px,calc(100vw - 32px)); max-height:70vh; overflow:auto; box-sizing:border-box; padding:18px; border:1px solid var(--border,#d5dce6); border-radius:12px; background:var(--bg-surface,#fff); color:var(--text-primary,#1e293b); box-shadow:0 12px 40px #0003; font:13px/1.5 var(--font,sans-serif); }
+.fr-import-progress progress { accent-color:var(--accent,#2563eb); }

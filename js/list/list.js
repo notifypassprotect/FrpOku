@@ -142,64 +142,68 @@ async function readFileAsText(file) {
   }
 }
 
+let importInProgress = false;
 async function handleFiles(fileList) {
-  const allIncoming = Array.from(fileList || []);
-  if (allIncoming.length === 0) return;
-
-  const validFiles = [];
-  const rejectedFiles = [];
-
-  allIncoming.forEach(f => {
-    const isFrp = f.name.toLowerCase().endsWith('.frp') || f.name.toLowerCase().endsWith('.fr3');
-    if (!isFrp) {
-      rejectedFiles.push({ name: f.name, reason: 'Yalnızca .frp veya .fr3 dosyaları yüklenebilir.' });
-    } else {
-      validFiles.push(f);
-    }
-  });
-
-  if (rejectedFiles.length > 0) {
-    toast(`${rejectedFiles.length} dosya geçersiz format nedeniyle atlandı.`, 'warning');
-  }
-
-  if (validFiles.length === 0) return;
-
-  const resultsToSave = [];
-
-  for (let i = 0; i < validFiles.length; i++) {
-    const file = validFiles[i];
-    try {
-      const text = await readFileAsText(file);
-      const validation = window.FrpSyntaxCheck?.validateFrpFileContent(file, text);
-      if (!validation || !validation.isValid) {
-        rejectedFiles.push({ name: file.name, reason: validation?.errors?.join(' ') || 'Geçersiz FRP içeriği.' });
-        continue;
+  if (importInProgress) { toast('Devam eden yüklemenin bitmesini bekleyin.', 'warning'); return; }
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
+  importInProgress = true;
+  const panel = document.createElement('section');
+  panel.className = 'fr-import-progress';
+  panel.setAttribute('aria-label', 'Rapor yükleme durumu');
+  panel.innerHTML = `<div style="display:flex;justify-content:space-between;gap:12px"><strong data-title>Raporlar hazırlanıyor</strong><button type="button" class="btn btn-sm btn-ghost" data-stop>Durdur</button></div>
+    <div data-count style="font-size:24px;font-weight:700;margin:10px 0">0 / ${files.length}</div>
+    <progress max="${files.length}" value="0" style="width:100%;height:12px" aria-label="İşlenen dosyalar"></progress>
+    <div data-file style="overflow-wrap:anywhere;margin:8px 0"></div>
+    <div data-status role="status" aria-live="polite" style="font-size:12px">${files.length} dosya seçildi.</div>`;
+  document.body.appendChild(panel);
+  let stop = false, processed = 0, rejected = 0, lastPaint = 0;
+  const batch = [], reasons = [];
+  const stopButton = panel.querySelector('[data-stop]');
+  stopButton.onclick = () => { stop = true; stopButton.disabled = true; stopButton.textContent = 'Durduruluyor…'; };
+  const paint = async (name = '') => {
+    panel.querySelector('[data-count]').textContent = `${processed} / ${files.length}`;
+    panel.querySelector('progress').value = processed;
+    panel.querySelector('[data-file]').textContent = name;
+    panel.querySelector('[data-status]').textContent = `${batch.length} uygun rapor · ${rejected} atlanan dosya`;
+    await new Promise(resolve => setTimeout(resolve, 0));
+    lastPaint = performance.now();
+  };
+  try {
+    await paint();
+    for (const file of files) {
+      if (stop) break;
+      try {
+        if (!/\.(frp|fr3)$/i.test(file.name)) throw new Error('Desteklenmeyen dosya türü');
+        const text = await readFileAsText(file);
+        const validation = window.FrpSyntaxCheck?.validateFrpFileContent(file, text);
+        if (!validation?.isValid) throw new Error(validation?.errors?.join(' ') || 'Geçersiz FRP içeriği');
+        const parsed = parseFrp(text);
+        batch.push({ parsedData: parsed, fileName: file.name, fileSize: file.size });
+      } catch (error) {
+        rejected++;
+        if (reasons.length < 5) reasons.push(`${file.name}: ${error.message}`);
       }
-      const parsed = typeof parseFrp === 'function' ? parseFrp(text) : { reportName: file.name, queries: [] };
-      resultsToSave.push({ parsedData: parsed, fileName: file.name, fileSize: file.size });
-    } catch (err) {
-      console.warn('Dosya okuma hatası:', file.name, err);
+      processed++;
+      if (performance.now() - lastPaint >= 16 || processed === files.length) await paint(file.webkitRelativePath || file.name);
     }
-  }
-
-  if (rejectedFiles.length > 0) {
-    const firstReason = rejectedFiles[0]?.reason || 'Geçersiz dosya.';
-    toast(`${rejectedFiles.length} dosya yüklenmedi: ${firstReason}`, 'warning');
-  }
-
-  if (resultsToSave.length > 0) {
-    const res = FrpStore.addMany(resultsToSave);
-    const added = res.added || resultsToSave.length;
-    const updated = res.updated || 0;
-    toast(`${added} rapor başarıyla yüklendi.${updated > 0 ? ` (${updated} güncellendi)` : ''}`, 'success');
-    if (window.FrpAudit) {
-      window.FrpAudit.logAction({
-        action: 'REPORT_UPLOAD',
-        target: `${added} Rapor`,
-        details: `${added} adet rapor sisteme başarıyla yüklendi.`
-      });
-    }
+    stopButton.disabled = true;
+    panel.querySelector('[data-title]').textContent = 'Raporlar listeye ekleniyor';
+    await paint();
+    const result = batch.length ? FrpStore.addMany(batch) : { added: 0, updated: 0 };
+    batch.length = 0;
     refreshAll();
+    panel.querySelector('[data-title]').textContent = stop ? 'Yükleme durduruldu' : 'Dosyalar işlendi';
+    panel.querySelector('[data-status]').textContent = `${result.added ?? 0} yeni · ${result.updated ?? 0} güncellenen · ${rejected} atlanan · ${files.length - processed} işlenmeyen. Bulut kayıt durumunu üst çubuktan takip edebilirsiniz.`;
+    panel.querySelector('[data-file]').textContent = reasons.join(' · ');
+  } catch (error) {
+    panel.querySelector('[data-title]').textContent = 'Yükleme tamamlanamadı';
+    panel.querySelector('[data-status]').textContent = error.message || 'Dosyalar işlenirken hata oluştu.';
+  } finally {
+    importInProgress = false;
+    stopButton.disabled = false;
+    stopButton.textContent = 'Kapat';
+    stopButton.onclick = () => panel.remove();
   }
 }
 window.handleFiles = handleFiles;
@@ -552,7 +556,7 @@ function renderTable() {
   if (resultCount) resultCount.textContent = sorted.length + ' sonuç';
 
   const prefs = FrpStore.getPreferences();
-  const pageSize = prefs.pageSize || 50;
+  const pageSize = Math.min(200, Math.max(1, Number(prefs.pageSize) || 50));
   const totalItems = sorted.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   if (currentPage > totalPages) currentPage = totalPages;
@@ -694,7 +698,7 @@ function renderCards(container) {
   const sorted = sortFiles(allFiles);
   if (resultCount) resultCount.textContent = sorted.length + ' sonuç';
   const target = container || document.getElementById('cardsView');
-  const pageSize = FrpStore.getPreferences().pageSize || 50;
+  const pageSize = Math.min(200, Math.max(1, Number(FrpStore.getPreferences().pageSize) || 50));
   renderPaginationControls(sorted.length, pageSize);
   const start = (currentPage - 1) * pageSize;
   const visible = pageSize >= 9999 ? sorted : sorted.slice(start, start + pageSize);
@@ -706,7 +710,7 @@ function renderTimeline(container) {
   const sorted = sortFiles(allFiles);
   if (resultCount) resultCount.textContent = sorted.length + ' sonuç';
   const target = container || document.getElementById('timelineView');
-  const pageSize = FrpStore.getPreferences().pageSize || 50;
+  const pageSize = Math.min(200, Math.max(1, Number(FrpStore.getPreferences().pageSize) || 50));
   renderPaginationControls(sorted.length, pageSize);
   const start = (currentPage - 1) * pageSize;
   const visible = pageSize >= 9999 ? sorted : sorted.slice(start, start + pageSize);

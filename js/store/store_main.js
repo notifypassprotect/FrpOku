@@ -100,7 +100,7 @@
     const restored = await restoreFromIndexedDB();
     if (!Array.isArray(restored)) return [];
     _memoryStore = restored;
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(restored)); } catch {}
+    _cacheSmallArchive(restored);
     return restored;
   }
 
@@ -280,7 +280,7 @@
 
   function _flushPendingSync() {
     if (_pendingSyncIds.size === 0) return;
-    [..._pendingSyncIds].forEach(_queueReportSync);
+    [..._pendingSyncIds].filter(id => !_reportSyncChains.has(String(id))).forEach(_queueReportSync);
   }
   if (typeof window !== 'undefined') {
     window.addEventListener('online', _flushPendingSync);
@@ -295,17 +295,35 @@
     _persistedReportHashes = new Map((files || []).map(report => [String(report.id), _reportHash(report)]));
   }
 
+  function _cacheSmallArchive(files) {
+    try {
+      // IndexedDB is the primary archive. Avoid serializing large XML archives
+      // merely to discover that they do not fit in synchronous localStorage.
+      if (files.length > 100 || files.reduce((n, f) => n + (f.rawXml?.length || 0), 0) > 500000) {
+        localStorage.removeItem(STORE_KEY);
+        return;
+      }
+      const json = JSON.stringify(files);
+      if (json.length < 2500000) localStorage.setItem(STORE_KEY, json);
+      else localStorage.removeItem(STORE_KEY);
+    } catch {}
+  }
+
+  async function _persistAcknowledgement(report) {
+    try {
+      const db = await initDB();
+      if (!db) { _cacheSmallArchive(_memoryStore); return; }
+      const tx = db.transaction(DB_STORE, 'readwrite');
+      tx.objectStore(DB_STORE).put(report);
+      tx.oncomplete = () => { try { localStorage.removeItem(STORE_KEY); } catch {} };
+      tx.onerror = () => console.warn('Rapor sürümü yerel diske yazılamadı.');
+    } catch (error) { console.warn('Rapor sürümü kaydedilemedi:', error); }
+  }
+
   function _persistLocal(files) {
     _memoryStore = files;
     syncToIndexedDB(files);
-    try {
-      const json = JSON.stringify(files);
-      if (json.length < 2500000) {
-        localStorage.setItem(STORE_KEY, json);
-      }
-    } catch (e) {
-      // localStorage kotası aşıldıysa IndexedDB yeterlidir
-    }
+    _cacheSmallArchive(files);
     return true;
   }
 
@@ -313,7 +331,7 @@
     const current = _memoryStore.find(report => String(report.id) === String(id));
     if (!current || !version) return;
     current.version = version;
-    _persistLocal(_memoryStore);
+    _persistAcknowledgement(current);
     _persistedReportHashes.set(String(id), _reportHash(current));
   }
 
@@ -322,12 +340,24 @@
     else if (typeof window.toast === 'function') window.toast(message, 'error', 6000);
   }
 
+  let _activeSyncRequests = 0;
+  const _syncWaiters = [];
+  async function _withSyncSlot(task) {
+    if (_activeSyncRequests >= 4) await new Promise(resolve => _syncWaiters.push(resolve));
+    else _activeSyncRequests++;
+    try { return await task(); }
+    finally {
+      const next = _syncWaiters.shift();
+      if (next) next(); else _activeSyncRequests--;
+    }
+  }
+
   function _queueReportSync(id) {
     if (!window.FrpCloud || typeof window.FrpCloud.saveReport !== 'function') return;
     const key = String(id);
     const syncSessionIdentity = _sessionIdentity();
     const previous = _reportSyncChains.get(key) || Promise.resolve();
-    const next = previous.catch(() => {}).then(async () => {
+    const next = previous.catch(() => {}).then(() => _withSyncSlot(async () => {
       if (syncSessionIdentity !== _sessionIdentity()) return;
       const latest = _memoryStore.find(report => String(report.id) === key);
       if (!latest) {
@@ -383,7 +413,7 @@
         const eventName = error?.status === 409 ? 'frp:sync-conflict' : 'frp:sync-error';
         window.dispatchEvent(new CustomEvent(eventName, { detail: { id: key, message: error?.message || 'Rapor kaydedilemedi.' } }));
       }
-    }).finally(() => {
+    })).finally(() => {
       if (_reportSyncChains.get(key) === next) _reportSyncChains.delete(key);
     });
     _reportSyncChains.set(key, next);
@@ -530,7 +560,7 @@
       }
 
       _memoryStore = loadedFiles;
-      try { localStorage.setItem(STORE_KEY, JSON.stringify(loadedFiles)); } catch (e) {}
+      _cacheSmallArchive(loadedFiles);
       syncToIndexedDB(loadedFiles);
       _rememberPersisted(loadedFiles);
     } catch (err) {
@@ -581,7 +611,7 @@
         }
       });
     }
-    return list.sort((a, b) => {
+    return [...list].sort((a, b) => {
       if (a.isFavorite && !b.isFavorite) return -1;
       if (!a.isFavorite && b.isFavorite) return 1;
       return new Date(b.loadedAt || 0) - new Date(a.loadedAt || 0);
@@ -594,8 +624,8 @@
     let decId = strId;
     try { decId = decodeURIComponent(strId); } catch {}
 
-    const list = getAll();
-    const item = list.find(r => r.id === id || String(r.id) === strId || String(r.id) === decId);
+    const candidate = _read().find(r => r.id === id || String(r.id) === strId || String(r.id) === decId);
+    const item = candidate && _reportsVisibleToSession([candidate])[0];
     if (!item) return null;
     item.queries  = Array.isArray(item.queries)  ? item.queries  : [];
     item.datasets = Array.isArray(item.datasets) ? item.datasets : [];
@@ -726,9 +756,13 @@
     const ownerUsername = curUser ? curUser.username : '';
     const ownerDepartment = curUser ? (curUser.department || 'Bilgi İşlem') : '';
 
+    const nameIndex = new Map();
+    files.forEach((file, index) => {
+      if (String(file.userId || file.user_id) === String(userId) && !nameIndex.has(file.name)) nameIndex.set(file.name, index);
+    });
     parsedList.forEach(item => {
       const { parsedData, fileName, fileSize } = item;
-      const existingIdx = files.findIndex(f => f.name === fileName && String(f.userId || f.user_id) === String(userId));
+      const existingIdx = (nameIndex.get(fileName) ?? -1);
       const autoTags = window.FrpTags ? window.FrpTags.generateAutoTags(parsedData, fileName) : [];
       const existingTags = existingIdx >= 0 ? (files[existingIdx].tags || []) : [];
       const mergedTags = [...new Set([...existingTags, ...autoTags])];
@@ -775,6 +809,7 @@
         files[existingIdx] = fileRecord;
         updated++;
       } else {
+        nameIndex.set(fileName, files.length);
         files.push(fileRecord);
         added++;
       }
@@ -2421,6 +2456,9 @@
     bumpVersionFilename: (name, count) => window.FrpTags ? window.FrpTags.bumpVersionFilename(name, count) : name,
 
     refreshFromCloud: async function() {
+      // An archive refresh during a bulk save causes redundant full writes and
+      // may replace records with a response captured before their save finished.
+      if (_reportSyncChains.size > 0) return getAll();
       const refreshSequence = ++_refreshSequence;
       const sessionIdentity = _sessionIdentity();
       if (sessionIdentity === 'anonymous') return [];
@@ -2433,7 +2471,7 @@
         typeof window.FrpCloud.loadSnippets === 'function' ? window.FrpCloud.loadSnippets() : Promise.resolve(null),
         typeof window.FrpCloud.loadSettings === 'function' ? window.FrpCloud.loadSettings() : Promise.resolve(null)
       ]);
-      if (refreshSequence !== _refreshSequence || sessionIdentity !== _sessionIdentity()) return getAll();
+      if (refreshSequence !== _refreshSequence || sessionIdentity !== _sessionIdentity() || _reportSyncChains.size > 0) return getAll();
 
       if (trashSettled.status === 'fulfilled' && Array.isArray(trashSettled.value)) _writeTrash(trashSettled.value);
       if (categorySettled.status === 'fulfilled' && Array.isArray(categorySettled.value)) localStorage.setItem(CATEGORIES_KEY, JSON.stringify(categorySettled.value));
