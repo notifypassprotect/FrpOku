@@ -487,9 +487,11 @@
         }
       });
 
-      // Detail views can use the durable local report without waiting for every
+      // Detail views and list view can use the durable local report without waiting for every
       // cloud list, settings, categories and snippets request to finish.
       resolveLocalReady();
+      if (typeof window.refreshAll === 'function') window.refreshAll();
+      window.dispatchEvent(new CustomEvent('frp:local-ready'));
 
       // Bulut verilerini (Aktif raporlar, çöp kutusu, kategoriler, snippets, ayarlar) paralel çek:
       if (window.FrpCloud && bootstrapSessionIdentity !== 'anonymous') {
@@ -1598,6 +1600,10 @@
   let _activeWorkspace = localStorage.getItem(_workspaceStorageKey()) || 'personal';
 
   function getActiveWorkspace() {
+    const saved = localStorage.getItem(_workspaceStorageKey());
+    if (saved && (saved === 'pool' || saved === 'personal' || saved === 'mine')) {
+      _activeWorkspace = saved;
+    }
     return _activeWorkspace;
   }
 

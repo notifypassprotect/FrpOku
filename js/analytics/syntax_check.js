@@ -675,6 +675,18 @@
     return depth;
   }
 
+  function caseDepthAt(text, end) {
+    let depth = 0;
+    const regex = /\b(CASE|END)\b/gi;
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+      if (match.index >= end) break;
+      if (match[1].toUpperCase() === 'CASE') depth++;
+      else if (match[1].toUpperCase() === 'END') depth = Math.max(0, depth - 1);
+    }
+    return depth;
+  }
+
   function consumeJoinSource(text, start) {
     let pos = start;
     while (/\s/.test(text[pos] || '')) pos++;
@@ -1063,14 +1075,16 @@
         if (nextItem && nextItem.lineNo <= endLineObj.line) {
           const nextTrimClean = nextItem.clean.trim();
           const endsWithComma = /,\s*$/.test(curTrim);
-          const endsWithOp = /(=|<>|!=|<=|>=|<|>|\+|-|\*|\/|\|\||\bAS|\bAND|\bOR|\bCASE|\bWHEN|\bTHEN|\bELSE)\s*$/i.test(curTrim);
+          const endsWithOp = /(=|<>|!=|<=|>=|<|>|\+|-|\*|\/|\|\||\bAS|\bAND|\bOR|\bCASE|\bWHEN|\bTHEN|\bELSE|\()\s*$/i.test(curTrim);
           const startsWithComma = /^\s*,/.test(nextTrimClean);
           const startsWithFrom = /^\s*FROM\b/i.test(nextTrimClean);
-          const isSqlContinuation = /^(?:AND|OR|WHEN|THEN|ELSE|END)\b/i.test(curTrim) || /^(?:AND|OR|WHEN|THEN|ELSE|END)\b/i.test(nextTrimClean);
-          const lineOffset = lineStartOffsets[l - 1] || 0;
-          const isNestedExpression = parenthesisDepthAt(maskedSql, lineOffset) > 0;
+          const isSqlContinuation = /^(?:AND|OR|WHEN|THEN|ELSE|END|CASE)\b/i.test(curTrim) || /^(?:AND|OR|WHEN|THEN|ELSE|END|CASE)\b/i.test(nextTrimClean);
+          const lineEndOffset = (l < lineStartOffsets.length) ? lineStartOffsets[l] : maskedSql.length;
+          const isNestedExpression = parenthesisDepthAt(maskedSql, lineEndOffset) > 0 ||
+                                     caseDepthAt(maskedSql, lineEndOffset) > 0;
+          const startsWithClosing = /^\s*[\)]/.test(nextTrimClean);
 
-          if (!endsWithComma && !endsWithOp && !startsWithComma && !startsWithFrom && !isSqlContinuation && !isNestedExpression) {
+          if (!endsWithComma && !endsWithOp && !startsWithComma && !startsWithFrom && !isSqlContinuation && !isNestedExpression && !startsWithClosing) {
             const nextStartsWithOp = /^(=|<>|!=|<=|>=|<|>|\+|-|\*|\/|\|\|)/.test(nextTrimClean);
             const nextStartsNewExpr = !nextStartsWithOp && (
               /^(?:[a-zA-Z_]\w*\s*\(|CASE\b|\(|\d+|'|[a-zA-Z_]\w*\.[a-zA-Z0-9_#$*]+)/i.test(nextTrimClean) ||

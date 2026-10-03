@@ -1246,7 +1246,10 @@ function initListPage() {
     if (!isAdmin && FrpStore.getActiveWorkspace?.() === 'mine') {
       FrpStore.setActiveWorkspace?.('personal');
     }
-    setWorkspaceTabState(FrpStore.getActiveWorkspace?.() || 'personal');
+    const curWs = FrpStore.getActiveWorkspace?.() || 'personal';
+    setWorkspaceTabState(curWs);
+    const pn = document.getElementById('poolNotice');
+    if (pn) pn.style.display = (curWs === 'pool') ? 'block' : 'none';
     updateWorkspaceCounts();
   };
   refreshWorkspaceAccess();
@@ -1270,9 +1273,31 @@ function initListPage() {
   }
   updateAnalyticsVisibility();
 
+  // Yerel depodaki (IndexedDB) veriler hazır olduğunda listeyi derhal render et:
+  if (window.FrpStoreLocalReady) {
+    window.FrpStoreLocalReady.then(() => {
+      refreshWorkspaceAccess();
+      refreshAll();
+      updateAnalyticsVisibility();
+    }).catch(() => {});
+  }
+  window.addEventListener('frp:local-ready', () => {
+    refreshWorkspaceAccess();
+    refreshAll();
+    updateAnalyticsVisibility();
+  });
+
+  // Sayfaya geri dönüldüğünde (bfcache / history.back / detaydan dönüş):
+  window.addEventListener('pageshow', () => {
+    refreshWorkspaceAccess();
+    refreshAll();
+    updateAnalyticsVisibility();
+  });
+
   // Bulut senkronizasyonu tamamlandığında listeyi arka planda güncelle (UI event binding'i asla BLOKE ETMEZ):
   if (window.FrpStoreReady) {
     window.FrpStoreReady.then(() => {
+      refreshWorkspaceAccess();
       refreshAll();
       updateAnalyticsVisibility();
     }).catch(err => {

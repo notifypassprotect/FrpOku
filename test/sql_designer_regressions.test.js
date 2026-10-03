@@ -133,3 +133,36 @@ test('table function with parameter list does not produce Cartesian product warn
   assert.equal(resCartesian.warnings.some(w => w.includes('Kartezyen')), true, 'Comma-separated tables must still be flagged');
 });
 
+test('multiline count distinct case expressions do not produce false positive missing comma errors', () => {
+  const ctx = loadSqlAnalyzers();
+  const sql = `select
+  count(distinct C.HASTA_ID) total,
+  count(distinct
+    case
+      when exists(
+        select *
+        from hasta_tani ht
+        where
+          HT.TARIHI between c.tarihi and c.tarihi + 30
+          and HT.HASTA_ID = C.HASTA_ID
+          and HT.TANI_KODU in ('575', '575.01')
+          or
+          exists(
+            select * from cari cc
+            left outer join tetkik tt on tt.id=cc.tetkik_id
+            where cc.tarihi between c.tarihi and c.tarihi + 30
+            and CC.HASTA_ID=C.HASTA_ID
+            and tt.fatura_kodu in ('P606310', '606310')
+          )
+        )
+      then C.hasta_id end) adet
+from cari c`;
+
+  const res = ctx.FrpSyntaxCheck.checkSqlStaticSyntax(sql);
+  const commaErrors = res.errors.filter(e => e.includes('virgül'));
+  assert.equal(commaErrors.length, 0, 'SyntaxCheck must not flag missing comma on multiline count(distinct case)');
+
+  const diagErrors = Array.from(ctx.findSyntaxErrors(sql, 'sql')).filter(d => (d.message || '').includes('virgül') || (d.suggestion || '').includes('virgül'));
+  assert.equal(diagErrors.length, 0, 'Highlight diagnostics must not flag missing comma on multiline count(distinct case)');
+});
+
