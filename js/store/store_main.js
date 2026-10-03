@@ -50,19 +50,17 @@
   async function syncToIndexedDB(files) {
     try {
       const db = await initDB();
-      if (!db) return;
-      await new Promise(resolve => {
+      if (!db) return false;
+      return await new Promise(resolve => {
         const tx = db.transaction(DB_STORE, 'readwrite');
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => resolve();
-        tx.onabort = () => resolve();
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+        tx.onabort = () => resolve(false);
         const store = tx.objectStore(DB_STORE);
         store.clear();
         files.forEach(f => store.put(f));
       });
-    } catch (e) {
-      console.warn('IndexedDB sync hatası:', e);
-    }
+    } catch (e) { console.warn('IndexedDB sync hatası:', e); return false; }
   }
 
   async function syncTrashToIndexedDB(trashItems) {
@@ -266,11 +264,16 @@
     return [...unique.values()].sort((a, b) => new Date(a.editedAt || 0) - new Date(b.editedAt || 0));
   }
 
+  let _syncStatusTimer = null;
   function _savePendingSyncIds() {
-    try {
-      localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify([..._pendingSyncIds]));
-    } catch (e) {}
-    window.dispatchEvent(new Event('frp:sync-status'));
+    // Report-level IndexedDB markers are authoritative; coalesce the compatibility
+    // index and UI updates instead of serializing 10,000 IDs after every receipt.
+    if (_syncStatusTimer) return;
+    _syncStatusTimer = setTimeout(() => {
+      _syncStatusTimer = null;
+      try { localStorage.setItem(PENDING_SYNC_KEY,JSON.stringify([..._pendingSyncIds])); } catch {}
+      window.dispatchEvent(new Event('frp:sync-status'));
+    },150);
   }
 
   function getSyncStatus() {
@@ -316,14 +319,14 @@
   }
 
   async function _persistAcknowledgement(report) {
-    try {
-      const db = await initDB();
-      if (!db) { _cacheSmallArchive(_memoryStore); return; }
-      const tx = db.transaction(DB_STORE, 'readwrite');
+    const db = await initDB();
+    if (!db) throw new Error('Yerel aktarım kuyruğuna erişilemiyor.');
+    await new Promise((resolve,reject) => {
+      const tx = db.transaction(DB_STORE,'readwrite');
       tx.objectStore(DB_STORE).put(report);
-      tx.oncomplete = () => { try { localStorage.removeItem(STORE_KEY); } catch {} };
-      tx.onerror = () => console.warn('Rapor sürümü yerel diske yazılamadı.');
-    } catch (error) { console.warn('Rapor sürümü kaydedilemedi:', error); }
+      tx.oncomplete = resolve;
+      tx.onerror = tx.onabort = () => reject(new Error('Yerel aktarım kuyruğu kaydedilemedi.'));
+    });
   }
 
   function _persistLocal(files) {
@@ -337,7 +340,7 @@
     const current = _memoryStore.find(report => String(report.id) === String(id));
     if (!current || !version) return;
     current.version = version;
-    _persistAcknowledgement(current);
+    _persistAcknowledgement(current).catch(error => _notifySyncIssue(error.message));
     _persistedReportHashes.set(String(id), _reportHash(current));
   }
 
@@ -349,7 +352,7 @@
   let _activeSyncRequests = 0;
   const _syncWaiters = [];
   async function _withSyncSlot(task) {
-    if (_activeSyncRequests >= 4) await new Promise(resolve => _syncWaiters.push(resolve));
+    if (_activeSyncRequests >= (window.location?.protocol === 'file:' ? 4 : 40)) await new Promise(resolve => _syncWaiters.push(resolve));
     else _activeSyncRequests++;
     try { return await task(); }
     finally {
@@ -372,12 +375,15 @@
         return;
       }
       try {
+        if (await _lastFilesWrite === false) throw Object.assign(new Error('Yerel kuyruk kaydedilemedi. Depolama alanını kontrol edin; sayfayı kapatmayın.'),{status:507});
+        const sentToken = latest._syncToken;
+        const snapshot = {...latest};
         let saved;
         for (let attempt = 0; attempt < 4; attempt++) {
           const delay = Math.max(0, _syncPauseUntil - Date.now());
           if (delay) await new Promise(resolve => setTimeout(resolve, delay));
           if (syncSessionIdentity !== _sessionIdentity()) return;
-          try { saved = await window.FrpCloud.saveReport(latest); break; }
+          try { saved = await window.FrpCloud.saveReport(snapshot); break; }
           catch (error) {
             if (error.status === 429) _syncPauseUntil = Date.now() + Math.max(1000, error.retryAfterMs || 61000);
             if (attempt === 3 || (error.status && error.status !== 429 && error.status < 500)) throw error;
@@ -386,36 +392,31 @@
         }
         if (syncSessionIdentity !== _sessionIdentity()) return;
         if (!saved) throw new Error('Bulut kaydı doğrulanamadı.');
-        _applySavedVersion(key, saved.version);
-        _pendingSyncIds.delete(key);
+        const current = _memoryStore.find(report => String(report.id) === key);
+        if (!current) return;
+        current.version = saved.version;
+        const unchanged = current._syncToken === sentToken;
+        if (unchanged) current._syncPending = false;
+        // Persist the acknowledged version before removing the resumable queue entry.
+        await _persistAcknowledgement(current);
+        if (syncSessionIdentity !== _sessionIdentity()) return;
+        if (current._syncToken === sentToken) {
+          _pendingSyncIds.delete(key);
+          _persistedReportHashes.set(key,_reportHash(current));
+        }
         _syncIssues.delete(key);
         _lastSyncedAt = Date.now();
         _savePendingSyncIds();
       } catch (error) {
+        if (syncSessionIdentity !== _sessionIdentity()) return;
         console.warn('Rapor senkronizasyonu başarısız:', error);
         if (error?.status === 409) {
-          _syncIssues.set(key, 'conflict');
-          const draftSaved = _preserveConflictDraft(latest);
-          if (!draftSaved) _notifySyncIssue('Çakışan rapor için yerel kopya saklanamadı. Sayfayı yenilemeden raporu dışa aktarın.');
-          // Çakışma: Sunucudaki sürüm yerelden daha yeni. Stale raporu kuyruktan kaldır, döngüyü sonlandır:
-          if (draftSaved) _pendingSyncIds.delete(key);
+          _syncIssues.set(key,'conflict');
+          _pendingSyncIds.add(key);
+          _preserveConflictDraft(latest);
           _savePendingSyncIds();
-          if (draftSaved && error.currentVersion) {
-            _applySavedVersion(key, error.currentVersion);
-          }
-          if (draftSaved && window.FrpCloud && typeof window.FrpCloud.getReport === 'function') {
-            window.FrpCloud.getReport(key).then(fresh => {
-              if (fresh) {
-                const idx = _memoryStore.findIndex(r => String(r.id) === key);
-                if (idx >= 0) {
-                  _memoryStore[idx] = fresh;
-                  _persistLocal(_memoryStore);
-                  _persistedReportHashes.set(key, _reportHash(fresh));
-                }
-              }
-            }).catch(() => {});
-          }
-        } else if (error?.status === 400 || error?.status === 401 || error?.status === 403 || error?.status === 404) {
+          _notifySyncIssue('Sunucuda farklı bir sürüm var. Yerel raporunuz ve aktarım kuyruğu korundu.');
+        } else if (error?.status === 400 || error?.status === 401 || error?.status === 403 || error?.status === 404 || error?.status === 413 || error?.status === 507) {
           _syncIssues.set(key, 'error');
           // Keep the local report until a cloud save is actually acknowledged.
           _pendingSyncIds.add(key);
@@ -442,6 +443,10 @@
     const changedIds = syncCloud ? ownedFiles
       .filter(report => _persistedReportHashes.get(String(report.id)) !== _reportHash(report))
       .map(report => String(report.id)) : [];
+    const changed = new Set(changedIds);
+    ownedFiles.forEach(report => {
+      if (changed.has(String(report.id))) { report._syncToken = _uuid(); report._syncPending = true; }
+    });
     _persistLocal(files);
     if (changedIds.length && !_pendingSyncIds.size) _syncProgressIds.clear();
     changedIds.forEach(id => { _pendingSyncIds.add(id); _syncProgressIds.add(id); _syncIssues.delete(id); });
@@ -466,6 +471,16 @@
     try {
       let isCloudLoaded = false;
       let loadedFiles = [];
+      // Restore the durable archive before merging cloud summaries. Large archives
+      // deliberately have no localStorage copy, so _read() alone is insufficient.
+      const diskFiles = await restoreFromIndexedDB();
+      if (_sessionIdentity() !== bootstrapSessionIdentity) return;
+      if (diskFiles.length) _memoryStore = diskFiles;
+      (_read() || []).forEach(report => {
+        if (report._syncPending && String(report.userId || report.user_id) === String(window.FrpAuth?.getUser()?.id)) {
+          _pendingSyncIds.add(String(report.id)); _syncProgressIds.add(String(report.id));
+        }
+      });
 
       // Bulut verilerini (Aktif raporlar, çöp kutusu, kategoriler, snippets, ayarlar) paralel çek:
       if (window.FrpCloud && bootstrapSessionIdentity !== 'anonymous') {
@@ -493,14 +508,7 @@
                 const local = localMap.get(cfId);
                 let item = cf;
 
-                if (_pendingSyncIds.has(cfId) && local) {
-                  if (_syncIssues.get(cfId) === 'conflict' || (Number(local?.version) || 0) >= (Number(cf?.version) || 0)) {
-                    item = local;
-                  } else {
-                    _pendingSyncIds.delete(cfId);
-                    _savePendingSyncIds();
-                  }
-                }
+                if (_pendingSyncIds.has(cfId) && local) item = local;
 
                 // Kullanıcı notunun buluttaki boş veriyle ezilmesini önle
                 if (userNotes[cfId]?.note && (!item.userNote || !item.userNote.trim())) {
@@ -580,8 +588,10 @@
       }
 
       _memoryStore = loadedFiles;
+      _savePendingSyncIds();
       _cacheSmallArchive(loadedFiles);
-      syncToIndexedDB(loadedFiles);
+      _lastFilesWrite = syncToIndexedDB(loadedFiles);
+      setTimeout(_flushPendingSync, 1000);
       _rememberPersisted(loadedFiles);
     } catch (err) {
       console.warn('Bootstrap error:', err);
@@ -2462,6 +2472,7 @@
   // ── Public Store API (Köprü ve Delegasyon) ─────────────────────
   const FrpStore = {
     getSyncStatus, getSyncConflictDrafts,
+    waitForLocalSave: () => _lastFilesWrite,
     getAll, getById, ensureFullReport, add, addMany, deleteOne, deleteMany, deleteAll, resetAllUserData, clearSessionCache,
     updateNote, updateMeta, updateCode, getCodeHistory, revertLastCodeEdit, updateReport, saveFile, updateFileName, restoreFromIndexedDB, hydrateFromIndexedDB,
     exportBackup, importBackup,
@@ -2532,13 +2543,7 @@
           const id = String(cloudReport.id);
           const local = localMap.get(id);
           let report = cloudReport;
-          if (_pendingSyncIds.has(id) && local) {
-            if (_syncIssues.get(id) === 'conflict' || (Number(local.version) || 0) >= (Number(cloudReport.version) || 0)) report = local;
-            else {
-              _pendingSyncIds.delete(id);
-              _savePendingSyncIds();
-            }
-          }
+          if (_pendingSyncIds.has(id) && local) report = local;
           if (userNotes[id]?.note && !String(report.userNote || '').trim()) {
             report = { ...report, userNote: userNotes[id].note, user_note: userNotes[id].note };
           }
@@ -2564,6 +2569,12 @@
 
   let _lastBackgroundSyncTime = Date.now();
   function startBackgroundSync() {
+    setInterval(() => {
+      if (window.FrpAuth?.isLoggedIn() && navigator.onLine !== false) _flushPendingSync();
+    }, 30000);
+    window.addEventListener('beforeunload', event => {
+      if (_pendingSyncIds.size) { event.preventDefault(); event.returnValue = ''; }
+    });
     setInterval(async () => {
       if (typeof document !== 'undefined' && document.hidden) return;
       if (!window.FrpAuth || !window.FrpAuth.isLoggedIn()) return;

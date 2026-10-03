@@ -1,4 +1,5 @@
 function registerReportWriteRoute(app, deps) {
+  require('./report_bulk_write').registerBulkReportWrite(app, deps);
   const { apiWriteRateLimiter, buildOwnedReportRow, canManageReport, getReportRecord, nextReportVersion, readLocalReports, reportId, reportRowToClient, requireAuth, safeLogStr, supabase, toSupabaseReportRow, writeLocalReports } = deps;
 
   app.put('/api/reports/:id', apiWriteRateLimiter, requireAuth, async (req, res) => {

@@ -193,6 +193,7 @@ async function handleFiles(fileList) {
     panel.querySelector('[data-title]').textContent = 'Raporlar listeye ekleniyor';
     await paint();
     const result = batch.length ? FrpStore.addMany(batch) : { added: 0, updated: 0 };
+    if (await FrpStore.waitForLocalSave() === false) throw new Error('Raporlar bellekte; yerel kuyruk diske yazılamadı. Depolama alanını kontrol edin ve sayfayı kapatmayın.');
     batch.length = 0;
     refreshAll();
     panel.querySelector('[data-title]').textContent = stop ? 'Yükleme durduruldu' : 'Dosyalar işlendi';

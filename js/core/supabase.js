@@ -230,6 +230,49 @@
     return r;
   }
 
+  // Bound both report count and encoded payload size. At most two packages fly
+  // concurrently; each report promise resolves only after its server receipt.
+  const uploadQueue = [];
+  let uploadTimer = null, activePackages = 0;
+  function enqueueUpload(report) {
+    const body = JSON.stringify(report); // immutable snapshot for idempotent retry
+    const auth = serverAuthHeaders().Authorization || '';
+    return new Promise((resolve,reject) => {
+      uploadQueue.push({body,bytes:new Blob([body]).size,id:String(report.id),auth,resolve,reject});
+      scheduleUpload();
+    });
+  }
+  function scheduleUpload() {
+    if (uploadTimer || !uploadQueue.length || activePackages >= 2) return;
+    uploadTimer = setTimeout(() => { uploadTimer=null; drainUploads(); }, 30);
+  }
+  async function drainUploads() {
+    if (!uploadQueue.length || activePackages >= 2) return;
+    const batch = [], auth = uploadQueue[0].auth;
+    let bytes = 32;
+    while(uploadQueue.length && batch.length < 40 && uploadQueue[0].auth === auth) {
+      const next = uploadQueue[0];
+      if (batch.some(item=>item.id === next.id) || (batch.length && bytes + next.bytes > 4 * 1024 * 1024)) break;
+      batch.push(uploadQueue.shift()); bytes += next.bytes + 1;
+    }
+    activePackages++;
+    scheduleUpload();
+    try {
+      if (auth !== (serverAuthHeaders().Authorization || '')) throw Object.assign(new Error('Oturum değişti; aktarım durduruldu.'),{status:401});
+      const response = await serverRequest('/api/reports/bulk-save', {
+        method:'POST',body:'{"reports":[' + batch.map(item=>item.body).join(',') + ']}',timeout:120000
+      });
+      if (!Array.isArray(response?.results)) throw new Error('Sunucu paket sonucunu doğrulamadı.');
+      const byId = new Map(response.results.map(r=>[String(r.id),r]));
+      for(const item of batch) {
+        const saved = byId.get(item.id);
+        if(saved?.success && Number(saved.version)>0) item.resolve({id:item.id,version:Number(saved.version)});
+        else item.reject(Object.assign(new Error(saved?.reason || 'Rapor kaydı doğrulanamadı.'),{status:saved?.status || 503}));
+      }
+    } catch(error) { batch.forEach(item=>item.reject(error)); }
+    finally { activePackages--;scheduleUpload(); }
+  }
+
   const FrpCloud = {
     async bulkLifecycle(action, items) {
       if (USE_SERVER_BRIDGE) {
@@ -374,18 +417,7 @@
 
     // ── 3. RAPOR KAYDET / GÜNCELLE ──────────────────────────────────
     async saveReport(report) {
-      if (USE_SERVER_BRIDGE) {
-        try {
-          const data = await serverRequest(`/api/reports/${encodeURIComponent(report.id)}`, {
-            method: 'PUT',
-            body: JSON.stringify(report)
-          });
-          return data?.report || false;
-        } catch (error) {
-          console.warn('Rapor kaydedilemedi:', error.message);
-          throw error;
-        }
-      }
+      if (USE_SERVER_BRIDGE) return enqueueUpload(report);
       const sb = getClient();
       if (!sb || !report) return false;
       try {
