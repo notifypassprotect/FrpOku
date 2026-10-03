@@ -201,16 +201,16 @@
               Beni Hatırla
             </label>
             <a href="#" id="linkEmergencyRecover" style="font-size:.75rem;color:#4f46e5;font-weight:700;text-decoration:none;display:none;">
-              🔐 Acil Kurtarma Anahtarı ile Sıfırla
+              Acil Kurtarma Anahtarı ile Sıfırla
             </a>
           </div>
 
           <div id="loginCaptchaContainer" style="display:none;margin-bottom:.85rem;background:#fffbeb;border:1.5px solid #f59e0b;border-radius:10px;padding:.75rem .9rem;box-shadow:0 2px 8px rgba(245,158,11,0.12);">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;">
               <label for="loginCaptchaAnswer" style="font-size:.76rem;font-weight:800;color:#92400e;display:flex;align-items:center;gap:.35rem;">
-                <span>🛡️ Güvenlik Doğrulaması (Captcha)</span>
+                <span>Güvenlik Doğrulaması (Captcha)</span>
               </label>
-              <button type="button" id="btnRefreshCaptcha" title="Soruyu Yenile" style="background:none;border:none;cursor:pointer;font-size:.74rem;font-weight:700;color:#2563eb;">🔄 Yenile</button>
+              <button type="button" id="btnRefreshCaptcha" title="Soruyu Yenile" style="background:none;border:none;cursor:pointer;font-size:.74rem;font-weight:700;color:#2563eb;">Yenile</button>
             </div>
             <div style="display:flex;align-items:center;gap:.65rem;margin-bottom:.35rem;">
               <span id="loginCaptchaQuestion" style="font-size:.95rem;font-weight:800;color:#1e293b;background:#f1f5f9;border:1px solid #cbd5e1;padding:.4rem .85rem;border-radius:8px;letter-spacing:1px;font-family:monospace;">?</span>
@@ -325,15 +325,17 @@
 
           <!-- 4 ADET ACİL ERİŞİM ANAHTARI KARTI -->
           <div id="regKeysNotice" style="display:none;text-align:center;padding:0.5rem 0;">
-            <div style="width:48px;height:48px;margin:0 auto .6rem;background:linear-gradient(135deg, #10b981, #059669);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:#fff;box-shadow:0 6px 20px rgba(16,185,129,0.3);">🔐</div>
-            <div style="font-size:1.1rem;font-weight:800;color:#0f172a;margin-bottom:.25rem;">Kayıt Başarılı!</div>
+            <div style="width:48px;height:48px;margin:0 auto .6rem;background:linear-gradient(135deg, #10b981, #059669);border-radius:14px;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 6px 20px rgba(16,185,129,0.3);">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            </div>
+            <div style="font-size:1.1rem;font-weight:800;color:#0f172a;margin-bottom:.25rem;">Kayıt Başarılı</div>
             <div style="font-size:.82rem;font-weight:700;color:#2563eb;margin-bottom:.4rem;">4 Adet Acil Erişim Anahtarınız Üretildi</div>
             <p style="font-size:.76rem;color:#475569;line-height:1.45;margin-bottom:.85rem;">
-              Bu tek kullanımlık anahtarlar admine veya e-postanıza ulaşamadığınız acil durumlarda şifrenizi sıfırlamanızı sağlar. Lütfen kopyalayıp güvenli bir yere kaydedin.
+              Bu tek kullanımlık anahtarlar yöneticiye veya e-postanıza ulaşamadığınız durumlarda şifrenizi sıfırlamanızı sağlar. Lütfen kopyalayıp güvenli bir yere kaydedin.
             </p>
             <div id="regKeysList" style="display:flex;flex-direction:column;gap:.4rem;margin-bottom:.85rem;"></div>
             <button type="button" id="btnCopyAllRecoveryKeys" style="width:100%;padding:.6rem;border:1px solid #cbd5e1;border-radius:10px;background:#f8fafc;color:#0f172a;font-weight:700;font-size:.8rem;cursor:pointer;margin-bottom:.55rem;">
-              📋 Tüm Anahtarları Kopyala
+              Tüm Anahtarları Kopyala
             </button>
             <button type="button" id="btnProceedAfterKeys" style="width:100%;padding:.7rem;border:none;border-radius:10px;background:#2563eb;color:#fff;font-weight:700;font-size:.86rem;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,0.25);">
               Anahtarları Kaydettim, Giriş Yap
@@ -356,7 +358,7 @@
           <!-- ADIM 1: E-Posta Kodu Gönderme -->
           <div id="forgotStep1" style="margin-bottom:.9rem;">
             <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:.85rem;margin-bottom:.75rem;">
-              <div style="font-weight:800;font-size:.82rem;color:#1e40af;margin-bottom:.45rem;">📧 E-Posta ile Kod Alarak Sıfırla</div>
+              <div style="font-weight:800;font-size:.82rem;color:#1e40af;margin-bottom:.45rem;">E-Posta ile Kod Alarak Sıfırla</div>
               <div style="display:flex;gap:.5rem;align-items:center;">
                 <input type="text" id="forgotIdentifier" aria-label="Şifre sıfırlama kullanıcı adı veya e-posta" placeholder="Kullanıcı adı veya e-posta" style="flex:1;padding:.55rem .75rem;border-radius:8px;background:#ffffff;border:1.5px solid #bfdbfe;color:#0f172a;font-size:.83rem;outline:none;box-sizing:border-box;" />
                 <button type="button" id="btnSendForgotCode" style="padding:.55rem .85rem;border:none;border-radius:8px;background:#2563eb;color:#fff;font-weight:700;font-size:.78rem;cursor:pointer;white-space:nowrap;flex-shrink:0;">Kod Gönder</button>
@@ -366,7 +368,7 @@
 
             <!-- ADIM 2: Kod + Yeni Şifre -->
             <div id="forgotStep2" style="display:none;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:.85rem;margin-bottom:.75rem;">
-              <div style="font-weight:800;font-size:.82rem;color:#0f172a;margin-bottom:.45rem;">🔢 Doğrulama Kodunu Girin</div>
+              <div style="font-weight:800;font-size:.82rem;color:#0f172a;margin-bottom:.45rem;">Doğrulama Kodunu Girin</div>
               <div style="margin-bottom:.5rem;">
                 <input type="text" id="forgotCode" maxlength="6" aria-label="Altı haneli doğrulama kodu" placeholder="6 haneli kod" style="width:100%;padding:.55rem .75rem;border-radius:8px;background:#ffffff;border:1.5px solid #cbd5e1;color:#0f172a;font-size:1.1rem;font-family:monospace;font-weight:800;letter-spacing:6px;text-align:center;outline:none;box-sizing:border-box;" />
               </div>
@@ -374,7 +376,7 @@
                 <input type="password" id="forgotNewPass" aria-label="Yeni şifre" placeholder="Yeni şifre (min 6)" style="padding:.5rem .65rem;border-radius:8px;background:#fff;border:1.5px solid #cbd5e1;color:#0f172a;font-size:.83rem;outline:none;box-sizing:border-box;" />
                 <input type="password" id="forgotNewPassConf" aria-label="Yeni şifre tekrarı" placeholder="Tekrar girin" style="padding:.5rem .65rem;border-radius:8px;background:#fff;border:1.5px solid #cbd5e1;color:#0f172a;font-size:.83rem;outline:none;box-sizing:border-box;" />
               </div>
-              <button type="button" id="btnApplyForgotCode" style="width:100%;padding:.65rem;border:none;border-radius:8px;background:#10b981;color:#fff;font-weight:700;font-size:.85rem;cursor:pointer;">✅ Şifreyi Sıfırla</button>
+              <button type="button" id="btnApplyForgotCode" style="width:100%;padding:.65rem;border:none;border-radius:8px;background:#10b981;color:#fff;font-weight:700;font-size:.85rem;cursor:pointer;">Şifreyi Sıfırla</button>
               <div id="forgotCodeError" style="display:none;font-size:.72rem;color:#b91c1c;margin-top:.4rem;"></div>
             </div>
 
@@ -388,7 +390,7 @@
           <button type="button" id="btnGoToRecFromForgot" style="
             width: 100%; padding:.65rem; border: none; border-radius: 10px;
             background: #4f46e5; color: #ffffff; font-weight: 700; font-size:.82rem; cursor: pointer; margin-bottom:.5rem;
-          ">🔐 Acil Kurtarma Anahtarı ile Sıfırla</button>
+          ">Acil Kurtarma Anahtarı ile Sıfırla</button>
           <button type="button" id="btnBackToLoginFromForgot" style="
             width: 100%; padding:.6rem; border: 1px solid #cbd5e1; border-radius: 10px;
             background: #f1f5f9; color: #475569; font-weight: 700; font-size:.8rem; cursor: pointer;
@@ -398,10 +400,12 @@
         <!-- 4. ACİL ERİŞİM ANAHTARI İLE ŞİFRE SIFIRLAMA -->
         <form id="authRecoveryPanel" style="display: none; text-align: left;">
           <div style="text-align:center;margin-bottom:1.15rem;">
-            <div style="width:48px;height:48px;margin:0 auto .6rem;background:linear-gradient(135deg, #6366f1, #4f46e5);border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.35rem;">🔐</div>
+            <div style="width:48px;height:48px;margin:0 auto .6rem;background:linear-gradient(135deg, #6366f1, #4f46e5);border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            </div>
             <div style="font-size: 1.15rem; font-weight: 800; color: #0f172a; margin-bottom:.25rem;">Acil Erişim Anahtarı ile Kurtarma</div>
             <p style="font-size:.78rem; color: #475569; line-height: 1.45; margin: 0 auto;">
-              Kayıt esnasında verilen 4 acil erişim anahtarından birini girerek şifrenizi anında sıfırlayabilirsiniz.
+              Kayıt esnasında verilen 4 acil erişim anahtarından birini girerek şifrenizi sıfırlayabilirsiniz.
             </p>
           </div>
 
@@ -427,11 +431,11 @@
           </div>
 
           <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:.5rem .75rem;margin-bottom:.85rem;font-size:.72rem;color:#1e40af;line-height:1.4;">
-            ℹ️ Kullanılan kurtarma anahtarı iptal edilir. Yeni şifreniz son 3 şifreniz ile aynı olamaz.
+            Kullanılan kurtarma anahtarı iptal edilir. Yeni şifreniz son 3 şifreniz ile aynı olamaz.
           </div>
 
           <button type="submit" id="btnRecSubmit" style="width:100%;padding:.75rem;border:none;border-radius:10px;background:#4f46e5;color:#ffffff;font-weight:700;font-size:.9rem;cursor:pointer;box-shadow:0 4px 14px rgba(79,70,229,0.25);margin-bottom:.55rem;">
-            Şifreyi Sıfırla ve Oturum Aç 🔓
+            Şifreyi Sıfırla ve Oturum Aç
           </button>
           <button type="button" id="btnBackToLoginFromRec" style="width:100%;padding:.65rem;border:1px solid #cbd5e1;border-radius:10px;background:#f1f5f9;color:#475569;font-weight:700;font-size:.82rem;cursor:pointer;">
             ← Giriş Ekranına Dön
@@ -653,7 +657,7 @@
         errEl.textContent = 'Bağlantı hatası: ' + err.message;
       } finally {
         btnApplyForgotCode.disabled = false;
-        btnApplyForgotCode.textContent = '✅ Şifreyi Sıfırla';
+        btnApplyForgotCode.textContent = 'Şifreyi Sıfırla';
       }
     };
   }
@@ -817,7 +821,7 @@
         const keysList = portal.querySelector('#regKeysList');
         keysList.innerHTML = res.recoveryKeys.map((k, idx) => `
           <div class="auth-recovery-key-pill">
-            <span>🔑 Anahtar #${idx + 1}</span>
+            <span>Anahtar #${idx + 1}</span>
             <code>${escHtml(k)}</code>
           </div>
         `).join('');
@@ -828,7 +832,7 @@
         btnCopy.onclick = async () => {
           try {
             await navigator.clipboard.writeText(res.recoveryKeys.join('\n'));
-            btnCopy.textContent = '✅ Tüm Anahtarlar Kopyalandı!';
+            btnCopy.textContent = 'Tüm Anahtarlar Kopyalandı';
             if (typeof window.toast === 'function') window.toast('Kurtarma anahtarları panoya kopyalandı.', 'success');
           } catch {
             if (typeof window.toast === 'function') window.toast('Lütfen anahtarları elle seçerek kopyalayınız.', 'info');
@@ -892,7 +896,7 @@
     });
 
     btnSubmit.disabled = false;
-    btnSubmit.textContent = 'Şifreyi Sıfırla ve Oturum Aç 🔓';
+    btnSubmit.textContent = 'Şifreyi Sıfırla ve Oturum Aç';
 
     if (res.success && res.user) {
       portal.remove();

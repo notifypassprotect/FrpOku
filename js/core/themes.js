@@ -189,7 +189,7 @@
     } catch (e) {}
     window.dispatchEvent(new CustomEvent('frpoku:uiModeChanged', { detail: { uiMode: valid } }));
     if (showToast && typeof window.toast === 'function') {
-      window.toast(valid === 'retro-win95' ? '💾 Retro Windows 95 Arayüz Modu devrede!' : '✨ Modern Kurumsal Arayüz Modu devrede!', 'info', 2000);
+      window.toast(valid === 'retro-win95' ? 'Retro Windows 95 arayüz modu etkinleştirildi.' : 'Modern arayüz modu etkinleştirildi.', 'info', 2000);
     }
   }
 
@@ -229,15 +229,19 @@
     }
   });
 
+  let _syncingButtons = false;
+
   function updateRetroButtons() {
     const isRetro = getUiMode() === 'retro-win95';
+    const targetText = isRetro ? 'Modern Mod' : 'Retro Mod';
     document.querySelectorAll('#btnRetroModeToggle').forEach(btn => {
-      btn.innerHTML = isRetro ? '✨ Modern Mod' : '💾 Retro Mod';
-      btn.classList.toggle('active', isRetro);
+      if (btn.textContent !== targetText) btn.textContent = targetText;
+      if (btn.classList.contains('active') !== isRetro) btn.classList.toggle('active', isRetro);
     });
+    const mobTargetText = isRetro ? 'Modern Arayüz Modu' : 'Retro Windows 95 Modu';
     document.querySelectorAll('#btnMobRetroToggle').forEach(btn => {
-      const span = btn.querySelector('span');
-      if (span) span.textContent = isRetro ? '✨ Modern Arayüz Modu' : '💾 Retro Windows 95 Modu';
+      const span = btn.querySelector('span') || btn;
+      if (span.textContent !== mobTargetText) span.textContent = mobTargetText;
     });
   }
 
@@ -273,12 +277,18 @@
   if (document.body) document.body.setAttribute('data-ui-mode', initialUiMode);
 
   function syncThemeButtons() {
-    const isDark = getGlobalTheme() === 'dark';
-    document.querySelectorAll('#btnThemeToggle').forEach(btn => {
-      const label = isDark ? 'Aydınlık Mod' : 'Koyu Mod';
-      if (btn.textContent !== label) btn.textContent = label;
-    });
-    updateRetroButtons();
+    if (_syncingButtons) return;
+    _syncingButtons = true;
+    try {
+      const isDark = getGlobalTheme() === 'dark';
+      document.querySelectorAll('#btnThemeToggle').forEach(btn => {
+        const label = isDark ? 'Aydınlık Mod' : 'Koyu Mod';
+        if (btn.textContent !== label) btn.textContent = label;
+      });
+      updateRetroButtons();
+    } finally {
+      _syncingButtons = false;
+    }
   }
 
   if (document.readyState === 'loading') {

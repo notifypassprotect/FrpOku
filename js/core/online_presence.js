@@ -241,17 +241,16 @@
     modal.innerHTML = `
       <div class="frp-lightbox-bar">
         <div class="frp-lightbox-title">
-          <span>🖼️</span>
           <span style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(fileName)}</span>
           ${size ? `<span style="font-size:0.75rem;opacity:0.75;">(${size})</span>` : ''}
         </div>
         <div class="frp-lightbox-tools">
-          <button type="button" class="frp-lightbox-btn btn-zoom-in" title="Yakınlaştır">🔍 +</button>
-          <button type="button" class="frp-lightbox-btn btn-zoom-out" title="Uzaklaştır">🔍 -</button>
+          <button type="button" class="frp-lightbox-btn btn-zoom-in" title="Yakınlaştır">+</button>
+          <button type="button" class="frp-lightbox-btn btn-zoom-out" title="Uzaklaştır">-</button>
           <button type="button" class="frp-lightbox-btn btn-zoom-reset" title="Varsayılan Boyut">1:1</button>
-          ${typeof window.openImageAnnotator === 'function' ? `<button type="button" class="frp-lightbox-btn btn-annotate" title="Çiz & Düzenle">✏️ Düzenle</button>` : ''}
-          <button type="button" class="frp-lightbox-btn btn-download" title="Görseli İndir">⬇️ İndir</button>
-          <button type="button" class="frp-lightbox-btn btn-close-lightbox" title="Kapat (ESC)">✕ Kapat</button>
+          ${typeof window.openImageAnnotator === 'function' ? `<button type="button" class="frp-lightbox-btn btn-annotate" title="Çiz & Düzenle">Düzenle</button>` : ''}
+          <button type="button" class="frp-lightbox-btn btn-download" title="Görseli İndir">İndir</button>
+          <button type="button" class="frp-lightbox-btn btn-close-lightbox" title="Kapat (ESC)">Kapat</button>
         </div>
       </div>
       <div class="frp-lightbox-body">
@@ -836,14 +835,14 @@
       }
       if (Notification.permission === 'granted') {
         if (dot) dot.className = 'frp-notif-status-dot granted';
-        if (text) text.textContent = '🔔 Bildirim: Açık';
+        if (text) text.textContent = 'Bildirim: Açık';
         btnNotif.title = 'Sohbet bildirimlerini kapat';
       } else if (Notification.permission === 'denied') {
         if (dot) dot.className = 'frp-notif-status-dot denied';
-        if (text) text.textContent = '🔕 Bildirim: Engellendi';
+        if (text) text.textContent = 'Bildirim: Engellendi';
       } else {
         if (dot) dot.className = 'frp-notif-status-dot';
-        if (text) text.textContent = '🔔 Bildirimleri Aç';
+        if (text) text.textContent = 'Bildirimleri Aç';
       }
     }
     updateNotifBtnUI();
@@ -942,7 +941,7 @@
         setChatNotificationsEnabled(true);
         updateNotifBtnUI();
         if (typeof window.toast === 'function') {
-          window.toast('✓ Masaüstü bildirimleri aktif! Yeni mesaj veya titreşim geldiğinde anlık bildirim alırsınız.', 'success');
+          window.toast('Masaüstü bildirimleri aktif.', 'success');
         }
       } else if (Notification.permission === 'denied') {
         if (typeof window.showConfirmDialog === 'function') {
@@ -963,7 +962,7 @@
           if (perm === 'granted') {
             setChatNotificationsEnabled(true);
             updateNotifBtnUI();
-            if (typeof window.toast === 'function') window.toast('Masaüstü bildirimleri başarıyla etkinleştirildi! 🎉', 'success');
+            if (typeof window.toast === 'function') window.toast('Masaüstü bildirimleri etkinleştirildi.', 'success');
           } else {
             if (typeof window.toast === 'function') window.toast('Bildirim izni onaylanmadı.', 'info');
           }
@@ -1733,7 +1732,7 @@
       ${isGroup ? `
         <div class="frp-group-info-drawer" id="frpGroupInfoDrawer">
           <div class="frp-group-info-header">
-            <span class="frp-group-info-title">👥 Grup Detayı & Üyeler</span>
+            <span class="frp-group-info-title">Grup Detayı & Üyeler</span>
             <button type="button" class="frp-chat-btn-ctrl btn-group-info-close" aria-label="Grup bilgisini kapat">${chatIcon('close')}</button>
           </div>
           <div style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:0.65rem;">
@@ -1746,7 +1745,7 @@
               <div style="text-align:center; padding:1.5rem; color:var(--text-muted); font-size:0.75rem;">Üyeler yükleniyor...</div>
             </div>
             <button type="button" class="frp-btn-leave-group" id="btnLeaveGroupAction">
-              🚪 Bu Gruptan Ayrıl
+              Bu Gruptan Ayrıl
             </button>
           </div>
         </div>
@@ -1755,7 +1754,7 @@
       <!-- PAYLAŞILAN MEDYA ÇEKMECESİ (İNOVASYON 4) -->
       <div class="frp-chat-media-drawer" style="display: none;">
         <div class="frp-chat-media-drawer-header">
-          <span>📁 Paylaşılan Medya & Ekler</span>
+          <span>Paylaşılan Medya & Ekler</span>
           <button type="button" class="frp-chat-btn-ctrl btn-media-close" aria-label="Medya bölümünü kapat">${chatIcon('close')}</button>
         </div>
         <div class="frp-chat-media-grid">
@@ -1791,10 +1790,10 @@
       <!-- EMOJI SEÇİCİ POPUP -->
       <div class="frp-chat-emoji-picker" style="display: none;">
         <div class="frp-chat-emoji-tabs">
-          <button type="button" class="emoji-tab-btn active" data-cat="faces">😀 Yüzler</button>
-          <button type="button" class="emoji-tab-btn" data-cat="hands">👍 İfadeler</button>
-          <button type="button" class="emoji-tab-btn" data-cat="work">💼 Kurumsal</button>
-          <button type="button" class="emoji-tab-btn" data-cat="hearts">❤️ Semboller</button>
+          <button type="button" class="emoji-tab-btn active" data-cat="faces">Yüzler</button>
+          <button type="button" class="emoji-tab-btn" data-cat="hands">İfadeler</button>
+          <button type="button" class="emoji-tab-btn" data-cat="work">Kurumsal</button>
+          <button type="button" class="emoji-tab-btn" data-cat="hearts">Semboller</button>
         </div>
         <div class="frp-chat-emoji-grid"></div>
       </div>
@@ -1802,7 +1801,7 @@
       <!-- FOOTER / GİRİŞ ALANI (INSTAGRAM DM KAPSÜLÜ VEYA DUYURU BİLGİSİ) -->
       <div class="frp-chat-footer" ${isReadOnlyRoom ? 'style="padding:0;"' : ''}>
         ${isReadOnlyRoom ? `
-          <div class="frp-chat-readonly-notice">📢 Bu resmi duyuru kanalıdır. Sadece sistem yöneticileri paylaşım yapabilir.</div>
+          <div class="frp-chat-readonly-notice">Bu resmi duyuru kanalıdır. Sadece sistem yöneticileri paylaşım yapabilir.</div>
         ` : `
           <div class="frp-chat-reply-composer" hidden>
             <div class="frp-chat-reply-accent"></div>
@@ -2067,11 +2066,11 @@
               if (btnNudgeAction) {
                 btnNudgeAction.disabled = false;
                 btnNudgeAction.classList.remove('cooling-down');
-                btnNudgeAction.title = 'Titreşim Gönder (📳 MSN Titret)';
+                btnNudgeAction.title = 'Titreşim Gönder';
               }
               if (btnNudgeHeader) {
                 btnNudgeHeader.disabled = false;
-                btnNudgeHeader.title = 'Titreşim Gönder (📳 MSN Titret)';
+                btnNudgeHeader.title = 'Titreşim Gönder';
               }
             } else {
               updateBtn();
@@ -2137,11 +2136,11 @@
               </div>
               <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
                 <span class="frp-group-role-badge ${isThisCreator ? 'admin' : 'member'}">
-                  ${isThisCreator ? '👑 Yönetici' : 'Üye'}
+                  ${isThisCreator ? 'Yönetici' : 'Üye'}
                 </span>
                 ${(isMeAdmin && !isSelf && !isThisCreator) ? `
                   <button type="button" class="frp-btn-kick-member" data-user-id="${escHtml(String(mem.id))}" data-user-name="${escHtml(mem.fullName || mem.username)}" title="Gruptan Çıkar">
-                    ✕ Çıkar
+                    Çıkar
                   </button>
                 ` : ''}
               </div>
@@ -3369,8 +3368,8 @@
             <div class="frp-chat-img-thumb-wrap" title="Büyütmek için tıklayın">
               <img src="${escHtml(safeAttachmentUrl)}" alt="${escHtml(m.attachment.name || 'Görsel')}" />
               <div class="frp-chat-img-overlay">
-                <button type="button" class="frp-chat-img-action-btn btn-open-img-lightbox" title="Büyüt ve Önizle">🔍 Önizle</button>
-                <button type="button" class="frp-chat-img-action-btn btn-download-img" title="Görseli İndir">⬇️ İndir</button>
+                <button type="button" class="frp-chat-img-action-btn btn-open-img-lightbox" title="Büyüt ve Önizle">Önizle</button>
+                <button type="button" class="frp-chat-img-action-btn btn-download-img" title="Görseli İndir">İndir</button>
               </div>
             </div>
           `;

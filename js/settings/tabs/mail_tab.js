@@ -9,7 +9,7 @@ window.FrpSettingsTabs.mail = {
     return `
       <div style="display:flex;flex-direction:column;gap:1.25rem;">
         <div>
-          <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">✉️ E-posta & SMTP Sistem Sağlığı</div>
+          <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">E-posta & SMTP Sistem Sağlığı</div>
           <div style="font-size:.78rem;color:var(--text-muted);margin-top:.2rem;">
             Sunucu e-posta gönderim altyapısını, SMTP bağlantı durumunu ve bildirim istatistiklerini izleyin.
           </div>
@@ -71,7 +71,7 @@ window.FrpSettingsTabs.mail = {
             <div style="margin-top:.5rem;padding-top:.75rem;border-top:1px solid var(--border-light);display:flex;align-items:center;gap:.6rem;">
               <input type="email" id="tbMailTestTarget" class="master-search-input" placeholder="Test e-posta adresi..." style="flex:1;font-size:.82rem;padding:.4rem .65rem;" />
               <button type="button" id="btnSendTestEmail" class="btn btn-sm btn-primary" style="font-weight:700;padding:.45rem .85rem;white-space:nowrap;">
-                📧 Test Gönder
+                Test Gönder
               </button>
             </div>
           </div>
@@ -132,7 +132,7 @@ window.FrpSettingsTabs.mail = {
             safeToast('Hata: ' + err.message, 'error');
           } finally {
             btnTest.disabled = false;
-            btnTest.textContent = '📧 Test Gönder';
+            btnTest.textContent = 'Test Gönder';
           }
         });
       }

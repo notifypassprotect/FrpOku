@@ -221,8 +221,8 @@ window.openSettingsModal = function(initialTab = 'appearance') {
       { id: 'trash',      label: 'Çöp Kutusu', count: trashItems.length, isTrash: true },
       { id: 'storage',    label: 'Yedekleme & Depolama' },
       ...(isAdmin ? [
-        { id: 'rooms',    label: '🏢 Sohbet Odaları & Kanallar' },
-        { id: 'mail',     label: '✉️ E-posta & SMTP Sağlığı' }
+        { id: 'rooms',    label: 'Sohbet Odaları & Kanallar' },
+        { id: 'mail',     label: 'E-posta & SMTP Sağlığı' }
       ] : []),
       ...(isAdmin ? [{ id: 'audit', label: 'Denetim Günlüğü' }] : [])
     ];
@@ -341,7 +341,7 @@ window.openSettingsModal = function(initialTab = 'appearance') {
 
         window.dispatchEvent(new CustomEvent('frpoku:avatarChanged', { detail: { avatar: stagedProfile.avatar } }));
 
-        btn.innerHTML = `<span style="display:flex;align-items:center;gap:.35rem;"><span>✓</span><span>Kaydedildi</span></span>`;
+        btn.textContent = 'Kaydedildi';
         btn.style.background = 'linear-gradient(135deg, #059669, #10b981)';
 
         safeToast('Değişiklikler başarıyla kaydedildi.', 'success');

@@ -39,16 +39,14 @@ window.FrpListRenderers = window.FrpListRenderers || {};
     const hasRisk = Array.isArray(file.queries) && file.queries.some(q => /\b(DROP|TRUNCATE|ALTER)\s+(TABLE|DATABASE|VIEW|PROCEDURE|INDEX)\b/i.test(q.sql || ''));
     const hasNote = Boolean((file.userNote && file.userNote.trim()) || (file.noteHtml && file.noteHtml.trim()) || (Array.isArray(file.attachments) && file.attachments.length > 0));
 
-    lines.push('──────────────────────────────');
-    lines.push('🎨 Renk & Durum Bilgisi:');
-    if (hasRisk) lines.push('• 🔴 [Kırmızı - Risk]: Bu raporda DROP/TRUNCATE/ALTER veya riskli SQL komutları tespit edildi!');
-    if (isPublic) lines.push('• 🟢 [Yeşil - Havuzda]: Tüm personelle paylaşılan ortak kütüphane raporudur.');
-    if (qCount > 0) lines.push(`• 🔵 [Mavi - SQL]: Rapor bünyesinde ${qCount} adet SQL sorgusu tanımlıdır.`);
-    if (file.pascalScript || file.hasPascalScript) lines.push('• 🟣 [Mor - Pascal]: Rapor içerisinde özel Pascal Script kod bloğu yer alır.');
-    if (file.category) lines.push(`• 🏷️ [Kategori]: ${file.category}`);
-    if (file.isPinned) lines.push('• 📌 [Sabit]: Listenin en üstünde sabitlenmiş rapor.');
-    if (file.isFavorite) lines.push('• ⭐ [Favori]: Sık kullanılanlar listenize eklenmiştir.');
-    if (hasNote) lines.push('• 📝 [Not]: Rapora iliştirilmiş özel dokümantasyon veya belge mevcuttur.');
+    if (hasRisk) lines.push('[Kırmızı - Risk]: Kritik SQL komutu');
+    if (isPublic) lines.push('[Yeşil - Havuzda]: Ortak havuz raporu');
+    if (qCount > 0) lines.push(`[Mavi - SQL]: ${qCount} SQL sorgusu`);
+    if (file.pascalScript || file.hasPascalScript) lines.push('[Mor - Pascal]: Pascal Script kodu');
+    if (file.category) lines.push(`[Kategori]: ${file.category}`);
+    if (file.isPinned) lines.push('[Sabit]: Sabitlenmiş');
+    if (file.isFavorite) lines.push('[Favori]: Favorilere ekli');
+    if (hasNote) lines.push('[Not]: Rapor notu mevcut');
 
     return lines.join('\n');
   }

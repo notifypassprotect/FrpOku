@@ -494,7 +494,7 @@ function openReportPickerForDiff(slot) {
           <option value="size">Boyuta Göre</option>
           <option value="queries">SQL Sayısına Göre</option>
         </select>
-        ${slot === 'C' && fileC ? `<button class="btn btn-sm btn-ghost" id="cmpPickerRemoveC" style="color:#ef4444;border-color:#ef4444;font-size:.75rem;">✕ Paneli Kaldır</button>` : ''}
+        ${slot === 'C' && fileC ? `<button class="btn btn-sm btn-ghost" id="cmpPickerRemoveC" style="color:#ef4444;border-color:#ef4444;font-size:.75rem;">Paneli Kaldır</button>` : ''}
       </div>
 
       <div class="cmp-picker-list" id="cmpPickerList"></div>

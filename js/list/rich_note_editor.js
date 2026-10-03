@@ -1260,17 +1260,17 @@
       if (!type) return;
       e.target.value = '';
       const calloutStyles = {
-        info: { bg: '#eff6ff', border: '#3b82f6', icon: 'ℹ️', title: 'Bilgi Notu', text: '#1e40af' },
-        warning: { bg: '#fffbeb', border: '#f59e0b', icon: '⚠️', title: 'Dikkat / Uyarı', text: '#92400e' },
-        success: { bg: '#ecfdf5', border: '#10b981', icon: '✅', title: 'Başarılı / Onay', text: '#065f46' },
-        danger: { bg: '#fef2f2', border: '#ef4444', icon: '❌', title: 'Kritik Durum', text: '#991b1b' }
+        info: { bg: '#eff6ff', border: '#3b82f6', title: 'Bilgi Notu', text: '#1e40af' },
+        warning: { bg: '#fffbeb', border: '#f59e0b', title: 'Dikkat / Uyarı', text: '#92400e' },
+        success: { bg: '#ecfdf5', border: '#10b981', title: 'Başarılı / Onay', text: '#065f46' },
+        danger: { bg: '#fef2f2', border: '#ef4444', title: 'Kritik Durum', text: '#991b1b' }
       };
       const style = calloutStyles[type] || calloutStyles.info;
       const html = `
         <div class="note-callout" style="position: relative; background: ${style.bg}; border-left: 4px solid ${style.border}; border-radius: 8px; padding: 0.85rem 1.1rem; margin: 1rem 0; color: ${style.text}; font-size: 0.92rem;">
           <button type="button" class="btn-remove-note-block" contenteditable="false" style="position: absolute; top: 6px; right: 8px; border: none; background: transparent; color: inherit; opacity: 0.6; cursor: pointer; font-size: 0.8rem; font-weight: 800; padding: 2px 6px; border-radius: 4px;" title="Bu kutuyu tamamen kaldır">✕</button>
           <div style="font-weight: 800; display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.35rem;">
-            <span>${style.icon}</span> <span>${style.title}</span>
+            <span>${style.title}</span>
           </div>
           <div>Buraya açıklamayı ve önemli detayları girin...</div>
         </div>
@@ -1377,7 +1377,7 @@
         if (text && navigator.clipboard?.writeText) {
           navigator.clipboard.writeText(text).then(() => {
             const oldText = copyBtn.textContent;
-            copyBtn.textContent = '✓ Kopyalandı!';
+            copyBtn.textContent = 'Kopyalandı';
             setTimeout(() => { copyBtn.textContent = oldText; }, 2000);
             window.toast?.('SQL panoya kopyalandı', 'success');
           }).catch(() => {
@@ -1583,7 +1583,7 @@
           const durationStr = formatRecordTime(recordSeconds);
           const audioBlock = `
             <div class="note-audio-block" contenteditable="false" style="margin: 0.8rem 0; padding: 0.6rem 0.85rem; background: var(--bg-card, #f8fafc); border: 1px solid var(--border, #cbd5e1); border-radius: 10px; display: inline-flex; align-items: center; gap: 0.75rem;">
-              <span style="font-size: 0.85rem; font-weight: 700; color: #ef4444;">🎙️ Sesli Not (${durationStr}):</span>
+              <span style="font-size: 0.85rem; font-weight: 700; color: #ef4444;">Sesli Not (${durationStr}):</span>
               <audio controls src="${audioUrl}" style="height: 32px; vertical-align: middle;"></audio>
             </div>
             <p><br></p>
@@ -1617,7 +1617,7 @@
       if (val === 'bug') {
         tHtml = `
           <div style="border-left: 4px solid #ef4444; background: rgba(239,68,68,0.06); padding: 0.75rem 1rem; border-radius: 6px; margin: 0.8rem 0;">
-            <strong style="color: #ef4444;">⚠️ HATA BİLDİRİMİ</strong>
+            <strong style="color: #ef4444;">HATA BİLDİRİMİ</strong>
             <ul style="margin: 0.4rem 0 0 1.2rem; padding: 0;">
               <li><strong>Hata Tanımı:</strong> Rapor çıktısında...</li>
               <li><strong>Etkilenen Parametre / Tablo:</strong> </li>
@@ -1627,7 +1627,7 @@
       } else if (val === 'sql') {
         tHtml = `
           <div style="border-left: 4px solid #3b82f6; background: rgba(59,130,246,0.06); padding: 0.75rem 1rem; border-radius: 6px; margin: 0.8rem 0;">
-            <strong style="color: #2563eb;">🔄 SQL REVİZYON NOTU</strong>
+            <strong style="color: #2563eb;">SQL REVİZYON NOTU</strong>
             <ul style="margin: 0.4rem 0 0 1.2rem; padding: 0;">
               <li><strong>Sorgu Adı:</strong> </li>
               <li><strong>Yapılan İyileştirme:</strong> İndeks kullanımı eklendi.</li>
@@ -1637,13 +1637,13 @@
       } else if (val === 'perf') {
         tHtml = `
           <div style="border-left: 4px solid #f59e0b; background: rgba(245,158,11,0.06); padding: 0.75rem 1rem; border-radius: 6px; margin: 0.8rem 0;">
-            <strong style="color: #d97706;">⚡ PERFORMANS İNCELEMESİ</strong>
+            <strong style="color: #d97706;">PERFORMANS İNCELEMESİ</strong>
             <p style="margin: 0.3rem 0;">Mevcut sorgu yanıt süresi ve sunucu yükü analiz edildi.</p>
           </div><p><br></p>`;
       } else if (val === 'approved') {
         tHtml = `
           <div style="border-left: 4px solid #10b981; background: rgba(16,185,129,0.06); padding: 0.75rem 1rem; border-radius: 6px; margin: 0.8rem 0;">
-            <strong style="color: #059669;">✅ RAPOR ONAYLANDI</strong>
+            <strong style="color: #059669;">RAPOR ONAYLANDI</strong>
             <p style="margin: 0.3rem 0;">Tasarım, veri bağlamları ve hesaplama alanları kontrol edildi, üretime uygundur.</p>
           </div><p><br></p>`;
       }
@@ -1969,12 +1969,12 @@
           updateNoteStatistics();
           savedSnapshot = snapshot();
           try { localStorage.removeItem(draftKey); } catch {}
-          saveStatus.textContent = '✓ Not ve tüm ekler başarıyla temizlendi.';
+          saveStatus.textContent = 'Not ve ekler başarıyla temizlendi.';
           window.toast?.('Not silindi.', 'success');
         } else if (snapshot() === sentSnapshot) {
           savedSnapshot = sentSnapshot;
           try { localStorage.removeItem(draftKey); } catch {}
-          saveStatus.textContent = '✓ Değişiklikler ve ekler başarıyla kaydedildi.';
+          saveStatus.textContent = 'Değişiklikler ve ekler kaydedildi.';
           window.toast?.('Not ve belgeler kaydedildi.', 'success');
         } else {
           persistDraft();

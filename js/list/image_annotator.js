@@ -1054,7 +1054,7 @@
           </div>
           <div style="display:flex;align-items:center;justify-content:flex-end;gap:.6rem;">
             <button type="button" id="btnWmCancel" class="btn btn-sm btn-ghost">Vazgeç</button>
-            <button type="button" id="btnWmApply" class="btn btn-sm btn-primary" style="font-weight:800;padding:.45rem 1.2rem;">Filigranı Bas 💧</button>
+            <button type="button" id="btnWmApply" class="btn btn-sm btn-primary" style="font-weight:800;padding:.45rem 1.2rem;">Filigranı Ekle</button>
           </div>
         </div>
       `;
@@ -1140,28 +1140,28 @@
           <div style="display:flex;flex-direction:column;gap:1rem;margin-bottom:1.25rem;">
             <div>
               <div style="display:flex;justify-content:space-between;font-size:.78rem;font-weight:700;color:var(--text-secondary,#475569);margin-bottom:.3rem;">
-                <span>✨ Parlaklık</span>
+                <span>Parlaklık</span>
                 <span id="lblAdjBright">0</span>
               </div>
               <input type="range" id="rngAdjBright" min="-50" max="50" value="0" style="width:100%;accent-color:var(--accent,#2563eb);" />
             </div>
             <div>
               <div style="display:flex;justify-content:space-between;font-size:.78rem;font-weight:700;color:var(--text-secondary,#475569);margin-bottom:.3rem;">
-                <span>🌓 Kontrast</span>
+                <span>Kontrast</span>
                 <span id="lblAdjContrast">0</span>
               </div>
               <input type="range" id="rngAdjContrast" min="-50" max="50" value="0" style="width:100%;accent-color:var(--accent,#2563eb);" />
             </div>
             <div>
               <div style="display:flex;justify-content:space-between;font-size:.78rem;font-weight:700;color:var(--text-secondary,#475569);margin-bottom:.3rem;">
-                <span>🎨 Doygunluk (Saturation)</span>
+                <span>Doygunluk</span>
                 <span id="lblAdjSat">%100</span>
               </div>
               <input type="range" id="rngAdjSat" min="0" max="200" value="100" style="width:100%;accent-color:var(--accent,#2563eb);" />
             </div>
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;">
-            <button type="button" id="btnAdjReset" class="btn btn-sm btn-ghost" style="font-size:.76rem;color:#d97706;">↺ Sıfırla</button>
+            <button type="button" id="btnAdjReset" class="btn btn-sm btn-ghost" style="font-size:.76rem;color:#d97706;">Sıfırla</button>
             <div style="display:flex;gap:.5rem;">
               <button type="button" id="btnAdjCancel" class="btn btn-sm btn-ghost">Vazgeç</button>
               <button type="button" id="btnAdjApply" class="btn btn-sm btn-primary" style="font-weight:800;padding:.45rem 1.2rem;">Uygula & Kaydet</button>

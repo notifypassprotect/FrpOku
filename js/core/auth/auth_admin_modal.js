@@ -217,11 +217,11 @@
  <!-- Sekmeler -->
  <div class="admin-modal-tabs">
       <button type="button" id="tabAdminPending" class="admin-tab-btn ${initialTab === 'pending' ? 'active' : ''}">
-        <span>⏳ Onay Bekleyenler</span>
+        <span>Onay Bekleyenler</span>
         <span id="adminPendingTabBadge" class="badge badge-red" style="font-size:.72rem;padding:.15rem .45rem;">...</span>
       </button>
       <button type="button" id="tabAdminAll" class="admin-tab-btn ${initialTab === 'all' ? 'active' : ''}">
-        <span>👥 Tüm Kullanıcılar</span>
+        <span>Tüm Kullanıcılar</span>
         <span id="adminAllTabBadge" class="badge badge-blue" style="font-size:.72rem;padding:.15rem .45rem;">...</span>
       </button>
     </div>
@@ -1109,7 +1109,6 @@
     if (rooms.length === 0) {
       html += `
         <div style="text-align:center;padding:3rem 1rem;background:var(--bg-card,#f8fafc);border-radius:14px;border:1px dashed var(--border,#cbd5e1);">
-          <div style="font-size:2rem;margin-bottom:.5rem;">🏢</div>
           <div style="font-size:1.05rem;font-weight:800;color:var(--text-primary,#0f172a);">Henüz Tanımlı Bir Oda Yok</div>
           <div style="font-size:.82rem;color:var(--text-muted,#64748b);margin-top:.3rem;">Yukarıdaki "Yeni Oda / Kanal Oluştur" butonuna tıklayarak ilk odayı ekleyebilirsiniz.</div>
         </div>
@@ -1119,14 +1118,14 @@
         const isAll = room.is_all_users !== false;
         const memberCount = Array.isArray(room.member_user_ids) ? room.member_user_ids.length : 0;
         const accessBadge = isAll
-          ? `<span class="badge badge-green" style="font-size:.72rem;padding:.2rem .5rem;">👥 Tüm Kullanıcılar (Genel)</span>`
-          : `<span class="badge badge-blue" style="font-size:.72rem;padding:.2rem .5rem;">🔒 ${memberCount} Özel Seçili Üye</span>`;
+          ? `<span class="badge badge-green" style="font-size:.72rem;padding:.2rem .5rem;">Tüm Kullanıcılar (Genel)</span>`
+          : `<span class="badge badge-blue" style="font-size:.72rem;padding:.2rem .5rem;">${memberCount} Özel Seçili Üye</span>`;
 
         html += `
           <div class="admin-user-card" style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border:1px solid var(--border,#e2e8f0);border-radius:12px;background:var(--bg-surface,#fff);">
             <div style="display:flex;align-items:center;gap:.9rem;min-width:0;flex:1;">
               <div style="width:44px;height:44px;border-radius:12px;background:rgba(37,99,235,0.08);display:flex;align-items:center;justify-content:center;font-size:1.45rem;flex-shrink:0;">
-                ${escHtml(room.icon || '🏢')}
+                ${escHtml(room.icon || '')}
               </div>
               <div style="min-width:0;flex:1;">
                 <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">
@@ -1140,10 +1139,10 @@
             </div>
             <div style="display:flex;align-items:center;gap:.5rem;margin-left:1rem;flex-shrink:0;">
               <button type="button" class="btn btn-sm btn-secondary btn-edit-room" data-id="${room.id}" style="padding:.4rem .75rem;font-weight:700;">
-                ✏️ Düzenle
+                Düzenle
               </button>
               <button type="button" class="btn btn-sm btn-ghost btn-delete-room" data-id="${room.id}" data-name="${escHtml(room.name)}" style="color:#ef4444;padding:.4rem .75rem;font-weight:700;">
-                🗑️ Sil
+                Sil
               </button>
             </div>
           </div>
@@ -1217,7 +1216,7 @@
       <div class="modal" style="max-width:520px;width:95vw;max-height:90vh;display:flex;flex-direction:column;padding:1.6rem;border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,.4);border:1px solid var(--border,#cbd5e1);background:var(--bg-surface,#ffffff);">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem;border-bottom:1px solid var(--border,#e2e8f0);padding-bottom:.8rem;">
           <div style="font-size:1.15rem;font-weight:900;color:var(--text-primary,#0f172a);">
-            ${isEdit ? '🏢 Odayı Düzenle' : '🏢 Yeni Oda / Departman Kanalı'}
+            ${isEdit ? 'Odayı Düzenle' : 'Yeni Oda / Departman Kanalı'}
           </div>
           <button type="button" id="btnCloseRoomModal" style="border:none;background:rgba(148,163,184,0.15);width:32px;height:32px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;">✕</button>
         </div>

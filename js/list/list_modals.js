@@ -849,7 +849,7 @@ window.FrpListModals = window.FrpListModals || {};
         if (confirm('Bu rapora ait notu silmek istediğinize emin misiniz?')) {
           await FrpStore.updateNote(fileId, '');
           if (textarea) textarea.value = '';
-          if (feedback) feedback.textContent = '✓ Not silindi.';
+          if (feedback) feedback.textContent = 'Not silindi.';
           if (typeof window.toast === 'function') window.toast('Rapor notu silindi.', 'info');
         }
       };
@@ -859,7 +859,7 @@ window.FrpListModals = window.FrpListModals || {};
     saveBtn.onclick = async () => {
       const val = textarea.value.trim();
       await FrpStore.updateNote(fileId, val);
-      if (feedback) feedback.textContent = '✓ Değişiklikler kaydedildi.';
+      if (feedback) feedback.textContent = 'Değişiklikler kaydedildi.';
       if (typeof window.toast === 'function') {
         window.toast(val ? 'Rapor notu kaydedildi.' : 'Rapor notu temizlendi.', 'success');
       }
@@ -874,12 +874,9 @@ window.FrpListModals = window.FrpListModals || {};
     overlay.innerHTML = `
       <div class="modal" style="max-width:540px;padding:1.5rem;display:flex;flex-direction:column;gap:1.25rem;">
         <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border-light);padding-bottom:.75rem;">
-          <div style="display:flex;align-items:center;gap:.6rem;">
-            <div style="font-size:1.3rem;">🎨</div>
-            <div>
-              <div style="font-size:1.05rem;font-weight:800;color:var(--text-primary);">Rapor Renk &amp; Durum Rehberi</div>
-              <div style="font-size:.76rem;color:var(--text-muted);">Listede ve başlıklarda kullanılan renklerin anlamları</div>
-            </div>
+          <div>
+            <div style="font-size:1.05rem;font-weight:800;color:var(--text-primary);">Rapor Renk &amp; Durum Rehberi</div>
+            <div style="font-size:.76rem;color:var(--text-muted);">Listede ve başlıklarda kullanılan renklerin anlamları</div>
           </div>
           <button type="button" class="btn btn-sm btn-ghost btn-close-guide" style="font-size:1.1rem;padding:.2rem .5rem;" aria-label="Kapat">✕</button>
         </div>

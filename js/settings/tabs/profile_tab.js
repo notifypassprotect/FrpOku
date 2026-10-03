@@ -142,10 +142,10 @@ window.FrpSettingsTabs.profile = {
           <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-light); padding-bottom:.5rem;">
             <div>
               <div style="font-weight:800; font-size:.95rem; color:var(--text-primary); display:flex; align-items:center; gap:.45rem;">
-                <span>🖼️</span> Profil Resmi & Avatar Seçimi
+                Profil Resmi & Avatar Seçimi
               </div>
               <div style="font-size:.74rem; color:var(--text-muted); margin-top:2px;">
-                Kişisel fotoğrafınızı yükleyip ölçeklendirin veya hazır kurumsal avatarlardan birini seçin.
+                Kişisel fotoğrafınızı yükleyin veya hazır avatarlardan birini seçin.
               </div>
             </div>
             <span class="badge badge-purple" style="font-size:.7rem; font-weight:700;">Görünüm & Kimlik</span>
@@ -167,17 +167,17 @@ window.FrpSettingsTabs.profile = {
               <div style="display:flex; gap:.65rem; flex-wrap:wrap; align-items:center;">
                 <input type="file" id="profAvatarFileInput" accept="image/png, image/jpeg, image/webp, image/gif" style="display:none;" />
                 <button type="button" id="btnUploadCustomAvatar" class="btn btn-sm btn-primary" style="font-weight:800; padding:.5rem 1.15rem; border-radius:9px; display:inline-flex; align-items:center; gap:.45rem; box-shadow:0 4px 12px rgba(37,99,235,0.25);">
-                  <span>📸</span> Fotoğraf Yükle & Düzenle
+                  Fotoğraf Yükle & Düzenle
                 </button>
                 <button type="button" id="btnResetAvatarInitials" class="btn btn-sm btn-ghost" style="font-weight:700; padding:.5rem 1rem; border-radius:9px; border:1px solid var(--border);">
-                  ✨ Baş Harflere Sıfırla
+                  Baş Harflere Sıfırla
                 </button>
               </div>
 
               <!-- Hazır Yönetici Avatarları -->
               <div>
                 <div style="font-size:.74rem; font-weight:700; color:var(--text-secondary); margin-bottom:.4rem;">
-                  Veya Hazır Yönetici & Ekip Avatarlarından Birini Seçin:
+                  Veya Hazır Avatarlardan Birini Seçin:
                 </div>
                 <div style="display:flex; gap:.5rem; flex-wrap:wrap;" id="profPresetAvatarsWrap">
                   ${presetButtonsHtml}
@@ -189,7 +189,7 @@ window.FrpSettingsTabs.profile = {
           <!-- İnteraktif Görsel Düzenleme / Kırpma / Ölçekleme Alanı -->
           <div id="profAvatarCropSection" style="display:none; margin-top:.35rem; padding:1.1rem; border-radius:12px; background:var(--bg-raised, #f8fafc); border:1.5px dashed var(--accent, #2563eb); animation:fadeIn .2s ease-out;">
             <div style="font-weight:800; font-size:.85rem; color:var(--text-primary); margin-bottom:.6rem; display:flex; align-items:center; gap:.4rem;">
-              <span>✂️</span> Fotoğrafınızı Konumlandırın & Ölçekleyin
+              Fotoğrafınızı Konumlandırın & Ölçekleyin
             </div>
             <div style="display:flex; gap:1.4rem; align-items:center; flex-wrap:wrap;">
               <div style="position:relative; width:130px; height:130px; flex-shrink:0;">
@@ -202,11 +202,11 @@ window.FrpSettingsTabs.profile = {
                 </label>
                 <input type="range" id="profAvatarZoom" min="0.8" max="3" step="0.05" value="1" style="width:100%; accent-color:var(--accent); cursor:pointer;" />
                 <div style="font-size:.7rem; color:var(--text-muted); line-height:1.4;">
-                  💡 Resim otomatik olarak kare oranına optimize edilir ve yüksek çözünürlüklü avatar olarak kaydedilir.
+                  Resim otomatik olarak kare oranına göre ölçeklenir ve kaydedilir.
                 </div>
                 <div style="display:flex; gap:.65rem; margin-top:.2rem;">
                   <button type="button" id="btnApplyCroppedAvatar" class="btn btn-sm btn-primary" style="font-weight:800; padding:.45rem 1.25rem;">
-                    ✓ Bu Resmi Kullan
+                    Bu Resmi Kullan
                   </button>
                   <button type="button" id="btnCancelCropAvatar" class="btn btn-sm btn-ghost" style="font-weight:700; padding:.45rem 1rem;">
                     Vazgeç
@@ -277,9 +277,9 @@ window.FrpSettingsTabs.profile = {
               <label style="display:flex;align-items:flex-start;gap:.6rem;cursor:pointer;font-size:.82rem;font-weight:700;color:var(--text-primary,#0f172a);">
                 <input type="checkbox" id="cbChatEmailDigest" ${stagedProfile.emailChatDigest !== false ? 'checked' : ''} style="width:17px;height:17px;accent-color:var(--accent,#2563eb);margin-top:2px;cursor:pointer;" />
                 <div>
-                  <div>💬 Okunmamış Mesajlar İçin E-Posta Bildirimi</div>
+                  <div>Okunmamış Mesajlar İçin E-Posta Bildirimi</div>
                   <div style="font-size:.7rem;color:var(--text-muted,#64748b);font-weight:normal;margin-top:2px;line-height:1.4;">
-                    Mesaj aldığınızda 3-5 dakika boyunca okunmazsa e-posta kutunuza akıllı özet gönderilir (Anti-spam korumalı).
+                    Mesaj aldığınızda 3-5 dakika boyunca okunmazsa e-posta kutunuza özet gönderilir.
                   </div>
                 </div>
               </label>

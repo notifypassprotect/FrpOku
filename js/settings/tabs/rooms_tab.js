@@ -10,13 +10,13 @@ window.FrpSettingsTabs.rooms = {
       <div style="display:flex;flex-direction:column;gap:1.25rem;">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.8rem;">
           <div>
-            <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">🏢 Sohbet Odaları & Grup Kanalları</div>
+            <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">Sohbet Odaları & Grup Kanalları</div>
             <div style="font-size:.78rem;color:var(--text-muted);margin-top:.2rem;">
               Ekip sohbet panelindeki kurumsal odaları, departman kanallarını ve üye erişim izinlerini yönetin.
             </div>
           </div>
           <button type="button" id="btnAdminCreateRoomInSettings" class="btn btn-primary" style="display:inline-flex;align-items:center;gap:.4rem;font-weight:700;padding:.5rem 1rem;">
-            <span>➕ Yeni Oda / Kanal Ekle</span>
+            <span>Yeni Oda / Kanal Ekle</span>
           </button>
         </div>
 
@@ -59,7 +59,6 @@ window.FrpSettingsTabs.rooms = {
       if (rooms.length === 0) {
         container.innerHTML = `
           <div style="text-align:center;padding:3rem 1rem;background:var(--bg-card,#f8fafc);border-radius:14px;border:1px dashed var(--border,#cbd5e1);">
-            <div style="font-size:2.2rem;margin-bottom:.5rem;">🏢</div>
             <div style="font-size:1.05rem;font-weight:800;color:var(--text-primary,#0f172a);">Henüz Tanımlı Bir Oda Yok</div>
             <div style="font-size:.82rem;color:var(--text-muted,#64748b);margin-top:.3rem;">
               "Yeni Oda / Kanal Ekle" butonunu kullanarak departman veya proje kanalları oluşturabilirsiniz.
@@ -73,14 +72,14 @@ window.FrpSettingsTabs.rooms = {
         const isAll = room.is_all_users !== false;
         const memberCount = Array.isArray(room.member_user_ids) ? room.member_user_ids.length : 0;
         const accessBadge = isAll
-          ? `<span class="badge badge-green" style="font-size:.72rem;padding:.2rem .5rem;">👥 Tüm Kullanıcılar</span>`
-          : `<span class="badge badge-blue" style="font-size:.72rem;padding:.2rem .5rem;">🔒 ${memberCount} Özel Üye</span>`;
+          ? `<span class="badge badge-green" style="font-size:.72rem;padding:.2rem .5rem;">Tüm Kullanıcılar</span>`
+          : `<span class="badge badge-blue" style="font-size:.72rem;padding:.2rem .5rem;">${memberCount} Özel Üye</span>`;
 
         return `
           <div class="admin-user-card" style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border:1px solid var(--border,#e2e8f0);border-radius:12px;background:var(--bg-surface,#fff);gap:1rem;">
             <div style="display:flex;align-items:center;gap:.9rem;min-width:0;flex:1;">
               <div style="width:44px;height:44px;border-radius:12px;background:rgba(37,99,235,0.08);display:flex;align-items:center;justify-content:center;font-size:1.45rem;flex-shrink:0;">
-                ${escHtml(room.icon || '🏢')}
+                ${escHtml(room.icon || '')}
               </div>
               <div style="min-width:0;flex:1;">
                 <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">
@@ -94,10 +93,10 @@ window.FrpSettingsTabs.rooms = {
             </div>
             <div style="display:flex;align-items:center;gap:.5rem;flex-shrink:0;">
               <button type="button" class="btn btn-sm btn-secondary btn-settings-edit-room" data-id="${room.id}" style="padding:.4rem .75rem;font-weight:700;">
-                ✏️ Düzenle
+                Düzenle
               </button>
               <button type="button" class="btn btn-sm btn-ghost btn-settings-delete-room" data-id="${room.id}" data-name="${escHtml(room.name)}" style="color:#ef4444;padding:.4rem .75rem;font-weight:700;">
-                🗑️ Sil
+                Sil
               </button>
             </div>
           </div>
@@ -170,7 +169,7 @@ window.FrpSettingsTabs.rooms = {
         <div class="modal" style="max-width:540px;width:92vw;padding:1.6rem;border-radius:18px;background:var(--bg-surface,#fff);border:1px solid var(--border,#cbd5e1);box-shadow:0 25px 60px rgba(0,0,0,0.35);">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.1rem;border-bottom:1px solid var(--border,#e2e8f0);padding-bottom:.7rem;">
             <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary,#0f172a);">
-              ${isEdit ? '✏️ Odayı Düzenle' : '➕ Yeni Oda / Grup Kanalı Oluştur'}
+              ${isEdit ? 'Odayı Düzenle' : 'Yeni Oda / Grup Kanalı Oluştur'}
             </div>
             <button type="button" id="btnCloseRoomModal" style="border:none;background:rgba(148,163,184,0.15);width:32px;height:32px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;">✕</button>
           </div>
