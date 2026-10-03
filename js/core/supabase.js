@@ -241,7 +241,7 @@
       const results=[];
       for(const item of items) {
         try {
-          const saved=action==='purge' ? await this.purgeReport(item.id) : await this.moveToTrash(item.id);
+          const saved=action==='purge' ? await this.purgeReport(item.id) : action==='restore' ? await this.restoreFromTrash(item.id,item) : await this.moveToTrash(item.id);
           results.push({id:item.id,success:Boolean(saved),version:saved?.version});
         } catch(error) { results.push({id:item.id,success:false,reason:error.message}); }
       }

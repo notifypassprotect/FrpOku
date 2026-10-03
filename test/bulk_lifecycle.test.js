@@ -55,3 +55,11 @@ test('database batch uses compact columns, ownership/version predicates and repo
   assert.ok(calls.filter(c=>c[0]==='select').every(c=>!c[1].includes('*')&&!c[1].includes('data')));
   assert.equal(calls.find(c=>c[0]==='update')[1].data,undefined);
 });
+test('restore batches keep missing/conflicting reports failed and preserve XML',async()=>{
+ const f=fixture(records().map(r=>({...r,is_deleted:true,deleted_at:'2026-01-01'})));
+ const r=await f.request({action:'restore',items:[{id:'0',version:2},{id:'1',version:1},{id:'missing',version:2},{id:'49',version:2}]});
+ assert.equal(r.payload.results.filter(r=>r.success).length,1);
+ assert.equal(f.rows[0].is_deleted,false);assert.equal(f.rows[0].deleted_at,null);
+ assert.equal(f.rows[0].version,3);assert.equal(f.rows[0].rawXml,'private XML');
+ assert.equal(f.rows[1].is_deleted,true);assert.equal(f.rows[49].is_deleted,true);
+});

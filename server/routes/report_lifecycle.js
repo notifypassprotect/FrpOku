@@ -6,7 +6,7 @@ function registerReportLifecycleRoutes(app, deps) {
   app.post('/api/reports/bulk-lifecycle', apiWriteRateLimiter, requireAuth, async (req, res) => {
     const { action, items } = req.body || {};
     const { REPORT_ID_REGEX } = require('../../lib/report_access');
-    if (!['trash','purge'].includes(action) || !Array.isArray(items) || !items.length || items.length > 50 ||
+    if (!['trash','purge','restore'].includes(action) || !Array.isArray(items) || !items.length || items.length > 50 ||
         items.some(item => !item || typeof item.id !== 'string' || !REPORT_ID_REGEX.test(item.id)) ||
         new Set(items.map(item=>item.id)).size !== items.length) {
       return res.status(400).json({success:false, reason:'Geçerli en fazla 50 rapor seçin.'});
@@ -24,10 +24,10 @@ function registerReportLifecycleRoutes(app, deps) {
       const now = new Date().toISOString();
       for (const item of items) {
         const record = byId.get(item.id);
-        if (!record) { results.push({id:item.id,success:true}); continue; }
+        if (!record) { results.push({id:item.id,success:action!=='restore',reason:action==='restore'?'Rapor bulunamadı.':undefined}); continue; }
         if (!canManageReport(req.authUser,record)) { results.push({id:item.id,success:false,reason:'Bu raporu silme yetkiniz yok.'}); continue; }
         const version = Math.max(1,Number(record.version ?? record.data?.version)||1);
-        if (action==='trash' && Number(item.version)!==version) { results.push({id:item.id,success:false,reason:'Rapor başka bir oturumda güncellendi.'}); continue; }
+        if (action!=='purge' && Number(item.version)!==version) { results.push({id:item.id,success:false,reason:'Rapor başka bir oturumda güncellendi.'}); continue; }
         const key = record.version == null ? 'null' : String(record.version);
         if (!groups.has(key)) groups.set(key,{version,dbVersion:record.version,ids:[]});
         groups.get(key).ids.push(item.id);
@@ -37,7 +37,7 @@ function registerReportLifecycleRoutes(app, deps) {
         try {
           let savedIds = group.ids;
           if (supabase) {
-            let query = action==='purge' ? supabase.from('reports').delete() : supabase.from('reports').update({is_deleted:true,deleted_at:now,updated_at:now,version:group.version+1});
+            let query = action==='purge' ? supabase.from('reports').delete() : supabase.from('reports').update({is_deleted:action!=='restore',deleted_at:action==='restore'?null:now,updated_at:now,version:group.version+1});
             query = query.in('id',group.ids);
             query = group.dbVersion == null ? query.is('version',null) : query.eq('version',group.dbVersion);
             if (req.authUser.role!=='admin') query=query.eq('user_id',String(req.authUser.id));
@@ -49,7 +49,7 @@ function registerReportLifecycleRoutes(app, deps) {
           for(const id of group.ids) {
             if(!saved.has(id)) { results.push({id,success:false,reason:'Rapor aynı anda değişti; tekrar deneyin.'}); continue; }
             if(action==='purge') removed.add(id);
-            else if(!supabase) Object.assign(byId.get(id),{isDeleted:true,is_deleted:true,deletedAt:now,deleted_at:now,version:group.version+1});
+            else if(!supabase) Object.assign(byId.get(id),{isDeleted:action!=='restore',is_deleted:action!=='restore',deletedAt:action==='restore'?null:now,deleted_at:action==='restore'?null:now,version:group.version+1});
             results.push({id,success:true,version:group.version+1});
           }
         } catch { group.ids.forEach(id=>results.push({id,success:false,reason:'Sunucu işlemi tamamlayamadı.'})); }

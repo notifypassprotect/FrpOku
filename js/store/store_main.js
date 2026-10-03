@@ -1164,56 +1164,20 @@
     return true;
   }
 
-  async function restoreManyFromTrash(ids) {
-    const idSet = new Set((ids || []).map(i => String(i)));
-    (ids || []).forEach(i => {
-      try { idSet.add(decodeURIComponent(String(i))); } catch {}
-    });
-
-    let trash = _readTrash();
-    const originalTrash = [...trash];
-    const originalFiles = [..._read()];
-
-    const toRestore = trash.filter(t => idSet.has(String(t.id))).map(f => ({ ...f }));
-    if (toRestore.length === 0) return false;
-    trash = trash.filter(t => !idSet.has(String(t.id)));
-    _writeTrash(trash);
-
-    let files = [...originalFiles];
-    toRestore.forEach(f => {
-      delete f.deletedAt;
-      delete f.deleted_at;
-      f.isDeleted = false;
-      f.is_deleted = false;
-      files = files.filter(item => item.id !== f.id);
-      files.unshift(f);
-    });
-    _write(files, { syncCloud: false });
-
-    _audit('TRASH_BULK_RESTORE', `${toRestore.length} Rapor`, 'Seçili raporlar çöp kutusundan geri yüklendi.');
-
-    if (window.FrpCloud && typeof window.FrpCloud.restoreFromTrash === 'function') {
-      try {
-        const results = await Promise.all(toRestore.map(report => window.FrpCloud.restoreFromTrash(report.id, report)));
-        if (!results || results.some(r => !r)) throw new Error('Sunucu toplu geri yükleme işlemini reddetti.');
-      } catch (err) {
-        _writeTrash(originalTrash);
-        _write(originalFiles, { syncCloud: false });
-        _notifySyncIssue('Seçili raporlar geri yüklenemedi: Sunucu işlemi reddetti.');
-        throw err;
-      }
-    } else if (window.FrpCloud && typeof window.FrpCloud.saveReport === 'function') {
-      try {
-        const results = await Promise.all(toRestore.map(report => window.FrpCloud.saveReport(report)));
-        if (!results || results.some(r => !r)) throw new Error('Sunucu toplu geri yükleme işlemini reddetti.');
-      } catch (err) {
-        _writeTrash(originalTrash);
-        _write(originalFiles, { syncCloud: false });
-        _notifySyncIssue('Seçili raporlar geri yüklenemedi: Sunucu işlemi reddetti.');
-        throw err;
-      }
-    }
-    return true;
+  async function restoreManyFromTrash(ids, { onProgress } = {}) {
+    const selected = new Set((ids || []).map(String));
+    const items = _readTrash().filter(r => selected.has(String(r.id)));
+    if (items.some(r => !canManagePoolReport(r))) throw new Error('Bu raporları değiştirme yetkiniz yok.');
+    return _bulkOperation('Raporlar geri yükleniyor', items, async item => {
+      if (!window.FrpCloud) return true;
+      return window.FrpCloud.restoreFromTrash(item.id, item);
+    }, async results => {
+      const restored = new Set(results.map(r => String(r.item.id)));
+      const reports = results.map(({item,saved}) => ({...item,isDeleted:false,is_deleted:false,deletedAt:null,deleted_at:null,version:saved?.version || item.version}));
+      _write([...reports,..._read().filter(r => !restored.has(String(r.id)))], {syncCloud:false});
+      _writeTrash(_readTrash().filter(r => !restored.has(String(r.id))));
+      _audit('TRASH_BULK_RESTORE', `${results.length} Rapor`, 'Seçili raporlar geri yüklendi.');
+    }, onProgress, 'restore');
   }
 
   async function purgeFromTrash(id) {
@@ -1238,25 +1202,19 @@
     return true;
   }
 
-  async function purgeManyFromTrash(ids) {
-    const idSet = new Set(ids);
-    const originalTrash = [..._readTrash()];
-    let trash = originalTrash.filter(t => !idSet.has(t.id));
-    _writeTrash(trash);
-
-    _audit('TRASH_BULK_PURGE', `${ids.length} Rapor`, 'Seçili raporlar çöpten kalıcı olarak silindi.');
-
-    if (window.FrpCloud && typeof window.FrpCloud.purgeManyReports === 'function') {
-      try {
-        const ok = await window.FrpCloud.purgeManyReports(ids);
-        if (!ok) throw new Error('Sunucu toplu silme işlemini reddetti.');
-      } catch (err) {
-        _writeTrash(originalTrash);
-        _notifySyncIssue('Seçili raporlar silinemedi: Sunucu işlemi reddetti.');
-        throw err;
-      }
-    }
-    return true;
+  async function purgeManyFromTrash(ids, { onProgress } = {}) {
+    const selected = new Set((ids || []).map(String));
+    const items = _readTrash().filter(r => selected.has(String(r.id)));
+    if (items.some(r => !canManagePoolReport(r))) throw new Error('Bu raporları silme yetkiniz yok.');
+    return _bulkOperation('Raporlar kalıcı olarak siliniyor', items, async item => {
+      if (!window.FrpCloud) return true;
+      return window.FrpCloud.purgeReport(item.id);
+    }, async results => {
+      const removed = new Set(results.map(r => String(r.item.id)));
+      _forgetRemoved(removed);
+      _writeTrash(_readTrash().filter(r => !removed.has(String(r.id))));
+      _audit('TRASH_BULK_PURGE', `${results.length} Rapor`, 'Seçili raporlar kalıcı olarak silindi.');
+    }, onProgress, 'purge');
   }
 
   async function emptyTrash() {

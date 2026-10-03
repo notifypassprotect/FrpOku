@@ -119,3 +119,16 @@ test('886-report bulk delete uses 18 requests and retains unconfirmed results',a
   assert.equal(calls,18);assert.equal(store.getAll().length,1415);assert.ok(store.getById('10'));
   assert.equal(store.getTrash().length,885);assert.equal(updates.at(-1).completed,886);
 });
+test('trash restore and purge use bounded batches and retain failed records',async()=>{
+ const calls=[];
+ const {store}=await storeFixture(null,{loadActiveReports:async()=>archive(120),bulkLifecycle:async(action,items)=>{
+ calls.push({action,count:items.length});return items.map(item=>({...item,success:!(action==='restore'&&item.id==='3'),version:item.version+1}));
+ }});
+ await store.refreshFromCloud();await store.moveManyToTrash(archive(120).map(r=>r.id));
+ const updates=[];
+ await assert.rejects(store.restoreManyFromTrash(archive(120).map(r=>r.id),{onProgress:p=>updates.push({...p})}),/119 rapor işlendi, 1 rapor işlenemedi/);
+ assert.equal(store.getAll().length,119);assert.equal(store.getTrash().length,1);
+ assert.equal(store.getAll()[0].version,3);assert.equal(updates.at(-1).completed,120);
+ await store.purgeManyFromTrash(['3']);assert.equal(store.getTrash().length,0);
+ assert.ok(calls.every(c=>c.count<=50));assert.equal(calls.filter(c=>c.action==='restore').length,3);
+});

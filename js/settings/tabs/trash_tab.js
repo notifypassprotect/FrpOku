@@ -1,288 +1,96 @@
-// ============================================================
-//  trash_tab.js — Çöp Kutusu, Geri Yükleme & Kalıcı Silme
-// ============================================================
-
+// Paginated trash workspace. Actions apply only to the explicit selection.
 window.FrpSettingsTabs = window.FrpSettingsTabs || {};
-
 window.FrpSettingsTabs.trash = {
-  selectedTrashIds: new Set(),
-
-  render({ escHtml }) {
-    const trashItems = FrpStore.getTrash() || [];
-
-    const trashRowsHtml = trashItems.map(item => {
-      const isSelected = this.selectedTrashIds.has(item.id);
-      const repName = item.meta?.reportName || item.name;
-      const delTime = item.deletedAt ? new Date(item.deletedAt).toLocaleString('tr-TR') : 'Bilinmiyor';
-
-      return `
-        <div class="trash-item-row" data-id="${item.id}" data-search="${escHtml((repName + ' ' + item.name).toLowerCase())}" style="display:flex;align-items:center;justify-content:space-between;padding:.65rem .85rem;background:var(--bg-surface);border:1px solid var(--border-light);border-radius:10px;gap:.75rem;transition:background .15s;">
-          <div style="display:flex;align-items:center;gap:.65rem;min-width:0;flex:1;">
-            <input type="checkbox" class="trash-item-cb" data-id="${item.id}" ${isSelected ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer;" />
-            <div style="min-width:0;flex:1;">
-              <div style="font-weight:700;font-size:.85rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(repName)}</div>
-              <div style="font-size:.72rem;color:var(--text-muted);margin-top:.15rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
-                <span>${escHtml(item.name)}</span>
-                <span>Silinme: ${delTime}</span>
-              </div>
-            </div>
-          </div>
-          <div style="display:flex;align-items:center;gap:.35rem;flex-shrink:0;">
-            <button type="button" class="btn btn-sm btn-ghost btn-restore-item" data-id="${item.id}" style="color:var(--green);font-weight:700;padding:.3rem .6rem;" title="Geri Yükle">
-              Kurtar
-            </button>
-            <button type="button" class="btn btn-sm btn-ghost btn-purge-item" data-id="${item.id}" style="color:var(--red);font-weight:700;padding:.3rem .6rem;" title="Kalıcı Olarak Sil">
-              Sil
-            </button>
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    return `
-      <div style="display:flex;flex-direction:column;gap:1rem;">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.75rem;">
-          <div>
-            <div style="font-size:1.1rem;font-weight:800;color:var(--text-primary);">Çöp Kutusu (${trashItems.length})</div>
-            <div style="font-size:.78rem;color:var(--green);margin-top:.2rem;font-weight:700;">
-              Geri yükleme ve silme işlemleri anında uygulanır.
-            </div>
-          </div>
-          <div style="display:flex;gap:.5rem;align-items:center;">
-            <button type="button" class="btn btn-sm btn-primary" id="btnRestoreSelectedTrash" style="display:${this.selectedTrashIds.size > 0 ? 'inline-flex' : 'none'};font-weight:700;">
-              Seçilenleri Geri Yükle (<span id="trashSelectedCount">${this.selectedTrashIds.size}</span>)
-            </button>
-            <button type="button" class="btn btn-sm btn-danger" id="btnPurgeSelectedTrash" style="display:${this.selectedTrashIds.size > 0 ? 'inline-flex' : 'none'};font-weight:700;">
-              Seçilenleri Kalıcı Sil
-            </button>
-            ${trashItems.length > 0 ? `
-              <button type="button" class="btn btn-sm btn-danger" id="btnEmptyTrashAll" style="font-weight:700;">
-                Çöp Kutusunu Boşalt
-              </button>
-            ` : ''}
-          </div>
-        </div>
-
-        ${trashItems.length > 0 ? `
-          <div style="display:flex;align-items:center;gap:.75rem;">
-            <div style="position:relative;flex:1;">
-              <input type="text" id="trashSearchInput" placeholder="Çöp kutusunda ara (Rapor adı, dosya adı)..." class="master-search-input" style="width:100%;font-size:.82rem;padding:.45rem .8rem;" />
-            </div>
-            <label style="display:flex;align-items:center;gap:.4rem;font-size:.78rem;font-weight:700;cursor:pointer;color:var(--text-secondary);">
-              <input type="checkbox" id="trashSelectAll" style="width:16px;height:16px;cursor:pointer;" />
-              <span>Tümünü Seç</span>
-            </label>
-          </div>
-
-          <div id="trashItemsListContainer" style="display:flex;flex-direction:column;gap:.45rem;max-height:360px;overflow-y:auto;padding-right:.3rem;">
-            ${trashRowsHtml}
-          </div>
-        ` : `
-          <div style="text-align:center;padding:3.5rem 1rem;background:var(--bg-surface);border-radius:12px;border:1px dashed var(--border);">
-            <div style="width:48px;height:48px;margin:0 auto .75rem;border-radius:12px;background:var(--bg-raised);color:var(--text-muted);display:flex;align-items:center;justify-content:center;">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-            </div>
-            <div style="font-weight:800;font-size:1rem;color:var(--text-primary);">Çöp Kutusu Boş</div>
-            <div style="font-size:.78rem;color:var(--text-muted);margin-top:.2rem;">Silinmiş herhangi bir rapor bulunmuyor.</div>
-          </div>
-        `}
-      </div>
-    `;
+  selectedTrashIds: new Set(), query: '', sort: 'newest', page: 0, pageSize: 50,
+  render({escHtml}) {
+    this.escHtml = escHtml;
+    this.items = FrpStore.getTrash() || [];
+    const existing = new Set(this.items.map(r => String(r.id)));
+    this.selectedTrashIds.forEach(id => { if (!existing.has(id)) this.selectedTrashIds.delete(id); });
+    return `<style>
+      .trash-workspace{display:flex;flex-direction:column;gap:16px;height:100%;min-height:480px;color:var(--text-primary)}
+      .trash-heading,.trash-tools,.trash-selection,.trash-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+      .trash-heading h2{margin:0;font-size:1.35rem;letter-spacing:-.03em}.trash-count{font-size:.85rem;background:var(--bg-raised);border:1px solid var(--border-light);border-radius:20px;padding:5px 12px}
+      .trash-help{color:var(--text-muted);font-size:.82rem;line-height:1.6;margin:6px 0 0}
+      .trash-tools input{flex:1;min-width:180px}.trash-tools select{background:var(--bg-surface);color:var(--text-primary);border:1px solid var(--border-light);border-radius:8px;padding:9px}
+      .trash-selection{padding:12px;background:var(--bg-raised);border:1px solid var(--border-light);border-radius:12px;font-size:.82rem}
+      .trash-actions{display:flex;gap:8px;flex-wrap:wrap}.trash-workspace button:disabled{opacity:.45;cursor:not-allowed}
+      .trash-selection label{display:flex;align-items:center;gap:8px}.trash-workspace input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent,#2563eb);flex-shrink:0}
+      .trash-list{flex:1 1 0;min-height:120px;border:1px solid var(--border-light);border-radius:12px;overflow-y:auto}
+      .trash-item-row{display:flex;align-items:center;gap:12px;padding:14px;cursor:pointer;border-bottom:1px solid var(--border-light);margin:0}
+      .trash-item-row:last-child{border-bottom:0}.trash-item-row:has(input:checked){background:var(--accent-light,rgba(37,99,235,.08))}.trash-item-row:hover{background:var(--bg-raised)}
+      .trash-item-copy{flex:1;min-width:0}.trash-item-title{display:block;font-weight:700;font-size:.86rem;overflow-wrap:anywhere}.trash-item-file{display:block;color:var(--text-muted);font-size:.75rem;margin-top:4px;overflow-wrap:anywhere}
+      .trash-item-date{font-size:.75rem;color:var(--text-muted);white-space:nowrap}.trash-footer{font-size:.8rem;color:var(--text-muted);padding:4px 0}.trash-empty{text-align:center;padding:64px 16px;color:var(--text-muted)}.trash-empty strong{display:block;color:var(--text-primary);font-size:1.1rem;margin-bottom:8px}
+      @media(max-width:700px){.trash-item-date{display:none}.trash-actions{width:100%}.trash-tools select{max-width:100%}}
+    </style><section class="trash-workspace" aria-label="Çöp kutusu">
+      <header><div class="trash-heading"><h2>Çöp kutusu</h2><span class="trash-count">${this.items.length.toLocaleString('tr-TR')} rapor</span></div>
+      <p class="trash-help">Raporları seçerek geri yükleyin veya kalıcı olarak silin. İşlemler anında uygulanır; ayrıca kaydetmeniz gerekmez.</p></header>
+      <div class="trash-tools"><input id="trashSearchInput" class="master-search-input" type="search" aria-label="Çöp kutusunda ara" placeholder="Rapor veya dosya adı ara…" value="${escHtml(this.query)}">
+      <select id="trashSort" aria-label="Sıralama"><option value="newest">Son silinenler</option><option value="oldest">İlk silinenler</option><option value="name">Rapor adı (A–Z)</option></select></div>
+      <div class="trash-selection"><label><input id="trashSelectAll" type="checkbox">Bu sayfayı seç</label><span id="trashSelectedCount" role="status"></span>
+      <div class="trash-actions"><button class="btn btn-sm btn-primary" id="btnRestoreSelectedTrash" type="button" disabled>Geri yükle</button><button class="btn btn-sm btn-danger" id="btnPurgeSelectedTrash" type="button" disabled>Kalıcı sil</button></div></div>
+      <div class="trash-heading"><button class="btn btn-sm btn-ghost" type="button" id="trashSelectResults"></button><button class="btn btn-sm btn-ghost" type="button" id="trashClearSelection">Seçimi temizle</button></div>
+      <div class="trash-list" id="trashItemsListContainer"></div>
+      <footer class="trash-footer"><span id="trashRange" role="status"></span><div class="trash-actions"><button type="button" class="btn btn-sm btn-ghost" id="trashPrev">Önceki</button><button type="button" class="btn btn-sm btn-ghost" id="trashNext">Sonraki</button></div></footer>
+      <p class="trash-help">Çöp kutusunu boşaltmak için aramayı temizleyip tüm sonuçları seçin, ardından “Kalıcı sil” düğmesini kullanın. Kalıcı silme geri alınamaz.</p>
+    </section>`;
   },
-
-  bind({ overlay, renderModal, safeToast }) {
-    const updateTrashSelectionUI = () => {
-      const count = this.selectedTrashIds.size;
-      const btnRestore = overlay.querySelector('#btnRestoreSelectedTrash');
-      const btnPurge = overlay.querySelector('#btnPurgeSelectedTrash');
-      const countSpan = overlay.querySelector('#trashSelectedCount');
-
-      if (btnRestore) btnRestore.style.display = count > 0 ? 'inline-flex' : 'none';
-      if (btnPurge) btnPurge.style.display = count > 0 ? 'inline-flex' : 'none';
-      if (countSpan) countSpan.textContent = count;
+  bind({overlay, renderModal, safeToast}) {
+    const $ = selector => overlay.querySelector(selector);
+    const selection = this.selectedTrashIds;
+    let filtered = [], visible = [], busy = false;
+    const updateSelection = () => {
+      $('#trashSelectedCount').textContent = `${selection.size.toLocaleString('tr-TR')} rapor seçildi`;
+      for (const id of ['#btnRestoreSelectedTrash','#btnPurgeSelectedTrash','#trashClearSelection']) $(id).disabled = busy || !selection.size;
+      const count = visible.filter(r => selection.has(String(r.id))).length;
+      $('#trashSelectAll').checked = visible.length > 0 && count === visible.length;
+      $('#trashSelectAll').indeterminate = count > 0 && count < visible.length;
+      $('#trashSelectAll').disabled = !visible.length || busy;
+      overlay.querySelectorAll('.trash-item-cb').forEach(cb => { cb.checked = selection.has(cb.dataset.id); });
     };
-
-    overlay.querySelector('#trashSearchInput')?.addEventListener('input', (e) => {
-      const query = (e.target.value || '').toLowerCase().trim();
-      overlay.querySelectorAll('.trash-item-row').forEach(row => {
-        const text = row.dataset.search || '';
-        row.style.display = text.includes(query) ? 'flex' : 'none';
-      });
-    });
-
-    overlay.querySelector('#trashSelectAll')?.addEventListener('change', (e) => {
-      const isChecked = e.target.checked;
-      overlay.querySelectorAll('.trash-item-cb').forEach(cb => {
-        cb.checked = isChecked;
-        const id = cb.dataset.id;
-        if (isChecked) this.selectedTrashIds.add(id);
-        else this.selectedTrashIds.delete(id);
-      });
-      updateTrashSelectionUI();
-    });
-
-    overlay.querySelectorAll('.trash-item-cb').forEach(cb => {
-      cb.addEventListener('change', (e) => {
-        const id = e.target.dataset.id;
-        if (e.target.checked) this.selectedTrashIds.add(id);
-        else this.selectedTrashIds.delete(id);
-        updateTrashSelectionUI();
-      });
-    });
-
-    // Tekil Kurtar
-    overlay.querySelectorAll('.btn-restore-item').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id = btn.dataset.id;
-        try {
-          await FrpStore.restoreFromTrash(id);
-          if (window.FrpAudit) {
-            window.FrpAudit.logAction({
-              action: 'TRASH_RESTORE',
-              target: id,
-              details: `Rapor (${id}) çöp kutusundan geri yüklendi.`
-            });
-          }
-          this.selectedTrashIds.delete(id);
-          safeToast('Rapor başarıyla geri yüklendi.', 'success');
-        } catch (err) {
-          console.warn('Rapor geri yüklenemedi:', err);
-        } finally {
-          if (typeof window.refreshAll === 'function') window.refreshAll();
-          renderModal();
-        }
-      });
-    });
-
-    // Tekil Kalıcı Sil
-    overlay.querySelectorAll('.btn-purge-item').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.dataset.id;
-        window.showConfirmDialog({
-          title: 'Raporu Kalıcı Olarak Sil',
-          message: 'Bu raporu kalıcı olarak silmek istediğinize emin misiniz? Bu işlem geri alınamaz.',
-          confirmText: 'Kalıcı Olarak Sil',
-          isDanger: true,
-          onConfirm: async () => {
-            try {
-              await FrpStore.purgeFromTrash(id);
-              if (window.FrpAudit) {
-                window.FrpAudit.logAction({
-                  action: 'TRASH_PURGE',
-                  target: id,
-                  details: `Rapor (${id}) çöp kutusundan kalıcı olarak silindi.`
-                });
-              }
-              this.selectedTrashIds.delete(id);
-              safeToast('Rapor kalıcı olarak silindi.', 'info');
-            } catch (err) {
-              console.warn('Rapor kalıcı olarak silinemedi:', err);
-            } finally {
-              if (typeof window.refreshAll === 'function') window.refreshAll();
-              renderModal();
-            }
-          }
-        });
-      });
-    });
-
-    // Toplu Kurtar
-    overlay.querySelector('#btnRestoreSelectedTrash')?.addEventListener('click', async () => {
-      const ids = Array.from(this.selectedTrashIds);
-      if (ids.length === 0) return;
-      const trashItems = (FrpStore.getTrash ? FrpStore.getTrash() : []).filter(t => ids.includes(t.id));
+    const draw = () => {
+      const q = this.query.toLocaleLowerCase('tr-TR').trim();
+      filtered = this.items.filter(r => `${r.meta?.reportName || ''} ${r.name || ''}`.toLocaleLowerCase('tr-TR').includes(q));
+      filtered.sort((a,b) => this.sort === 'name' ? String(a.meta?.reportName || a.name || '').localeCompare(String(b.meta?.reportName || b.name || ''),'tr') : ((Date.parse(b.deletedAt || b.deleted_at)||0)-(Date.parse(a.deletedAt || a.deleted_at)||0)) * (this.sort === 'oldest' ? -1 : 1));
+      this.page = Math.max(0,Math.min(this.page,Math.ceil(filtered.length/this.pageSize)-1));
+      const start = this.page * this.pageSize;
+      visible = filtered.slice(start,start+this.pageSize);
+      const esc = value => this.escHtml(String(value ?? ''));
+      $('#trashItemsListContainer').innerHTML = visible.length ? visible.map(r => {
+        const date = new Date(r.deletedAt || r.deleted_at);
+        return `<label class="trash-item-row"><input type="checkbox" class="trash-item-cb" data-id="${esc(r.id)}" aria-label="${esc(r.meta?.reportName || r.name)} seç"><span class="trash-item-copy"><span class="trash-item-title">${esc(r.meta?.reportName || r.name)}</span><span class="trash-item-file">${esc(r.name)}</span></span><time class="trash-item-date">${Number.isNaN(date.getTime()) ? 'Tarih bilinmiyor' : esc(date.toLocaleString('tr-TR',{dateStyle:'short',timeStyle:'short'}))}</time></label>`;
+      }).join('') : `<div class="trash-empty"><strong>${this.items.length ? 'Sonuç bulunamadı' : 'Çöp kutusu boş'}</strong>${this.items.length ? 'Farklı bir rapor veya dosya adı arayın.' : 'Sildiğiniz raporlar burada görünür.'}</div>`;
+      $('#trashRange').textContent = filtered.length ? `${start+1}–${start+visible.length} / ${filtered.length.toLocaleString('tr-TR')} rapor · Sayfa ${this.page+1} / ${Math.ceil(filtered.length/this.pageSize)}` : '0 rapor';
+      $('#trashPrev').disabled = this.page === 0;
+      $('#trashNext').disabled = start+visible.length >= filtered.length;
+      $('#trashSelectResults').textContent = `Tüm sonuçları seç (${filtered.length.toLocaleString('tr-TR')})`;
+      $('#trashSelectResults').disabled = !filtered.length;
+      updateSelection();
+    };
+    $('#trashSort').value = this.sort;
+    $('#trashSearchInput').addEventListener('input', e => { this.query=e.target.value;this.page=0;selection.clear();draw(); });
+    $('#trashSort').addEventListener('change', e => { this.sort=e.target.value;this.page=0;draw(); });
+    $('#trashSelectAll').addEventListener('change', e => { visible.forEach(r => e.target.checked ? selection.add(String(r.id)) : selection.delete(String(r.id)));updateSelection(); });
+    $('#trashItemsListContainer').addEventListener('change', e => { if(e.target.matches('.trash-item-cb')) { e.target.checked ? selection.add(e.target.dataset.id) : selection.delete(e.target.dataset.id);updateSelection(); } });
+    $('#trashSelectResults').addEventListener('click', () => { filtered.forEach(r => selection.add(String(r.id)));updateSelection(); });
+    $('#trashClearSelection').addEventListener('click', () => { selection.clear();updateSelection(); });
+    $('#trashPrev').addEventListener('click', () => { this.page--;draw(); });
+    $('#trashNext').addEventListener('click', () => { this.page++;draw(); });
+    const run = async (ids, restore) => {
+      if(busy) return;
+      busy=true;updateSelection();
       try {
-        if (FrpStore.restoreManyFromTrash) {
-          await FrpStore.restoreManyFromTrash(ids);
-        } else {
-          for (const id of ids) {
-            await FrpStore.restoreFromTrash(id);
-          }
-        }
-        if (window.FrpAudit) {
-          window.FrpAudit.logAction({
-            action: 'TRASH_RESTORE',
-            target: `${ids.length} Rapor`,
-            details: `${ids.length} adet rapor çöp kutusundan geri yüklendi.`,
-            reports: trashItems.map(t => ({ id: t.id, name: t.name, title: t.meta?.reportName || t.name }))
-          });
-        }
-        this.selectedTrashIds.clear();
-        safeToast(`${ids.length} rapor başarıyla geri yüklendi.`, 'success');
-      } catch (err) {
-        console.warn('Toplu geri yükleme hatası:', err);
-      } finally {
-        if (typeof window.refreshAll === 'function') window.refreshAll();
-        renderModal();
-      }
+        await (restore ? FrpStore.restoreManyFromTrash(ids) : FrpStore.purgeManyFromTrash(ids));
+        selection.clear();safeToast(`${ids.length} rapor ${restore ? 'geri yüklendi' : 'kalıcı olarak silindi'}.`,'success');
+      } catch(error) { safeToast(error.message || 'İşlem tamamlanamadı. Tekrar deneyin.','error'); }
+      finally { busy=false;if(typeof window.refreshAll === 'function') window.refreshAll();renderModal(); }
+    };
+    $('#btnRestoreSelectedTrash').addEventListener('click', () => { if(selection.size) run([...selection],true); });
+    $('#btnPurgeSelectedTrash').addEventListener('click', () => {
+      if(!selection.size || busy) return;
+      const ids = [...selection];
+      window.showConfirmDialog({title:`${ids.length} rapor kalıcı olarak silinsin mi?`,message:'Yalnızca seçtiğiniz raporlar silinecek. Bu işlem geri alınamaz.',confirmText:`${ids.length} raporu kalıcı sil`,isDanger:true,onConfirm:() => run(ids,false)});
     });
-
-    // Toplu Kalıcı Sil
-    overlay.querySelector('#btnPurgeSelectedTrash')?.addEventListener('click', () => {
-      const ids = Array.from(this.selectedTrashIds);
-      if (ids.length === 0) return;
-      const trashItems = (FrpStore.getTrash ? FrpStore.getTrash() : []).filter(t => ids.includes(t.id));
-      window.showConfirmDialog({
-        title: 'Seçilenleri Kalıcı Sil',
-        message: `${ids.length} adet raporu kalıcı olarak silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`,
-        confirmText: 'Evet, Kalıcı Olarak Sil',
-        isDanger: true,
-        onConfirm: async () => {
-          try {
-            if (FrpStore.purgeManyFromTrash) {
-              await FrpStore.purgeManyFromTrash(ids);
-            } else {
-              for (const id of ids) {
-                await FrpStore.purgeFromTrash(id);
-              }
-            }
-            if (window.FrpAudit) {
-              window.FrpAudit.logAction({
-                action: 'TRASH_PURGE',
-                target: `${ids.length} Rapor`,
-                details: `${ids.length} adet rapor çöp kutusundan kalıcı olarak silindi.`,
-                reports: trashItems.map(t => ({ id: t.id, name: t.name, title: t.meta?.reportName || t.name }))
-              });
-            }
-            this.selectedTrashIds.clear();
-            safeToast(`${ids.length} rapor kalıcı olarak silindi.`, 'info');
-          } catch (err) {
-            console.warn('Toplu silme hatası:', err);
-          } finally {
-            if (typeof window.refreshAll === 'function') window.refreshAll();
-            renderModal();
-          }
-        }
-      });
-    });
-
-    // Çöp Kutusunu Tamamen Boşalt
-    overlay.querySelector('#btnEmptyTrashAll')?.addEventListener('click', () => {
-      window.showConfirmDialog({
-        title: 'Çöp Kutusunu Boşalt',
-        message: 'Çöp kutusundaki tüm raporları kalıcı olarak temizlemek istediğinize emin misiniz? Bu işlem geri alınamaz.',
-        confirmText: 'Tümünü Temizle',
-        isDanger: true,
-        onConfirm: async () => {
-          try {
-            await FrpStore.emptyTrash();
-            if (window.FrpAudit) {
-              window.FrpAudit.logAction({
-                action: 'TRASH_EMPTY',
-                target: 'Tüm Çöp Kutusu',
-                details: 'Çöp kutusundaki tüm raporlar kalıcı olarak temizlendi.'
-              });
-            }
-            this.selectedTrashIds.clear();
-            safeToast('Çöp kutusu tamamen boşaltıldı.', 'info');
-          } catch (err) {
-            console.warn('Çöp kutusu boşaltma hatası:', err);
-          } finally {
-            if (typeof window.refreshAll === 'function') window.refreshAll();
-            renderModal();
-          }
-        }
-      });
-    });
+    draw();
   }
 };
