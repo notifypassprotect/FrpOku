@@ -2238,3 +2238,198 @@ html[data-ui-scale="xlarge"] .quick-filters-scroll {
   flex-wrap: wrap !important;
   max-width: 100% !important;
 }
+
+/* ══════════════════════════════════════════════════════════
+   SİSTEM GENELİ RETRO WINDOWS 95 MİMARİSİ (TÜM SAYFALARDA GEÇERLİ)
+   Liste, Detay, Karşılaştırma, Gösterge Paneli ve Modallar
+   ══════════════════════════════════════════════════════════ */
+html[data-ui-mode="retro-win95"] {
+  --bg-app: #008080 !important;
+  --bg-page: #008080 !important;
+  --bg-surface: #c0c0c0 !important;
+  --bg-raised: #d4d0c8 !important;
+  --bg-card: #c0c0c0 !important;
+  --text-primary: #000000 !important;
+  --text-secondary: #222222 !important;
+  --text-muted: #444444 !important;
+  --border: #808080 !important;
+  --border-light: #dfdfdf !important;
+  --ui-border-subtle: #808080 !important;
+  --ui-radius-sm: 0px !important;
+  --ui-radius-md: 0px !important;
+  --ui-radius-lg: 0px !important;
+  --ui-radius-xl: 0px !important;
+  --ui-radius-pill: 0px !important;
+  --radius: 0px !important;
+  --radius-sm: 0px !important;
+  --radius-md: 0px !important;
+  --radius-lg: 0px !important;
+  --shadow-sm: none !important;
+  --shadow-md: none !important;
+  --shadow-lg: none !important;
+  --ui-shadow-panel: none !important;
+  --ui-glass-blur: none !important;
+  --ui-glass-bg: #c0c0c0 !important;
+  --font: 'Segoe UI', Tahoma, Arial, sans-serif !important;
+}
+
+html[data-ui-mode="retro-win95"] *,
+html[data-ui-mode="retro-win95"] *::before,
+html[data-ui-mode="retro-win95"] *::after {
+  border-radius: 0px !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+html[data-ui-mode="retro-win95"] body {
+  background: #008080 !important;
+  font-family: 'Segoe UI', Tahoma, Arial, sans-serif !important;
+  color: #000000 !important;
+}
+
+/* Win95 Başlık Çubuğu: Klasik Koyu Mavi Degrade & Beyaz Kalın Metin */
+html[data-ui-mode="retro-win95"] .topbar,
+html[data-ui-mode="retro-win95"] .cmp-topbar,
+html[data-ui-mode="retro-win95"] .detail-topbar,
+html[data-ui-mode="retro-win95"] .dash-header,
+html[data-ui-mode="retro-win95"] .modal-header,
+html[data-ui-mode="retro-win95"] .settings-modal-header,
+html[data-ui-mode="retro-win95"] .cmp-slot-header {
+  background: linear-gradient(90deg, #000080 0%, #1084d0 100%) !important;
+  color: #ffffff !important;
+  border-bottom: 2px solid #404040 !important;
+  padding: 6px 12px !important;
+}
+
+html[data-ui-mode="retro-win95"] .topbar *,
+html[data-ui-mode="retro-win95"] .cmp-topbar *,
+html[data-ui-mode="retro-win95"] .detail-topbar *,
+html[data-ui-mode="retro-win95"] .dash-header *,
+html[data-ui-mode="retro-win95"] .modal-header *,
+html[data-ui-mode="retro-win95"] .settings-modal-header *,
+html[data-ui-mode="retro-win95"] .cmp-slot-header * {
+  color: #ffffff !important;
+}
+
+/* 3D Kabartmalı Düğmeler (Win95 Outset Beveled Buttons) */
+html[data-ui-mode="retro-win95"] .btn,
+html[data-ui-mode="retro-win95"] button:not(.btn-icon):not(.theme-selector-select),
+html[data-ui-mode="retro-win95"] .btn-back,
+html[data-ui-mode="retro-win95"] .detail-tab-btn,
+html[data-ui-mode="retro-win95"] .dash-filter-btn,
+html[data-ui-mode="retro-win95"] .theme-switch-pill,
+html[data-ui-mode="retro-win95"] .filter-chip,
+html[data-ui-mode="retro-win95"] .view-btn {
+  background: #c0c0c0 !important;
+  color: #000000 !important;
+  border-top: 2px solid #ffffff !important;
+  border-left: 2px solid #ffffff !important;
+  border-right: 2px solid #404040 !important;
+  border-bottom: 2px solid #404040 !important;
+  box-shadow: inset 1px 1px 0 #dfdfdf, inset -1px -1px 0 #808080 !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+}
+
+html[data-ui-mode="retro-win95"] .btn:active,
+html[data-ui-mode="retro-win95"] button:active,
+html[data-ui-mode="retro-win95"] .btn-back:active,
+html[data-ui-mode="retro-win95"] .detail-tab-btn.active,
+html[data-ui-mode="retro-win95"] .dash-filter-btn.active,
+html[data-ui-mode="retro-win95"] .view-btn.active {
+  border-top: 2px solid #404040 !important;
+  border-left: 2px solid #404040 !important;
+  border-right: 2px solid #ffffff !important;
+  border-bottom: 2px solid #ffffff !important;
+  box-shadow: inset 1px 1px 0 #808080, inset -1px -1px 0 #dfdfdf !important;
+  transform: translate(1px, 1px) !important;
+}
+
+/* 3D Batık Girdi Kutuları (Win95 Inset Sunken Fields) */
+html[data-ui-mode="retro-win95"] input[type="text"],
+html[data-ui-mode="retro-win95"] input[type="search"],
+html[data-ui-mode="retro-win95"] input[type="password"],
+html[data-ui-mode="retro-win95"] input[type="email"],
+html[data-ui-mode="retro-win95"] input[type="number"],
+html[data-ui-mode="retro-win95"] select,
+html[data-ui-mode="retro-win95"] textarea,
+html[data-ui-mode="retro-win95"] .master-search-input,
+html[data-ui-mode="retro-win95"] .field-select,
+html[data-ui-mode="retro-win95"] .detail-search-input {
+  background: #ffffff !important;
+  color: #000000 !important;
+  border-top: 2px solid #808080 !important;
+  border-left: 2px solid #808080 !important;
+  border-right: 2px solid #ffffff !important;
+  border-bottom: 2px solid #ffffff !important;
+  box-shadow: inset 1px 1px 0 #000000, inset -1px -1px 0 #dfdfdf !important;
+}
+
+/* Paneller, Kartlar, Sekmeler ve Pencereler (Win95 Window Frame) */
+html[data-ui-mode="retro-win95"] .app-wrap,
+html[data-ui-mode="retro-win95"] .cmp-shell,
+html[data-ui-mode="retro-win95"] .dash-wrap,
+html[data-ui-mode="retro-win95"] .card,
+html[data-ui-mode="retro-win95"] .dash-card,
+html[data-ui-mode="retro-win95"] .dash-chart-card,
+html[data-ui-mode="retro-win95"] .dash-table-wrap,
+html[data-ui-mode="retro-win95"] .settings-card,
+html[data-ui-mode="retro-win95"] .report-card,
+html[data-ui-mode="retro-win95"] .note-area,
+html[data-ui-mode="retro-win95"] .sql-accordion,
+html[data-ui-mode="retro-win95"] .detail-panel,
+html[data-ui-mode="retro-win95"] .metadata-panel,
+html[data-ui-mode="retro-win95"] .cmp-slot,
+html[data-ui-mode="retro-win95"] .cmp-panel,
+html[data-ui-mode="retro-win95"] .bulk-bar,
+html[data-ui-mode="retro-win95"] .modal,
+html[data-ui-mode="retro-win95"] .settings-modal-dialog,
+html[data-ui-mode="retro-win95"] .modal-box {
+  background: #c0c0c0 !important;
+  color: #000000 !important;
+  border-top: 2px solid #ffffff !important;
+  border-left: 2px solid #ffffff !important;
+  border-right: 2px solid #000000 !important;
+  border-bottom: 2px solid #000000 !important;
+  box-shadow: inset 1px 1px 0 #dfdfdf, inset -1px -1px 0 #808080 !important;
+}
+
+/* Tablolar ve Sütun Başlıkları */
+html[data-ui-mode="retro-win95"] th,
+html[data-ui-mode="retro-win95"] .dash-table-header {
+  background: #c0c0c0 !important;
+  color: #000000 !important;
+  border-top: 2px solid #ffffff !important;
+  border-left: 2px solid #ffffff !important;
+  border-right: 2px solid #404040 !important;
+  border-bottom: 2px solid #404040 !important;
+  box-shadow: inset 1px 1px 0 #dfdfdf, inset -1px -1px 0 #808080 !important;
+  font-weight: 800 !important;
+}
+
+html[data-ui-mode="retro-win95"] tr:hover td {
+  background: #000080 !important;
+  color: #ffffff !important;
+}
+
+html[data-ui-mode="retro-win95"] tr:hover td a,
+html[data-ui-mode="retro-win95"] tr:hover td span,
+html[data-ui-mode="retro-win95"] tr:hover td div {
+  color: #ffffff !important;
+}
+
+/* Win95 Kaydırma Çubuğu (Scrollbar) */
+html[data-ui-mode="retro-win95"] ::-webkit-scrollbar {
+  width: 16px !important;
+  height: 16px !important;
+  background: #dfdfdf !important;
+}
+
+html[data-ui-mode="retro-win95"] ::-webkit-scrollbar-thumb {
+  background: #c0c0c0 !important;
+  border-top: 2px solid #ffffff !important;
+  border-left: 2px solid #ffffff !important;
+  border-right: 2px solid #404040 !important;
+  border-bottom: 2px solid #404040 !important;
+  box-shadow: inset 1px 1px 0 #dfdfdf, inset -1px -1px 0 #808080 !important;
+}

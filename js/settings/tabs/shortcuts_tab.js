@@ -6,15 +6,19 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
 
 window.FrpSettingsTabs.shortcuts = {
   shortcutsList: [
-    { key: 'Ctrl + F', desc: 'Raporlar ve sorgularda anında ara' },
+    { key: 'Ctrl + F / /', desc: 'Raporlar ve sorgularda anında ara' },
     { key: 'Ctrl + E', desc: 'Tüm rapor listesini Excel tablosu olarak dışa aktar' },
     { key: 'Ctrl + R', desc: 'Editörde seçili ifadeyi değiştir (Replace)' },
     { key: 'Ctrl + ,', desc: 'Ayarlar & Kullanıcı Yönetimi penceresini aç' },
     { key: 'Alt + N / Ctrl + I', desc: 'Yeni .frp rapor dosyası ekle' },
     { key: 'Ctrl + M', desc: 'Komut Paletini aç (Hızlı Menü)' },
-    { key: 'ESC',      desc: 'Açık modal pencereleri veya aramayı kapat' },
+    { key: 'Delete',   desc: 'Seçili raporları sil' },
+    { key: 'Ctrl + A', desc: 'Listedeki tüm raporları seç veya seçimi kaldır' },
+    { key: 'ESC',      desc: 'Açık pencereleri kapat; pencere yoksa seçimi temizle' },
     { key: 'F6',       desc: 'Görünüm modunu değiştir (Tablo / Kartlar / Zaman Tüneli)' },
-    { key: 'F8',       desc: 'Seçili raporlar için Karşılaştırma modunu aç' }
+    { key: 'F8',       desc: 'Seçili 2 veya 3 raporu karşılaştır (en fazla 3)' },
+    { key: 'Ctrl + D', desc: 'Yönetim Paneline git' },
+    { key: 'Ctrl + T', desc: 'Aydınlık / Koyu temayı değiştir' }
   ],
 
   render() {

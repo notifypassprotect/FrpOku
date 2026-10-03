@@ -44,9 +44,12 @@ test('timeline_renderer.js displays full group count and getReportColorTooltip p
   assert.match(tableCode, /\[Mavi - SQL\]/, 'tooltip must describe blue SQL count');
 });
 
-test('index.html removes btnColorGuide and adds accessible 1-click Retro Win95 mode toggle', () => {
+test('retro mode is removed from main index list and configured exclusively in settings appearance tab', () => {
   const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
   assert.doesNotMatch(html, /id="btnColorGuide"/, 'btnColorGuide button must be removed');
-  assert.match(html, /id="btnRetroModeToggle"/, 'topbar must contain btnRetroModeToggle');
-  assert.match(html, /id="btnMobRetroToggle"/, 'mobile drawer must contain btnMobRetroToggle');
+  assert.doesNotMatch(html, /id="btnRetroModeToggle"/, 'topbar must not contain btnRetroModeToggle');
+  assert.doesNotMatch(html, /id="btnMobRetroToggle"/, 'mobile drawer must not contain btnMobRetroToggle');
+
+  const appearanceCode = fs.readFileSync(path.join(__dirname, '../js/settings/tabs/appearance_tab.js'), 'utf8');
+  assert.match(appearanceCode, /value="retro-win95"/, 'settings appearance tab must support retro-win95 mode');
 });

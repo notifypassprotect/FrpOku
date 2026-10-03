@@ -861,8 +861,19 @@ function updateBulkBar() {
 
     const btnCompare = document.getElementById('btnCompareSelected');
     if (btnCompare) {
-      btnCompare.style.display = count >= 2 ? 'inline-flex' : 'none';
-      btnCompare.textContent = count === 2 ? 'Karşılaştır' : `Seçilen ${count} Raporu Karşılaştır`;
+      if (count >= 2 && count <= 3) {
+        btnCompare.style.display = 'inline-flex';
+        btnCompare.disabled = false;
+        btnCompare.textContent = `${count} Raporu Karşılaştır`;
+        btnCompare.title = 'Seçilen raporları yan yana karşılaştır';
+      } else if (count > 3) {
+        btnCompare.style.display = 'inline-flex';
+        btnCompare.disabled = true;
+        btnCompare.textContent = 'Karşılaştır (Maks. 3)';
+        btnCompare.title = 'Karşılaştırma için en fazla 3 rapor seçilebilir.';
+      } else {
+        btnCompare.style.display = 'none';
+      }
     }
 
     // Havuz Butonlarının Dinamik Durum Yönetimi (Asla aynı anda ikisi birden görünmez)
@@ -1534,7 +1545,11 @@ function initListPage() {
 
   document.getElementById('btnCompareSelected')?.addEventListener('click', () => {
     if (selectedIds.size < 2) return;
-    const ids = [...selectedIds].slice(0, 2).join(',');
+    if (selectedIds.size > 3) {
+      toast('Karşılaştırma için en fazla 3 rapor seçebilirsiniz.', 'warning');
+      return;
+    }
+    const ids = [...selectedIds].slice(0, 3).join(',');
     window.FrpNavigate(`compare.html?ids=${encodeURIComponent(ids)}`);
   });
 
@@ -1888,8 +1903,49 @@ function initListPage() {
       currentViewMode = modes[nextIdx];
       renderCurrentView();
     }
+    const isEditing = e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT' || e.target.isContentEditable);
+    const modalOpen = !!document.querySelector('.modal-overlay, .confirm-overlay, dialog[open]');
+    const mod = e.ctrlKey || e.metaKey;
+    if (!isEditing && !modalOpen) {
+      if (e.key === 'Delete' && selectedIds.size > 0) {
+        e.preventDefault();
+        document.getElementById('btnDeleteBulk')?.click();
+        return;
+      }
+      if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        const ids = [...document.querySelectorAll('.row-checkbox')].map(c => decodeURIComponent(c.dataset.id || ''));
+        const allSelected = ids.length > 0 && ids.every(id => selectedIds.has(id));
+        if (allSelected) ids.forEach(id => selectedIds.delete(id));
+        else ids.forEach(id => selectedIds.add(id));
+        renderCurrentView();
+        updateBulkBar();
+        return;
+      }
+      if (e.key === 'Escape' && selectedIds.size > 0) {
+        selectedIds.clear();
+        renderCurrentView();
+        updateBulkBar();
+        return;
+      }
+      if (e.key === 'F8') {
+        e.preventDefault();
+        if (selectedIds.size >= 2 && selectedIds.size <= 3) document.getElementById('btnCompareSelected')?.click();
+        else toast('Karşılaştırmak için 2 veya 3 rapor seçin.', 'warning');
+        return;
+      }
+      if (mod && !e.shiftKey && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        window.FrpNavigate('dashboard.html');
+        return;
+      }
+      if (mod && !e.shiftKey && e.key.toLowerCase() === 't') {
+        e.preventDefault();
+        document.getElementById('btnThemeToggle')?.click();
+        return;
+      }
+    }
     // '/' tuşu ile arama kutusuna hızlı odaklanma
-    const isEditing = e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable);
     if (e.key === '/' && !isEditing) {
       const prefs = window.FrpStore ? window.FrpStore.getPreferences() : {};
       if (prefs.quickSearchKey !== false) {
