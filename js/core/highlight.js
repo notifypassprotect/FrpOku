@@ -71,6 +71,7 @@ const PAS_KEYWORD_LIST = [
   'FINALLY', 'CASE', 'OF', 'EXIT', 'BREAK', 'CONTINUE', 'MOD', 'DIV', 'NOT', 'AND', 'OR', 'XOR', 'NIL', 
   'TRUE', 'FALSE', 'RESULT', 'SELF', 'INHERITED', 'CHAR', 'BYTE', 'WORD', 'LONGINT', 'INT64', 'CARDINAL',
   'SHORTINT', 'SMALLINT', 'VARIANT', 'OLEVARIANT', 'REAL', 'SINGLE',
+  'VARTOINT', 'VARTOSTR', 'VARISNULL', 'VARISEMPTY', 'RETURNQUERY',
   'MESSAGEDLG', 'MESSAGEBOX', 'SHOWMESSAGE', 'INPUTQUERY', 'STRINGREPLACE', 'FORMATDATETIME', 
   'STRTOINT', 'INTTOSTR', 'FLOATTOSTR', 'STRTOFLOAT', 'STRTODATE', 'DATETOSTR', 'STRTODATETIME',
   'LENGTH', 'COPY', 'POS', 'TRIM', 'UPPERCASE', 'LOWERCASE', 'DELETE', 'INSERT', 'ROUND', 'TRUNC',
@@ -150,7 +151,43 @@ function findFuzzyTypoMatch(word, lang = 'pascal') {
     const sFix = staticMap.get(up);
     if (sFix.toUpperCase() !== up) return sFix;
   }
-  // Kullanıcı tanımlı Oracle/Pascal fonksiyonlarını sözlük benzerliğine göre hata sayma.
+
+  // 3. Pascal için dinamik Levenshtein bulanık yazım hatası denetimi (Open, Color, FetchAll vb.)
+  if (lang === 'pascal') {
+    let bestMatch = null;
+    let minDistance = 999;
+
+    for (const kw of PAS_KEYWORD_LIST) {
+      const lenDiff = Math.abs(up.length - kw.length);
+      const maxLenDiff = kw.length >= 10 ? 2 : 1;
+      if (lenDiff > maxLenDiff) continue;
+
+      const maxDist = kw.length >= 10 ? 2 : 1;
+      const d = levenshteinDist(up, kw);
+      if (d > 0 && d <= maxDist && d < minDistance) {
+        minDistance = d;
+        bestMatch = kw;
+      }
+    }
+
+    if (bestMatch) {
+      const CANONICAL_MAP = {
+        OPEN: 'Open', CLOSE: 'Close', FETCHALL: 'FetchAll', EXECSQL: 'ExecSQL',
+        COLOR: 'Color', FONT: 'Font', BRUSH: 'Brush', PEN: 'Pen', FRAME: 'Frame',
+        TEXT: 'Text', CAPTION: 'Caption', VALUE: 'Value', LINES: 'Lines', MEMO: 'Memo',
+        VISIBLE: 'Visible', ENABLED: 'Enabled', WIDTH: 'Width', HEIGHT: 'Height',
+        LEFT: 'Left', TOP: 'Top', SHOWMESSAGE: 'ShowMessage', MESSAGEDLG: 'MessageDlg',
+        INTTOSTR: 'IntToStr', STRTOINT: 'StrToInt', FLOATTOSTR: 'FloatToStr', STRTOFLOAT: 'StrToFloat',
+        FORMATDATETIME: 'FormatDateTime', FORMATFLOAT: 'FormatFloat', FORMAT: 'Format',
+        PROCEDURE: 'procedure', FUNCTION: 'function', BEGIN: 'begin', END: 'end',
+        VAR: 'var', CONST: 'const', TYPE: 'type', IF: 'if', THEN: 'then', ELSE: 'else',
+        WHILE: 'while', DO: 'do', FOR: 'for', REPEAT: 'repeat', UNTIL: 'until',
+        REPORT: 'Report', ENGINE: 'Engine', STOPREPORT: 'StopReport'
+      };
+      return CANONICAL_MAP[bestMatch] || (bestMatch.charAt(0).toUpperCase() + bestMatch.slice(1).toLowerCase());
+    }
+  }
+
   return null;
 }
 
@@ -396,12 +433,17 @@ function highlightPascal(raw) {
       if (PAS_TYPO_MAP.has(up)) {
         const fix = PAS_TYPO_MAP.get(up);
         out += `<span class="syntax-error" title="Yazım Hatası: '${esc(word)}' -> Doğrusu: '${fix}'">${esc(word)}</span>`;
-      } else if (PAS_KW.has(up)) {
-        out += `<span class="pas-keyword">${esc(word)}</span>`;
-      } else if (PAS_TYPE.has(up)) {
-        out += `<span class="pas-type">${esc(word)}</span>`;
       } else {
-        out += esc(word);
+        const fuzzyFix = findFuzzyTypoMatch(word, 'pascal');
+        if (fuzzyFix) {
+          out += `<span class="syntax-error" title="Yazım Hatası: '${esc(word)}' -> Doğrusu: '${fuzzyFix}'">${esc(word)}</span>`;
+        } else if (PAS_KW.has(up)) {
+          out += `<span class="pas-keyword">${esc(word)}</span>`;
+        } else if (PAS_TYPE.has(up)) {
+          out += `<span class="pas-type">${esc(word)}</span>`;
+        } else {
+          out += esc(word);
+        }
       }
       i = j; continue;
     }
@@ -1216,7 +1258,7 @@ function findSyntaxErrors(code, lang = 'sql') {
           errors.push({
             line: lineN,
             col: 1,
-            token: ';',
+            token: pe.token || ';',
             suggestion: pe.suggestion || "Satır sonuna ';' ekleyin",
             message: pe.text
           });

@@ -226,190 +226,305 @@
  errors.push({ text: `Satır ${unclosed.line}: Açılan '${unclosed.type || 'begin'}' bloğu kapatılmamış`, line: unclosed.line, suggestion: "Bloğu uygun bir 'end;' ile kapatın." });
  }
 
- // ── RAPOR NESNE İSMİ UYUMSUZLUKLARI (Object / Component Inspector Çapraz Denetimi) ──
+ // ── RAPOR NESNE VE PASCAL SÖZDİZİMİ DENETİMİ (Object / Member & Keyword Typo Checking) ──
  const reportComponentNames = extractReportComponentNames(reportContext);
- if (reportComponentNames.size > 0) {
- // Script içindeki yerel 'var' tanımlamalarını ayıkla
+
+ // Script içindeki yerel 'var' tanımlamalarını ve parametreleri ayıkla
  const declaredVars = new Set();
  const varSectionRx = /\bVAR\b([\s\S]+?)(?=\bBEGIN\b|\bPROCEDURE\b|\bFUNCTION\b|\bCONST\b|\bTYPE\b|$)/gi;
  let vm;
- while ((vm = varSectionRx.exec(code))!== null) {
- const decls = vm[1].split(';');
- decls.forEach(d => {
- const colonIdx = d.indexOf(':');
- if (colonIdx!== -1) {
- const varList = d.slice(0, colonIdx).split(',');
- varList.forEach(v => {
- const cleanV = v.trim().toUpperCase();
- if (cleanV) declaredVars.add(cleanV);
- });
- }
- });
+ while ((vm = varSectionRx.exec(code)) !== null) {
+   const decls = vm[1].split(';');
+   decls.forEach(d => {
+     const colonIdx = d.indexOf(':');
+     if (colonIdx !== -1) {
+       const varList = d.slice(0, colonIdx).split(',');
+       varList.forEach(v => {
+         const cleanV = v.trim().toUpperCase();
+         if (cleanV) declaredVars.add(cleanV);
+       });
+     }
+   });
  }
 
- // Standart Delphi / FastReport anahtar kelimeleri ve yerleşik nesneleri (Spesifik görsel sayfa isimleri hariç)
- const PASCAL_BUILTINS = new Set([
- 'REPORT', 'ENGINE', 'SENDER', 'SELF', 'CANVAS', 'APPLICATION', 'SCREEN',
- 'TRUNC', 'ROUND', 'INTTOSTR', 'STRTOINT', 'FLOATTOSTR', 'STRTOFLOAT', 'FORMATDATETIME',
- 'NOW', 'DATE', 'TIME', 'INCMONTH', 'TRIM', 'COPY', 'POS', 'LENGTH', 'UPPERCASE', 'LOWERCASE',
- 'SHOWMESSAGE', 'MESSAGEDLG', 'GET', 'SET', 'VARARRAYCREATE', 'VARARRAYOF', 'NULL', 'UNASSIGNED',
- 'TRUE', 'FALSE', 'RESULT', 'ITEMS', 'LINES', 'TEXT', 'CAPTION', 'VALUE', 'CLOSE', 'OPEN',
- 'TFRXMEMOVIEW', 'TFRXPICTUREVIEW', 'TFRXCHECKLISTBOXCONTROL', 'TFRXDBCHECKLISTBOXCONTROL',
- 'TSTRINGLIST', 'TLIST', 'TOBJECT', 'COMPONENT', 'OWNER', 'MATH', 'SYSUTILS', 'CLASSES', 'FORMS'
+ // Procedure / function parametrelerini de yerel değişken olarak ekle
+ const procHeaderRx = /\b(?:PROCEDURE|FUNCTION)\b\s+[a-zA-Z0-9_]+\s*\(([^)]*)\)/gi;
+ let pm;
+ while ((pm = procHeaderRx.exec(code)) !== null) {
+   const paramsList = pm[1].split(';');
+   paramsList.forEach(pGroup => {
+     const colonIdx = pGroup.indexOf(':');
+     const paramNames = (colonIdx !== -1 ? pGroup.slice(0, colonIdx) : pGroup).replace(/\bVAR\b|\bCONST\b|\bOUT\b/gi, '').split(',');
+     paramNames.forEach(pn => {
+       const cleanPn = pn.trim().toUpperCase();
+       if (cleanPn) declaredVars.add(cleanPn);
+     });
+   });
+ }
+
+ // Standart FastReport & Delphi Nesne Özellikleri ve Metodları (Open, Close, FetchAll, Color, Width, Text vb.)
+ const PASCAL_COMMON_MEMBERS = {
+   OPEN: 'Open', CLOSE: 'Close', FETCHALL: 'FetchAll', EXECSQL: 'ExecSQL',
+   FIRST: 'First', NEXT: 'Next', PRIOR: 'Prior', LAST: 'Last', POST: 'Post',
+   EDIT: 'Edit', APPEND: 'Append', INSERT: 'Insert', DELETE: 'Delete', CANCEL: 'Cancel',
+   REFRESH: 'Refresh', CLEAR: 'Clear', ADD: 'Add', LOADFROMFILE: 'LoadFromFile',
+   SAVETOFILE: 'SaveToFile', FIELDBYNAME: 'FieldByName', PARAMBYNAME: 'ParamByName',
+   PREPAREREPORT: 'PrepareReport', SHOWREPORT: 'ShowReport', DESIGNREPORT: 'DesignReport',
+   PRINT: 'Print', EXPORT: 'Export', NEWPAGE: 'NewPage', NEWCOLUMN: 'NewColumn',
+   SHOWBAND: 'ShowBand', STOPREPORT: 'StopReport',
+   COLOR: 'Color', FONT: 'Font', BRUSH: 'Brush', PEN: 'Pen', FRAME: 'Frame',
+   TEXT: 'Text', CAPTION: 'Caption', VALUE: 'Value', LINES: 'Lines', MEMO: 'Memo',
+   VISIBLE: 'Visible', ENABLED: 'Enabled', WIDTH: 'Width', HEIGHT: 'Height',
+   LEFT: 'Left', TOP: 'Top', ALIGN: 'Align', ALIGNMENT: 'Alignment',
+   WORDWRAP: 'WordWrap', TAG: 'Tag', NAME: 'Name', RECORDCOUNT: 'RecordCount',
+   ISEMPTY: 'IsEmpty', EOF: 'Eof', BOF: 'Bof', ACTIVE: 'Active', SQL: 'SQL',
+   PARAMS: 'Params', DATASET: 'DataSet', DATAFIELD: 'DataField', ASSTRING: 'AsString',
+   ASINTEGER: 'AsInteger', ASFLOAT: 'AsFloat', ASDATETIME: 'AsDateTime',
+   ASBOOLEAN: 'AsBoolean', PRINTABLE: 'Printable', STRETCHMODE: 'StretchMode',
+   SHIFTMODE: 'ShiftMode', DISPLAYFORMAT: 'DisplayFormat', FORMATSTR: 'FormatStr',
+   PARENTFONT: 'ParentFont', PARENTCOLOR: 'ParentColor', GAPX: 'GapX', GAPY: 'GapY'
+ };
+
+ const PASCAL_KEYWORDS = {
+   BEGIN: 'begin', END: 'end', PROCEDURE: 'procedure', FUNCTION: 'function',
+   VAR: 'var', CONST: 'const', TYPE: 'type', IF: 'if', THEN: 'then', ELSE: 'else',
+   WHILE: 'while', DO: 'do', FOR: 'for', TO: 'to', DOWNTO: 'downto', REPEAT: 'repeat',
+   UNTIL: 'until', CASE: 'case', OF: 'of', TRY: 'try', EXCEPT: 'except', FINALLY: 'finally',
+   WITH: 'with', USES: 'uses', PROGRAM: 'program', AND: 'and', OR: 'or', NOT: 'not',
+   XOR: 'xor', MOD: 'mod', DIV: 'div', TRUE: 'True', FALSE: 'False', NIL: 'nil',
+   NULL: 'Null', UNASSIGNED: 'Unassigned', RESULT: 'Result', SENDER: 'Sender', SELF: 'Self'
+ };
+
+ const PASCAL_BUILTIN_FUNCS = {
+   SHOWMESSAGE: 'ShowMessage', MESSAGEDLG: 'MessageDlg', TRUNC: 'Trunc', ROUND: 'Round',
+   INTTOSTR: 'IntToStr', STRTOINT: 'StrToInt', STRTOINTDEF: 'StrToIntDef', FLOATTOSTR: 'FloatToStr',
+   STRTOFLOAT: 'StrToFloat', FORMATDATETIME: 'FormatDateTime', FORMATFLOAT: 'FormatFloat',
+   FORMAT: 'Format', NOW: 'Now', DATE: 'Date', TIME: 'Time', INCMONTH: 'IncMonth',
+   TRIM: 'Trim', COPY: 'Copy', POS: 'Pos', LENGTH: 'Length', UPPERCASE: 'UpperCase',
+   LOWERCASE: 'LowerCase', STRINGREPLACE: 'StringReplace', VARARRAYCREATE: 'VarArrayCreate',
+   VARARRAYOF: 'VarArrayOf', INC: 'Inc', DEC: 'Dec', GET: 'Get', SET: 'Set', VARTOINT: 'VarToInt', VARTOSTR: 'VarToStr', VARISNULL: 'VarIsNull', VARISEMPTY: 'VarIsEmpty', RETURNQUERY: 'ReturnQuery'
+ };
+
+ const PASCAL_TYPES_AND_CONSTS = new Set([
+   'INTEGER', 'CARDINAL', 'WORD', 'BYTE', 'SMALLINT', 'INT64', 'STRING', 'ANSISTRING',
+   'WIDESTRING', 'CHAR', 'BOOLEAN', 'REAL', 'SINGLE', 'DOUBLE', 'EXTENDED', 'CURRENCY',
+   'TDATE', 'TTIME', 'TDATETIME', 'VARIANT', 'POINTER', 'TFRXCOMPONENT', 'TFRXVIEW',
+   'TFRXMEMOVIEW', 'TFRXPICTUREVIEW', 'TFRXSHAPEVIEW', 'TFRXBAND', 'TFRXREPORTPAGE',
+   'TFRXDATASET', 'TFRXQUERY', 'TSTRINGLIST', 'TLIST', 'TOBJECT', 'TCOMPONENT',
+   'CLWHITE', 'CLBLACK', 'CLRED', 'CLGREEN', 'CLBLUE', 'CLYELLOW', 'CLGRAY', 'CLSILVER',
+   'CLNAVY', 'CLNONE', 'CLAQUA', 'CLFUCHSIA', 'CLLIME', 'CLMAROON', 'CLOLIVE', 'CLPURPLE',
+   'CLTEAL', 'CLWINDOW', 'CLWINDOWTEXT', 'CLBTNFACE', 'CLHIGHLIGHT', 'CANVAS', 'APPLICATION', 'SCREEN',
+   'MATH', 'SYSUTILS', 'CLASSES', 'FORMS', 'MRNONE', 'MROK', 'MRCANCEL', 'MRYES', 'MRNO', 'MRABORT'
+ ]);
+
+ const ALL_KNOWN_WORDS = new Set([
+   ...Object.keys(PASCAL_COMMON_MEMBERS),
+   ...Object.keys(PASCAL_KEYWORDS),
+   ...Object.keys(PASCAL_BUILTIN_FUNCS),
+   ...PASCAL_TYPES_AND_CONSTS
  ]);
 
  const FR_BUILTIN_MAP = {
- REPORT: {
- label: 'Report',
- props: {
- PRINTOPTIONS: {
- label: 'PrintOptions',
- props: ['PRINTER', 'COPIES', 'DUPLEX', 'SHOWDIALOG', 'PRINTMODE', 'REVERSE', 'PAGENUMBERS', 'COLLATE']
- },
- REPORTOPTIONS: {
- label: 'ReportOptions',
- props: ['NAME', 'AUTHOR', 'DESCRIPTION', 'VERSIONBUILD', 'VERSIONMAJOR', 'VERSIONMINOR', 'GUID']
- },
- VARIABLES: { label: 'Variables', props: [] },
- PARAMS: { label: 'Params', props: [] },
- FILENAME: { label: 'FileName', props: [] },
- SCRIPTTEXT: { label: 'ScriptText', props: [] },
- PREPAREREPORT: { label: 'PrepareReport', props: [] },
- SHOWREPORT: { label: 'ShowReport', props: [] },
- DESIGNREPORT: { label: 'DesignReport', props: [] }
- }
- },
- ENGINE: {
- label: 'Engine',
- props: {
- STOPREPORT: { label: 'StopReport', props: [] },
- NEWPAGE: { label: 'NewPage', props: [] },
- NEWCOLUMN: { label: 'NewColumn', props: [] },
- SHOWBAND: { label: 'ShowBand', props: [] },
- CURX: { label: 'CurX', props: [] },
- CURY: { label: 'CurY', props: [] },
- PAGEWIDTH: { label: 'PageWidth', props: [] },
- PAGEHEIGHT: { label: 'PageHeight', props: [] }
- }
- }
+   REPORT: {
+     label: 'Report',
+     props: {
+       PRINTOPTIONS: {
+         label: 'PrintOptions',
+         props: ['PRINTER', 'COPIES', 'DUPLEX', 'SHOWDIALOG', 'PRINTMODE', 'REVERSE', 'PAGENUMBERS', 'COLLATE']
+       },
+       REPORTOPTIONS: {
+         label: 'ReportOptions',
+         props: ['NAME', 'AUTHOR', 'DESCRIPTION', 'VERSIONBUILD', 'VERSIONMAJOR', 'VERSIONMINOR', 'GUID']
+       },
+       VARIABLES: { label: 'Variables', props: [] },
+       PARAMS: { label: 'Params', props: [] },
+       FILENAME: { label: 'FileName', props: [] },
+       SCRIPTTEXT: { label: 'ScriptText', props: [] },
+       PREPAREREPORT: { label: 'PrepareReport', props: [] },
+       SHOWREPORT: { label: 'ShowReport', props: [] },
+       DESIGNREPORT: { label: 'DesignReport', props: [] }
+     }
+   },
+   ENGINE: {
+     label: 'Engine',
+     props: {
+       STOPREPORT: { label: 'StopReport', props: [] },
+       NEWPAGE: { label: 'NewPage', props: [] },
+       NEWCOLUMN: { label: 'NewColumn', props: [] },
+       SHOWBAND: { label: 'ShowBand', props: [] },
+       CURX: { label: 'CurX', props: [] },
+       CURY: { label: 'CurY', props: [] },
+       PAGEWIDTH: { label: 'PageWidth', props: [] },
+       PAGEHEIGHT: { label: 'PageHeight', props: [] }
+     }
+   }
  };
 
  function getLevenshteinDist(s1, s2) {
- const m = s1.length, n = s2.length;
- const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
- for (let i = 0; i <= m; i++) dp[i][0] = i;
- for (let j = 0; j <= n; j++) dp[0][j] = j;
- for (let i = 1; i <= m; i++) {
- for (let j = 1; j <= n; j++) {
- if (s1[i - 1] === s2[j - 1]) dp[i][j] = dp[i - 1][j - 1];
- else dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
- }
- }
- return dp[m][n];
+   const m = s1.length, n = s2.length;
+   const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+   for (let i = 0; i <= m; i++) dp[i][0] = i;
+   for (let j = 0; j <= n; j++) dp[0][j] = j;
+   for (let i = 1; i <= m; i++) {
+     for (let j = 1; j <= n; j++) {
+       if (s1[i - 1] === s2[j - 1]) dp[i][j] = dp[i - 1][j - 1];
+       else dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+     }
+   }
+   return dp[m][n];
  }
 
  const seenUnknowns = new Set();
  strippedLines.forEach((sLine, lIdx) => {
- const lnum = lIdx + 1;
- // Zincirleme Obje/Property kalıpları: ObjeAdi.Prop1 veya ObjeAdi.Prop1.Prop2
- const fullChainRx = /\b([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)+)\b/g;
- let cm;
- while ((cm = fullChainRx.exec(sLine))!== null) {
- const rawChain = cm[1];
- const parts = rawChain.split('.');
- const rootObj = parts[0];
- const upperRoot = rootObj.toUpperCase();
+   const lnum = lIdx + 1;
 
- // 1. Report / Engine gibi yerleşik nesnelerin alt özellik denetimi
- if (FR_BUILTIN_MAP[upperRoot]) {
- const schema = FR_BUILTIN_MAP[upperRoot];
- if (parts.length >= 2) {
- const p1 = parts[1];
- const upperP1 = p1.toUpperCase();
- if (!schema.props[upperP1] &&!seenUnknowns.has(`${upperRoot}.${upperP1}`)) {
- seenUnknowns.add(`${upperRoot}.${upperP1}`);
- let closestP1 = '';
- let minDist = 999;
- for (const validProp of Object.keys(schema.props)) {
- const d = getLevenshteinDist(upperP1, validProp);
- if (d < minDist && d <= 3) {
- minDist = d;
- closestP1 = schema.props[validProp].label;
- }
- }
- errors.push({
- text: `Satır ${lnum}: Geçersiz '${schema.label}' Özelliği '${p1}'${closestP1? ` ➔ (Doğrusu: '${closestP1}')`: ''}`,
- line: lnum,
- token: p1,
- suggestion: closestP1? `'${p1}' yerine '${closestP1}' kullanın.`: `'${p1}' özelliğinin geçerli olduğundan emin olun.`
+   // 1. Zincirleme Obje/Property kalıpları: ObjeAdi.Prop1 veya ObjeAdi.Prop1.Prop2
+   const fullChainRx = /\b([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)+)\b/g;
+   let cm;
+   while ((cm = fullChainRx.exec(sLine)) !== null) {
+     const rawChain = cm[1];
+     const parts = rawChain.split('.');
+     const rootObj = parts[0];
+     const upperRoot = rootObj.toUpperCase();
+
+     // Report / Engine alt özellik denetimi
+     if (FR_BUILTIN_MAP[upperRoot]) {
+       const schema = FR_BUILTIN_MAP[upperRoot];
+       if (parts.length >= 2) {
+         const p1 = parts[1];
+         const upperP1 = p1.toUpperCase();
+         if (!schema.props[upperP1] && !seenUnknowns.has(`${upperRoot}.${upperP1}`)) {
+           seenUnknowns.add(`${upperRoot}.${upperP1}`);
+           let closestP1 = '';
+           let minDist = 999;
+           for (const validProp of Object.keys(schema.props)) {
+             const d = getLevenshteinDist(upperP1, validProp);
+             if (d < minDist && d <= 3) {
+               minDist = d;
+               closestP1 = schema.props[validProp].label;
+             }
+           }
+           errors.push({
+             text: `Satır ${lnum}: Geçersiz '${schema.label}' Özelliği '${p1}'${closestP1 ? ` ➔ (Doğrusu: '${closestP1}')` : ''}`,
+             line: lnum,
+             token: p1,
+             suggestion: closestP1 ? `'${p1}' yerine '${closestP1}' kullanın.` : `'${p1}' özelliğinin geçerli olduğundan emin olun.`
+           });
+         }
+       }
+       continue;
+     }
+
+     // Genel Nesne Özellik / Metod Denetimi (Örn: Query1.Opn, Memo1.Colr, qp.FetchAl)
+     for (let pIdx = 1; pIdx < parts.length; pIdx++) {
+       const part = parts[pIdx];
+       const upperPart = part.toUpperCase();
+       if (ALL_KNOWN_WORDS.has(upperPart) || declaredVars.has(upperPart)) continue;
+
+       // Bilinen metod/özelliklerde bulanık yazım hatası (Levenshtein) ara
+       let closestMember = '';
+       let minMemDist = 999;
+       for (const [validK, validLabel] of Object.entries(PASCAL_COMMON_MEMBERS)) {
+         const lenDiff = Math.abs(upperPart.length - validK.length);
+         const maxLenDiff = validK.length >= 10 ? 2 : 1;
+         if (lenDiff > maxLenDiff) continue;
+
+         const maxDist = validK.length >= 10 ? 2 : 1;
+         const d = getLevenshteinDist(upperPart, validK);
+         if (d > 0 && d <= maxDist && d < minMemDist) {
+           minMemDist = d;
+           closestMember = validLabel;
+         }
+       }
+
+       if (closestMember) {
+         const errKey = `${upperRoot}.${upperPart}`;
+         if (!seenUnknowns.has(errKey)) {
+           seenUnknowns.add(errKey);
+           errors.push({
+             text: `Satır ${lnum}: '${rootObj}' nesnesi için geçersiz özellik veya metod '${part}' ➔ (Doğrusu: '${closestMember}')`,
+             line: lnum,
+             token: part,
+             suggestion: `'${part}' yerine '${closestMember}' kullanın.`
+           });
+         }
+       }
+     }
+
+     // Root Obje Tanımlı mı? (Rapor tasarımındaki bileşenler arasında var mı?)
+     if (reportComponentNames.size > 0 && !ALL_KNOWN_WORDS.has(upperRoot) && !declaredVars.has(upperRoot) && !reportComponentNames.has(upperRoot) && !seenUnknowns.has(upperRoot)) {
+       seenUnknowns.add(upperRoot);
+       let closest = '';
+       if (getLevenshteinDist(upperRoot, 'REPORT') <= 2 || upperRoot === 'REPOR') {
+         closest = 'Report';
+       } else if (getLevenshteinDist(upperRoot, 'ENGINE') <= 2) {
+         closest = 'Engine';
+       } else {
+         let minDistance = 999;
+         for (const realComp of reportComponentNames) {
+           if (realComp.startsWith(upperRoot) || upperRoot.startsWith(realComp)) {
+             closest = realComp;
+             break;
+           }
+           const dist = getLevenshteinDist(upperRoot, realComp);
+           if (dist < minDistance && dist <= 3) {
+             minDistance = dist;
+             closest = realComp;
+           }
+         }
+       }
+       errors.push({
+         text: `Satır ${lnum}: Tanımsız Rapor Nesnesi '${rootObj}' ➔ Rapor tasarımında '${rootObj}' adında bir nesne bulunamadı${closest ? ` (Önerilen: '${closest}')` : ''}`,
+         line: lnum,
+         token: rootObj,
+         suggestion: closest ? `'${rootObj}' yerine '${closest}' kullanın.` : `'${rootObj}' nesnesinin rapor tasarımında var olduğundan emin olun.`
+       });
+     }
+   }
+
+   // 2. Tekil (Standalone) Pascal Sözdizimi & Typo Taraması (Örn: FetchAl, Opn, Colr, begn, prcedure)
+   const tokenRx = /\b([a-zA-Z_][a-zA-Z0-9_]*)\b/g;
+   let tm;
+   while ((tm = tokenRx.exec(sLine)) !== null) {
+     const token = tm[1];
+     const matchIdx = tm.index;
+     if (matchIdx > 0 && sLine[matchIdx - 1] === '.') continue;
+     const afterIdx = matchIdx + token.length;
+     if (afterIdx < sLine.length && sLine[afterIdx] === '.') continue;
+     if (token.length < 3) continue;
+
+     const upperToken = token.toUpperCase();
+     if (ALL_KNOWN_WORDS.has(upperToken) || declaredVars.has(upperToken) || (reportComponentNames.size > 0 && reportComponentNames.has(upperToken))) continue;
+
+     const beforeStr = sLine.slice(0, matchIdx).trim().toUpperCase();
+     if (/\b(?:PROCEDURE|FUNCTION|PROGRAM)\b$/.test(beforeStr)) continue;
+
+     let closestStandalone = '';
+     let minStandDist = 999;
+     for (const [validK, validLabel] of Object.entries({ ...PASCAL_COMMON_MEMBERS, ...PASCAL_KEYWORDS, ...PASCAL_BUILTIN_FUNCS })) {
+       const lenDiff = Math.abs(upperToken.length - validK.length);
+       const maxLenDiff = validK.length >= 10 ? 2 : 1;
+       if (lenDiff > maxLenDiff) continue;
+
+       const maxDist = validK.length >= 10 ? 2 : 1;
+       const d = getLevenshteinDist(upperToken, validK);
+       if (d > 0 && d <= maxDist && d < minStandDist) {
+         minStandDist = d;
+         closestStandalone = validLabel;
+       }
+     }
+
+     if (closestStandalone && !seenUnknowns.has(upperToken)) {
+       seenUnknowns.add(upperToken);
+       errors.push({
+         text: `Satır ${lnum}: Hatalı Pascal sözdizimi '${token}' ➔ (Muhtemel yazım hatası, doğrusu: '${closestStandalone}')`,
+         line: lnum,
+         token: token,
+         suggestion: `'${token}' yerine '${closestStandalone}' kullanın.`
+       });
+     }
+   }
  });
- } else if (schema.props[upperP1] && parts.length >= 3) {
- // 3. Seviye alt özellik (Örn: Report.PrintOptions.Printer)
- const subSchema = schema.props[upperP1];
- const p2 = parts[2];
- const upperP2 = p2.toUpperCase();
- if (Array.isArray(subSchema.props) && subSchema.props.length > 0 &&!subSchema.props.includes(upperP2) &&!seenUnknowns.has(`${upperP1}.${upperP2}`)) {
- seenUnknowns.add(`${upperP1}.${upperP2}`);
- let closestP2 = '';
- let minDist = 999;
- for (const validSub of subSchema.props) {
- const d = getLevenshteinDist(upperP2, validSub);
- if (d < minDist && d <= 3) {
- minDist = d;
- closestP2 = validSub;
- }
- }
- errors.push({
- text: `Satır ${lnum}: Geçersiz '${subSchema.label}' Özelliği '${p2}'${closestP2? ` ➔ (Doğrusu: '${closestP2}')`: ''}`,
- line: lnum,
- token: p2,
- suggestion: closestP2? `'${p2}' yerine '${closestP2}' kullanın.`: `'${p2}' özelliğinin geçerli olduğundan emin olun.`
- });
- }
- }
- }
- continue;
- }
-
- if (PASCAL_BUILTINS.has(upperRoot) || declaredVars.has(upperRoot)) continue;
-
- // 2. Rapor tasarımındaki bileşenler arasında var mı?
- if (!reportComponentNames.has(upperRoot) &&!seenUnknowns.has(upperRoot)) {
- seenUnknowns.add(upperRoot);
-
- // Report / Engine için yazım hatası mı?
- let closest = '';
- if (getLevenshteinDist(upperRoot, 'REPORT') <= 2 || upperRoot === 'REPOR') {
- closest = 'Report';
- } else if (getLevenshteinDist(upperRoot, 'ENGINE') <= 2) {
- closest = 'Engine';
- } else {
- let minDistance = 999;
- for (const realComp of reportComponentNames) {
- if (realComp.startsWith(upperRoot) || upperRoot.startsWith(realComp)) {
- closest = realComp;
- break;
- }
- const dist = getLevenshteinDist(upperRoot, realComp);
- if (dist < minDistance && dist <= 3) {
- minDistance = dist;
- closest = realComp;
- }
- }
- }
-
- errors.push({
- text: `Satır ${lnum}: Tanımsız Rapor Nesnesi '${rootObj}' ➔ Rapor tasarımında '${rootObj}' adında bir nesne bulunamadı${closest? ` (Önerilen: '${closest}')`: ''}`,
- line: lnum,
- token: rootObj,
- suggestion: closest 
-? `'${rootObj}' yerine '${closest}' kullanın.` 
-: `'${rootObj}' nesnesinin rapor tasarımında var olduğundan emin olun.`
- });
- }
- }
- });
- }
 
  // FastReport olay betikleri ve prosedürler 'end;' ile bitebilir.
 

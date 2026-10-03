@@ -296,9 +296,12 @@ function renderSidebar(file) {
  <div class="note-area" style="background:var(--bg-card);border:1px solid var(--border-light);border-radius:10px;padding:.75rem;margin-top:.6rem;">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:.4rem;margin-bottom:.4rem;">
       <div class="meta-label" style="margin:0;font-weight:700;">Kullanıcı Notu</div>
-      <button type="button" id="btnOpenRichNoteModalDetail" class="btn btn-sm" style="font-size:.72rem;padding:.2rem.55rem;background:rgba(37,99,235,0.12);color:var(--accent-bright);border:1px solid rgba(37,99,235,0.3);border-radius:6px;font-weight:700;display:inline-flex;align-items:center;gap:3px;cursor:pointer;" title="Gelişmiş Zengin Editörü Aç (Word Modu & Ekler)">
-        <span>📝 Word Modu</span>
-      </button>
+      <div style="display:flex;align-items:center;gap:.35rem;">
+        <button type="button" id="btnToggleSidebarHtmlPreview" class="btn btn-sm btn-ghost" style="font-size:.72rem;padding:.2rem .45rem;border-radius:6px;font-weight:700;display:inline-flex;align-items:center;gap:3px;cursor:pointer;" title="HTML Önizlemeyi Aç/Kapat">&lt;/&gt; HTML</button>
+        <button type="button" id="btnOpenRichNoteModalDetail" class="btn btn-sm" style="font-size:.72rem;padding:.2rem.55rem;background:rgba(37,99,235,0.12);color:var(--accent-bright);border:1px solid rgba(37,99,235,0.3);border-radius:6px;font-weight:700;display:inline-flex;align-items:center;gap:3px;cursor:pointer;" title="Gelişmiş Zengin Editörü Aç (Word Modu & Ekler)">
+          <span>📝 Word Modu</span>
+        </button>
+      </div>
     </div>
 
     <!-- Hızlı Şablonlar ve Araçlar -->
@@ -323,6 +326,17 @@ function renderSidebar(file) {
     </div>
 
     <textarea class="note-textarea" id="noteTextarea" placeholder="Bu rapora ait detaylı notlar, açıklamalar veya SQL hatırlatmaları ekleyin..." style="margin-top:0;">${esc(file.userNote || '')}</textarea>
+
+    <div id="sidebarNoteHtmlPreviewWrap" style="display:none;width:100%;margin-top:.5rem;padding:.65rem .85rem;border-radius:8px;border:1px dashed var(--border-light);background:var(--bg-surface);box-sizing:border-box;">
+      <div style="font-size:.68rem;font-weight:800;color:var(--accent);text-transform:uppercase;margin-bottom:.3rem;display:flex;align-items:center;justify-content:space-between;">
+        <span style="display:flex;align-items:center;gap:4px;">
+          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;"></span>
+          <span>Canlı HTML Çıktısı</span>
+        </span>
+        <span style="font-size:.65rem;color:var(--text-muted);text-transform:none;">HTML önizleme</span>
+      </div>
+      <div id="sidebarNoteHtmlPreview" style="font-size:.84rem;line-height:1.6;color:var(--text-primary);overflow-wrap:anywhere;max-height:220px;overflow-y:auto;"></div>
+    </div>
 
     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:.45rem;gap:.5rem;flex-wrap:wrap;">
       <span id="noteCharStats" style="font-size:.7rem;color:var(--text-muted);font-family:var(--mono);font-weight:600;">0 karakter</span>
@@ -430,16 +444,61 @@ function renderSidebar(file) {
 
   const noteInp = document.getElementById('noteTextarea');
   const noteStats = document.getElementById('noteCharStats');
+  const htmlPrevWrap = document.getElementById('sidebarNoteHtmlPreviewWrap');
+  const htmlPrevEl = document.getElementById('sidebarNoteHtmlPreview');
+  const btnToggleHtml = document.getElementById('btnToggleSidebarHtmlPreview');
+  let sidebarHtmlForced = false;
+
+  function updateSidebarNoteHtmlPreview() {
+    if (!noteInp || !htmlPrevWrap || !htmlPrevEl) return;
+    const val = noteInp.value || '';
+    const hasHtml = /<[a-z][\s\S]*>/i.test(val);
+    if (sidebarHtmlForced || hasHtml) {
+      htmlPrevWrap.style.display = 'block';
+      const cleanHtml = val.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+      htmlPrevEl.innerHTML = cleanHtml;
+      btnToggleHtml?.classList.add('active');
+    } else {
+      htmlPrevWrap.style.display = 'none';
+      btnToggleHtml?.classList.remove('active');
+    }
+  }
+
+  if (btnToggleHtml) {
+    btnToggleHtml.addEventListener('click', () => {
+      sidebarHtmlForced = !sidebarHtmlForced;
+      updateSidebarNoteHtmlPreview();
+      if (sidebarHtmlForced && noteInp) noteInp.focus();
+    });
+  }
+
   function updateNoteStats() {
     if (!noteInp || !noteStats) return;
     const len = noteInp.value.length;
     const words = noteInp.value.trim() ? noteInp.value.trim().split(/\s+/).length : 0;
     noteStats.textContent = `${len} karakter · ${words} kelime`;
+    updateSidebarNoteHtmlPreview();
   }
   if (noteInp) {
     noteInp.addEventListener('input', updateNoteStats);
     updateNoteStats();
   }
+
+  // Zengin not editöründe kaydet/sil yapılınca sayfa yeniden yüklenmeden kenar çubuğunu ve canlı önizlemeyi güncelle
+  if (window.__detailNoteUpdatedHandler) window.removeEventListener('frpoku:noteUpdated', window.__detailNoteUpdatedHandler);
+  window.__detailNoteUpdatedHandler = (ev) => {
+    if (String(ev.detail?.id) !== String(file.id)) return;
+    const text = ev.detail?.userNote || '';
+    file.userNote = text;
+    file.user_note = text;
+    currentFile = FrpStore.getById(file.id) || currentFile;
+    const liveInp = document.getElementById('noteTextarea');
+    if (liveInp) {
+      liveInp.value = text;
+      liveInp.dispatchEvent(new Event('input'));
+    }
+  };
+  window.addEventListener('frpoku:noteUpdated', window.__detailNoteUpdatedHandler);
 
   const btnOpenRich = document.getElementById('btnOpenRichNoteModalDetail');
   if (btnOpenRich) {

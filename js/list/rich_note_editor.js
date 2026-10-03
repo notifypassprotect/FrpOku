@@ -720,6 +720,7 @@
           <div style="display: flex; align-items: center; gap: 0.15rem;">
             <button type="button" id="tbUndo" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.45rem; font-size: 0.85rem;" title="Geri Al (Ctrl+Z)">Geri Al</button>
             <button type="button" id="tbRedo" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.45rem; font-size: 0.85rem;" title="Yinele (Ctrl+Y)">Yinele</button>
+            <button type="button" id="tbHtmlMode" class="btn btn-sm btn-ghost" style="padding: 0.25rem 0.55rem; font-size: 0.8rem; font-weight: 800; font-family: var(--mono, monospace);" title="HTML kaynağını düzenle, çıktıyı altta gör" aria-pressed="false">&lt;/&gt; HTML</button>
           </div>
 
           <div style="width: 1px; height: 20px; background: var(--border-light, #e2e8f0); margin: 0 0.15rem;"></div>
@@ -914,8 +915,14 @@
         <div class="rich-note-workspace" style="flex: 1; display: flex; overflow: hidden; position: relative;">
           
           <!-- EDİTÖR ÇALIŞMA ALANI -->
-          <div class="rich-note-page" style="flex: 1; overflow-y: auto; padding: 2rem 3rem; background: var(--bg-card, #f8fafc); display: flex; justify-content: center;">
+          <div class="rich-note-page" style="flex: 1; overflow-y: auto; padding: 2rem 3rem; background: var(--bg-card, #f8fafc); display: flex; flex-direction: column; align-items: center; gap: 1rem;">
             <div id="richNoteContent" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Not içeriği" data-placeholder="Bu rapor için bir not yazın…" style="width: 100%; max-width: 850px; min-height: 500px; background: var(--bg-surface, #ffffff); border: 1px solid var(--border, #cbd5e1); border-radius: 12px; padding: 2rem 2.5rem; outline: none; font-family: inherit; font-size: 0.95rem; line-height: 1.75; color: var(--text-primary, #0f172a); box-shadow: 0 4px 20px rgba(0,0,0,0.06);">${currentNoteHtml}</div>
+            <div id="richNoteHtmlPane" style="display: none; width: 100%; max-width: 850px; flex-direction: column; gap: 0.6rem;">
+              <label for="richNoteHtmlSource" style="font-size: 0.78rem; font-weight: 800; color: var(--text-secondary, #475569);">HTML kaynağı</label>
+              <textarea id="richNoteHtmlSource" spellcheck="false" aria-label="Not HTML kaynağı" style="width: 100%; min-height: 260px; resize: vertical; box-sizing: border-box; padding: 0.9rem 1rem; border-radius: 10px; border: 1px solid var(--border, #cbd5e1); background: var(--bg-surface, #ffffff); color: var(--text-primary, #0f172a); font-family: var(--mono, monospace); font-size: 0.82rem; line-height: 1.55; tab-size: 2;"></textarea>
+              <div style="font-size: 0.78rem; font-weight: 800; color: var(--text-secondary, #475569);">Çıktı <span style="font-weight: 600; color: var(--text-muted, #64748b);">(güvenli olmayan etiketler kaydedilirken temizlenir)</span></div>
+              <div id="richNoteHtmlPreview" style="min-height: 140px; padding: 1.25rem 1.5rem; border-radius: 10px; border: 1px dashed var(--border, #cbd5e1); background: var(--bg-surface, #ffffff); color: var(--text-primary, #0f172a); font-size: 0.95rem; line-height: 1.7; overflow-wrap: anywhere;"></div>
+            </div>
           </div>
 
           <!-- SAĞ EKLER BÖLÜMÜ (ATTACHMENT TRAY) -->
@@ -977,6 +984,7 @@
     let savedSnapshot = snapshot();
     function persistDraft() {
       clearTimeout(draftTimer);
+      if (typeof htmlModeOn !== 'undefined' && htmlModeOn && typeof htmlSource !== 'undefined' && htmlSource) editor.innerHTML = sanitizeRichHtml(htmlSource.value);
       if (snapshot() === savedSnapshot) return true;
       try {
         localStorage.setItem(draftKey, JSON.stringify({ noteHtml: editor.innerHTML, attachments, savedAt: Date.now() }));
@@ -1028,6 +1036,43 @@
 
     editor.addEventListener('input', updateNoteStatistics);
     updateNoteStatistics();
+
+    // ── HTML MODU: kaynak düzenleme + altta canlı çıktı ──
+    const htmlPane = overlay.querySelector('#richNoteHtmlPane');
+    const htmlSource = overlay.querySelector('#richNoteHtmlSource');
+    const htmlPreview = overlay.querySelector('#richNoteHtmlPreview');
+    const btnHtmlMode = overlay.querySelector('#tbHtmlMode');
+    let htmlModeOn = false;
+    const renderHtmlPreview = () => { htmlPreview.innerHTML = sanitizeRichHtml(htmlSource.value); };
+    htmlSource.addEventListener('input', () => {
+      editor.innerHTML = sanitizeRichHtml(htmlSource.value);
+      renderHtmlPreview();
+      updateNoteStatistics();
+    });
+    htmlSource.addEventListener('keydown', event => {
+      if (event.key !== 'Tab') return;
+      event.preventDefault(); event.stopPropagation();
+      const s = htmlSource.selectionStart, e2 = htmlSource.selectionEnd;
+      htmlSource.value = htmlSource.value.slice(0, s) + '  ' + htmlSource.value.slice(e2);
+      htmlSource.selectionStart = htmlSource.selectionEnd = s + 2;
+      htmlSource.dispatchEvent(new Event('input'));
+    });
+    btnHtmlMode?.addEventListener('click', () => {
+      htmlModeOn = !htmlModeOn;
+      btnHtmlMode.setAttribute('aria-pressed', String(htmlModeOn));
+      btnHtmlMode.classList.toggle('active', htmlModeOn);
+      if (htmlModeOn) {
+        htmlSource.value = editor.innerHTML;
+        renderHtmlPreview();
+        editor.style.display = 'none';
+        htmlPane.style.display = 'flex';
+        htmlSource.focus();
+      } else {
+        htmlPane.style.display = 'none';
+        editor.style.display = '';
+        editor.focus();
+      }
+    });
 
     // ── GÜVENLİ PENCERE KAPATMA (MOUSE SÜRÜKLEME KORUMASI) ──
     // Metin seçimi sırasında farenin dışarı kayması pencereyi ASLA kapatmaz!
@@ -1932,6 +1977,7 @@
       const btnSave = overlay.querySelector('#btnRichNoteSave');
       btnSave.disabled = true;
       saveStatus.textContent = remove ? 'Siliniyor…' : 'Buluta kaydediliyor…';
+      if (typeof htmlModeOn !== 'undefined' && htmlModeOn && typeof htmlSource !== 'undefined' && htmlSource) editor.innerHTML = sanitizeRichHtml(htmlSource.value);
       const sentSnapshot = snapshot();
       const payload = remove ? { userNote: '', noteHtml: '', attachments: [] } : {
         userNote: editor.innerText.trim(), noteHtml: sanitizeRichHtml(editor.innerHTML), attachments: [...attachments]
@@ -1943,8 +1989,9 @@
         const data = await res.json();
         if (!res.ok || !data.success) throw new Error(data.reason || 'Not kaydedilemedi.');
         window.FrpStore?.updateNote(fileId, payload.userNote, payload, { syncCloud: false });
+        try { window.dispatchEvent(new CustomEvent('frpoku:noteUpdated', { detail: { id: fileId, userNote: payload.userNote } })); } catch {}
         try {
-          const row = document.querySelector(`[data-id="${encodeURIComponent(String(fileId))}"]`);
+          const row = document.getElementById('viewer') ? null : document.querySelector(`[data-id="${encodeURIComponent(String(fileId))}"]`);
           if (row) {
             const hasNote = Boolean(payload.userNote && payload.userNote.trim());
             const existingBadge = row.querySelector('.badge-note, [title*="Not"]');
@@ -1964,6 +2011,7 @@
         saveBusy = false;
         if (remove) {
           editor.innerHTML = '';
+          if (htmlModeOn) { htmlSource.value = ''; renderHtmlPreview(); }
           attachments = [];
           renderAttachments();
           updateNoteStatistics();
