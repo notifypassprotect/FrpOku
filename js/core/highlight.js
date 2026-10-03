@@ -430,21 +430,12 @@ function highlightPascal(raw) {
       while (j < len && /\w/.test(raw[j])) j++;
       const word = raw.slice(i, j);
       const up = word.toUpperCase();
-      if (PAS_TYPO_MAP.has(up)) {
-        const fix = PAS_TYPO_MAP.get(up);
-        out += `<span class="syntax-error" title="Yazım Hatası: '${esc(word)}' -> Doğrusu: '${fix}'">${esc(word)}</span>`;
-      } else {
-        const fuzzyFix = findFuzzyTypoMatch(word, 'pascal');
-        if (fuzzyFix) {
-          out += `<span class="syntax-error" title="Yazım Hatası: '${esc(word)}' -> Doğrusu: '${fuzzyFix}'">${esc(word)}</span>`;
-        } else if (PAS_KW.has(up)) {
-          out += `<span class="pas-keyword">${esc(word)}</span>`;
-        } else if (PAS_TYPE.has(up)) {
-          out += `<span class="pas-type">${esc(word)}</span>`;
-        } else {
-          out += esc(word);
-        }
-      }
+      // Coloring is lexical, not a validator. User-defined identifiers such as
+      // qCase, Format1 or a local variable must never be rewritten as keywords.
+      // Context-aware diagnostics are supplied by checkPascalSyntax below.
+      if (PAS_KW.has(up)) out += `<span class="pas-keyword">${esc(word)}</span>`;
+      else if (PAS_TYPE.has(up)) out += `<span class="pas-type">${esc(word)}</span>`;
+      else out += esc(word);
       i = j; continue;
     }
     // :=
@@ -503,6 +494,9 @@ function findSyntaxErrors(code, lang = 'sql') {
     let wm;
     while ((wm = wordRx.exec(cleanLineText)) !== null) {
       const w = wm[0];
+      // Pascal's semantic checker knows query/component names and declarations.
+      // Do not run the context-free keyword-distance scanner a second time.
+      if (lang === 'pascal') break;
       const match = findFuzzyTypoMatch(w, lang);
       if (match) {
         if (!errors.some(e => e.line === lineNum && e.token.toUpperCase() === w.toUpperCase())) {

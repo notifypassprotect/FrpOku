@@ -667,7 +667,7 @@
  }
 
  if (Array.isArray(context.datasets)) {
- context.datasets.forEach(ds => { if (ds.name) names.add(ds.name.toUpperCase()); });
+ context.datasets.forEach(ds => { const name=typeof ds === 'string' ? ds : ds?.name; if (name) names.add(name.toUpperCase()); });
  }
 
  return names;
