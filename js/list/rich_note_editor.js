@@ -1267,7 +1267,8 @@
       };
       const style = calloutStyles[type] || calloutStyles.info;
       const html = `
-        <div style="background: ${style.bg}; border-left: 4px solid ${style.border}; border-radius: 8px; padding: 0.85rem 1.1rem; margin: 1rem 0; color: ${style.text}; font-size: 0.92rem;">
+        <div class="note-callout" style="position: relative; background: ${style.bg}; border-left: 4px solid ${style.border}; border-radius: 8px; padding: 0.85rem 1.1rem; margin: 1rem 0; color: ${style.text}; font-size: 0.92rem;">
+          <button type="button" class="btn-remove-note-block" contenteditable="false" style="position: absolute; top: 6px; right: 8px; border: none; background: transparent; color: inherit; opacity: 0.6; cursor: pointer; font-size: 0.8rem; font-weight: 800; padding: 2px 6px; border-radius: 4px;" title="Bu kutuyu tamamen kaldır">✕</button>
           <div style="font-weight: 800; display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.35rem;">
             <span>${style.icon}</span> <span>${style.title}</span>
           </div>
@@ -1316,7 +1317,11 @@
     // Görev Listesi / Checklist
     overlay.querySelector('#tbChecklist')?.addEventListener('click', () => {
       const checkHtml = `
-        <div class="note-todo-card" style="margin: 0.6rem 0; padding: 0.6rem 0.9rem; background: var(--bg-card, #f8fafc); border: 1px solid var(--border, #cbd5e1); border-radius: 8px;">
+        <div class="note-todo-card" style="position: relative; margin: 0.6rem 0; padding: 0.6rem 0.9rem; background: var(--bg-card, #f8fafc); border: 1px solid var(--border, #cbd5e1); border-radius: 8px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;" contenteditable="false">
+            <span style="font-size:0.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;">Görev Listesi</span>
+            <button type="button" class="btn-remove-note-block" style="border:none;background:transparent;color:#ef4444;cursor:pointer;font-size:0.75rem;font-weight:800;padding:1px 6px;border-radius:4px;" title="Görev listesini tamamen kaldır">✕ Kaldır</button>
+          </div>
           <div style="display:flex; align-items:center; gap:8px; margin-bottom: 6px;">
             <input type="checkbox" style="width:16px;height:16px;cursor:pointer;" />
             <span>Görev maddesi 1...</span>
@@ -1337,7 +1342,10 @@
         <div class="note-sql-card" style="margin: 0.8rem 0; border: 1px solid var(--border, #cbd5e1); border-radius: 8px; overflow: hidden; background: #0f172a; color: #f8fafc; font-family: 'Fira Code', Consolas, monospace;">
           <div style="display:flex;align-items:center;justify-content:space-between;padding:0.35rem 0.75rem;background:#1e293b;border-bottom:1px solid #334155;font-size:0.75rem;font-weight:700;color:#94a3b8;" contenteditable="false">
             <span>SQL SORGUSU</span>
-            <button type="button" class="btn-copy-sql" style="border:none;background:rgba(255,255,255,0.1);color:#38bdf8;cursor:pointer;font-size:0.72rem;font-weight:700;padding:2px 8px;border-radius:4px;">Kopyala</button>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <button type="button" class="btn-copy-sql" style="border:none;background:rgba(255,255,255,0.1);color:#38bdf8;cursor:pointer;font-size:0.72rem;font-weight:700;padding:2px 8px;border-radius:4px;">Kopyala</button>
+              <button type="button" class="btn-remove-note-block" style="border:none;background:rgba(239,68,68,0.2);color:#ef4444;cursor:pointer;font-size:0.72rem;font-weight:700;padding:2px 8px;border-radius:4px;" title="SQL bloğunu kaldır">✕ Sil</button>
+            </div>
           </div>
           <pre contenteditable="true" style="margin:0;padding:0.75rem 1rem;font-size:0.85rem;line-height:1.5;overflow-x:auto;color:#38bdf8;white-space:pre-wrap;font-family:inherit;">SELECT ID, RAPOR_ADI, TARIH&#10;FROM TBL_RAPOR&#10;WHERE AKTIF = 1&#10;ORDER BY ID DESC;</pre>
         </div>
@@ -1347,6 +1355,19 @@
     });
 
     editor.addEventListener('click', (e) => {
+      const removeBtn = e.target.closest('.btn-remove-note-block');
+      if (removeBtn) {
+        e.preventDefault();
+        const block = removeBtn.closest('.note-callout, .note-todo-card, .note-sql-card, table');
+        if (block) {
+          block.remove();
+          scheduleDraft();
+          updateNoteStatistics();
+          if (typeof window.toast === 'function') window.toast('Blok başarıyla kaldırıldı.', 'info');
+        }
+        return;
+      }
+
       const copyBtn = e.target.closest('.btn-copy-sql');
       if (copyBtn) {
         e.preventDefault();
@@ -1363,6 +1384,22 @@
             window.toast?.('Panoya kopyalanamadı', 'error');
           });
         }
+      }
+    });
+
+    // Boş kalmış veya izi kalmış blokları temizlemek için backspace/delete kancası
+    editor.addEventListener('keydown', (e) => {
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        setTimeout(() => {
+          editor.querySelectorAll('.note-callout, .note-todo-card, .note-sql-card').forEach(card => {
+            const text = (card.innerText || '').trim();
+            if (!text || text === '✕' || text === '✕ Kaldır' || text === 'SQL SORGUSUKopyala✕ Sil') {
+              card.remove();
+              scheduleDraft();
+              updateNoteStatistics();
+            }
+          });
+        }, 10);
       }
     });
 
@@ -1909,11 +1946,20 @@
         window.FrpStore?.updateNote(fileId, payload.userNote, payload, { syncCloud: false });
         window.refreshAll?.();
         saveBusy = false;
-        if (snapshot() === sentSnapshot) {
+        if (remove) {
+          editor.innerHTML = '';
+          attachments = [];
+          renderAttachments();
+          updateNoteStatistics();
+          savedSnapshot = snapshot();
+          try { localStorage.removeItem(draftKey); } catch {}
+          saveStatus.textContent = '✓ Not ve tüm ekler başarıyla temizlendi.';
+          window.toast?.('Not silindi.', 'success');
+        } else if (snapshot() === sentSnapshot) {
           savedSnapshot = sentSnapshot;
           try { localStorage.removeItem(draftKey); } catch {}
-          window.toast?.(remove ? 'Not silindi.' : 'Not ve belgeler kaydedildi.', 'success');
-          close(true);
+          saveStatus.textContent = '✓ Değişiklikler ve ekler başarıyla kaydedildi.';
+          window.toast?.('Not ve belgeler kaydedildi.', 'success');
         } else {
           persistDraft();
           saveStatus.textContent = 'Önceki değişiklikler kaydedildi. Yeni düzenlemelerinizi de kaydedin.';

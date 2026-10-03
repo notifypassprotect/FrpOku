@@ -132,6 +132,66 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
       .trim();
   }
 
+  function resolveTargetInfo(l) {
+    if (!l) return { name: 'Genel Sistem', isMulti: false };
+    const allStored = (typeof window.FrpStore !== 'undefined' && typeof window.FrpStore.getAll === 'function') ? window.FrpStore.getAll() : [];
+    
+    // Explicit report name
+    if (l.reportName) return { name: l.reportName, isMulti: false, id: l.reportId };
+    if (l.fileName && !l.fileName.endsWith('.json')) return { name: l.fileName, isMulti: false, id: l.reportId };
+
+    // Explicit reportId lookup
+    if (l.reportId) {
+      const rep = allStored.find(f => f.id === l.reportId || f.guid === l.reportId);
+      if (rep) return { name: rep.meta?.reportName || rep.name, id: rep.id, isMulti: false };
+    }
+
+    let target = String(l.target || '').trim();
+
+    // Check if target is a GUID or ID
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(target) || /^[a-zA-Z0-9_-]{16,}$/.test(target)) {
+      const rep = allStored.find(f => f.id === target || f.guid === target);
+      if (rep) return { name: rep.meta?.reportName || rep.name, id: rep.id, isMulti: false };
+    }
+
+    // Check if target matches stored report name
+    if (target && target !== 'Genel Sistem') {
+      const rep = allStored.find(f => f.name?.toLowerCase() === target.toLowerCase() || (f.meta?.reportName && f.meta.reportName.toLowerCase() === target.toLowerCase()));
+      if (rep) return { name: rep.meta?.reportName || rep.name, id: rep.id, isMulti: false };
+    }
+
+    // Check multiple reports (e.g. "5 Rapor" or arrays in reports/items/metadata)
+    const rList = (Array.isArray(l.reports) && l.reports.length > 0) ? l.reports :
+                  (Array.isArray(l.items) && l.items.length > 0) ? l.items :
+                  (Array.isArray(l.metadata?.reports) && l.metadata.reports.length > 0) ? l.metadata.reports :
+                  (Array.isArray(l.metadata?.items) && l.metadata.items.length > 0) ? l.metadata.items : null;
+
+    if (rList && rList.length > 0) {
+      const names = rList.map(item => {
+        if (typeof item === 'string') {
+          const found = allStored.find(f => f.id === item || f.guid === item || f.name?.toLowerCase() === item.toLowerCase());
+          return found ? (found.meta?.reportName || found.name) : item;
+        }
+        return item.reportName || item.title || item.name || item.fileName || 'Rapor';
+      });
+
+      if (names.length === 1) return { name: names[0], isMulti: false };
+      return {
+        name: `${names.length} Rapor: ${names.slice(0, 2).join(', ')}${names.length > 2 ? '...' : ''}`,
+        isMulti: true,
+        count: names.length
+      };
+    }
+
+    // If target is like "5 Rapor"
+    const match = target.match(/^(\d+)\s*Rapor$/i);
+    if (match) {
+      return { name: target, isMulti: true, count: parseInt(match[1], 10) };
+    }
+
+    return { name: target || 'Genel Sistem', isMulti: false };
+  }
+
   function formatTimestamp(isoStr) {
     if (!isoStr) return '-';
     try {
@@ -157,41 +217,53 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
     const dateStr = formatTimestamp(log.timestamp);
     const ipDisplay = (log.ip && log.ip !== '-' && log.ip !== '') ? log.ip : '127.0.0.1';
 
-    // Rapor Listesini Çıkar (Toplu veya Tekil İşlemlerde)
-    let reportsList = [];
-    if (Array.isArray(log.reports) && log.reports.length > 0) {
-      reportsList = log.reports;
-    } else if (Array.isArray(log.metadata?.reports) && log.metadata.reports.length > 0) {
-      reportsList = log.metadata.reports;
-    } else if (Array.isArray(log.items) && log.items.length > 0) {
-      reportsList = log.items;
-    } else {
-      const allStored = typeof window.FrpStore !== 'undefined' && typeof window.FrpStore.getAll === 'function' ? window.FrpStore.getAll() : [];
+    // Rapor Listesini Çıkar ve GUID'leri Gerçek Rapor Adlarına Çözümle
+    const allStored = typeof window.FrpStore !== 'undefined' && typeof window.FrpStore.getAll === 'function' ? window.FrpStore.getAll() : [];
+    let rawReports = [];
+
+    if (Array.isArray(log.reports) && log.reports.length > 0) rawReports = log.reports;
+    else if (Array.isArray(log.metadata?.reports) && log.metadata.reports.length > 0) rawReports = log.metadata.reports;
+    else if (Array.isArray(log.items) && log.items.length > 0) rawReports = log.items;
+    else if (Array.isArray(log.metadata?.items) && log.metadata.items.length > 0) rawReports = log.metadata.items;
+    else {
       const targetStr = String(log.target || '').trim();
       const detailsStr = String(log.details || '').trim();
 
       if (targetStr && targetStr !== 'Genel Sistem' && !/^\d+\s*Rapor$/i.test(targetStr)) {
-        const found = allStored.find(f => f.name.toLowerCase() === targetStr.toLowerCase() || (f.meta?.reportName && f.meta.reportName.toLowerCase() === targetStr.toLowerCase()) || f.id === log.reportId);
-        if (found) {
-          reportsList.push({ id: found.id, name: found.name, title: found.meta?.reportName || found.name });
-        } else {
-          reportsList.push({ name: targetStr, title: targetStr });
-        }
+        rawReports.push(targetStr);
       } else {
         const quoted = detailsStr.match(/'([^']+)'/g) || [];
         quoted.forEach(q => {
           const cleanName = q.replace(/^'|'$/g, '').trim();
-          if (cleanName && cleanName.endsWith('.frp')) {
-            const found = allStored.find(f => f.name.toLowerCase() === cleanName.toLowerCase() || (f.meta?.reportName && f.meta.reportName.toLowerCase() === cleanName.toLowerCase()));
-            if (found) {
-              reportsList.push({ id: found.id, name: found.name, title: found.meta?.reportName || found.name });
-            } else {
-              reportsList.push({ name: cleanName, title: cleanName });
-            }
-          }
+          if (cleanName) rawReports.push(cleanName);
         });
       }
     }
+
+    if (log.reportId && !rawReports.includes(log.reportId)) {
+      rawReports.unshift(log.reportId);
+    }
+
+    let reportsList = rawReports.map(item => {
+      if (typeof item === 'string') {
+        const found = allStored.find(f => f.id === item || f.guid === item || f.name?.toLowerCase() === item.toLowerCase() || (f.meta?.reportName && f.meta.reportName.toLowerCase() === item.toLowerCase()));
+        if (found) {
+          return { id: found.id, name: found.name, title: found.meta?.reportName || found.name, size: found.size || found.sizeBytes };
+        }
+        return { name: item, title: item };
+      }
+      if (item && typeof item === 'object') {
+        const repId = item.id || item.reportId;
+        const found = repId ? allStored.find(f => f.id === repId || f.guid === repId) : null;
+        return {
+          id: repId || found?.id,
+          name: item.name || item.fileName || found?.name || '',
+          title: item.title || item.reportName || found?.meta?.reportName || item.name || item.fileName || 'Rapor',
+          size: item.size || item.sizeBytes || found?.size || found?.sizeBytes
+        };
+      }
+      return null;
+    }).filter(Boolean);
 
     // Tekrarlanan raporları tekilleştir
     const uniqueReports = [];
@@ -291,11 +363,34 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
           </div>
           <div style="grid-column:1/-1;">
             <div style="font-size:.7rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px;">Hedef / Rapor Nesnesi</div>
-            <div style="font-weight:700;color:var(--text-primary);word-break:break-all;">${escHtml(log.target || 'Genel Sistem')}</div>
+            <div style="font-weight:700;color:var(--text-primary);word-break:break-word;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+              <span>${escHtml(resolveTargetInfo(log).name)}</span>
+              ${log.reportId || (log.target && log.target !== resolveTargetInfo(log).name) ? `<span style="font-size:.72rem;color:var(--text-muted);font-family:var(--mono);font-weight:400;">(${escHtml(log.reportId || log.target)})</span>` : ''}
+            </div>
           </div>
         </div>
 
+    let changeDetailsHtml = '';
+    const rawChanges = log.changes || log.metadata?.changes || (log.oldValue !== undefined || log.newValue !== undefined ? [{ field: 'Değer', old: log.oldValue, new: log.newValue }] : null);
+    if (rawChanges && Array.isArray(rawChanges) && rawChanges.length > 0) {
+      changeDetailsHtml = `
+        <div style="margin-bottom:1.2rem;">
+          <div style="font-size:.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:.45rem;">Değişiklik Detayları &amp; Etkilenen Alanlar</div>
+          <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:10px;padding:.6rem;display:flex;flex-direction:column;gap:6px;">
+            ${rawChanges.map(c => `
+              <div style="display:flex;align-items:center;gap:.6rem;font-size:.8rem;padding:.4rem .6rem;background:var(--bg-surface);border-radius:6px;border:1px solid var(--border-light);flex-wrap:wrap;">
+                <span style="font-weight:800;color:var(--text-primary);min-width:90px;">${escHtml(c.field || c.name || 'Alan')}:</span>
+                ${c.old !== undefined ? `<span style="color:var(--red);text-decoration:line-through;font-family:var(--mono);font-size:.75rem;">${escHtml(String(c.old))}</span> <span style="color:var(--text-muted);">→</span> ` : ''}
+                <span style="color:var(--green);font-weight:700;font-family:var(--mono);font-size:.75rem;">${escHtml(String(c.new !== undefined ? c.new : c.value || ''))}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
         ${reportsSectionHtml}
+        ${changeDetailsHtml}
 
         <div style="margin-bottom:1.2rem;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.45rem;">
@@ -383,7 +478,7 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
 
     const tableRows = logs.map(l => {
       const actInfo = getActionInfo(l.action);
-      const targetDisplay = l.target || l.reportName || l.fileName || 'Genel Sistem';
+      const targetDisplay = resolveTargetInfo(l).name;
       const detailsDisplay = cleanDetails(l.details) || `${actInfo.label} işlemi gerçekleştirildi.`;
       const userDisplay = l.username || (l.role === 'admin' ? 'admin' : 'misafir');
       const timeStr = formatTimestamp(l.timestamp);
@@ -609,7 +704,7 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
         const dateStr = formatTimestamp(l.timestamp);
         const actInfo = getActionInfo(l.action);
         const ipDisplay = (l.ip && l.ip !== '-' && l.ip !== '') ? l.ip : '127.0.0.1';
-        const targetDisplay = l.target || l.reportName || l.fileName || 'Genel Sistem';
+        const targetDisplay = resolveTargetInfo(l).name;
         const detailsDisplay = cleanDetails(l.details) || `${actInfo.label} işlemi gerçekleştirildi.`;
         const userDisplay = l.username || (l.role === 'admin' ? 'admin' : 'misafir');
 

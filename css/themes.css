@@ -544,3 +544,195 @@
 .code-theme-aurora-emerald .pas-special { color: #059669 !important; }
 .code-theme-aurora-emerald .pas-proc { color: #6ee7b7 !important; font-weight: 700; }
 
+/* ══════════════════════════════════════════════════════════
+   TEMA 17 — Obsidian Gold (Lüks Altın & Obsidyen Siyah)
+   ══════════════════════════════════════════════════════════ */
+.ui-theme-obsidian-gold {
+  --accent: #d97706;
+  --accent-bright: #f59e0b;
+  --accent-glow: rgba(245, 158, 11, 0.4);
+}
+.code-theme-obsidian-gold .code-scroll,
+.code-theme-obsidian-gold .code-editor-backdrop,
+.code-theme-obsidian-gold .code-editor-wrap,
+.code-theme-obsidian-gold .editor-main {
+  background: #0d0f12 !important;
+  color: #fef3c7 !important;
+}
+.code-theme-obsidian-gold .line-src { color: #fef3c7 !important; }
+.code-theme-obsidian-gold .code-line { color: #fef3c7; }
+.code-theme-obsidian-gold .line-num { background: #07080a !important; color: #b45309 !important; border-right: 1px solid #292524; }
+.code-theme-obsidian-gold .editor-gutter { background: #07080a !important; border-right: 1px solid #292524 !important; }
+.code-theme-obsidian-gold .editor-gutter-line { color: #b45309 !important; }
+
+.code-theme-obsidian-gold .sql-keyword,
+.code-theme-obsidian-gold .pas-keyword { color: #fbbf24 !important; font-weight: 700; text-shadow: 0 0 8px rgba(251,191,36,0.3); }
+.code-theme-obsidian-gold .sql-fn,
+.code-theme-obsidian-gold .pas-type { color: #fde68a !important; font-weight: 600; }
+.code-theme-obsidian-gold .sql-string,
+.code-theme-obsidian-gold .pas-string { color: #fca5a5 !important; }
+.code-theme-obsidian-gold .sql-comment,
+.code-theme-obsidian-gold .pas-comment { color: #78716c !important; font-style: italic; }
+.code-theme-obsidian-gold .sql-number,
+.code-theme-obsidian-gold .pas-number { color: #fed7aa !important; }
+.code-theme-obsidian-gold .sql-param { color: #eab308 !important; font-weight: 800; }
+.code-theme-obsidian-gold .sql-operator,
+.code-theme-obsidian-gold .pas-special { color: #d4d4d8 !important; }
+.code-theme-obsidian-gold .pas-proc { color: #fef08a !important; font-weight: 700; }
+
+/* ══════════════════════════════════════════════════════════
+   SİSTEM ARAYÜZ MİMARİSİ: RETRO WINDOWS 95 MODU
+   ══════════════════════════════════════════════════════════ */
+html[data-ui-mode="retro-win95"] {
+  --bg-page: #008080 !important; /* Klasik Win95 Teal Masaüstü Arka Planı */
+  --bg-surface: #c0c0c0 !important;
+  --bg-raised: #d4d0c8 !important;
+  --text-primary: #000000 !important;
+  --text-secondary: #222222 !important;
+  --text-muted: #555555 !important;
+  --border: #808080 !important;
+  --border-light: #dfdfdf !important;
+  --radius: 0px !important;
+  --radius-sm: 0px !important;
+  --radius-md: 0px !important;
+  --radius-lg: 0px !important;
+}
+
+html[data-ui-mode="retro-win95"] *,
+html[data-ui-mode="retro-win95"] *::before,
+html[data-ui-mode="retro-win95"] *::after {
+  border-radius: 0px !important;
+}
+
+html[data-ui-mode="retro-win95"] body,
+html[data-ui-mode="retro-win95"] button,
+html[data-ui-mode="retro-win95"] input,
+html[data-ui-mode="retro-win95"] select,
+html[data-ui-mode="retro-win95"] textarea {
+  font-family: 'Segoe UI', Tahoma, Arial, sans-serif !important;
+}
+
+/* 3D Kabartmalı Düğmeler (Outset Bevel) */
+html[data-ui-mode="retro-win95"] .btn,
+html[data-ui-mode="retro-win95"] button:not(.btn-icon):not(.theme-selector-select) {
+  background: #c0c0c0 !important;
+  color: #000000 !important;
+  border-top: 2px solid #ffffff !important;
+  border-left: 2px solid #ffffff !important;
+  border-right: 2px solid #404040 !important;
+  border-bottom: 2px solid #404040 !important;
+  box-shadow: inset 1px 1px 0 #dfdfdf, inset -1px -1px 0 #808080 !important;
+  font-weight: 700 !important;
+  text-shadow: none !important;
+  transform: none !important;
+}
+
+html[data-ui-mode="retro-win95"] .btn:active,
+html[data-ui-mode="retro-win95"] button:active {
+  border-top: 2px solid #404040 !important;
+  border-left: 2px solid #404040 !important;
+  border-right: 2px solid #ffffff !important;
+  border-bottom: 2px solid #ffffff !important;
+  box-shadow: inset 1px 1px 0 #808080, inset -1px -1px 0 #dfdfdf !important;
+  transform: translate(1px, 1px) !important;
+}
+
+/* 3D Batık Girdi Kutuları (Inset Sunken) */
+html[data-ui-mode="retro-win95"] input[type="text"],
+html[data-ui-mode="retro-win95"] input[type="search"],
+html[data-ui-mode="retro-win95"] input[type="password"],
+html[data-ui-mode="retro-win95"] select,
+html[data-ui-mode="retro-win95"] textarea,
+html[data-ui-mode="retro-win95"] .master-search-input {
+  background: #ffffff !important;
+  color: #000000 !important;
+  border-top: 2px solid #808080 !important;
+  border-left: 2px solid #808080 !important;
+  border-right: 2px solid #ffffff !important;
+  border-bottom: 2px solid #ffffff !important;
+  box-shadow: inset 1px 1px 0 #000000, inset -1px -1px 0 #dfdfdf !important;
+}
+
+/* Pencereler & Modallar (Win95 Pencere Başlığı) */
+html[data-ui-mode="retro-win95"] .modal,
+html[data-ui-mode="retro-win95"] .settings-modal-dialog,
+html[data-ui-mode="retro-win95"] .modal-box {
+  background: #c0c0c0 !important;
+  color: #000000 !important;
+  border-top: 2px solid #ffffff !important;
+  border-left: 2px solid #ffffff !important;
+  border-right: 2px solid #000000 !important;
+  border-bottom: 2px solid #000000 !important;
+  box-shadow: inset 1px 1px 0 #dfdfdf, inset -1px -1px 0 #808080, 4px 4px 0 rgba(0,0,0,0.4) !important;
+  padding: 4px !important;
+}
+
+html[data-ui-mode="retro-win95"] .topbar,
+html[data-ui-mode="retro-win95"] .modal-header,
+html[data-ui-mode="retro-win95"] .settings-modal-header {
+  background: linear-gradient(90deg, #000080 0%, #1084d0 100%) !important;
+  color: #ffffff !important;
+  padding: 4px 8px !important;
+  border-bottom: 2px solid #404040 !important;
+}
+
+html[data-ui-mode="retro-win95"] .topbar *,
+html[data-ui-mode="retro-win95"] .modal-header *,
+html[data-ui-mode="retro-win95"] .settings-modal-header * {
+  color: #ffffff !important;
+}
+
+/* Kartlar ve Paneller */
+html[data-ui-mode="retro-win95"] .card,
+html[data-ui-mode="retro-win95"] .settings-card,
+html[data-ui-mode="retro-win95"] .dash-table-wrap,
+html[data-ui-mode="retro-win95"] .report-card {
+  background: #c0c0c0 !important;
+  color: #000000 !important;
+  border-top: 2px solid #808080 !important;
+  border-left: 2px solid #808080 !important;
+  border-right: 2px solid #ffffff !important;
+  border-bottom: 2px solid #ffffff !important;
+  box-shadow: inset 1px 1px 0 #000000, inset -1px -1px 0 #dfdfdf !important;
+}
+
+/* Tablolar & Başlıklar */
+html[data-ui-mode="retro-win95"] th,
+html[data-ui-mode="retro-win95"] .dash-table-header {
+  background: #c0c0c0 !important;
+  color: #000000 !important;
+  border-top: 2px solid #ffffff !important;
+  border-left: 2px solid #ffffff !important;
+  border-right: 2px solid #404040 !important;
+  border-bottom: 2px solid #404040 !important;
+  box-shadow: inset 1px 1px 0 #dfdfdf, inset -1px -1px 0 #808080 !important;
+  font-weight: 800 !important;
+}
+
+html[data-ui-mode="retro-win95"] tr:hover td {
+  background: #000080 !important;
+  color: #ffffff !important;
+}
+
+html[data-ui-mode="retro-win95"] tr:hover td a,
+html[data-ui-mode="retro-win95"] tr:hover td span {
+  color: #ffffff !important;
+}
+
+/* Retro Kaydırma Çubuğu (Scrollbar) */
+html[data-ui-mode="retro-win95"] ::-webkit-scrollbar {
+  width: 16px;
+  height: 16px;
+  background: #dfdfdf;
+}
+
+html[data-ui-mode="retro-win95"] ::-webkit-scrollbar-thumb {
+  background: #c0c0c0;
+  border-top: 2px solid #ffffff;
+  border-left: 2px solid #ffffff;
+  border-right: 2px solid #404040;
+  border-bottom: 2px solid #404040;
+  box-shadow: inset 1px 1px 0 #dfdfdf, inset -1px -1px 0 #808080;
+}
+
+

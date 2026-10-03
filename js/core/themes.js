@@ -24,7 +24,8 @@
     { id: 'solarized-dark',   label: 'Solarized Dark' },
     { id: 'midnight-amethyst',label: 'Midnight Amethyst' },
     { id: 'nordic-frost',     label: 'Nordic Frost' },
-    { id: 'aurora-emerald',   label: 'Aurora Emerald' }
+    { id: 'aurora-emerald',   label: 'Aurora Emerald' },
+    { id: 'obsidian-gold',    label: 'Obsidian Gold (Lüks Altın & Siyah)' }
   ];
 
   function _scopedUserKey(key) {
@@ -82,7 +83,7 @@
                    target === 'monokai' || target === 'nord' || target === 'tokyo-night' || target === 'cyberpunk' || 
                    target === 'matrix' || target === 'synthwave' || target === 'deep-ocean' || 
                    target === 'solarized-dark' || target === 'midnight-amethyst' || target === 'nordic-frost' ||
-                   target === 'aurora-emerald';
+                   target === 'aurora-emerald' || target === 'obsidian-gold';
     const uiTheme = isDark ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', uiTheme);
     if (document.body) document.body.setAttribute('data-theme', uiTheme);
@@ -167,6 +168,31 @@
     return wrap;
   }
 
+  const THEME_UI_MODE_KEY = 'frpoku_ui_mode';
+
+  function getUiMode() {
+    return _readThemeValue(THEME_UI_MODE_KEY) || localStorage.getItem(THEME_UI_MODE_KEY) || 'modern';
+  }
+
+  function setUiMode(mode, showToast = false) {
+    const valid = mode === 'retro-win95' ? 'retro-win95' : 'modern';
+    document.documentElement.setAttribute('data-ui-mode', valid);
+    if (document.body) document.body.setAttribute('data-ui-mode', valid);
+    try {
+      localStorage.setItem(_scopedUserKey(THEME_UI_MODE_KEY), valid);
+      localStorage.setItem(THEME_UI_MODE_KEY, valid);
+      const scopedPrefKey = _scopedUserKey('frpoku_preferences');
+      const prefs = JSON.parse(_readThemeValue('frpoku_preferences') || '{}');
+      prefs.uiMode = valid;
+      localStorage.setItem(scopedPrefKey, JSON.stringify(prefs));
+      localStorage.setItem('frpoku_preferences', JSON.stringify(prefs));
+    } catch (e) {}
+    window.dispatchEvent(new CustomEvent('frpoku:uiModeChanged', { detail: { uiMode: valid } }));
+    if (showToast && typeof window.toast === 'function') {
+      window.toast(valid === 'retro-win95' ? '💾 Retro Windows 95 Arayüz Modu devrede!' : '✨ Modern Kurumsal Arayüz Modu devrede!', 'info', 2000);
+    }
+  }
+
   // Tarayıcı sekmeleri ve pencereler arası senkronizasyon (Storage Event)
   window.addEventListener('storage', (e) => {
     if (e.key === THEME_CODE_KEY && e.newValue) {
@@ -178,6 +204,9 @@
         const label = isDark ? 'Aydınlık Mod' : 'Koyu Mod';
         if (btn.textContent !== label) btn.textContent = label;
       });
+    } else if (e.key === THEME_UI_MODE_KEY && e.newValue) {
+      document.documentElement.setAttribute('data-ui-mode', e.newValue);
+      if (document.body) document.body.setAttribute('data-ui-mode', e.newValue);
     }
   });
 
@@ -201,11 +230,18 @@
     applyCodeTheme,
     setTheme,
     initCodeTheme,
-    createThemeSelector
+    createThemeSelector,
+    getUiMode,
+    setUiMode
   };
 
   // Sayfa yüklendiğinde otomatik uygula
   initCodeTheme();
+
+  // Arayüz Modunu (Modern vs Retro Win95) uygula
+  const initialUiMode = getUiMode();
+  document.documentElement.setAttribute('data-ui-mode', initialUiMode);
+  if (document.body) document.body.setAttribute('data-ui-mode', initialUiMode);
 
   function syncThemeButtons() {
     const isDark = getGlobalTheme() === 'dark';

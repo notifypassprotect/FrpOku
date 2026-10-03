@@ -311,6 +311,23 @@ window.FrpListRenderers = window.FrpListRenderers || {};
   window.FrpListRenderers.renderSkeletonTable = function(container, count = 7) {
     if (!container) return;
     const rows = Array.from({ length: count });
+    if (container.tagName === 'TBODY') {
+      container.innerHTML = rows.map(() => `
+        <tr class="skeleton-table-row" aria-hidden="true" style="border-bottom:1px solid var(--border-light);">
+          <td style="padding:.75rem .5rem;text-align:center;width:36px;"><div class="frp-skeleton-pulse" style="width:16px;height:16px;border-radius:4px;margin:auto;"></div></td>
+          <td style="padding:.75rem .4rem;text-align:center;width:56px;"><div class="frp-skeleton-pulse" style="width:28px;height:14px;border-radius:4px;margin:auto;"></div></td>
+          <td style="padding:.75rem .8rem;max-width:320px;"><div class="frp-skeleton-pulse skeleton-line" style="width:75%;height:14px;border-radius:4px;"></div></td>
+          <td style="padding:.75rem .8rem;max-width:220px;"><div class="frp-skeleton-pulse skeleton-line" style="width:60%;height:12px;border-radius:4px;"></div></td>
+          <td style="padding:.75rem .8rem;width:80px;"><div class="frp-skeleton-pulse skeleton-line" style="width:45px;height:12px;border-radius:4px;"></div></td>
+          <td style="padding:.75rem .8rem;width:110px;"><div class="frp-skeleton-pulse" style="width:65px;height:18px;border-radius:999px;"></div></td>
+          <td style="padding:.75rem .8rem;width:120px;"><div class="frp-skeleton-pulse skeleton-line" style="width:90px;height:12px;border-radius:4px;"></div></td>
+          <td style="padding:.75rem .8rem;width:140px;"><div class="frp-skeleton-pulse skeleton-line" style="width:75px;height:12px;border-radius:4px;"></div></td>
+          <td style="padding:.75rem .8rem;width:80px;"><div class="frp-skeleton-pulse skeleton-line" style="width:45px;height:12px;border-radius:4px;"></div></td>
+          <td style="padding:.75rem .8rem;width:100px;"><div class="frp-skeleton-pulse skeleton-line" style="width:70px;height:12px;border-radius:4px;"></div></td>
+        </tr>
+      `).join('');
+      return;
+    }
     container.innerHTML = `
       <div class="report-table-wrap" aria-hidden="true" style="border:1.5px solid var(--border-light);border-radius:14px;background:var(--bg-surface);overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.03);">
         <div style="padding:.9rem 1.25rem;background:var(--bg-raised);border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:1.5rem;">

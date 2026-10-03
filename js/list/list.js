@@ -718,7 +718,7 @@ function renderTimeline(container) {
   renderPaginationControls(sorted.length, pageSize);
   const start = (currentPage - 1) * pageSize;
   const visible = pageSize >= 9999 ? sorted : sorted.slice(start, start + pageSize);
-  if (window.FrpListRenderers?.renderTimeline) window.FrpListRenderers.renderTimeline(visible, target);
+  if (window.FrpListRenderers?.renderTimeline) window.FrpListRenderers.renderTimeline(visible, target, sorted);
 }
 window.renderTimeline = renderTimeline;
 
@@ -1338,7 +1338,8 @@ function initListPage() {
 
     // Ortak havuz sekmesine geçildiğinde havuz raporlarını arka planda buluttan anında tazele:
     if (FrpStore.refreshFromCloud) {
-      try {
+      const needsSkeleton = (!allFiles || allFiles.length === 0);
+      if (needsSkeleton) {
         if (currentViewMode === 'cards') {
           const cardsEl = document.getElementById('cardsView');
           if (cardsEl && window.FrpListRenderers?.renderSkeletonCards) {
@@ -1350,10 +1351,11 @@ function initListPage() {
             window.FrpListRenderers.renderSkeletonTable(tb, 7);
           }
         }
-        await FrpStore.refreshFromCloud();
+      }
+      FrpStore.refreshFromCloud().then(() => {
         updateUserList();
         applySearch();
-      } catch (e) {}
+      }).catch(() => {});
     }
   });
 
@@ -1799,6 +1801,12 @@ function initListPage() {
         else save();
       }
     });
+  });
+
+  document.getElementById('btnColorGuide')?.addEventListener('click', () => {
+    if (typeof window.openColorGuideModal === 'function') {
+      window.openColorGuideModal();
+    }
   });
 
   savedViewSelect?.addEventListener('change', () => {

@@ -67,6 +67,26 @@ window.FrpSettingsTabs.appearance = {
           </div>
         </div>
 
+        <!-- Sistem Arayüz Stili (Modern Kurumsal vs Retro Windows 95) -->
+        <div class="settings-card">
+          <div style="font-weight:700;font-size:.85rem;margin-bottom:.3rem;">Sistem Arayüz Stili (UI Architecture Mode)</div>
+          <div style="font-size:.74rem;color:var(--text-muted);margin-bottom:.75rem;">
+            Tüm düğmeler, paneller, form kutuları ve pencerelerin tasarım yapısını belirler. Bu bir tema değildir; sistemin mimari görünüm modudur.
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+            <label class="settings-radio-card ${(stagedPrefs.uiMode || 'modern') === 'modern' ? 'active' : ''}">
+              <input type="radio" name="stagedUiMode" value="modern" ${(stagedPrefs.uiMode || 'modern') === 'modern' ? 'checked' : ''} style="display:none;" />
+              <div style="font-weight:800;font-size:.85rem;color:var(--accent);">✨ Modern Kurumsal (Varsayılan)</div>
+              <div style="font-size:.7rem;color:var(--text-muted);margin-top:.2rem;">Yuvarlatılmış köşeler, yumuşak gölgeler, cam efekti ve modern tipografi.</div>
+            </label>
+            <label class="settings-radio-card ${stagedPrefs.uiMode === 'retro-win95' ? 'active' : ''}">
+              <input type="radio" name="stagedUiMode" value="retro-win95" ${stagedPrefs.uiMode === 'retro-win95' ? 'checked' : ''} style="display:none;" />
+              <div style="font-weight:800;font-size:.85rem;color:#d97706;">💾 Retro Windows 95 / Klasik Makine</div>
+              <div style="font-size:.7rem;color:var(--text-muted);margin-top:.2rem;">3D kabartmalı beveled düğmeler, batık girdi alanları, köşeli pencereler ve retro his.</div>
+            </label>
+          </div>
+        </div>
+
         <!-- 15 Popüler Yazı Tipi Ailesi -->
         <div class="settings-card">
           <div style="font-weight:700;font-size:.85rem;margin-bottom:.6rem;">Genel Yazı Tipi Ailesi (Popüler Fontlar)</div>
@@ -218,6 +238,22 @@ window.FrpSettingsTabs.appearance = {
       }
       markDirty();
       safeToast('Açık tema önizlemesi etkinleştirildi.', 'info');
+    });
+
+    overlay.querySelectorAll('input[name="stagedUiMode"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        stagedPrefs.uiMode = e.target.value;
+        markDirty();
+        if (window.FrpThemes && typeof window.FrpThemes.setUiMode === 'function') {
+          window.FrpThemes.setUiMode(e.target.value, false);
+        } else {
+          document.documentElement.setAttribute('data-ui-mode', e.target.value);
+        }
+        overlay.querySelectorAll('input[name="stagedUiMode"]').forEach(r => {
+          r.closest('.settings-radio-card')?.classList.toggle('active', r.checked);
+        });
+        safeToast(e.target.value === 'retro-win95' ? 'Retro Windows 95 arayüz modu etkinleştirildi.' : 'Modern arayüz modu etkinleştirildi.', 'info');
+      });
     });
 
     overlay.querySelectorAll('input[name="stagedFontFamily"]').forEach(radio => {

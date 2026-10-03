@@ -862,6 +862,79 @@ window.FrpListModals = window.FrpListModals || {};
     };
   };
 
+  // 9. Rapor Renk & Durum Rehberi Modalı
+  window.FrpListModals.openColorGuideModal = function() {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.zIndex = '200050';
+    overlay.innerHTML = `
+      <div class="modal" style="max-width:540px;padding:1.5rem;display:flex;flex-direction:column;gap:1.25rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border-light);padding-bottom:.75rem;">
+          <div style="display:flex;align-items:center;gap:.6rem;">
+            <div style="font-size:1.3rem;">🎨</div>
+            <div>
+              <div style="font-size:1.05rem;font-weight:800;color:var(--text-primary);">Rapor Renk &amp; Durum Rehberi</div>
+              <div style="font-size:.76rem;color:var(--text-muted);">Listede ve başlıklarda kullanılan renklerin anlamları</div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-sm btn-ghost btn-close-guide" style="font-size:1.1rem;padding:.2rem .5rem;" aria-label="Kapat">✕</button>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:.85rem;max-height:65vh;overflow-y:auto;padding-right:.3rem;">
+          <div style="display:flex;align-items:flex-start;gap:.85rem;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:10px;padding:.85rem 1rem;">
+            <span class="badge" style="background:rgba(239,68,68,0.2);color:#ef4444;border:1px solid rgba(239,68,68,0.4);font-weight:800;padding:.2rem .6rem;border-radius:6px;font-size:.75rem;flex-shrink:0;">Risk / Kırmızı</span>
+            <div style="font-size:.82rem;line-height:1.45;color:var(--text-primary);">
+              <strong>SQL Güvenlik Riski veya Hata Bildirimi:</strong> İçerisinde veri tabanını etkileyebilecek <code>DROP</code>, <code>TRUNCATE</code>, <code>ALTER</code> komutları tespit edilen raporlarda veya kritik hata notu eklenmiş kayıtlarda görünür.
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:flex-start;gap:.85rem;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);border-radius:10px;padding:.85rem 1rem;">
+            <span class="badge badge-pool" style="font-weight:800;padding:.2rem .6rem;border-radius:6px;font-size:.75rem;flex-shrink:0;">Havuzda / Yeşil</span>
+            <div style="font-size:.82rem;line-height:1.45;color:var(--text-primary);">
+              <strong>Ortak Rapor Havuzu:</strong> Kurum içindeki tüm personelle paylaşılan ve herkesin inceleyip indirebileceği genel kütüphane raporlarını ifade eder.
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:flex-start;gap:.85rem;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25);border-radius:10px;padding:.85rem 1rem;">
+            <span class="badge badge-blue" style="font-weight:800;padding:.2rem .6rem;border-radius:6px;font-size:.75rem;flex-shrink:0;">SQL / Mavi</span>
+            <div style="font-size:.82rem;line-height:1.45;color:var(--text-primary);">
+              <strong>SQL Sorgu Yoğunluğu &amp; Standart Rapor:</strong> Raporun bünyesinde barındırdığı SQL sorgu adedini ve standart sistem kayıtlarını gösterir.
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:flex-start;gap:.85rem;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.25);border-radius:10px;padding:.85rem 1rem;">
+            <span class="badge badge-purple" style="font-weight:800;padding:.2rem .6rem;border-radius:6px;font-size:.75rem;flex-shrink:0;">Kategori / Mor</span>
+            <div style="font-size:.82rem;line-height:1.45;color:var(--text-primary);">
+              <strong>Kategori &amp; Kod Sınıflandırması:</strong> Raporun HBYS, Klinik, Finans gibi atandığı kategoriyi veya Pascal Script kod bloğu içerdiğini belirtir.
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:flex-start;gap:.85rem;background:var(--bg-raised);border:1px solid var(--border-light);border-radius:10px;padding:.85rem 1rem;">
+            <span class="badge" style="background:#fef3c7;color:#92400e;font-weight:800;padding:.2rem .6rem;border-radius:6px;font-size:.75rem;flex-shrink:0;">Düzenleniyor</span>
+            <div style="font-size:.82rem;line-height:1.45;color:var(--text-primary);">
+              <strong>Eşzamanlı Kilit Göstergesi:</strong> Şu anda başka bir kullanıcının bu rapor üzerinde tasarım veya kod düzenlemesi yaptığını gösterir.
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:flex-start;gap:.85rem;background:var(--bg-raised);border:1px solid var(--border-light);border-radius:10px;padding:.85rem 1rem;">
+            <span class="badge" style="background:var(--bg-surface);color:var(--accent);border:1px solid var(--accent);font-weight:800;padding:.2rem .6rem;border-radius:6px;font-size:.75rem;flex-shrink:0;">[Not]</span>
+            <div style="font-size:.82rem;line-height:1.45;color:var(--text-primary);">
+              <strong>Kullanıcı &amp; Dokümantasyon Notu:</strong> Rapora özel açıklama, SQL kullanım notu, ekran görüntüsü veya PDF belgesi iliştirildiğini ifade eder.
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;border-top:1px solid var(--border-light);padding-top:.75rem;">
+          <button type="button" class="btn btn-sm btn-primary btn-close-guide" style="padding:.45rem 1.25rem;font-weight:800;">Anladım</button>
+        </div>
+      </div>
+    `;
+    const close = () => overlay.remove();
+    overlay.querySelectorAll('.btn-close-guide').forEach(b => b.addEventListener('click', close));
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    document.body.appendChild(overlay);
+  };
+
   // Kısayol aliasları
   window.openParamsModal = window.FrpListModals.openParamsModal;
   window.openDependenciesModal = window.FrpListModals.openDependenciesModal;
@@ -871,4 +944,5 @@ window.FrpListModals = window.FrpListModals || {};
   window.openRecentModal = window.FrpListModals.openRecentModal;
   window.openDownloadHistoryModal = window.FrpListModals.openDownloadHistoryModal;
   window.openReportNoteModal = window.FrpListModals.openReportNoteModal;
+  window.openColorGuideModal = window.FrpListModals.openColorGuideModal;
 })();

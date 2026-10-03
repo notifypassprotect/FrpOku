@@ -945,7 +945,7 @@
     nextNonEmptyMap.set(item.idx, nonEmptyLines[pos + 1] || null);
   });
 
-  const clauseStartRx = /^(?:WHERE|GROUP\s+BY|ORDER\s+BY|HAVING|UNION|MINUS|INTERSECT|CONNECT\s+BY|START\s+WITH|(?:CROSS\s+|NATURAL(?:\s+\w+)*\s+|(?:LEFT|RIGHT|FULL)(?:\s+OUTER)?\s+|INNER\s+)?JOIN|\))\b/i;
+  const clauseStartRx = /^(?:WHERE|GROUP\s+BY|ORDER\s+BY|HAVING|UNION|MINUS|INTERSECT|CONNECT\s+BY|START\s+WITH|PIVOT|UNPIVOT|(?:CROSS\s+|NATURAL(?:\s+\w+)*\s+|(?:LEFT|RIGHT|FULL)(?:\s+OUTER)?\s+|INNER\s+)?JOIN|\))\b/i;
 
   cleanLines.forEach(item => {
     const { lineNo, idx, clean } = item;

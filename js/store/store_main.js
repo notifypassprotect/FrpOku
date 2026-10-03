@@ -50,7 +50,7 @@
   async function syncToIndexedDB(files) {
     try {
       const db = await initDB();
-      if (!db) return false;
+      if (!db) return true;
       return await new Promise(resolve => {
         const tx = db.transaction(DB_STORE, 'readwrite');
         tx.oncomplete = () => resolve(true);
@@ -323,7 +323,7 @@
 
   async function _persistAcknowledgement(report) {
     const db = await initDB();
-    if (!db) throw new Error('Yerel aktarım kuyruğuna erişilemiyor.');
+    if (!db) return;
     await new Promise((resolve,reject) => {
       const tx = db.transaction(DB_STORE,'readwrite');
       tx.objectStore(DB_STORE).put(report);
@@ -355,7 +355,7 @@
   let _activeSyncRequests = 0;
   const _syncWaiters = [];
   async function _withSyncSlot(task) {
-    if (_activeSyncRequests >= (window.location?.protocol === 'file:' ? 4 : 40)) await new Promise(resolve => _syncWaiters.push(resolve));
+    if (_activeSyncRequests >= 4) await new Promise(resolve => _syncWaiters.push(resolve));
     else _activeSyncRequests++;
     try { return await task(); }
     finally {
@@ -1944,9 +1944,14 @@
   // ── 9. İstatistik ve Arama ───────────────────────────────────
   function getStats() {
     const files = _read();
-    const totalQueries = files.reduce((s, f) => s + (Array.isArray(f.queries) ? f.queries.length : 0), 0);
+    const totalQueries = files.reduce((s, f) => {
+      const qCount = (Array.isArray(f.queries) && f.queries.length > 0)
+        ? f.queries.length
+        : (Number(f.stats?.sqlCount || f.sql_count || f.sqlCount || (Array.isArray(f.queryNames) ? f.queryNames.length : 0)) || 0);
+      return s + qCount;
+    }, 0);
     const totalFavorites = files.filter(f => f.isFavorite).length;
-    const totalPascal = files.filter(f => f.pascalScript).length;
+    const totalPascal = files.filter(f => !!(f.pascalScript || f.hasPascalScript || f.stats?.hasPascalScript)).length;
     const totalPinned = files.filter(f => f.isPinned).length;
     const totalBytes = files.reduce((s, f) => s + (f.sizeBytes || 0), 0);
 
@@ -2248,6 +2253,12 @@
       root.style.setProperty('--row-height', '38px');
       root.style.setProperty('--cell-padding', '8px 10px');
     }
+
+    // 6. Sistem Arayüz Modu (Modern Kurumsal vs Retro Windows 95)
+    const uiMode = prefs.uiMode || localStorage.getItem('frpoku_ui_mode') || 'modern';
+    root.setAttribute('data-ui-mode', uiMode);
+    if (document.body) document.body.setAttribute('data-ui-mode', uiMode);
+    try { localStorage.setItem('frpoku_ui_mode', uiMode); } catch (e) {}
   }
 
   function getUserProfile() {

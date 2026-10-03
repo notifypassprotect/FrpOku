@@ -89,31 +89,74 @@ function renderDashboard() {
     const totalQueries = files.reduce((a,f) => a + (Array.isArray(f.queries) && f.queries.length > 0 ? f.queries.length : (Number(f.stats?.sqlCount || f.sql_count || f.sqlCount || 0) || 0)), 0);
     const totalPascal = files.filter(f => f.pascalScript).length;
 
-    // SQL Parametre Kullanım Analizi
-    const paramUsageMap = {};
-    files.forEach(file => {
-      (file.queries || []).forEach(q => {
-        const fn = window.extractParamsFromSql || (() => []);
-        const params = fn(q.sql || '');
-        params.forEach(p => {
-          if (!paramUsageMap[p]) paramUsageMap[p] = { param: p, count: 0, reports: new Set() };
-          paramUsageMap[p].count++;
-          paramUsageMap[p].reports.add(file.meta?.reportName || file.name);
+    // SQL Parametre Kullanım Analizi (param_usage.js motoru ve özet kayıt uyumu ile)
+    let paramAnalytics = [];
+    if (typeof FrpStore !== 'undefined' && typeof FrpStore.getParameterUsage === 'function') {
+      paramAnalytics = FrpStore.getParameterUsage(files);
+    } else if (typeof window.getParameterUsage === 'function') {
+      paramAnalytics = window.getParameterUsage(files);
+    } else {
+      const paramUsageMap = {};
+      files.forEach(file => {
+        const fileParamSet = new Set();
+        (file.queries || []).forEach(q => {
+          const fn = window.extractParamsFromSql || (() => []);
+          const params = fn(q.sql || '');
+          params.forEach(p => {
+            fileParamSet.add(p);
+            if (!paramUsageMap[p]) paramUsageMap[p] = { param: p, count: 0, reports: new Set() };
+            paramUsageMap[p].count++;
+            paramUsageMap[p].reports.add(file.meta?.reportName || file.name);
+          });
+        });
+        const pList = Array.isArray(file.paramNames) ? file.paramNames : (Array.isArray(file.data?.paramNames) ? file.data.paramNames : []);
+        pList.forEach(p => {
+          let param = String(p || '').toUpperCase().trim();
+          if (!param) return;
+          if (!param.startsWith(':') && !param.startsWith('@') && !param.startsWith('&')) param = ':' + param;
+          if (!fileParamSet.has(param)) {
+            fileParamSet.add(param);
+            if (!paramUsageMap[param]) paramUsageMap[param] = { param, count: 0, reports: new Set() };
+            paramUsageMap[param].count++;
+            paramUsageMap[param].reports.add(file.meta?.reportName || file.name);
+          }
         });
       });
-    });
-
-    const paramAnalytics = Object.values(paramUsageMap)
-      .map(item => ({
-        param: item.param,
-        count: item.count,
-        reportCount: item.reports.size,
-        reports: Array.from(item.reports)
-      }))
-      .sort((a, b) => b.count !== a.count ? b.count - a.count : b.reportCount - a.reportCount);
+      paramAnalytics = Object.values(paramUsageMap)
+        .map(item => ({
+          param: item.param,
+          count: item.count,
+          reportCount: item.reports.size,
+          reports: Array.from(item.reports)
+        }))
+        .sort((a, b) => b.count !== a.count ? b.count - a.count : b.reportCount - a.reportCount);
+    }
 
     const totalParams = paramAnalytics.length;
     const avgQueries = totalReports > 0 ? (totalQueries / totalReports).toFixed(1) : 0;
+
+    // Rapor Karmaşıklık Analizi
+    let countStatic = 0, countSimple = 0, countMedium = 0, countComplex = 0;
+    files.forEach(f => {
+      const qc = Array.isArray(f.queries) && f.queries.length > 0 ? f.queries.length : (Number(f.stats?.sqlCount || f.sql_count || f.sqlCount || (Array.isArray(f.queryNames) ? f.queryNames.length : 0)) || 0);
+      if (qc === 0) countStatic++;
+      else if (qc <= 2) countSimple++;
+      else if (qc <= 6) countMedium++;
+      else countComplex++;
+    });
+
+    // Kategori Dağılımı
+    const catMap = {};
+    files.forEach(f => {
+      const c = f.category || 'Kategorisiz';
+      catMap[c] = (catMap[c] || 0) + 1;
+    });
+    const topCategories = Object.entries(catMap).sort((a,b) => b[1] - a[1]).slice(0, 6);
+
+    // En Büyük Dosya Boyutuna Sahip Raporlar (Top 5)
+    const heavyReports = [...files]
+      .sort((a, b) => (Number(b.sizeBytes || b.size) || 0) - (Number(a.sizeBytes || a.size) || 0))
+      .slice(0, 5);
 
     // En çok kullanılan tablolar
     const tableUsage = (typeof FrpStore !== 'undefined' && typeof FrpStore.getTableUsage === 'function')
@@ -225,25 +268,97 @@ function renderDashboard() {
  </div>
  </div>
 
- <!-- PARAMETRE ANALİTİĞİ -->
- ${paramAnalytics.length > 0? `
- <div class="dash-table-wrap">
- <div class="dash-table-header">SQL Parametre Kullanım Analitiği (Top ${Math.min(15, paramAnalytics.length)}) <span style="font-size:.72rem;color:var(--text-muted);font-weight:400;">— Hangi parametrenin kaç raporda geçtiğini görün</span></div>
- <table class="dash-tbl">
- <thead><tr><th>#</th><th>Parametre Adı</th><th>Kullanım Sayısı</th><th>Bağımlı Rapor Sayısı</th><th>Örnek Raporlar</th></tr></thead>
- <tbody>
- ${paramAnalytics.slice(0, 15).map((p, i) => `
- <tr>
- <td style="color:var(--text-muted);font-size:.78rem;">${i+1}</td>
- <td><code style="color:var(--orange);font-family:var(--mono);font-weight:700;">${p.param}</code></td>
- <td><strong>${p.count} kez</strong></td>
- <td><span class="badge badge-purple">${p.reportCount} rapor</span></td>
- <td style="font-size:.75rem;color:var(--text-secondary);">${p.reports.slice(0,3).join(', ')}${p.reports.length > 3? '...': ''}</td>
- </tr>
- `).join('')}
- </tbody>
- </table>
- </div>`: ''}
+  <!-- YENİ DERİNLEMESİNE ANALİZLER (Karmaşıklık, Kategoriler & En Ağır Raporlar) -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));gap:1.25rem;">
+    <!-- Karmaşıklık Analizi -->
+    <div class="dash-table-wrap" style="padding:1.25rem;">
+      <div style="font-weight:800;font-size:.95rem;color:var(--text-primary);margin-bottom:.4rem;">Rapor Karmaşıklık Analizi</div>
+      <div style="font-size:.74rem;color:var(--text-muted);margin-bottom:1rem;">SQL sorgu adedine göre sistemdeki rapor mimarisinin dağılımı</div>
+      <div style="display:flex;flex-direction:column;gap:.75rem;">
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:.78rem;font-weight:700;margin-bottom:4px;">
+            <span>Statik / Salt Tasarım (0 SQL)</span>
+            <span>${countStatic} (%${totalReports > 0 ? Math.round(countStatic/totalReports*100) : 0})</span>
+          </div>
+          <div style="height:7px;background:var(--bg-raised);border-radius:999px;overflow:hidden;"><div style="height:100%;width:${totalReports > 0 ? Math.round(countStatic/totalReports*100) : 0}%;background:#94a3b8;"></div></div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:.78rem;font-weight:700;margin-bottom:4px;">
+            <span>Basit Raporlar (1-2 SQL)</span>
+            <span>${countSimple} (%${totalReports > 0 ? Math.round(countSimple/totalReports*100) : 0})</span>
+          </div>
+          <div style="height:7px;background:var(--bg-raised);border-radius:999px;overflow:hidden;"><div style="height:100%;width:${totalReports > 0 ? Math.round(countSimple/totalReports*100) : 0}%;background:#10b981;"></div></div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:.78rem;font-weight:700;margin-bottom:4px;">
+            <span>Standart Raporlar (3-6 SQL)</span>
+            <span>${countMedium} (%${totalReports > 0 ? Math.round(countMedium/totalReports*100) : 0})</span>
+          </div>
+          <div style="height:7px;background:var(--bg-raised);border-radius:999px;overflow:hidden;"><div style="height:100%;width:${totalReports > 0 ? Math.round(countMedium/totalReports*100) : 0}%;background:#3b82f6;"></div></div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:.78rem;font-weight:700;margin-bottom:4px;">
+            <span>Kompleks / Ağır Raporlar (7+ SQL)</span>
+            <span>${countComplex} (%${totalReports > 0 ? Math.round(countComplex/totalReports*100) : 0})</span>
+          </div>
+          <div style="height:7px;background:var(--bg-raised);border-radius:999px;overflow:hidden;"><div style="height:100%;width:${totalReports > 0 ? Math.round(countComplex/totalReports*100) : 0}%;background:#f59e0b;"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kategori Dağılımı -->
+    <div class="dash-table-wrap" style="padding:1.25rem;">
+      <div style="font-weight:800;font-size:.95rem;color:var(--text-primary);margin-bottom:.4rem;">En Yoğun Kategoriler</div>
+      <div style="font-size:.74rem;color:var(--text-muted);margin-bottom:1rem;">Raporların kategorilere göre dağılımı</div>
+      <div style="display:flex;flex-direction:column;gap:.6rem;">
+        ${topCategories.length > 0 ? topCategories.map(([cat, cnt]) => `
+          <div style="display:flex;align-items:center;justify-content:space-between;font-size:.8rem;padding:.35rem .6rem;background:var(--bg-raised);border-radius:8px;border:1px solid var(--border-light);">
+            <span style="font-weight:700;color:var(--text-primary);">${escHtml(cat)}</span>
+            <span class="badge badge-purple" style="font-size:.72rem;">${cnt} rapor (%${totalReports > 0 ? Math.round(cnt/totalReports*100) : 0})</span>
+          </div>
+        `).join('') : '<div style="font-size:.78rem;color:var(--text-muted);">Henüz kategori tanımlanmadı.</div>'}
+      </div>
+    </div>
+
+    <!-- En Büyük 5 Rapor -->
+    <div class="dash-table-wrap" style="padding:1.25rem;">
+      <div style="font-weight:800;font-size:.95rem;color:var(--text-primary);margin-bottom:.4rem;">En Kapsamlı &amp; Büyük 5 Rapor</div>
+      <div style="font-size:.74rem;color:var(--text-muted);margin-bottom:1rem;">Dosya boyutu en yüksek raporlar</div>
+      <div style="display:flex;flex-direction:column;gap:.5rem;">
+        ${heavyReports.map((hr, idx) => {
+          const numBytes = Number(hr.sizeBytes || hr.size) || 0;
+          const sz = numBytes > 1048576 ? (numBytes / 1048576).toFixed(1) + ' MB' : Math.round(numBytes / 1024) + ' KB';
+          const rName = hr.meta?.reportName || hr.name;
+          return `
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;font-size:.78rem;padding:.35rem .5rem;border-bottom:1px dashed var(--border-light);">
+              <a href="detail.html?id=${encodeURIComponent(hr.id)}" style="font-weight:700;color:var(--accent);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:210px;" title="${escHtml(rName)}">${idx+1}. ${escHtml(rName)}</a>
+              <span class="badge badge-blue" style="font-size:.7rem;flex-shrink:0;">${sz}</span>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  </div>
+
+  <!-- PARAMETRE ANALİTİĞİ -->
+  ${paramAnalytics.length > 0? `
+  <div class="dash-table-wrap">
+  <div class="dash-table-header">SQL Parametre Kullanım Analitiği (Top 10) <span style="font-size:.72rem;color:var(--text-muted);font-weight:400;">— Hangi parametrenin kaç raporda geçtiğini görün</span></div>
+  <table class="dash-tbl">
+  <thead><tr><th>#</th><th>Parametre Adı</th><th>Kullanım Sayısı</th><th>Bağımlı Rapor Sayısı</th><th>Örnek Raporlar</th></tr></thead>
+  <tbody>
+  ${paramAnalytics.slice(0, 10).map((p, i) => `
+  <tr>
+  <td style="color:var(--text-muted);font-size:.78rem;">${i+1}</td>
+  <td><a href="index.html?q=${encodeURIComponent(p.param)}&field=all" style="text-decoration:none;" title="Bu parametreyi içeren raporları filtrele"><code style="color:var(--orange);font-family:var(--mono);font-weight:700;cursor:pointer;">${p.param}</code></a></td>
+  <td><strong>${p.count} kez</strong></td>
+  <td><span class="badge badge-purple">${p.reportCount} rapor</span></td>
+  <td style="font-size:.75rem;color:var(--text-secondary);">${(p.reports || []).slice(0,3).map(r => typeof r === 'string' ? r : (r.reportName || r.fileName)).join(', ')}${(p.reports || []).length > 3? '...': ''}</td>
+  </tr>
+  `).join('')}
+  </tbody>
+  </table>
+  </div>`: ''}
 
   <!-- KULLANICI BAZLI RAPOR YÜKLEME İSTATİSTİĞİ -->
   ${userAnalytics.length > 0 ? `
@@ -434,6 +549,16 @@ async function initDashboard() {
   } catch (e) {}
 
   const wrap = document.getElementById('dashWrap');
+  // Hızlı Açılış: Hafızada veya önbellekte hazır rapor varsa beklemeden anında çiz
+  const existingReports = (window.FrpStore && typeof window.FrpStore.getAll === 'function') ? window.FrpStore.getAll() : [];
+  if (existingReports.length > 0) {
+    renderDashboard();
+    if (window.FrpStoreReady) {
+      window.FrpStoreReady.then(() => renderDashboard()).catch(() => {});
+    }
+    return;
+  }
+
   if (window.FrpStoreReady) {
     if (wrap) {
       wrap.innerHTML = `
@@ -443,7 +568,14 @@ async function initDashboard() {
           <div style="font-size:.85rem;margin-top:.4rem;">IndexedDB ve önbellek analizi yapılıyor</div>
         </div>`;
     }
-    await window.FrpStoreReady;
+    try {
+      await Promise.race([
+        window.FrpStoreReady,
+        new Promise(resolve => setTimeout(resolve, 2500))
+      ]);
+    } catch (e) {
+      console.warn('FrpStoreReady wait error:', e);
+    }
   }
   renderDashboard();
 }

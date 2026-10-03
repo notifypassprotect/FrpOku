@@ -89,7 +89,7 @@ test('store_main.js kalıcı istemci hatalarında (400, 401, 403, 404) raporu se
   const storeCode = fs.readFileSync(path.join(__dirname, '..', 'js', 'store', 'store_main.js'), 'utf8');
   assert.match(
     storeCode,
-    /else if \(error\?\.status === 400 \|\| error\?\.status === 401 \|\| error\?\.status === 403 \|\| error\?\.status === 404\)/,
+    /else if \(error\?\.status === 400 \|\| error\?\.status === 401 \|\| error\?\.status === 403 \|\| error\?\.status === 404/,
     'Kalıcı istemci hataları özel olarak yakalanmalıdır.'
   );
 });

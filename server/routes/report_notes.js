@@ -177,6 +177,7 @@ function registerReportNoteRoutes(app, deps) {
 
       const extension = path.extname(filename).slice(1).toLowerCase();
       const contentType = attachmentMimeTypes[extension] || 'application/octet-stream';
+      const displayName = req.query.name ? path.basename(String(req.query.name)) : filename;
       if (req.query.download === '1') {
         res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
       } else {

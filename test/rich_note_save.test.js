@@ -16,8 +16,8 @@ test('failed note save retains editor and draft without updating local report',a
   assert.equal(calls.closed,0);assert.equal(calls.update,0);assert.equal(calls.draft,1);
   assert.equal(button.disabled,false);assert.match(status.textContent,/Kaydedilemedi/);
 });
-test('confirmed note save updates local report and closes once',async()=>{
-  const {ctx,calls}=setup(true);await ctx.saveNote();assert.equal(calls.update,1);assert.equal(calls.closed,1);
+test('confirmed note save updates local report and keeps modal open for feedback',async()=>{
+  const {ctx,calls}=setup(true);await ctx.saveNote();assert.equal(calls.update,1);assert.equal(calls.closed,0);
 });
 test('edits made during a save remain open as a new draft',async()=>{
   const {ctx,calls}=setup(true);let i=0;ctx.snapshot=()=>++i===1?'sent':'new edits';await ctx.saveNote();
