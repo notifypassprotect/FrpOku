@@ -219,8 +219,35 @@
       const cur = getGlobalTheme();
       const next = cur === 'dark' ? 'light' : 'dark';
       setTheme(next);
+      return;
+    }
+    const retroBtn = e.target.closest('#btnRetroModeToggle, #btnMobRetroToggle');
+    if (retroBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleUiMode();
     }
   });
+
+  function updateRetroButtons() {
+    const isRetro = getUiMode() === 'retro-win95';
+    document.querySelectorAll('#btnRetroModeToggle').forEach(btn => {
+      btn.innerHTML = isRetro ? '✨ Modern Mod' : '💾 Retro Mod';
+      btn.classList.toggle('active', isRetro);
+    });
+    document.querySelectorAll('#btnMobRetroToggle').forEach(btn => {
+      const span = btn.querySelector('span');
+      if (span) span.textContent = isRetro ? '✨ Modern Arayüz Modu' : '💾 Retro Windows 95 Modu';
+    });
+  }
+
+  function toggleUiMode() {
+    const cur = getUiMode();
+    const next = cur === 'retro-win95' ? 'modern' : 'retro-win95';
+    setUiMode(next, true);
+    updateRetroButtons();
+    return next;
+  }
 
   // Public API
   window.FrpThemes = {
@@ -232,7 +259,9 @@
     initCodeTheme,
     createThemeSelector,
     getUiMode,
-    setUiMode
+    setUiMode,
+    toggleUiMode,
+    updateRetroButtons
   };
 
   // Sayfa yüklendiğinde otomatik uygula
@@ -249,6 +278,7 @@
       const label = isDark ? 'Aydınlık Mod' : 'Koyu Mod';
       if (btn.textContent !== label) btn.textContent = label;
     });
+    updateRetroButtons();
   }
 
   if (document.readyState === 'loading') {

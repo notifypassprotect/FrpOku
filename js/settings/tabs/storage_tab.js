@@ -7,7 +7,13 @@ window.FrpSettingsTabs = window.FrpSettingsTabs || {};
 window.FrpSettingsTabs.storage = {
   render({ stagedPrefs }) {
     const files = FrpStore.getAll() || [];
-    const stats = FrpStore.getStats() || { total: files.length, queries: 0, storageFormatted: '0 MB' };
+    const stats = (typeof FrpStore.getStats === 'function' ? FrpStore.getStats() : null) || { total: files.length, queries: 0, storageFormatted: '0 MB' };
+    const totalQueries = Number(stats.queries || stats.totalQueries) || files.reduce((s, f) => {
+      const q = (Array.isArray(f.queries) && f.queries.length > 0)
+        ? f.queries.length
+        : (Number(f.sql_count || f.sqlCount || f.stats?.sqlCount || (Array.isArray(f.queryNames) ? f.queryNames.length : 0)) || 0);
+      return s + q;
+    }, 0);
     const isAdmin = window.FrpAuth?.getUser()?.role === 'admin';
 
     return `
@@ -28,7 +34,7 @@ window.FrpSettingsTabs.storage = {
               <div style="font-size:.74rem;color:var(--text-muted);font-weight:600;margin-top:.15rem;">Kayıtlı Rapor</div>
             </div>
             <div style="background:var(--bg-surface);padding:.8rem .6rem;border-radius:10px;border:1px solid var(--border-light);">
-              <div style="font-size:1.4rem;font-weight:800;color:var(--green);">${stats.queries || 0}</div>
+              <div style="font-size:1.4rem;font-weight:800;color:var(--green);">${totalQueries}</div>
               <div style="font-size:.74rem;color:var(--text-muted);font-weight:600;margin-top:.15rem;">SQL Sorgusu</div>
             </div>
             <div style="background:var(--bg-surface);padding:.8rem .6rem;border-radius:10px;border:1px solid var(--border-light);">

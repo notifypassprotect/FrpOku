@@ -54,9 +54,17 @@ window.FrpSettingsTabs.profile = {
     const userRole = curAuth.role === 'admin' ? 'Sistem Yöneticisi (Admin)' : 'Standart Kullanıcı';
     const userDept = stagedProfile.department || curAuth.department || 'Bilişim & Raporlama';
     
-    const allFiles = (typeof window !== 'undefined' && window.FrpStore?.getFiles?.()) || [];
+    const allFiles = (typeof window !== 'undefined' && typeof window.FrpStore?.getAll === 'function') ? window.FrpStore.getAll() : [];
     const myId = String(curAuth.id || '');
-    const myReportCount = allFiles.filter(f => String(f.owner_id || f.ownerId || f.userId || '') === myId || curAuth.role === 'admin').length;
+    const myUsername = String(curAuth.username || '').trim().toLowerCase();
+    const myReportCount = allFiles.filter(f => {
+      const fOwnerId = String(f.owner_id || f.ownerId || f.userId || f.user_id || '');
+      const fOwnerUsername = String(f.owner_username || f.ownerUsername || '').trim().toLowerCase();
+      if (myId && (fOwnerId === myId || (curAuth.role === 'admin' && (fOwnerId === 'usr_admin_root' || fOwnerId === 'admin' || !fOwnerId || fOwnerId === 'public')))) return true;
+      if (myUsername && fOwnerUsername === myUsername) return true;
+      if (curAuth.role === 'admin') return true;
+      return false;
+    }).length;
     const poolReportCount = allFiles.filter(f => Boolean(f.is_public || f.isPublic || f.in_pool || f.inPool)).length;
 
     let gpuRenderer = 'Donanım Hızlandırmalı WebGL GPU';

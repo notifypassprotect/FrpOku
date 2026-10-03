@@ -310,8 +310,11 @@ function getReportTables(file) {
 window.getReportTables = getReportTables;
 
 // ── Arama & Filtreleme ──────────────────────────────────────
-function applySearch() {
-  currentPage = 1;
+function applySearch(opts = {}) {
+  const isExplicitReset = opts && (opts.resetPage === true || (typeof Event !== 'undefined' && opts instanceof Event));
+  if (isExplicitReset) {
+    currentPage = 1;
+  }
   const btnReset = document.getElementById('btnResetFilters');
   if (btnReset) {
     const hasFilter = !!searchQuery || !!selectedTag || !!selectedCategory || !!selectedUser || onlyFavorites || onlyPinned || onlyNotes;
@@ -1221,7 +1224,7 @@ function setupMobileDrawer() {
 // ── Tümünü Yenile ───────────────────────────────────────────
 function refreshAll() {
   updateStats();
-  applySearch();
+  applySearch({ resetPage: false });
 }
 window.refreshAll = refreshAll;
 
@@ -1803,11 +1806,7 @@ function initListPage() {
     });
   });
 
-  document.getElementById('btnColorGuide')?.addEventListener('click', () => {
-    if (typeof window.openColorGuideModal === 'function') {
-      window.openColorGuideModal();
-    }
-  });
+
 
   savedViewSelect?.addEventListener('change', () => {
     if (deleteViewButton) deleteViewButton.disabled = !savedViewSelect.value;

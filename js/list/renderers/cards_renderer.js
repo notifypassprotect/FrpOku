@@ -33,8 +33,12 @@ window.FrpListRenderers.renderCards = function(files, container) {
     const oDept = file.ownerDepartment || file.owner_department || '';
     const ownerChip = `<span class="owner-chip" style="font-size:.72rem;padding:.15rem .5rem;" title="Yükleyen: ${escHtml(oName)}${oDept ? ' · ' + escHtml(oDept) : ''}">${escHtml(oName)}</span>`;
 
-    const isPublic = !!(file.isPublic || file.is_public);
-    const poolBadge = isPublic ? `<span class="badge badge-pool" style="font-size:.7rem;padding:.12rem .4rem;" title="Ortak Havuzda Paylaşıldı">Havuzda</span>` : '';
+    const isPublic = !!(file.isPublic || file.is_public || file.inPool || file.in_pool);
+    const poolBadge = isPublic ? `<span class="badge badge-pool" style="font-size:.7rem;padding:.12rem .4rem;" title="[Yeşil - Ortak Havuz]: Kurumsal ortak kütüphane raporu">Havuzda</span>` : '';
+    const hasRisk = Array.isArray(file.queries) && file.queries.some(q => /\b(DROP|TRUNCATE|ALTER)\s+(TABLE|DATABASE|VIEW|PROCEDURE|INDEX)\b/i.test(q.sql || ''));
+    const riskBadge = hasRisk ? `<span class="badge" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);font-size:.68rem;padding:1px 5px;border-radius:6px;" title="[Kırmızı - Güvenlik Riski]: Bu raporda DROP/TRUNCATE/ALTER komutları tespit edildi!">Risk</span>` : '';
+    const tooltip = window.FrpListRenderers?.getReportColorTooltip ? window.FrpListRenderers.getReportColorTooltip(file, reportName) : reportName;
+    const titleColorStyle = hasRisk ? 'color:#ef4444;' : (isPublic ? 'color:#10b981;' : '');
 
     const lockInfo = window.activeReportLocks ? window.activeReportLocks[file.id] : null;
     const currentUserId = String(window.FrpAuth?.getUser?.()?.id || '');
@@ -55,8 +59,9 @@ window.FrpListRenderers.renderCards = function(files, container) {
         <div class="card-top" style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;">
           <div style="min-width:0;flex:1;overflow:hidden;">
             <div class="card-title" style="font-weight:var(--heading-weight, 800);font-size:.92rem;color:var(--text-primary);line-height:1.35;word-break:break-word;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;">
-              <button type="button" class="report-title-action" data-list-action="open-detail" data-id="${encodedId}" aria-label="${escHtml(reportName)} raporunu aç">${escHtml(reportName)}</button>
+              <button type="button" class="report-title-action" data-list-action="open-detail" data-id="${encodedId}" style="${titleColorStyle}" title="${escHtml(tooltip)}" aria-label="${escHtml(reportName)} raporunu aç">${escHtml(reportName)}</button>
               ${poolBadge}
+              ${riskBadge}
               ${lockBadge}
             </div>
             <div style="font-size:.74rem;color:var(--text-muted);font-family:var(--font);margin-top:.25rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;" title="${escHtml(file.name)} · ${size}">

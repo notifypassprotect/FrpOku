@@ -14,11 +14,17 @@ window.FrpListRenderers.renderTimeline = function(files, container, allMatchingF
     return;
   }
 
+  const parseFileDate = (file) => {
+    const raw = file?.loadedAt || file?.updated_at || file?.updatedAt || file?.createdAt;
+    const d = raw ? new Date(raw) : new Date();
+    return isNaN(d.getTime()) ? new Date() : d;
+  };
+
   // Tüm filtrelenmiş kayıtlar üzerinden gerçek ay toplamlarını çıkar
   const totalCountsByGroup = {};
   const datasetForCounts = (Array.isArray(allMatchingFiles) && allMatchingFiles.length > 0) ? allMatchingFiles : files;
   datasetForCounts.forEach(file => {
-    const d = new Date(file.loadedAt);
+    const d = parseFileDate(file);
     const key = d.toLocaleString('tr-TR', { month: 'long', year: 'numeric' });
     totalCountsByGroup[key] = (totalCountsByGroup[key] || 0) + 1;
   });
@@ -26,7 +32,7 @@ window.FrpListRenderers.renderTimeline = function(files, container, allMatchingF
   // Görüntülenecek sayfalanmış dosyaları yüklenme tarihine göre grupla (Yıl-Ay)
   const groups = {};
   files.forEach(file => {
-    const d = new Date(file.loadedAt);
+    const d = parseFileDate(file);
     const key = d.toLocaleString('tr-TR', { month: 'long', year: 'numeric' });
     if (!groups[key]) groups[key] = [];
     groups[key].push(file);
@@ -34,31 +40,33 @@ window.FrpListRenderers.renderTimeline = function(files, container, allMatchingF
 
   container.innerHTML = Object.entries(groups).map(([groupTitle, items]) => {
     const totalInGroup = totalCountsByGroup[groupTitle] || items.length;
-    const countBadgeText = (totalInGroup > items.length)
-      ? `${totalInGroup.toLocaleString('tr-TR')} rapor · bu sayfada ${items.length}`
-      : `${totalInGroup.toLocaleString('tr-TR')} rapor`;
 
     return `
       <div class="timeline-group">
-        <div class="timeline-group-header">${groupTitle} (${countBadgeText})</div>
+        <div class="timeline-group-header">${groupTitle} (${totalInGroup.toLocaleString('tr-TR')} rapor)</div>
         <div class="timeline-items">
           ${items.map(file => {
             const encodedId = encodeInlineArg(file.id);
             const reportName = file.meta?.reportName || file.name;
-            const timeStr = new Date(file.loadedAt).toLocaleDateString('tr-TR');
+            const timeStr = parseFileDate(file).toLocaleDateString('tr-TR');
             const guidVal = (file.meta && file.meta.guid) ? file.meta.guid : '—';
             const oName = file.ownerName || file.owner_name || (file.userId === 'usr_admin_root' ? 'Admin' : 'Sistem');
             const oDept = file.ownerDepartment || file.owner_department || '';
             const ownerChip = `<span class="owner-chip" style="font-size:.7rem;padding:.1rem .45rem;" title="Yükleyen: ${escHtml(oName)}${oDept ? ' · ' + escHtml(oDept) : ''}">${escHtml(oName)}</span>`;
-            const isPublic = !!(file.isPublic || file.is_public);
-            const poolBadge = isPublic ? `<span class="badge badge-pool" style="font-size:.68rem;padding:.1rem .35rem;" title="Ortak Havuzda Paylaşıldı">Havuzda</span>` : '';
+            const isPublic = !!(file.isPublic || file.is_public || file.inPool || file.in_pool);
+            const poolBadge = isPublic ? `<span class="badge badge-pool" style="font-size:.68rem;padding:.1rem .35rem;" title="[Yeşil - Ortak Havuz]: Tüm personelle paylaşılan kurumsal rapor">Havuzda</span>` : '';
+            const hasRisk = Array.isArray(file.queries) && file.queries.some(q => /\b(DROP|TRUNCATE|ALTER)\s+(TABLE|DATABASE|VIEW|PROCEDURE|INDEX)\b/i.test(q.sql || ''));
+            const riskBadge = hasRisk ? `<span class="badge" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);font-size:.68rem;padding:1px 5px;border-radius:6px;" title="[Kırmızı - Güvenlik Riski]: Bu raporda DROP/TRUNCATE/ALTER komutları tespit edildi!">Risk</span>` : '';
+            const tooltip = window.FrpListRenderers?.getReportColorTooltip ? window.FrpListRenderers.getReportColorTooltip(file, reportName) : reportName;
+            const titleColorStyle = hasRisk ? 'color:#ef4444;' : (isPublic ? 'color:#10b981;' : '');
 
             return `
               <div class="timeline-item" data-list-action="open-detail" data-id="${encodedId}" style="cursor:pointer;">
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;">
                   <div style="display:flex;align-items:center;gap:.4rem;">
-                    <button type="button" class="report-title-action" data-list-action="open-detail" data-id="${encodedId}" aria-label="${escHtml(reportName)} raporunu aç">${escHtml(reportName)}</button>
+                    <button type="button" class="report-title-action" data-list-action="open-detail" data-id="${encodedId}" style="${titleColorStyle}" title="${escHtml(tooltip)}" aria-label="${escHtml(reportName)} raporunu aç">${escHtml(reportName)}</button>
                     ${poolBadge}
+                    ${riskBadge}
                   </div>
                   <span style="font-size:.75rem;color:var(--text-muted);">${timeStr}</span>
                 </div>

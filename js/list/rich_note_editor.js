@@ -1942,9 +1942,25 @@
         });
         const data = await res.json();
         if (!res.ok || !data.success) throw new Error(data.reason || 'Not kaydedilemedi.');
-        if (String(window.FrpAuth?.getUser()?.id || 'anonymous') !== editorUserId) return;
         window.FrpStore?.updateNote(fileId, payload.userNote, payload, { syncCloud: false });
-        window.refreshAll?.();
+        try {
+          const row = document.querySelector(`[data-id="${encodeURIComponent(String(fileId))}"]`);
+          if (row) {
+            const hasNote = Boolean(payload.userNote && payload.userNote.trim());
+            const existingBadge = row.querySelector('.badge-note, [title*="Not"]');
+            if (hasNote && !existingBadge) {
+              const nameDiv = row.querySelector('.file-name') || row;
+              const noteSpan = document.createElement('span');
+              noteSpan.className = 'badge-note';
+              noteSpan.title = '[Not]: Bu rapora özel not veya belge iliştirilmiş';
+              noteSpan.style.cssText = 'font-size:.72rem;color:var(--accent);font-weight:var(--bold-weight, 700);';
+              noteSpan.textContent = '[Not]';
+              nameDiv.appendChild(noteSpan);
+            } else if (!hasNote && existingBadge) {
+              existingBadge.remove();
+            }
+          }
+        } catch {}
         saveBusy = false;
         if (remove) {
           editor.innerHTML = '';

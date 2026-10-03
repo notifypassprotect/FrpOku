@@ -777,6 +777,9 @@ window.FrpListModals = window.FrpListModals || {};
   // 6. Rapor Not Ekleme / Görüntüleme Modalı
   window.FrpListModals.openReportNoteModal = async function(fileId) {
     if (!fileId) return;
+    if (window.FrpRichNoteEditor && typeof window.FrpRichNoteEditor.open === 'function') {
+      return window.FrpRichNoteEditor.open(fileId);
+    }
     const file = (FrpStore && FrpStore.getById ? FrpStore.getById(fileId) : null);
     if (!file) return;
 
@@ -812,6 +815,7 @@ window.FrpListModals = window.FrpListModals || {};
         <div style="margin-bottom: 1.2rem;">
           <label style="display: block; font-size: .8rem; font-weight: 700; color: var(--text-secondary, #475569); margin-bottom: .4rem;">Kişisel Notunuz</label>
           <textarea id="reportNoteTextarea" placeholder="Bu rapora özel notlarınızı buraya yazabilirsiniz (kalıcı olarak kaydedilir)..." style="width: 100%; min-height: 140px; padding: .75rem; border-radius: 10px; border: 1px solid var(--border, #cbd5e1); font-family: inherit; font-size: .88rem; line-height: 1.5; resize: vertical; background: var(--bg-card, #f8fafc); color: var(--text-primary, #0f172a); box-sizing: border-box;">${escHtml(currentNote)}</textarea>
+          <div id="reportNoteFeedback" style="font-size:.78rem;color:var(--accent);font-weight:600;margin-top:.4rem;min-height:1.2rem;"></div>
         </div>
 
         <div style="display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap;">
@@ -831,6 +835,7 @@ window.FrpListModals = window.FrpListModals || {};
     document.body.appendChild(overlay);
 
     const textarea = overlay.querySelector('#reportNoteTextarea');
+    const feedback = overlay.querySelector('#reportNoteFeedback');
     setTimeout(() => { if (textarea) textarea.focus(); }, 60);
 
     const close = () => overlay.remove();
@@ -843,9 +848,9 @@ window.FrpListModals = window.FrpListModals || {};
       deleteBtn.onclick = async () => {
         if (confirm('Bu rapora ait notu silmek istediğinize emin misiniz?')) {
           await FrpStore.updateNote(fileId, '');
+          if (textarea) textarea.value = '';
+          if (feedback) feedback.textContent = '✓ Not silindi.';
           if (typeof window.toast === 'function') window.toast('Rapor notu silindi.', 'info');
-          if (typeof window.refreshAll === 'function') window.refreshAll();
-          close();
         }
       };
     }
@@ -854,11 +859,10 @@ window.FrpListModals = window.FrpListModals || {};
     saveBtn.onclick = async () => {
       const val = textarea.value.trim();
       await FrpStore.updateNote(fileId, val);
+      if (feedback) feedback.textContent = '✓ Değişiklikler kaydedildi.';
       if (typeof window.toast === 'function') {
         window.toast(val ? 'Rapor notu kaydedildi.' : 'Rapor notu temizlendi.', 'success');
       }
-      if (typeof window.refreshAll === 'function') window.refreshAll();
-      close();
     };
   };
 

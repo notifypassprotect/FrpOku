@@ -227,6 +227,25 @@
       (Array.isArray(r.queryNames) ? r.queryNames : []));
     r.tree = Array.isArray(r.tree) ? r.tree : [];
     r.loadedAt = r.loadedAt || row.updated_at || new Date().toISOString();
+
+    const sqlCountVal = Number(
+      row.sql_count != null ? row.sql_count :
+      (r.sql_count != null ? r.sql_count :
+      (r.sqlCount != null ? r.sqlCount :
+      (r.stats?.sqlCount != null ? r.stats.sqlCount :
+      (Array.isArray(r.queries) && r.queries.length > 0 ? r.queries.length :
+      (Array.isArray(r.queryNames) ? r.queryNames.length : 0)))))
+    ) || 0;
+    r.sql_count = sqlCountVal;
+    r.sqlCount = sqlCountVal;
+    r.stats = r.stats || {};
+    r.stats.sqlCount = sqlCountVal;
+    r.stats.memoCount = Number(row.memo_count != null ? row.memo_count : (r.stats.memoCount || 0));
+    r.stats.datasetCount = Number(row.dataset_count != null ? row.dataset_count : (r.stats.datasetCount || 0));
+    r.stats.pageCount = Number(row.page_count != null ? row.page_count : (r.stats.pageCount || 0));
+    r.hasPascalScript = !!(row.has_script || r.pascalScript || r.hasPascalScript || r.stats?.hasPascalScript);
+    r.stats.hasPascalScript = r.hasPascalScript;
+
     return r;
   }
 

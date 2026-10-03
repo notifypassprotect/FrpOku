@@ -32,6 +32,28 @@ window.FrpListRenderers = window.FrpListRenderers || {};
   }
   window.renderTag = renderTag;
 
+  function getReportColorTooltip(file, reportName) {
+    const lines = [reportName || file.name || 'Rapor'];
+    const isPublic = !!(file.isPublic || file.is_public || file.inPool || file.in_pool);
+    const qCount = Array.isArray(file.queries) && file.queries.length > 0 ? file.queries.length : (Number(file.stats?.sqlCount || file.sql_count || file.sqlCount || 0) || 0);
+    const hasRisk = Array.isArray(file.queries) && file.queries.some(q => /\b(DROP|TRUNCATE|ALTER)\s+(TABLE|DATABASE|VIEW|PROCEDURE|INDEX)\b/i.test(q.sql || ''));
+    const hasNote = Boolean((file.userNote && file.userNote.trim()) || (file.noteHtml && file.noteHtml.trim()) || (Array.isArray(file.attachments) && file.attachments.length > 0));
+
+    lines.push('──────────────────────────────');
+    lines.push('🎨 Renk & Durum Bilgisi:');
+    if (hasRisk) lines.push('• 🔴 [Kırmızı - Risk]: Bu raporda DROP/TRUNCATE/ALTER veya riskli SQL komutları tespit edildi!');
+    if (isPublic) lines.push('• 🟢 [Yeşil - Havuzda]: Tüm personelle paylaşılan ortak kütüphane raporudur.');
+    if (qCount > 0) lines.push(`• 🔵 [Mavi - SQL]: Rapor bünyesinde ${qCount} adet SQL sorgusu tanımlıdır.`);
+    if (file.pascalScript || file.hasPascalScript) lines.push('• 🟣 [Mor - Pascal]: Rapor içerisinde özel Pascal Script kod bloğu yer alır.');
+    if (file.category) lines.push(`• 🏷️ [Kategori]: ${file.category}`);
+    if (file.isPinned) lines.push('• 📌 [Sabit]: Listenin en üstünde sabitlenmiş rapor.');
+    if (file.isFavorite) lines.push('• ⭐ [Favori]: Sık kullanılanlar listenize eklenmiştir.');
+    if (hasNote) lines.push('• 📝 [Not]: Rapora iliştirilmiş özel dokümantasyon veya belge mevcuttur.');
+
+    return lines.join('\n');
+  }
+  window.FrpListRenderers.getReportColorTooltip = getReportColorTooltip;
+
   const DEFAULT_COLUMN_ORDER = [
     'reportName',
     'fileName',
@@ -50,14 +72,15 @@ window.FrpListRenderers = window.FrpListRenderers || {};
       title: 'Rapor Başlığı',
       sortField: 'name',
       renderTd: (file, { reportName, hasNote }) => {
-        const isPublic = !!(file.isPublic || file.is_public);
-        const poolBadge = isPublic ? `<span class="badge badge-pool" style="font-size:.68rem;padding:1px 6px;border-radius:10px;margin-left:.25rem;" title="Ortak Havuzda Paylaşıldı">Havuzda</span>` : '';
+        const isPublic = !!(file.isPublic || file.is_public || file.inPool || file.in_pool);
+        const poolBadge = isPublic ? `<span class="badge badge-pool" style="font-size:.68rem;padding:1px 6px;border-radius:10px;margin-left:.25rem;" title="[Yeşil - Ortak Havuz]: Tüm personelle paylaşılan kurumsal rapor">Havuzda</span>` : '';
         const prefs = window.FrpStore ? window.FrpStore.getPreferences() : {};
+        let hasRisk = false;
         let riskBadge = '';
         if (prefs.showSqlRiskBadge !== false && Array.isArray(file.queries)) {
-          const hasRisk = file.queries.some(q => /\b(DROP|TRUNCATE|ALTER)\s+(TABLE|DATABASE|VIEW|PROCEDURE|INDEX)\b/i.test(q.sql || ''));
+          hasRisk = file.queries.some(q => /\b(DROP|TRUNCATE|ALTER)\s+(TABLE|DATABASE|VIEW|PROCEDURE|INDEX)\b/i.test(q.sql || ''));
           if (hasRisk) {
-            riskBadge = `<span class="badge" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);font-size:.68rem;padding:1px 5px;border-radius:6px;margin-left:.25rem;" title="Bu raporda DROP/TRUNCATE/ALTER komutları tespit edildi!">Risk</span>`;
+            riskBadge = `<span class="badge" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);font-size:.68rem;padding:1px 5px;border-radius:6px;margin-left:.25rem;" title="[Kırmızı - Güvenlik Riski]: Bu raporda DROP/TRUNCATE/ALTER komutları tespit edildi!">Risk</span>`;
           }
         }
         const oName = file.ownerName || file.owner_name || (file.userId === 'usr_admin_root' ? 'Admin' : 'Sistem');
@@ -69,15 +92,18 @@ window.FrpListRenderers = window.FrpListRenderers || {};
         const isLockedByOther = lockInfo && String(lockInfo.userId) !== currentUserId;
         const lockBadge = isLockedByOther ? `<span class="report-lock-badge" style="font-size:.68rem;padding:1px 6px;" title="${escHtml(lockInfo.userName || 'Kullanıcı')} şu anda bu raporu düzenliyor"><svg class="lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg> ${escHtml(lockInfo.userName || 'Biri')} düzenliyor</span>` : '';
 
+        const tooltip = getReportColorTooltip(file, reportName);
+        const titleColorStyle = hasRisk ? 'color:#ef4444;' : (isPublic ? 'color:#10b981;' : '');
+
         return `
           <td class="col-reportName" style="cursor:pointer;max-width:320px;">
             <div class="file-name" style="display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;">
-              <button type="button" class="report-name-title report-title-action" data-list-action="open-detail" data-id="${encodeURIComponent(String(file.id))}" style="font-weight:var(--report-title-weight, 700);font-size:.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(reportName)}" aria-label="${escHtml(reportName)} raporunu aç">${escHtml(reportName)}</button>
+              <button type="button" class="report-name-title report-title-action" data-list-action="open-detail" data-id="${encodeURIComponent(String(file.id))}" style="font-weight:var(--report-title-weight, 700);font-size:.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${titleColorStyle}" title="${escHtml(tooltip)}" aria-label="${escHtml(reportName)} raporunu aç">${escHtml(reportName)}</button>
               ${poolBadge}
               ${lockBadge}
               ${riskBadge}
               ${ownerChip}
-              ${hasNote ? `<span title="Not mevcut" style="font-size:.72rem;color:var(--accent);font-weight:var(--bold-weight, 700);">[Not]</span>` : ''}
+              ${hasNote ? `<span title="[Not]: Bu rapora özel not veya belge iliştirilmiş" style="font-size:.72rem;color:var(--accent);font-weight:var(--bold-weight, 700);">[Not]</span>` : ''}
             </div>
           </td>
         `;
