@@ -468,6 +468,8 @@
 
   // ── 3. Başlangıç & Bulut Senkronizasyonu ───────────────────────
   let _refreshSequence = 0;
+  let resolveLocalReady;
+  window.FrpStoreLocalReady = new Promise(resolve => { resolveLocalReady=resolve; });
   const bootstrapReady = (async () => {
     const splashStartTime = Date.now();
     const bootstrapSessionIdentity = _sessionIdentity();
@@ -484,6 +486,10 @@
           _pendingSyncIds.add(String(report.id)); _syncProgressIds.add(String(report.id));
         }
       });
+
+      // Detail views can use the durable local report without waiting for every
+      // cloud list, settings, categories and snippets request to finish.
+      resolveLocalReady();
 
       // Bulut verilerini (Aktif raporlar, çöp kutusu, kategoriler, snippets, ayarlar) paralel çek:
       if (window.FrpCloud && bootstrapSessionIdentity !== 'anonymous') {
@@ -511,7 +517,7 @@
                 const local = localMap.get(cfId);
                 let item = cf;
 
-                if (_pendingSyncIds.has(cfId) && local) item = local;
+                if (local && (_pendingSyncIds.has(cfId) || (local.rawXml && Number(local.version) === Number(cf.version)))) item = local;
 
                 // Kullanıcı notunun buluttaki boş veriyle ezilmesini önle
                 if (userNotes[cfId]?.note && (!item.userNote || !item.userNote.trim())) {
@@ -599,6 +605,7 @@
     } catch (err) {
       console.warn('Bootstrap error:', err);
     } finally {
+      resolveLocalReady();
       if (typeof window.refreshAll === 'function') window.refreshAll();
       if (window.FRP_CLOUD_STATUS && window.FRP_CLOUD_STATUS.ok === false) {
         _notifySyncIssue(window.FRP_CLOUD_STATUS.kind === 'auth'
@@ -2556,7 +2563,7 @@
           const id = String(cloudReport.id);
           const local = localMap.get(id);
           let report = cloudReport;
-          if (_pendingSyncIds.has(id) && local) report = local;
+          if (local && (_pendingSyncIds.has(id) || (local.rawXml && Number(local.version) === Number(cloudReport.version)))) report = local;
           if (userNotes[id]?.note && !String(report.userNote || '').trim()) {
             report = { ...report, userNote: userNotes[id].note, user_note: userNotes[id].note };
           }

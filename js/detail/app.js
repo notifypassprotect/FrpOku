@@ -1846,22 +1846,11 @@ async function init() {
 
 
 
- await window.FrpStoreReady;
+ await (window.FrpStoreLocalReady || window.FrpStoreReady);
  let file = FrpStore.getById(id);
 
- // Eğer LocalStorage boşsa veya rapor tekil bulunamadıysa IndexedDB yedeğinden çekmeyi dene
- if (!file && FrpStore.hydrateFromIndexedDB) {
- const restored = await FrpStore.hydrateFromIndexedDB();
- if (restored && restored.length > 0) {
- file = FrpStore.getById(id);
- }
- }
-
- // Eğer yerel depolarda yoksa bulut yüklemesini bekle
- if (!file && window.FrpStoreReady) {
- await window.FrpStoreReady;
- file = FrpStore.getById(id);
- }
+ // The local archive has already been read once. Fetch only the requested
+ // report if it is missing; do not hydrate the entire archive a second time.
 
  // Rapor listeden özet olarak geldiyse veya yerelde yoksa tam detayları (XML, ağaç vb.) sunucudan çek
  if (window.FrpStore && typeof window.FrpStore.ensureFullReport === 'function') {
@@ -1880,10 +1869,8 @@ async function init() {
 
  // Rapor zaten çözümlenmişse büyük XML'i gereksiz yere baştan parse etme
  if (file.rawXml && typeof parseFrp === 'function') {
- const hasStructure = Array.isArray(file.queries) && file.queries.length > 0 &&
- Array.isArray(file.tree) && file.tree.length > 0;
- const hasVisualPages = (Array.isArray(file.pages) && file.pages.length > 0) ||
- (Array.isArray(file.dialogPages) && file.dialogPages.length > 0);
+ const hasStructure = Array.isArray(file.queries) && Array.isArray(file.tree);
+ const hasVisualPages = Array.isArray(file.pages) && Array.isArray(file.dialogPages);
  if (!hasStructure || !hasVisualPages) {
  try {
  const reParsed = parseFrp(file.rawXml);
