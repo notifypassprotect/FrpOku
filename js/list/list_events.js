@@ -50,7 +50,7 @@
       return;
     }
 
-    if (action === 'dashboard') window.location.href = 'dashboard.html';
+    if (action === 'dashboard') window.FrpNavigate('dashboard.html');
     else if (action === 'open-detail') window.openDetail?.(id);
     else if (action === 'category') { event.stopPropagation(); window.openCategoryModalFor?.(id); }
     else if (action === 'copy-guid') { event.stopPropagation(); window.copyGuidText?.(decoded(target.dataset.value)); }

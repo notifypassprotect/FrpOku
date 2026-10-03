@@ -157,6 +157,8 @@
   const _pendingSyncIds = new Set();
   const _syncProgressIds = new Set();
   let _syncPauseUntil = 0;
+  let _navigationPausing = false;
+  let _allowInternalUnload = false;
   const _syncIssues = new Map();
   const CONFLICT_DRAFT_KEY = 'frpoku_sync_conflict_drafts';
   let _lastSyncedAt = null;
@@ -288,6 +290,7 @@
   }
 
   function _flushPendingSync() {
+    if (_navigationPausing) return;
     if (_pendingSyncIds.size === 0) return;
     [..._pendingSyncIds].filter(id => !_reportSyncChains.has(String(id)) && !_syncIssues.has(String(id))).forEach(_queueReportSync);
   }
@@ -367,7 +370,7 @@
     const syncSessionIdentity = _sessionIdentity();
     const previous = _reportSyncChains.get(key) || Promise.resolve();
     const next = previous.catch(() => {}).then(() => _withSyncSlot(async () => {
-      if (syncSessionIdentity !== _sessionIdentity()) return;
+      if (syncSessionIdentity !== _sessionIdentity() || _navigationPausing) return;
       const latest = _memoryStore.find(report => String(report.id) === key);
       if (!latest) {
         _pendingSyncIds.delete(key);
@@ -382,7 +385,7 @@
         for (let attempt = 0; attempt < 4; attempt++) {
           const delay = Math.max(0, _syncPauseUntil - Date.now());
           if (delay) await new Promise(resolve => setTimeout(resolve, delay));
-          if (syncSessionIdentity !== _sessionIdentity()) return;
+          if (syncSessionIdentity !== _sessionIdentity() || _navigationPausing) return;
           try { saved = await window.FrpCloud.saveReport(snapshot); break; }
           catch (error) {
             if (error.status === 429) _syncPauseUntil = Date.now() + Math.max(1000, error.retryAfterMs || 61000);
@@ -390,7 +393,7 @@
             if (error.status !== 429) await new Promise(resolve => setTimeout(resolve, 1500 * (attempt + 1)));
           }
         }
-        if (syncSessionIdentity !== _sessionIdentity()) return;
+        if (syncSessionIdentity !== _sessionIdentity() || _navigationPausing) return;
         if (!saved) throw new Error('Bulut kaydı doğrulanamadı.');
         const current = _memoryStore.find(report => String(report.id) === key);
         if (!current) return;
@@ -399,7 +402,7 @@
         if (unchanged) current._syncPending = false;
         // Persist the acknowledged version before removing the resumable queue entry.
         await _persistAcknowledgement(current);
-        if (syncSessionIdentity !== _sessionIdentity()) return;
+        if (syncSessionIdentity !== _sessionIdentity() || _navigationPausing) return;
         if (current._syncToken === sentToken) {
           _pendingSyncIds.delete(key);
           _persistedReportHashes.set(key,_reportHash(current));
@@ -408,7 +411,7 @@
         _lastSyncedAt = Date.now();
         _savePendingSyncIds();
       } catch (error) {
-        if (syncSessionIdentity !== _sessionIdentity()) return;
+        if (syncSessionIdentity !== _sessionIdentity() || _navigationPausing) return;
         console.warn('Rapor senkronizasyonu başarısız:', error);
         if (error?.status === 409) {
           _syncIssues.set(key,'conflict');
@@ -2472,6 +2475,16 @@
   // ── Public Store API (Köprü ve Delegasyon) ─────────────────────
   const FrpStore = {
     getSyncStatus, getSyncConflictDrafts,
+    prepareForNavigation: async () => {
+      _navigationPausing = true;
+      if (await _lastFilesWrite === false) {
+        _navigationPausing = false;
+        throw new Error('Yerel kuyruk kaydedilemedi.');
+      }
+      _allowInternalUnload = true;
+      // Another editor may veto navigation; restore upload activity in that case.
+      setTimeout(() => { _allowInternalUnload=false;_navigationPausing=false;_flushPendingSync(); },3000);
+    },
     waitForLocalSave: () => _lastFilesWrite,
     getAll, getById, ensureFullReport, add, addMany, deleteOne, deleteMany, deleteAll, resetAllUserData, clearSessionCache,
     updateNote, updateMeta, updateCode, getCodeHistory, revertLastCodeEdit, updateReport, saveFile, updateFileName, restoreFromIndexedDB, hydrateFromIndexedDB,
@@ -2573,7 +2586,7 @@
       if (window.FrpAuth?.isLoggedIn() && navigator.onLine !== false) _flushPendingSync();
     }, 30000);
     window.addEventListener('beforeunload', event => {
-      if (_pendingSyncIds.size) { event.preventDefault(); event.returnValue = ''; }
+      if (!_allowInternalUnload && (_pendingSyncIds.size || window.FrpImportActive)) { event.preventDefault(); event.returnValue = ''; }
     });
     setInterval(async () => {
       if (typeof document !== 'undefined' && document.hidden) return;

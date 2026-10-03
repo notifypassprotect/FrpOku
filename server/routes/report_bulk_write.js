@@ -22,13 +22,13 @@ function registerBulkReportWrite(app, deps) {
     const hashes = new Map(reports.map(r => [String(r.id), digest(r)]));
     const receiptMatches = (record, report) => {
       const receipt = record?.receipt || record?.data?._uploadReceipt || record?._uploadReceipt;
-      return receipt?.hash === hashes.get(String(report.id)) && Number(receipt.version) === Number(record.version);
+      return Boolean(receipt) && (receipt.hash === hashes.get(String(report.id)) || (report._syncToken && receipt.token === report._syncToken)) && Number(receipt.version) === Number(record.version);
     };
     const makeRow = (report, existing) => {
       const row = buildOwnedReportRow(report, req.authUser, {existing});
       row.version = nextReportVersion(existing, report.version);
       row.data = {...row.data, version:row.version, _syncPending:false,
-        _uploadReceipt:{hash:hashes.get(String(report.id)),version:row.version}};
+        _uploadReceipt:{hash:hashes.get(String(report.id)),token:report._syncToken || null,version:row.version}};
       return row;
     };
     const success = (id, version) => results.push({id:String(id),success:true,version:Number(version)});

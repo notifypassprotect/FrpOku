@@ -812,7 +812,7 @@ function handleItemClick(e, id) {
 window.handleItemClick = handleItemClick;
 
 function openDetail(id) {
-  window.location.href = 'detail.html?id=' + encodeURIComponent(id);
+  window.FrpNavigate('detail.html?id=' + encodeURIComponent(id));
 }
 window.openDetail = openDetail;
 
@@ -1210,7 +1210,7 @@ function setupMobileDrawer() {
   bindDrawerItem('btnMobParams', () => window.openParamsModal?.());
   bindDrawerItem('btnMobSnippets', () => window.renderSnippetsModal?.());
   bindDrawerItem('btnMobRecent', () => window.openRecentModal?.());
-  bindDrawerItem('btnMobDashboard', () => { window.location.href = 'dashboard.html'; });
+  bindDrawerItem('btnMobDashboard', () => { window.FrpNavigate('dashboard.html'); });
   bindDrawerItem('btnMobSettings', () => window.openSettingsModal?.('appearance'));
 
   document.getElementById('btnMobileFab')?.addEventListener('click', () => {
@@ -1505,7 +1505,7 @@ function initListPage() {
   document.getElementById('btnCompareSelected')?.addEventListener('click', () => {
     if (selectedIds.size < 2) return;
     const ids = [...selectedIds].slice(0, 2).join(',');
-    window.location.href = `compare.html?ids=${encodeURIComponent(ids)}`;
+    window.FrpNavigate(`compare.html?ids=${encodeURIComponent(ids)}`);
   });
 
   document.getElementById('btnDeleteBulk')?.addEventListener('click', () => {

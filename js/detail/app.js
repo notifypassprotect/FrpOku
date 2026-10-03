@@ -119,7 +119,7 @@ if (btnPrint) btnPrint.addEventListener('click', () => {
 const btnBack = document.getElementById('btnBack');
 if (btnBack) {
  btnBack.addEventListener('click', () => {
- window.location.href = 'index.html';
+ window.FrpNavigate('index.html');
  });
 }
 
@@ -1392,7 +1392,7 @@ async function saveEditMode(tabId, options = {}) {
  currentFile = FrpStore.getById(cloned.id) || cloned;
  showToast('Ortak havuzdaki rapor kişisel alanınıza kopyalanarak kaydedildi.', 'success');
  if (options.navigateToClone !== false) {
- setTimeout(() => { window.location.href = `detail.html?id=${encodeURIComponent(currentFile.id)}`; }, 700);
+ setTimeout(() => { window.FrpNavigate(`detail.html?id=${encodeURIComponent(currentFile.id)}`); }, 700);
  }
  return currentFile;
  }
@@ -1846,6 +1846,7 @@ async function init() {
 
 
 
+ await window.FrpStoreReady;
  let file = FrpStore.getById(id);
 
  // Eğer LocalStorage boşsa veya rapor tekil bulunamadıysa IndexedDB yedeğinden çekmeyi dene
@@ -1982,7 +1983,7 @@ async function init() {
  if (cloned) {
  showToast(`"${cloned.name}" kişisel raporlarınıza kopyalandı! Açılıyor... `, 'success');
  setTimeout(() => {
- window.location.href = `detail.html?id=${encodeURIComponent(cloned.id)}`;
+ window.FrpNavigate(`detail.html?id=${encodeURIComponent(cloned.id)}`);
  }, 500);
  }
  };

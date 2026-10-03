@@ -1,7 +1,7 @@
 document.addEventListener('click', event => {
  const target = event.target.closest('[data-dashboard-action]');
  if (!target) return;
- if (target.dataset.dashboardAction === 'open-index') window.location.href = 'index.html';
+ if (target.dataset.dashboardAction === 'open-index') window.FrpNavigate('index.html');
  if (target.dataset.dashboardAction === 'reload') window.location.reload();
  if (target.dataset.dashboardAction === 'filter-table') filterByTable(decodeURIComponent(target.dataset.table || ''));
 });
@@ -22,7 +22,7 @@ function verifyAdminAccess() {
  </div>
  </div>
  `;
- setTimeout(() => { window.location.href = 'index.html'; }, 2200);
+ setTimeout(() => { window.FrpNavigate('index.html'); }, 2200);
  return false;
  }
  return true;
@@ -422,7 +422,7 @@ function drawTrendChart(canvas, labels, data) {
 
 // Tabloya tıklayınca index.html'e SQL filtresiyle git
 function filterByTable(tableName) {
- window.location.href = 'index.html?filter_sql=' + encodeURIComponent(tableName);
+ window.FrpNavigate('index.html?filter_sql=' + encodeURIComponent(tableName));
 }
 window.filterByTable = filterByTable;
 

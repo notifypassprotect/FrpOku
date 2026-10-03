@@ -11,7 +11,7 @@
     const index = Number(target.dataset.index);
     const line = Number(target.dataset.line);
 
-    if (action === 'open-index') window.location.href = 'index.html';
+    if (action === 'open-index') window.FrpNavigate('index.html');
     else if (action === 'remove-tag') call('removeTagFromDetail', decoded(target.dataset.value));
     else if (action === 'copy-guid') call('copyGuidText', decoded(target.dataset.value));
     else if (action === 'export-sql') call('exportSqlQueryModal', index);
