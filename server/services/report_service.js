@@ -3,7 +3,7 @@ const path = require('path');
 
 function createReportService({ canReadReport, reportId, reportRowToClient, reportRowToSummaryClient, storePath, supabase }) {
   const tempPath = storePath + '.tmp';
-  const summarySelectColumns = 'id, name, file_size, category, tags, is_favorite, is_pinned, sql_count, memo_count, dataset_count, page_count, has_script, created_at, updated_at, user_note, note_html, note_attachments, is_deleted, deleted_at, user_id, is_public, owner_name, owner_username, owner_department, shared_at, version, meta:data->meta, tableNames:data->tableNames, queryNames:data->queryNames, paramNames:data->paramNames, datasets:data->datasets';
+  const summarySelectColumns = 'id, name, file_size, category, tags, is_favorite, is_pinned, sql_count, memo_count, dataset_count, page_count, has_script, created_at, updated_at, user_note, note_html, note_attachments, is_deleted, deleted_at, user_id, is_public, owner_name, owner_username, owner_department, shared_at, version, sourcePath:data->sourcePath, meta:data->meta, tableNames:data->tableNames, queryNames:data->queryNames, paramNames:data->paramNames, datasets:data->datasets';
 
   function readLocalReports() {
     if (!fs.existsSync(storePath)) return [];
@@ -50,12 +50,11 @@ function createReportService({ canReadReport, reportId, reportRowToClient, repor
       while (true) {
         let query = supabase.from('reports').select(summaryOnly ? summarySelectColumns : '*').eq('is_deleted', isDeleted);
         if (user.role !== 'admin') query = isDeleted ? query.eq('user_id', user.id) : query.or(`user_id.eq.${user.id},is_public.eq.true`);
-        const result = await query.order('updated_at', { ascending: false }).range(from, from + step - 1);
+        const result = await query.order('updated_at', { ascending: false }).order('id', { ascending: true }).range(from, from + step - 1);
         if (result.error) throw result.error;
         if (!result.data?.length) break;
         rows.push(...result.data);
-        if (result.data.length < step) break;
-        from += step;
+        from += result.data.length; // Database row caps may be lower than the requested page size.
       }
       return summaryOnly ? rows.map(reportRowToSummaryClient) : rows.map(reportRowToClient);
     }

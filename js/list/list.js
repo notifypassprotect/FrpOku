@@ -172,6 +172,7 @@ async function handleFiles(fileList) {
   };
   try {
     await paint();
+    await window.FrpStoreReady;
     for (const file of files) {
       if (stop) break;
       try {
@@ -180,7 +181,7 @@ async function handleFiles(fileList) {
         const validation = window.FrpSyntaxCheck?.validateFrpFileContent(file, text);
         if (!validation?.isValid) throw new Error(validation?.errors?.join(' ') || 'Geçersiz FRP içeriği');
         const parsed = parseFrp(text);
-        batch.push({ parsedData: parsed, fileName: file.name, fileSize: file.size });
+        batch.push({ parsedData: parsed, fileName: file.name, sourcePath: file.webkitRelativePath || file.name, fileSize: file.size });
       } catch (error) {
         rejected++;
         if (reasons.length < 5) reasons.push(`${file.name}: ${error.message}`);
@@ -1343,16 +1344,25 @@ function initListPage() {
   const syncStatus = document.getElementById('reportSyncStatus');
   const conflictDraftButton = document.getElementById('btnDownloadConflictDrafts');
   let _isSyncing = false;
+  const cloudProgress = document.createElement('progress');
+  cloudProgress.setAttribute('aria-label', 'Buluta kaydedilen raporlar');
+  cloudProgress.style.cssText = 'width:110px;height:7px;margin-left:8px;vertical-align:middle;accent-color:var(--green,#059669)';
+  cloudProgress.hidden = true;
+  syncStatus?.insertAdjacentElement('afterend', cloudProgress);
 
   function updateReportSyncStatus() {
     if (!syncStatus || !FrpStore.getSyncStatus) return;
-    const { pending, conflicts, errors, draftCount, lastSyncedAt } = FrpStore.getSyncStatus();
+    const { pending, total, completed, conflicts, errors, draftCount, lastSyncedAt } = FrpStore.getSyncStatus();
+    cloudProgress.hidden = !pending;
+    cloudProgress.max = total || pending || 1;
+    cloudProgress.value = completed || 0;
+    cloudProgress.title = `${completed || 0} / ${total || pending} rapor buluta kaydedildi`;
     if (conflictDraftButton) conflictDraftButton.hidden = !draftCount;
     const offline = navigator.onLine === false;
     syncStatus.dataset.state = conflicts || draftCount ? 'conflict' : errors ? 'error' : offline ? 'offline' : pending ? 'pending' : 'saved';
     syncStatus.textContent = conflicts ? `${conflicts} raporda kayıt çakışması` :
       errors ? `${errors} rapor kaydedilemedi` : offline ? (pending ? `Çevrimdışı · ${pending} kayıt bekliyor` : 'Çevrimdışı') :
-      pending ? `${pending} rapor buluta kaydediliyor` :
+      pending ? `${completed || 0} / ${total || pending} buluta kaydedildi · ${pending} bekliyor` :
       draftCount ? `${draftCount} yerel çakışma kopyası` :
       lastSyncedAt ? 'Buluta kaydedildi' : 'Bekleyen kayıt yok';
     syncStatus.title = conflicts ? 'Sunucudaki sürüm daha yeni. Raporu yeniden açıp değişiklikleri kontrol edin.' :

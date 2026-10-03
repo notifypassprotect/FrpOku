@@ -58,6 +58,7 @@
         }
         const error = new Error(data?.reason || `Sunucu isteği başarısız (${response.status}).`);
         error.status = response.status;
+        error.retryAfterMs = Math.max(1000, Number(response.headers.get('Retry-After')) * 1000 || 61000);
         error.code = data?.code || (response.status === 409 ? 'REPORT_CONFLICT' : 'SERVER_REQUEST_FAILED');
         throw error;
       }
@@ -276,18 +277,17 @@
             .from('reports')
             .select('*')
             .eq('is_deleted', false)
-            .order('updated_at', { ascending: false })
+            .order('updated_at', { ascending: false }).order('id', { ascending: true })
             .range(from, from + step - 1);
 
           if (error) {
             console.warn('Supabase aktif raporlar çekilemedi:', error.message);
-            break;
+            throw error;
           }
           if (!data || data.length === 0) break;
 
           allRows.push(...data);
-          if (data.length < step) break;
-          from += step;
+          from += data.length;
         }
 
         const reports = allRows.map(parseReportFromRow);
@@ -356,15 +356,14 @@
           }
 
           const { data, error } = await query
-            .order('deleted_at', { ascending: false })
+            .order('deleted_at', { ascending: false }).order('id', { ascending: true })
             .range(from, from + step - 1);
 
-          if (error) break;
+          if (error) throw error;
           if (!data || data.length === 0) break;
 
           allRows.push(...data);
-          if (data.length < step) break;
-          from += step;
+          from += data.length;
         }
 
         return allRows.map(parseReportFromRow);

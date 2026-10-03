@@ -157,12 +157,14 @@
   const _reportSyncChains = new Map();
   const PENDING_SYNC_KEY = 'frpoku_pending_sync';
   const _pendingSyncIds = new Set();
+  const _syncProgressIds = new Set();
+  let _syncPauseUntil = 0;
   const _syncIssues = new Map();
   const CONFLICT_DRAFT_KEY = 'frpoku_sync_conflict_drafts';
   let _lastSyncedAt = null;
   try {
     const raw = localStorage.getItem(PENDING_SYNC_KEY);
-    if (raw) JSON.parse(raw).forEach(id => _pendingSyncIds.add(String(id)));
+    if (raw) JSON.parse(raw).forEach(id => { _pendingSyncIds.add(String(id)); _syncProgressIds.add(String(id)); });
   } catch (e) {}
 
   const USER_NOTES_KEY = 'frpoku_user_notes_v2';
@@ -275,14 +277,16 @@
     const ownedIds = new Set(_reportsOwnedBySession(_read()).map(report => String(report.id)));
     const pending = [..._pendingSyncIds].filter(id => ownedIds.has(id)).length;
     const issues = [..._syncIssues.entries()].filter(([id]) => ownedIds.has(id));
-    return { pending, conflicts: issues.filter(([, kind]) => kind === 'conflict').length,
+    const total = _syncProgressIds.size || pending;
+    const completed = [..._syncProgressIds].filter(id => !_pendingSyncIds.has(id) && !_syncIssues.has(id)).length;
+    return { pending, total, completed, conflicts: issues.filter(([, kind]) => kind === 'conflict').length,
       errors: issues.filter(([, kind]) => kind === 'error').length,
       draftCount: Object.keys(getSyncConflictDrafts()).length, lastSyncedAt: _lastSyncedAt };
   }
 
   function _flushPendingSync() {
     if (_pendingSyncIds.size === 0) return;
-    [..._pendingSyncIds].filter(id => !_reportSyncChains.has(String(id))).forEach(_queueReportSync);
+    [..._pendingSyncIds].filter(id => !_reportSyncChains.has(String(id)) && !_syncIssues.has(String(id))).forEach(_queueReportSync);
   }
   if (typeof window !== 'undefined') {
     window.addEventListener('online', _flushPendingSync);
@@ -368,7 +372,18 @@
         return;
       }
       try {
-        const saved = await window.FrpCloud.saveReport(latest);
+        let saved;
+        for (let attempt = 0; attempt < 4; attempt++) {
+          const delay = Math.max(0, _syncPauseUntil - Date.now());
+          if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+          if (syncSessionIdentity !== _sessionIdentity()) return;
+          try { saved = await window.FrpCloud.saveReport(latest); break; }
+          catch (error) {
+            if (error.status === 429) _syncPauseUntil = Date.now() + Math.max(1000, error.retryAfterMs || 61000);
+            if (attempt === 3 || (error.status && error.status !== 429 && error.status < 500)) throw error;
+            if (error.status !== 429) await new Promise(resolve => setTimeout(resolve, 1500 * (attempt + 1)));
+          }
+        }
         if (syncSessionIdentity !== _sessionIdentity()) return;
         if (!saved) throw new Error('Bulut kaydı doğrulanamadı.');
         _applySavedVersion(key, saved.version);
@@ -402,8 +417,8 @@
           }
         } else if (error?.status === 400 || error?.status === 401 || error?.status === 403 || error?.status === 404) {
           _syncIssues.set(key, 'error');
-          // Kalıcı istemci / yetki hatası: Raporu sonsuz döngüye sokmamak için kuyruktan temizle
-          _pendingSyncIds.delete(key);
+          // Keep the local report until a cloud save is actually acknowledged.
+          _pendingSyncIds.add(key);
           _savePendingSyncIds();
           _notifySyncIssue(error.message || 'Rapor kaydedilemedi (Yetki veya doğrulama hatası).');
         } else {
@@ -422,12 +437,14 @@
   }
 
   function _write(files, { syncCloud = true } = {}) {
+    _refreshSequence++; // Invalidate snapshots requested before this local mutation.
     const ownedFiles = _reportsOwnedBySession(files);
     const changedIds = syncCloud ? ownedFiles
       .filter(report => _persistedReportHashes.get(String(report.id)) !== _reportHash(report))
       .map(report => String(report.id)) : [];
     _persistLocal(files);
-    changedIds.forEach(id => _pendingSyncIds.add(id));
+    if (changedIds.length && !_pendingSyncIds.size) _syncProgressIds.clear();
+    changedIds.forEach(id => { _pendingSyncIds.add(id); _syncProgressIds.add(id); _syncIssues.delete(id); });
     changedIds.forEach(id => _syncIssues.delete(id));
     if (changedIds.length > 0) _savePendingSyncIds();
     changedIds.forEach(_queueReportSync);
@@ -467,6 +484,7 @@
             const cloudFiles = activeSettled.value;
             if (Array.isArray(cloudFiles)) {
               const localMap = new Map((_read() || []).map(f => [String(f.id), f]));
+              localMap.forEach((f,id) => { if (!Number(f.version) && (f.userId || f.user_id) === window.FrpAuth?.getUser()?.id) _pendingSyncIds.add(id); });
               const userNotes = _getUserNotesMap();
               const pinOverrides = _getUserPinOverrides();
 
@@ -764,11 +782,12 @@
 
     const nameIndex = new Map();
     files.forEach((file, index) => {
-      if (String(file.userId || file.user_id) === String(userId) && !nameIndex.has(file.name)) nameIndex.set(file.name, index);
+      if (String(file.userId || file.user_id) === String(userId) && !nameIndex.has(file.sourcePath || file.name)) nameIndex.set(file.sourcePath || file.name, index);
     });
     parsedList.forEach(item => {
       const { parsedData, fileName, fileSize } = item;
-      const existingIdx = (nameIndex.get(fileName) ?? -1);
+      const sourcePath = item.sourcePath || fileName;
+      const existingIdx = (nameIndex.get(sourcePath) ?? -1);
       const autoTags = window.FrpTags ? window.FrpTags.generateAutoTags(parsedData, fileName) : [];
       const existingTags = existingIdx >= 0 ? (files[existingIdx].tags || []) : [];
       const mergedTags = [...new Set([...existingTags, ...autoTags])];
@@ -782,6 +801,7 @@
       const fileRecord = {
         id:              existingIdx >= 0 ? files[existingIdx].id : _uuid(),
         name:            fileName,
+        sourcePath,
         userId:          existingIdx >= 0 ? (files[existingIdx].userId || userId) : userId,
         user_id:         existingIdx >= 0 ? (files[existingIdx].userId || userId) : userId,
         sizeBytes:       fileSize,
@@ -815,7 +835,7 @@
         files[existingIdx] = fileRecord;
         updated++;
       } else {
-        nameIndex.set(fileName, files.length);
+        nameIndex.set(sourcePath, files.length);
         files.push(fileRecord);
         added++;
       }
@@ -983,6 +1003,8 @@
     _trashStore = [];
     _persistedReportHashes.clear();
     _pendingSyncIds.clear();
+    _syncProgressIds.clear();
+    _syncIssues.clear();
     try {
       localStorage.removeItem(STORE_KEY);
       localStorage.removeItem(TRASH_KEY);
@@ -2475,7 +2497,7 @@
     refreshFromCloud: async function() {
       // An archive refresh during a bulk save causes redundant full writes and
       // may replace records with a response captured before their save finished.
-      if (_bulkBusy || _reportSyncChains.size > 0) return getAll();
+      if (window.FrpImportActive || _bulkBusy || _reportSyncChains.size > 0) return getAll();
       const refreshSequence = ++_refreshSequence;
       const sessionIdentity = _sessionIdentity();
       if (sessionIdentity === 'anonymous') return [];
@@ -2488,7 +2510,7 @@
         typeof window.FrpCloud.loadSnippets === 'function' ? window.FrpCloud.loadSnippets() : Promise.resolve(null),
         typeof window.FrpCloud.loadSettings === 'function' ? window.FrpCloud.loadSettings() : Promise.resolve(null)
       ]);
-      if (refreshSequence !== _refreshSequence || sessionIdentity !== _sessionIdentity() || _bulkBusy || _reportSyncChains.size > 0) return getAll();
+      if (refreshSequence !== _refreshSequence || sessionIdentity !== _sessionIdentity() || window.FrpImportActive || _bulkBusy || _reportSyncChains.size > 0) return getAll();
 
       if (trashSettled.status === 'fulfilled' && Array.isArray(trashSettled.value)) _writeTrash(trashSettled.value);
       if (categorySettled.status === 'fulfilled' && Array.isArray(categorySettled.value)) localStorage.setItem(CATEGORIES_KEY, JSON.stringify(categorySettled.value));
