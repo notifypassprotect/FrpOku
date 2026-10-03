@@ -148,6 +148,7 @@ async function handleFiles(fileList) {
   const files = Array.from(fileList || []);
   if (!files.length) return;
   importInProgress = true;
+  window.FrpImportActive = true;
   const panel = document.createElement('section');
   panel.className = 'fr-import-progress';
   panel.setAttribute('aria-label', 'Rapor yükleme durumu');
@@ -201,6 +202,7 @@ async function handleFiles(fileList) {
     panel.querySelector('[data-status]').textContent = error.message || 'Dosyalar işlenirken hata oluştu.';
   } finally {
     importInProgress = false;
+    window.FrpImportActive = false;
     stopButton.disabled = false;
     stopButton.textContent = 'Kapat';
     stopButton.onclick = () => panel.remove();
@@ -1637,9 +1639,11 @@ function initListPage() {
   });
 
   // Arama ve Regex
+  let searchTimer;
   searchInput?.addEventListener('input', (e) => {
     searchQuery = e.target.value;
-    applySearch();
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(applySearch, 180);
   });
 
   regexBtn?.addEventListener('click', () => {

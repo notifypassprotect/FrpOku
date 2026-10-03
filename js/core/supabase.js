@@ -230,6 +230,23 @@
   }
 
   const FrpCloud = {
+    async bulkLifecycle(action, items) {
+      if (USE_SERVER_BRIDGE) {
+        const response = await serverRequest('/api/reports/bulk-lifecycle', {
+          method:'POST', body:JSON.stringify({action,items}), timeout:60000
+        });
+        if (!Array.isArray(response?.results)) throw new Error('Toplu işlem sonucu doğrulanamadı.');
+        return response.results;
+      }
+      const results=[];
+      for(const item of items) {
+        try {
+          const saved=action==='purge' ? await this.purgeReport(item.id) : await this.moveToTrash(item.id);
+          results.push({id:item.id,success:Boolean(saved),version:saved?.version});
+        } catch(error) { results.push({id:item.id,success:false,reason:error.message}); }
+      }
+      return results;
+    },
     getClient,
     getLastLoadStatus: () => ({ ...lastLoadStatus }),
 

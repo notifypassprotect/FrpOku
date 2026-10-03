@@ -1,6 +1,64 @@
 function registerReportLifecycleRoutes(app, deps) {
   const { apiWriteRateLimiter, canManageReport, getReportRecord, nextReportVersion, readLocalReports, reportId, reportRowToClient, requireAuth, supabase, writeLocalReports } = deps;
 
+  // Bounded batches keep bulk operations below the HTTP write-rate limit.
+  // Only status columns change; large report XML is neither read nor returned.
+  app.post('/api/reports/bulk-lifecycle', apiWriteRateLimiter, requireAuth, async (req, res) => {
+    const { action, items } = req.body || {};
+    const { REPORT_ID_REGEX } = require('../../lib/report_access');
+    if (!['trash','purge'].includes(action) || !Array.isArray(items) || !items.length || items.length > 50 ||
+        items.some(item => !item || typeof item.id !== 'string' || !REPORT_ID_REGEX.test(item.id)) ||
+        new Set(items.map(item=>item.id)).size !== items.length) {
+      return res.status(400).json({success:false, reason:'Geçerli en fazla 50 rapor seçin.'});
+    }
+    const results = [];
+    try {
+      let records;
+      if (supabase) {
+        const response = await supabase.from('reports').select('id,user_id,version,is_deleted').in('id',items.map(item=>item.id));
+        if (response.error) throw response.error;
+        records = response.data || [];
+      } else records = readLocalReports();
+      const byId = new Map(records.map(record=>[reportId(record),record]));
+      const groups = new Map();
+      const now = new Date().toISOString();
+      for (const item of items) {
+        const record = byId.get(item.id);
+        if (!record) { results.push({id:item.id,success:true}); continue; }
+        if (!canManageReport(req.authUser,record)) { results.push({id:item.id,success:false,reason:'Bu raporu silme yetkiniz yok.'}); continue; }
+        const version = Math.max(1,Number(record.version ?? record.data?.version)||1);
+        if (action==='trash' && Number(item.version)!==version) { results.push({id:item.id,success:false,reason:'Rapor başka bir oturumda güncellendi.'}); continue; }
+        const key = record.version == null ? 'null' : String(record.version);
+        if (!groups.has(key)) groups.set(key,{version,dbVersion:record.version,ids:[]});
+        groups.get(key).ids.push(item.id);
+      }
+      const removed = new Set();
+      for (const group of groups.values()) {
+        try {
+          let savedIds = group.ids;
+          if (supabase) {
+            let query = action==='purge' ? supabase.from('reports').delete() : supabase.from('reports').update({is_deleted:true,deleted_at:now,updated_at:now,version:group.version+1});
+            query = query.in('id',group.ids);
+            query = group.dbVersion == null ? query.is('version',null) : query.eq('version',group.dbVersion);
+            if (req.authUser.role!=='admin') query=query.eq('user_id',String(req.authUser.id));
+            const response = await query.select('id');
+            if (response.error) throw response.error;
+            savedIds = (response.data||[]).map(row=>String(row.id));
+          }
+          const saved = new Set(savedIds);
+          for(const id of group.ids) {
+            if(!saved.has(id)) { results.push({id,success:false,reason:'Rapor aynı anda değişti; tekrar deneyin.'}); continue; }
+            if(action==='purge') removed.add(id);
+            else if(!supabase) Object.assign(byId.get(id),{isDeleted:true,is_deleted:true,deletedAt:now,deleted_at:now,version:group.version+1});
+            results.push({id,success:true,version:group.version+1});
+          }
+        } catch { group.ids.forEach(id=>results.push({id,success:false,reason:'Sunucu işlemi tamamlayamadı.'})); }
+      }
+      if(!supabase && groups.size) writeLocalReports(records.filter(record=>!removed.has(reportId(record))));
+      res.json({success:true,results});
+    } catch { res.status(503).json({success:false,reason:'Toplu işlem doğrulanamadı. Listeyi yenileyerek kontrol edin.'}); }
+  });
+
   app.delete('/api/reports', apiWriteRateLimiter, requireAuth, async (req, res) => {
     try {
       if (supabase) {

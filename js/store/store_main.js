@@ -23,6 +23,8 @@
   let dbPromise = null;
   let _memoryStore = null;
   let _trashStore = [];
+  let _lastFilesWrite = Promise.resolve();
+  let _lastTrashWrite = Promise.resolve();
 
   // ── 1. IndexedDB Kalıcılık Katmanı ──────────────────────────
   function initDB() {
@@ -322,7 +324,7 @@
 
   function _persistLocal(files) {
     _memoryStore = files;
-    syncToIndexedDB(files);
+    _lastFilesWrite = syncToIndexedDB(files);
     _cacheSmallArchive(files);
     return true;
   }
@@ -600,22 +602,26 @@
   }, 1200);
 
   // ── 4. Rapor CRUD Metotları ──────────────────────────────────
+  const _barcodeChecks = new WeakMap();
   function getAll() {
     const list = _reportsVisibleToSession(_read());
     if (window.FrpTags && typeof window.FrpTags.isBarcodeReport === 'function') {
       list.forEach(file => {
         if (Array.isArray(file.tags) && file.tags.includes('Barkod')) {
-          if (!window.FrpTags.isBarcodeReport(file, file.name)) {
+          const old = _barcodeChecks.get(file);
+          const signature = [file.rawXml, file.pages, file.name, file.meta?.reportName, file.version, file.loadedAt];
+          const same = old && signature.every((value,index)=>value===old.signature[index]);
+          const isBarcode = same ? old.value : window.FrpTags.isBarcodeReport(file, file.name);
+          if (!same) _barcodeChecks.set(file, {signature,value:isBarcode});
+          if (!isBarcode) {
             file.tags = file.tags.filter(t => t !== 'Barkod');
           }
         }
       });
     }
-    return [...list].sort((a, b) => {
-      if (a.isFavorite && !b.isFavorite) return -1;
-      if (!a.isFavorite && b.isFavorite) return 1;
-      return new Date(b.loadedAt || 0) - new Date(a.loadedAt || 0);
-    });
+    return list.map(report=>({report,time:Date.parse(report.loadedAt || '') || 0}))
+      .sort((a,b)=>Number(Boolean(b.report.isFavorite))-Number(Boolean(a.report.isFavorite)) || b.time-a.time)
+      .map(entry=>entry.report);
   }
 
   function getById(id) {
@@ -869,30 +875,106 @@
     _audit('REPORT_CLEAR_ALL', 'Tüm Raporlar', 'Tüm aktif raporlar temizlendi.');
   }
 
-  async function resetAllUserData() {
-    if (window.FrpAuth?.getUser()?.role !== 'admin') throw new Error('Bu işlem yalnızca yöneticiye açıktır.');
-    const files = _read();
-    const owned = _reportsOwnedBySession(files);
-    if (window.FrpCloud) {
-      if (typeof window.FrpCloud.purgeManyReports === 'function' && owned.length > 0) {
-        await window.FrpCloud.purgeManyReports(owned.map(r => r.id)).catch(() => {});
-      }
-      if (typeof window.FrpCloud.emptyTrash === 'function') {
-        await window.FrpCloud.emptyTrash().catch(() => {});
-      }
-    }
-    _write([], { syncCloud: false });
-    _writeTrash([]);
-    syncToIndexedDB([]);
-    syncTrashToIndexedDB([]);
+  let _bulkBusy = false;
+  async function _bulkOperation(title, items, perform, commit, onProgress, batchAction) {
+    if (_bulkBusy) throw new Error('Devam eden toplu işlemin bitmesini bekleyin.');
+    if (window.FrpImportActive) throw new Error('Dosyalar işleniyor; yüklemenin tamamlanmasını bekleyin.');
+    _bulkBusy = true;
+    const identity = _sessionIdentity();
+    let view;
+    const state = { completed:0, succeeded:0, failed:0, total:items.length, phase:'İşlem hazırlanıyor…' };
+    const results = [], failures = [];
+    const update = () => { view?.update(state); if (onProgress) onProgress({ ...state }); };
+    const assertSession = () => { if (identity !== _sessionIdentity()) throw new Error('Oturum değişti; işlem durduruldu.'); };
     try {
-      localStorage.removeItem(CATEGORIES_KEY);
-      localStorage.removeItem(CUSTOM_TAGS_KEY);
-      localStorage.removeItem(SNIPPET_KEY);
-      localStorage.removeItem(RECENT_KEY);
-      localStorage.removeItem(PENDING_SYNC_KEY);
-    } catch (e) {}
-    _audit('DATA_RESET', 'Tüm Veritabanı', 'Kullanıcı onayı ile tüm raporlar, çöp kutusu ve ayarlar sıfırlandı.');
+      view = window.FrpBulkProgress?.create(title, items.length);
+      update();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      let cursor = 0;
+      if (batchAction && typeof window.FrpCloud?.bulkLifecycle === 'function') {
+        while (cursor < items.length) {
+          const batch=items.slice(cursor,cursor+50);cursor+=batch.length;
+          let reply;
+          try {
+            state.phase='Bekleyen kayıtlar tamamlanıyor…';update();
+            await Promise.all(batch.map(item=>_reportSyncChains.get(String(item.id))||Promise.resolve()));
+            assertSession();
+            state.phase='Raporlar sunucuda işleniyor…';update();
+            const current=new Map(_read().map(report=>[String(report.id),report]));
+            reply=await window.FrpCloud.bulkLifecycle(batchAction,batch.map(item=>({id:String(item.id),version:(current.get(String(item.id))||item).version})));
+          } catch(error) { reply=batch.map(item=>({id:String(item.id),success:false,reason:error.message})); }
+          const byId=new Map(reply.map(result=>[String(result.id),result]));
+          for(const item of batch) {
+            const saved=byId.get(String(item.id));
+            if(saved?.success) { results.push({item,saved});state.succeeded++; }
+            else { failures.push({item,error:new Error(saved?.reason||'Sunucu sonucu doğrulanamadı.')});state.failed++; }
+            state.completed++;
+          }
+          update();await new Promise(resolve=>setTimeout(resolve,0));
+        }
+      } else {
+      await Promise.all(Array.from({ length:Math.min(4, items.length) }, async () => {
+        while (cursor < items.length) {
+          const item = items[cursor++];
+          try {
+            assertSession();
+            state.phase = 'Bekleyen kayıtlar tamamlanıyor…';
+            await (_reportSyncChains.get(String(item.id)) || Promise.resolve());
+            assertSession();
+            state.phase = 'Raporlar işleniyor…';
+            const saved = await perform(item);
+            if (!saved) throw new Error('Sunucu işlemi doğrulamadı.');
+            results.push({item, saved}); state.succeeded++;
+          } catch (error) { failures.push({item, error}); state.failed++; }
+          state.completed++;
+          update();
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+      }));
+      }
+      assertSession();
+      state.phase = 'Liste ve yerel kayıtlar güncelleniyor…'; update();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      await commit(results, failures, phase => { assertSession(); state.phase=phase; update(); });
+      await Promise.all([_lastFilesWrite, _lastTrashWrite]);
+      if (failures.length) throw new Error(`${results.length} rapor işlendi, ${failures.length} rapor işlenemedi. Başarısız raporlar korundu. ${failures[0].error.message || ''}`);
+      view?.finish(`${results.length} rapor işlendi.`, false);
+      return true;
+    } catch (error) { view?.finish(error.message || 'İşlem başarısız.', true); throw error; }
+    finally { _bulkBusy = false; }
+  }
+
+  function _forgetRemoved(ids) {
+    ids.forEach(id => { _pendingSyncIds.delete(String(id)); _syncIssues.delete(String(id)); _persistedReportHashes.delete(String(id)); });
+    _savePendingSyncIds();
+  }
+
+  async function resetAllUserData({ onProgress } = {}) {
+    if (window.FrpAuth?.getUser()?.role !== 'admin') throw new Error('Bu işlem yalnızca yöneticiye açıktır.');
+    const owned = _reportsOwnedBySession(_read());
+    return _bulkOperation('Fabrika ayarlarına dönülüyor', owned, async report => {
+      if (!window.FrpCloud) return true;
+      if (typeof window.FrpCloud.purgeReport !== 'function') throw new Error('Sunucu silme bağlantısı kullanılamıyor.');
+      return window.FrpCloud.purgeReport(report.id);
+    }, async (results, failures, phase) => {
+      const removed = new Set(results.map(r => String(r.item.id)));
+      _forgetRemoved(removed);
+      _write(_read().filter(r => !removed.has(String(r.id))), { syncCloud:false });
+      if (failures.length) return;
+      phase('Çöp kutusu temizleniyor…');
+      if (window.FrpCloud) {
+        if (typeof window.FrpCloud.emptyTrash !== 'function') throw new Error('Çöp kutusu bağlantısı kullanılamıyor.');
+        const ok = await window.FrpCloud.emptyTrash();
+        if (!ok) throw new Error('Çöp kutusu temizlenemedi. İşlem tamamlanmadı.');
+      }
+      phase('Yerel kayıtlar temizleniyor…');
+      _writeTrash([]);
+      await Promise.all([syncToIndexedDB(_read()), syncTrashToIndexedDB([])]);
+      try {
+        [CATEGORIES_KEY,CUSTOM_TAGS_KEY,SNIPPET_KEY,RECENT_KEY].forEach(key => localStorage.removeItem(key));
+      } catch {}
+      _audit('DATA_RESET', 'Tüm Veritabanı', 'Raporlar ve çöp kutusu sıfırlandı.');
+    }, onProgress, 'purge');
   }
 
   async function clearSessionCache() {
@@ -932,11 +1014,12 @@
   function _writeTrash(items) {
     _trashStore = Array.isArray(items) ? items : [];
     try {
-      localStorage.setItem(TRASH_KEY, JSON.stringify(_trashStore));
+      if (_trashStore.length > 100 || _trashStore.reduce((n,r)=>n+(r.rawXml?.length||0),0)>500000) localStorage.removeItem(TRASH_KEY);
+      else localStorage.setItem(TRASH_KEY, JSON.stringify(_trashStore));
     } catch (e) {
       console.warn('Trash localStorage write error:', e);
     }
-    syncTrashToIndexedDB(_trashStore);
+    _lastTrashWrite = syncTrashToIndexedDB(_trashStore);
   }
 
   function getTrash() {
@@ -999,50 +1082,26 @@
     return true;
   }
 
-  async function moveManyToTrash(ids) {
-    const idSet = new Set((ids || []).map(i => String(i)));
-    (ids || []).forEach(i => {
-      try { idSet.add(decodeURIComponent(String(i))); } catch {}
-    });
-
-    const files = _read();
-    const originalFiles = [...files];
-    const originalTrash = [..._readTrash()];
-
-    const toTrash = files.filter(f => idSet.has(String(f.id))).map(f => ({ ...f }));
-    if (toTrash.length === 0) return false;
-    if (toTrash.some(f => !canManagePoolReport(f))) throw new Error('Yalnızca kendi raporlarınızı silebilirsiniz.');
-    const remaining = files.filter(f => !idSet.has(String(f.id)));
-
-    const now = new Date().toISOString();
-    let trash = [...originalTrash];
-    toTrash.forEach(f => {
-      f.deletedAt = now;
-      f.isDeleted = true;
-      f.is_deleted = true;
-      trash = trash.filter(t => t.id !== f.id);
-      trash.unshift(f);
-    });
-
-    _write(remaining, { syncCloud: false });
-    _writeTrash(trash);
-
-    _audit('TRASH_BULK_MOVE', `${toTrash.length} Rapor`, 'Seçili raporlar çöp kutusuna taşındı.');
-
-    if (window.FrpCloud && typeof window.FrpCloud.moveToTrash === 'function') {
-      try {
-        const savedReports = await Promise.all(toTrash.map(report => window.FrpCloud.moveToTrash(report.id, report)));
-        if (!savedReports || savedReports.some(s => !s)) throw new Error('Sunucu toplu çöp kutusuna taşıma işlemini reddetti.');
-        savedReports.forEach((saved, index) => { if (saved?.version) toTrash[index].version = saved.version; });
-        _writeTrash(trash);
-      } catch (err) {
-        _write(originalFiles, { syncCloud: false });
-        _writeTrash(originalTrash);
-        _notifySyncIssue('Seçili raporlar çöp kutusuna taşınamadı: Sunucu hatası oluştu.');
-        throw err;
-      }
-    }
-    return true;
+  async function moveManyToTrash(ids, { onProgress } = {}) {
+    const idSet = new Set((ids || []).map(String));
+    (ids || []).forEach(id => { try { idSet.add(decodeURIComponent(String(id))); } catch {} });
+    const reports = _read().filter(r => idSet.has(String(r.id)));
+    if (!reports.length) return false;
+    if (reports.some(r => !canManagePoolReport(r))) throw new Error('Yalnızca kendi raporlarınızı silebilirsiniz.');
+    return _bulkOperation('Seçilen raporlar siliniyor', reports, async report => {
+      if (!window.FrpCloud) return true;
+      if (typeof window.FrpCloud.moveToTrash !== 'function') throw new Error('Sunucu silme bağlantısı kullanılamıyor.');
+      const latest = _read().find(r => String(r.id) === String(report.id)) || report;
+      return window.FrpCloud.moveToTrash(report.id, latest);
+    }, async results => {
+      const removed = new Set(results.map(r => String(r.item.id)));
+      const now = new Date().toISOString();
+      const moved = results.map(({item,saved}) => ({...item, deletedAt:now, isDeleted:true, is_deleted:true, version:saved?.version || item.version}));
+      _forgetRemoved(removed);
+      _write(_read().filter(r => !removed.has(String(r.id))), { syncCloud:false });
+      _writeTrash([...moved, ..._readTrash().filter(r => !removed.has(String(r.id)))]);
+      _audit('TRASH_BULK_MOVE', `${results.length} Rapor`, 'Sunucuda doğrulanan raporlar çöp kutusuna taşındı.');
+    }, onProgress, 'trash');
   }
 
   async function restoreFromTrash(id) {
@@ -2458,7 +2517,7 @@
     refreshFromCloud: async function() {
       // An archive refresh during a bulk save causes redundant full writes and
       // may replace records with a response captured before their save finished.
-      if (_reportSyncChains.size > 0) return getAll();
+      if (_bulkBusy || _reportSyncChains.size > 0) return getAll();
       const refreshSequence = ++_refreshSequence;
       const sessionIdentity = _sessionIdentity();
       if (sessionIdentity === 'anonymous') return [];
@@ -2471,7 +2530,7 @@
         typeof window.FrpCloud.loadSnippets === 'function' ? window.FrpCloud.loadSnippets() : Promise.resolve(null),
         typeof window.FrpCloud.loadSettings === 'function' ? window.FrpCloud.loadSettings() : Promise.resolve(null)
       ]);
-      if (refreshSequence !== _refreshSequence || sessionIdentity !== _sessionIdentity() || _reportSyncChains.size > 0) return getAll();
+      if (refreshSequence !== _refreshSequence || sessionIdentity !== _sessionIdentity() || _bulkBusy || _reportSyncChains.size > 0) return getAll();
 
       if (trashSettled.status === 'fulfilled' && Array.isArray(trashSettled.value)) _writeTrash(trashSettled.value);
       if (categorySettled.status === 'fulfilled' && Array.isArray(categorySettled.value)) localStorage.setItem(CATEGORIES_KEY, JSON.stringify(categorySettled.value));
