@@ -466,6 +466,10 @@ function highlightPascal(raw) {
  * Advanced Syntax Errors Finder / Linter — returns array of error objects
  */
 function findSyntaxErrors(code, lang = 'sql') {
+  if (lang === 'sql' && window.FrpSyntaxCheck?.splitSqlProviderSections) {
+    const sections = window.FrpSyntaxCheck.splitSqlProviderSections(code);
+    if (sections.length > 1) return sections.flatMap(section => findSyntaxErrors(section.code,lang).map(item => ({...item,provider:section.provider})));
+  }
   if (!code || !code.trim()) return [];
   const errors = [];
   const lines = code.split('\n');
@@ -1196,7 +1200,7 @@ function findSyntaxErrors(code, lang = 'sql') {
       continue;
     }
 
-    if (ch === '(' && next === '*') {
+    if (lang === 'pascal' && ch === '(' && next === '*') {
       inParenStarComment = true;
       stripped += '  ';
       i++;
@@ -1216,7 +1220,7 @@ function findSyntaxErrors(code, lang = 'sql') {
       continue;
     }
 
-    if (ch === '<' && /[a-zA-Z_#]/.test(next)) {
+    if (lang === 'pascal' && ch === '<' && /[a-zA-Z_#]/.test(next)) {
       inMacro = true;
       stripped += ' ';
       continue;

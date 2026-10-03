@@ -5,6 +5,18 @@
 (function () {
  'use strict';
 
+ // Keep original line positions while checking alternative provider queries separately.
+ function splitSqlProviderSections(source) {
+   const text = String(source || '');
+   const markers = [...text.matchAll(/^\s*--\s*PROVIDER\s*=\s*(ORACLE|FIREBIRD)[^\r\n]*$/gim)];
+   if (markers.length < 2) return [];
+   return markers.map((marker,index) => {
+     const start = marker.index + marker[0].length;
+     const end = index+1 < markers.length ? markers[index+1].index : text.length;
+     return {provider:marker[1].toUpperCase(),code:text.slice(0,start).replace(/[^\n]/g,' ') + text.slice(start,end)};
+   });
+ }
+
  function checkPascalSyntax(code, reportContext = null) {
  const errors = [], warnings = [];
  if (!code ||!code.trim()) return { errors, warnings };
@@ -296,6 +308,7 @@
  };
 
  const PASCAL_BUILTIN_FUNCS = {
+   DAYSBETWEEN: 'DaysBetween', STRTODATE: 'StrToDate', STRTOTIME: 'StrToTime', STRTODATETIME: 'StrToDateTime',
    SHOWMESSAGE: 'ShowMessage', MESSAGEDLG: 'MessageDlg', TRUNC: 'Trunc', ROUND: 'Round',
    INTTOSTR: 'IntToStr', STRTOINT: 'StrToInt', STRTOINTDEF: 'StrToIntDef', FLOATTOSTR: 'FloatToStr',
    STRTOFLOAT: 'StrToFloat', FORMATDATETIME: 'FormatDateTime', FORMATFLOAT: 'FormatFloat',
@@ -374,6 +387,8 @@
    return dp[m][n];
  }
 
+ for (const match of stripped.matchAll(/\b(?:procedure|function)\s+([a-z_]\w*)/gi)) declaredVars.add(match[1].toUpperCase());
+ for (const match of stripped.matchAll(/\b([a-z_]\w*)\s*=\s*(?:class|record|array|set|\()/gi)) declaredVars.add(match[1].toUpperCase());
  const seenUnknowns = new Set();
  strippedLines.forEach((sLine, lIdx) => {
    const lnum = lIdx + 1;
@@ -426,10 +441,10 @@
        let minMemDist = 999;
        for (const [validK, validLabel] of Object.entries(PASCAL_COMMON_MEMBERS)) {
          const lenDiff = Math.abs(upperPart.length - validK.length);
-         const maxLenDiff = validK.length >= 10 ? 2 : 1;
+         const maxLenDiff = validK.length >= 5 ? 2 : 1;
          if (lenDiff > maxLenDiff) continue;
 
-         const maxDist = validK.length >= 10 ? 2 : 1;
+         const maxDist = validK.length >= 5 ? 2 : 1;
          const d = getLevenshteinDist(upperPart, validK);
          if (d > 0 && d <= maxDist && d < minMemDist) {
            minMemDist = d;
@@ -438,7 +453,7 @@
        }
 
        if (closestMember) {
-         const errKey = `${upperRoot}.${upperPart}`;
+         const errKey = `${lnum}:${upperRoot}.${upperPart}`;
          if (!seenUnknowns.has(errKey)) {
            seenUnknowns.add(errKey);
            errors.push({
@@ -501,12 +516,16 @@
 
      let closestStandalone = '';
      let minStandDist = 999;
-     for (const [validK, validLabel] of Object.entries({ ...PASCAL_COMMON_MEMBERS, ...PASCAL_KEYWORDS, ...PASCAL_BUILTIN_FUNCS })) {
+     const typePosition = /:\s*$/.test(beforeStr) && !/:=/.test(beforeStr);
+     const callPosition = /^\s*\(/.test(sLine.slice(afterIdx));
+     const candidates = typePosition ? Object.fromEntries([...PASCAL_TYPES_AND_CONSTS].map(type => [type,type])) :
+       callPosition ? PASCAL_BUILTIN_FUNCS : {...PASCAL_KEYWORDS,...PASCAL_BUILTIN_FUNCS};
+     for (const [validK, validLabel] of Object.entries(candidates)) {
        const lenDiff = Math.abs(upperToken.length - validK.length);
-       const maxLenDiff = validK.length >= 10 ? 2 : 1;
+       const maxLenDiff = validK.length >= 5 ? 2 : 1;
        if (lenDiff > maxLenDiff) continue;
 
-       const maxDist = validK.length >= 10 ? 2 : 1;
+       const maxDist = validK.length >= 5 ? 2 : 1;
        const d = getLevenshteinDist(upperToken, validK);
        if (d > 0 && d <= maxDist && d < minStandDist) {
          minStandDist = d;
@@ -514,8 +533,8 @@
        }
      }
 
-     if (closestStandalone && !seenUnknowns.has(upperToken)) {
-       seenUnknowns.add(upperToken);
+     if (closestStandalone && !seenUnknowns.has(`${lnum}:${upperToken}`)) {
+       seenUnknowns.add(`${lnum}:${upperToken}`);
        errors.push({
          text: `Satır ${lnum}: Hatalı Pascal sözdizimi '${token}' ➔ (Muhtemel yazım hatası, doğrusu: '${closestStandalone}')`,
          line: lnum,
@@ -524,6 +543,57 @@
        });
      }
    }
+ });
+
+
+ // Validate FastReport references before the ordinary Pascal scanner masks them.
+ const visibleCode = code.replace(/\/\/[^\n]*|\{[\s\S]*?\}|\(\*[\s\S]*?\*\)|'(?:''|[^'])*'/g, value => value.replace(/[^\n]/g,' '));
+ const referenceNames = new Map();
+ const addReference = value => {
+   const name=String(value?.name || value || '').replace(/^:/,'').trim();
+   if (/^[a-z_]\w*$/i.test(name)) referenceNames.set(name.toUpperCase(),name);
+ };
+ const context = reportContext || window.currentFile || {};
+ (context.paramNames || []).forEach(addReference);
+ (context.variableCategories || []).forEach(category => (category.variables || []).forEach(addReference));
+ const frequencies = new Map();
+ for (const match of visibleCode.matchAll(/<([a-z_]\w*)>/gi)) {
+   const key=match[1].toUpperCase();const old=frequencies.get(key);
+   frequencies.set(key,{name:match[1],count:(old?.count || 0)+1});
+ }
+ frequencies.forEach(value => {
+   if (value.count < 2) return;
+   const key=value.name.toUpperCase();
+   if (referenceNames.has(key) || ![...referenceNames.keys()].some(real => getLevenshteinDist(key,real)<=2)) addReference(value.name);
+ });
+ const addIssue = (line,col,token,message,suggestion) => {
+   if (!errors.some(error => error.line === line && error.token === token && error.text.includes(message)))
+     errors.push({line,col,token,text:`Satır ${line}: ${message}`,suggestion});
+ };
+ visibleCode.split('\n').forEach((line,index) => {
+   const lineNo=index+1;
+   for(const match of line.matchAll(/<([a-z_]\w*(?:\."[^"\n]+")?)(>?)/gi)) {
+     const prefix=line.slice(0,match.index).trimEnd();
+     // a<b and a<>b are comparison operators, not report references.
+     if (/[\w)\]]$/.test(prefix) && !/\b(?:if|then|while|until|and|or|not)\s*$/i.test(prefix)) continue;
+     if (!match[2]) addIssue(lineNo,match.index+1,match[1],`'<${match[1]}' rapor ifadesinde kapanış '>' eksik.`,"Rapor ifadesini '>' ile kapatın.");
+     if (match[1].includes('.')) continue;
+     const name=match[1], upper=name.toUpperCase();
+     if (!referenceNames.has(upper)) {
+       let closest='',distance=3;
+       referenceNames.forEach((label,key) => { const d=getLevenshteinDist(upper,key);if(d<distance && d<=2) {distance=d;closest=label;} });
+       if(closest) addIssue(lineNo,match.index+2,name,`Rapor parametresi '${name}' için olası yazım hatası; '${closest}' bekleniyor.`,`<${closest}> kullanın.`);
+     }
+   }
+   for(const match of line.matchAll(/\b([a-z_]\w*(?:\."[^"\n]+")?)\s*>/gi)) {
+     if(line[match.index-1] === '<') continue;
+     if (match[1].includes('."') || (referenceNames.has(match[1].toUpperCase()) && !declaredVars.has(match[1].toUpperCase())))
+       addIssue(lineNo,match.index+1,match[1],`'${match[1]}>' rapor ifadesinde açılış '<' eksik.`,"İfadenin başına '<' ekleyin.");
+   }
+   const raw=rawLines[index];
+   if (/^\s*if\s+<[a-z_]\w*>\s*[<>]\s*''/i.test(raw) && /^\s*if\b/i.test(line)) warnings.push({line:lineNo,text:`Satır ${lineNo}: Boş metinle '<' veya '>' karşılaştırması var. Amaç boş olmama kontrolüyse '<>' kullanın.`});
+   if (/^\s*[a-z_]\w*(?:\.[a-z_]\w*|\[[^\]]+\])*\s*:(?!=)\s*(?:<|['"\d(])/i.test(raw) && /^\s*[a-z_]/i.test(line))
+     addIssue(lineNo,Math.max(1,raw.indexOf(':')+1),':',"Atama operatöründe '=' eksik; ':' yerine ':=' kullanılmalı.","':' işaretini ':=' yapın.");
  });
 
  // FastReport olay betikleri ve prosedürler 'end;' ile bitebilir.
@@ -607,6 +677,15 @@
  const errors = [], warnings = [], securityRisks = [];
  if (!sql ||!sql.trim()) return { errors, warnings, securityRisks };
 
+ const sections = splitSqlProviderSections(sql);
+ if (sections.length > 1) {
+   sections.forEach(section => {
+     const result = checkSqlStaticSyntax(section.code);
+     errors.push(...result.errors); warnings.push(...result.warnings);
+     securityRisks.push(...result.securityRisks.map(item => ({...item,provider:section.provider})));
+   });
+   return {errors,warnings,securityRisks};
+ }
  const upper = sql.toUpperCase()
 .replace(/--[^\n]*/g, '')
 .replace(/\/\*[\s\S]*?\*\//g, '')
@@ -1289,6 +1368,7 @@
  window.FrpSyntaxCheck = {
  checkPascalSyntax,
  checkSqlStaticSyntax,
- validateFrpFileContent
+ validateFrpFileContent,
+ splitSqlProviderSections
  };
 })();
