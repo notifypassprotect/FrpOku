@@ -17,6 +17,7 @@ let selectedUser     = '';
 let onlyFavorites    = false;
 let onlyPinned       = false;
 let onlyNotes        = false;
+let onlyErrors       = false;
 let isRegexMode      = false;
 let isStoreLoaded    = false;
 let currentPage      = 1;
@@ -32,6 +33,7 @@ const tagSelect          = document.getElementById('tagSelect');
 const catSelect          = document.getElementById('catSelect');
 const userSelect         = document.getElementById('userSelect');
 const btnFavOnly         = document.getElementById('btnFavOnly');
+const btnErrorsOnly      = document.getElementById('btnErrorsOnly');
 const bulkBar            = document.getElementById('bulkBar');
 const resultCount        = document.getElementById('resultCount');
 const btnThemeToggle     = document.getElementById('btnThemeToggle');
@@ -317,7 +319,7 @@ function applySearch(opts = {}) {
   }
   const btnReset = document.getElementById('btnResetFilters');
   if (btnReset) {
-    const hasFilter = !!searchQuery || !!selectedTag || !!selectedCategory || !!selectedUser || onlyFavorites || onlyPinned || onlyNotes;
+    const hasFilter = !!searchQuery || !!selectedTag || !!selectedCategory || !!selectedUser || onlyFavorites || onlyPinned || onlyNotes || onlyErrors;
     btnReset.style.display = hasFilter ? 'inline-flex' : 'none';
   }
 
@@ -343,11 +345,35 @@ function applySearch(opts = {}) {
       ? (FrpStore.getOwnReports ? FrpStore.getOwnReports() : [])
       : (FrpStore.getMyReports ? FrpStore.getMyReports() : FrpStore.getAll());
 
+  // Hatalı rapor sayısı rozetini güncelle
+  const badgeErrors = document.getElementById('badgeErrorsCount');
+  if (badgeErrors) {
+    let errCount = 0;
+    for (const f of baseList) {
+      const diag = window.FrpListRenderers?.getReportSyntaxDiagnostic
+        ? window.FrpListRenderers.getReportSyntaxDiagnostic(f)
+        : null;
+      if (diag?.hasError) errCount++;
+    }
+    if (errCount > 0) {
+      badgeErrors.textContent = errCount;
+      badgeErrors.style.display = 'inline-flex';
+    } else {
+      badgeErrors.style.display = 'none';
+    }
+  }
+
   allFiles = baseList.filter(file => {
     if (onlyFavorites && !file.isFavorite) return false;
     if (selectedTag && !(file.tags || []).includes(selectedTag)) return false;
     if (onlyPinned && !file.isPinned) return false;
     if (onlyNotes && !(file.userNote && file.userNote.trim())) return false;
+    if (onlyErrors) {
+      const diag = window.FrpListRenderers?.getReportSyntaxDiagnostic
+        ? window.FrpListRenderers.getReportSyntaxDiagnostic(file)
+        : null;
+      if (!diag?.hasError) return false;
+    }
     if (selectedCategory && file.category !== selectedCategory) return false;
     if (curWs === 'pool' && selectedUser) {
       const oName = (file.ownerName || file.owner_name || file.ownerUsername || file.owner_username || (file.userId === 'usr_admin_root' ? 'Admin' : 'Bilinmeyen Kullanıcı')).trim();
@@ -628,8 +654,8 @@ function renderTable() {
     tableBody.innerHTML = `
       <tr><td colspan="10">
         <div class="empty-state">
-          <div class="empty-title">${searchQuery || selectedTag || onlyFavorites || onlyPinned || onlyNotes ? 'Sonuç bulunamadı' : 'Henüz rapor yüklenmedi'}</div>
-          <div class="empty-sub">${searchQuery || selectedTag || onlyFavorites || onlyPinned || onlyNotes ? 'Arama veya filtre kriterlerini değiştirin.' : 'Rapor eklemek için yukarıdaki butonları kullanın.'}</div>
+          <div class="empty-title">${searchQuery || selectedTag || onlyFavorites || onlyPinned || onlyNotes || onlyErrors ? 'Sonuç bulunamadı' : 'Henüz rapor yüklenmedi'}</div>
+          <div class="empty-sub">${searchQuery || selectedTag || onlyFavorites || onlyPinned || onlyNotes || onlyErrors ? 'Arama veya filtre kriterlerini değiştirin.' : 'Rapor eklemek için yukarıdaki butonları kullanın.'}</div>
         </div>
       </td></tr>`;
     return;
@@ -1746,6 +1772,12 @@ function initListPage() {
     applySearch();
   });
 
+  document.getElementById('btnErrorsOnly')?.addEventListener('click', () => {
+    onlyErrors = !onlyErrors;
+    document.getElementById('btnErrorsOnly')?.classList.toggle('active', onlyErrors);
+    applySearch();
+  });
+
   document.getElementById('btnResetFilters')?.addEventListener('click', () => {
     searchQuery = '';
     if (searchInput) searchInput.value = '';
@@ -1761,6 +1793,8 @@ function initListPage() {
     document.getElementById('btnPinnedOnly')?.classList.remove('active');
     onlyNotes = false;
     document.getElementById('btnNotesOnly')?.classList.remove('active');
+    onlyErrors = false;
+    document.getElementById('btnErrorsOnly')?.classList.remove('active');
     isRegexMode = false;
     regexBtn?.classList.remove('active');
     if (regexErrMsg) regexErrMsg.style.display = 'none';
@@ -1803,7 +1837,7 @@ function initListPage() {
         const id = existing?.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const filters = { workspace: FrpStore.getActiveWorkspace?.() || 'personal', query: searchQuery,
           field: searchField, tag: selectedTag, category: selectedCategory, user: selectedUser,
-          favorites: onlyFavorites, pinned: onlyPinned, notes: onlyNotes, regex: isRegexMode,
+          favorites: onlyFavorites, pinned: onlyPinned, notes: onlyNotes, errors: onlyErrors, regex: isRegexMode,
           mode: currentViewMode, sortField, sortDir };
         const save = () => {
           const updated = [...views.filter(view => view.id !== id), { id, name, filters }];
@@ -1848,6 +1882,7 @@ function initListPage() {
     onlyFavorites = !!f.favorites; btnFavOnly?.classList.toggle('active', onlyFavorites);
     onlyPinned = !!f.pinned; document.getElementById('btnPinnedOnly')?.classList.toggle('active', onlyPinned);
     onlyNotes = !!f.notes; document.getElementById('btnNotesOnly')?.classList.toggle('active', onlyNotes);
+    onlyErrors = !!f.errors; document.getElementById('btnErrorsOnly')?.classList.toggle('active', onlyErrors);
     isRegexMode = !!f.regex; regexBtn?.classList.toggle('active', isRegexMode);
     currentViewMode = ['table', 'cards', 'timeline'].includes(f.mode) ? f.mode : currentViewMode;
     sortField = String(f.sortField || 'loadedAt'); sortDir = f.sortDir === 'asc' ? 'asc' : 'desc';
@@ -1875,7 +1910,7 @@ function initListPage() {
     if (event.target !== savedViewSelect) clearSavedViewSelection();
   });
   document.querySelector('.toolbar-left')?.addEventListener('click', event => {
-    if (!event.target.closest('#btnFavOnly, #btnPinnedOnly, #btnNotesOnly, #regexBtn, #btnResetFilters')) return;
+    if (!event.target.closest('#btnFavOnly, #btnPinnedOnly, #btnNotesOnly, #btnErrorsOnly, #regexBtn, #btnResetFilters')) return;
     clearSavedViewSelection();
   });
   document.querySelectorAll('#tabWsPersonal, #tabWsMine, #tabWsPool, #btnViewTable, #btnViewCards, #btnViewTimeline')

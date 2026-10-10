@@ -86,6 +86,7 @@
  // Filtreler
  { id: 'filter_favs', label: 'Sadece Favoriler', desc: 'Favori filtresi aç/kapat', available: () => Boolean(document.getElementById('btnFavOnly')), action: () => { document.getElementById('btnFavOnly')?.click(); } },
  { id: 'filter_pinned', label: 'Sadece Sabitlenmiş', desc: 'Pin filtresi aç/kapat', available: () => Boolean(document.getElementById('btnPinnedOnly')), action: () => { document.getElementById('btnPinnedOnly')?.click(); } },
+ { id: 'filter_errors', label: 'Hatalı Raporlar', desc: 'Sözdizimi hatalı raporları filtrele', available: () => Boolean(document.getElementById('btnErrorsOnly')), action: () => { document.getElementById('btnErrorsOnly')?.click(); } },
  { id: 'filter_clear', label: 'Filtreyi Temizle', desc: 'Aramayı sıfırla', available: () => Boolean(document.getElementById('searchInput')), action: () => {
  const si = document.getElementById('searchInput');
  if (si) { si.value = ''; si.dispatchEvent(new Event('input')); si.focus(); }

@@ -102,3 +102,22 @@ end;`
   ctx.window.FrpListRenderers.renderTimeline([badSqlReport], container);
   assert.ok(container.innerHTML.includes('report-syntax-error-badge'), 'Timeline view must render red badge for error report');
 });
+
+test('index.html, ui_polish.css and list.js provide Hatalılar filter chip for syntax errors', () => {
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  assert.match(html, /id="btnErrorsOnly"/, 'index.html must define btnErrorsOnly filter button');
+  assert.match(html, />Hatalılar</, 'index.html must display Hatalılar label');
+
+  const css = fs.readFileSync(path.join(root, 'css/ui_polish.css'), 'utf8');
+  assert.match(css, /\.filter-chip#btnErrorsOnly/, 'ui_polish.css must style btnErrorsOnly');
+  assert.match(css, /\.filter-chip#btnErrorsOnly\.active/, 'ui_polish.css must style active state of btnErrorsOnly');
+
+  const listCode = fs.readFileSync(path.join(root, 'js/list/list.js'), 'utf8');
+  assert.match(listCode, /btnErrorsOnly/, 'list.js must reference btnErrorsOnly');
+  assert.match(listCode, /onlyErrors/, 'list.js must track onlyErrors state');
+  assert.match(listCode, /getReportSyntaxDiagnostic/, 'list.js must filter based on syntax diagnostic');
+
+  const paletteCode = fs.readFileSync(path.join(root, 'js/core/palette.js'), 'utf8');
+  assert.match(paletteCode, /id:\s*'filter_errors'/, 'palette.js must include filter_errors command');
+});
+
