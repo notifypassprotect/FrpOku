@@ -166,3 +166,29 @@ from cari c`;
   assert.equal(diagErrors.length, 0, 'Highlight diagnostics must not flag missing comma on multiline count(distinct case)');
 });
 
+test('NOT BETWEEN with string literals and SELECT string literal do not produce false positive errors', () => {
+  const ctx = loadSqlAnalyzers();
+  const sql = `SELECT
+  CASE
+    WHEN TO_CHAR(COALESCE(ak.AMELIYAT_BASLAMA_SAATI, c.KTS), 'HH24:MI')
+      NOT BETWEEN '08:00' AND '16:59' THEN 'Mesai Dışı'
+    WHEN TO_CHAR(COALESCE(ak.AMELIYAT_BASLAMA_TARIHI, c.KTS), 'DY') IN ('SAT', 'SUN')
+      THEN 'Mesai Dışı'
+    ELSE 'Mesai İçi'
+  END AS mesai_durumu
+FROM DUAL`;
+
+  const res = ctx.FrpSyntaxCheck.checkSqlStaticSyntax(sql);
+  assert.equal(res.errors.length, 0, 'SyntaxCheck must not flag NOT BETWEEN with string literals');
+  const diagErrors = ctx.findSyntaxErrors(sql, 'sql');
+  assert.equal(diagErrors.length, 0, 'findSyntaxErrors must not flag NOT BETWEEN with string literals');
+
+  const selectLiteral = `SELECT 'Aktif' AS durum FROM tablo`;
+  assert.equal(ctx.FrpSyntaxCheck.checkSqlStaticSyntax(selectLiteral).errors.length, 0);
+  assert.equal(ctx.findSyntaxErrors(selectLiteral, 'sql').length, 0);
+
+  const realError = `SELECT id FROM tablo WHERE x BETWEEN AND y`;
+  assert.ok(ctx.FrpSyntaxCheck.checkSqlStaticSyntax(realError).errors.some(e => e.includes('alt sınır')));
+  assert.ok(ctx.findSyntaxErrors(realError, 'sql').some(e => e.message.includes('alt sınır')));
+});
+

@@ -474,7 +474,7 @@ function findSyntaxErrors(code, lang = 'sql') {
   }
 
   function cleanCodeLine(value, sqlMode) {
-    let result = String(value || '').replace(/'(?:''|[^'\r\n])*'/g, match => ' '.repeat(match.length));
+    let result = String(value || '').replace(/'(?:''|[^'\r\n])*'/g, match => "'" + ' '.repeat(Math.max(0, match.length - 2)) + (match.length > 1 ? "'" : ''));
     result = result.replace(sqlMode ? /--[^\r\n]*/g : /\/\/[^\r\n]*/g, match => ' '.repeat(match.length));
     return result.replace(/\{[^\r\n]*\}/g, match => ' '.repeat(match.length));
   }
@@ -494,9 +494,11 @@ function findSyntaxErrors(code, lang = 'sql') {
     let wm;
     while ((wm = wordRx.exec(cleanLineText)) !== null) {
       const w = wm[0];
-      // Pascal's semantic checker knows query/component names and declarations.
-      // Do not run the context-free keyword-distance scanner a second time.
-      if (lang === 'pascal') break;
+      // Pascal nesne ve bileşen adları (örn: qCase., Query1.) anahtar kelime sayılmaz.
+      if (lang === 'pascal') {
+        const afterChar = cleanLineText[wm.index + w.length] || '';
+        if (afterChar === '.') continue;
+      }
       const match = findFuzzyTypoMatch(w, lang);
       if (match) {
         if (!errors.some(e => e.line === lineNum && e.token.toUpperCase() === w.toUpperCase())) {

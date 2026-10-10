@@ -519,7 +519,7 @@
      const typePosition = /:\s*$/.test(beforeStr) && !/:=/.test(beforeStr);
      const callPosition = /^\s*\(/.test(sLine.slice(afterIdx));
      const candidates = typePosition ? Object.fromEntries([...PASCAL_TYPES_AND_CONSTS].map(type => [type,type])) :
-       callPosition ? PASCAL_BUILTIN_FUNCS : {...PASCAL_KEYWORDS,...PASCAL_BUILTIN_FUNCS};
+       callPosition ? { ...PASCAL_BUILTIN_FUNCS, ...PASCAL_COMMON_MEMBERS } : { ...PASCAL_KEYWORDS, ...PASCAL_BUILTIN_FUNCS, ...PASCAL_COMMON_MEMBERS };
      for (const [validK, validLabel] of Object.entries(candidates)) {
        const lenDiff = Math.abs(upperToken.length - validK.length);
        const maxLenDiff = validK.length >= 5 ? 2 : 1;
@@ -1129,7 +1129,7 @@
     idx,
     lineNo: idx + 1,
     raw: l,
-    clean: l.replace(/'(?:''|[^'\r\n])*'/g, match => ' '.repeat(match.length))
+    clean: l.replace(/'(?:''|[^'\r\n])*'/g, match => "'" + ' '.repeat(Math.max(0, match.length - 2)) + (match.length > 1 ? "'" : ''))
             .replace(/--[^\r\n]*/g, match => ' '.repeat(match.length))
             .replace(/\{[^\r\n]*\}/g, match => ' '.repeat(match.length))
   }));
