@@ -60,11 +60,17 @@ window.FrpListRenderers.renderTimeline = function(files, container, allMatchingF
             const tooltip = window.FrpListRenderers?.getReportColorTooltip ? window.FrpListRenderers.getReportColorTooltip(file, reportName) : reportName;
             const titleColorStyle = hasRisk ? 'color:#ef4444;' : (isPublic ? 'color:#10b981;' : '');
 
+            const syntaxDiag = window.FrpListRenderers?.getReportSyntaxDiagnostic
+              ? window.FrpListRenderers.getReportSyntaxDiagnostic(file)
+              : { badgeHtml: '' };
+            const syntaxBadge = syntaxDiag.badgeHtml || '';
+
             return `
               <div class="timeline-item" data-list-action="open-detail" data-id="${encodedId}" style="cursor:pointer;">
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;">
                   <div style="display:flex;align-items:center;gap:.4rem;">
                     <button type="button" class="report-title-action" data-list-action="open-detail" data-id="${encodedId}" style="${titleColorStyle}" title="${escHtml(tooltip)}" aria-label="${escHtml(reportName)} raporunu aç">${escHtml(reportName)}</button>
+                    ${syntaxBadge}
                     ${poolBadge}
                     ${riskBadge}
                   </div>

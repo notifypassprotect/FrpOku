@@ -32,13 +32,82 @@ window.FrpListRenderers = window.FrpListRenderers || {};
   }
   window.renderTag = renderTag;
 
+  function getReportSyntaxDiagnostic(file) {
+    if (!file) return { hasError: false, count: 0, details: [], badgeHtml: '' };
+
+    const cacheKey = `${file.id || ''}_${file.updatedAt || file.date || ''}_${file.sizeBytes || file.size || ''}_${file.queries?.length || 0}_${(file.pascalScript || '').length}`;
+    if (file._syntaxDiagCacheKey === cacheKey && file._syntaxDiagResult) {
+      return file._syntaxDiagResult;
+    }
+
+    const errors = [];
+
+    // 1. SQL Sorguları Denetimi
+    if (Array.isArray(file.queries) && file.queries.length > 0) {
+      for (let i = 0; i < file.queries.length; i++) {
+        const q = file.queries[i];
+        const sql = q?.sql;
+        if (!sql || typeof sql !== 'string' || !sql.trim()) continue;
+        const qName = q.name || `Sorgu ${i + 1}`;
+
+        const synErrors = window.FrpSyntaxCheck?.checkSqlStaticSyntax
+          ? (window.FrpSyntaxCheck.checkSqlStaticSyntax(sql).errors || [])
+          : [];
+        const hlErrors = window.findSyntaxErrors
+          ? (window.findSyntaxErrors(sql, 'sql') || [])
+          : [];
+
+        const errList = [...new Set([...synErrors, ...hlErrors.map(e => e.message || e.text)])];
+        if (errList.length > 0) {
+          errors.push(`${qName} (SQL): ${errList[0]}`);
+        }
+      }
+    }
+
+    // 2. PascalScript Kodu Denetimi
+    if (file.pascalScript && typeof file.pascalScript === 'string' && file.pascalScript.trim()) {
+      const pasErrors = window.FrpSyntaxCheck?.checkPascalSyntax
+        ? (window.FrpSyntaxCheck.checkPascalSyntax(file.pascalScript, file).errors || [])
+        : [];
+      const hlErrors = window.findSyntaxErrors
+        ? (window.findSyntaxErrors(file.pascalScript, 'pascal') || [])
+        : [];
+
+      const errList = [...new Set([...pasErrors.map(e => e.text || e.message), ...hlErrors.map(e => e.message || e.text)])];
+      if (errList.length > 0) {
+        errors.push(`PascalScript: ${errList[0]}`);
+      }
+    }
+
+    const hasError = errors.length > 0;
+    let badgeHtml = '';
+    if (hasError) {
+      const tooltipText = `[Sözdizimi Hatası]: Bu raporda ${errors.length} adet SQL veya Pascal hatası var:\n` + errors.slice(0, 4).join('\n');
+      badgeHtml = `<span class="report-syntax-error-badge" title="${escHtml(tooltipText)}">!</span>`;
+    }
+
+    const result = {
+      hasError,
+      count: errors.length,
+      details: errors,
+      badgeHtml
+    };
+
+    file._syntaxDiagCacheKey = cacheKey;
+    file._syntaxDiagResult = result;
+    return result;
+  }
+  window.FrpListRenderers.getReportSyntaxDiagnostic = getReportSyntaxDiagnostic;
+
   function getReportColorTooltip(file, reportName) {
     const lines = [reportName || file.name || 'Rapor'];
     const isPublic = !!(file.isPublic || file.is_public || file.inPool || file.in_pool);
     const qCount = Array.isArray(file.queries) && file.queries.length > 0 ? file.queries.length : (Number(file.stats?.sqlCount || file.sql_count || file.sqlCount || 0) || 0);
     const hasRisk = Array.isArray(file.queries) && file.queries.some(q => /\b(DROP|TRUNCATE|ALTER)\s+(TABLE|DATABASE|VIEW|PROCEDURE|INDEX)\b/i.test(q.sql || ''));
     const hasNote = Boolean((file.userNote && file.userNote.trim()) || (file.noteHtml && file.noteHtml.trim()) || (Array.isArray(file.attachments) && file.attachments.length > 0));
+    const syntaxDiag = getReportSyntaxDiagnostic(file);
 
+    if (syntaxDiag.hasError) lines.push(`[Kırmızı ! - Sözdizimi Hatası]: ${syntaxDiag.count} hata (${syntaxDiag.details.slice(0, 2).join(', ')})`);
     if (hasRisk) lines.push('[Kırmızı - Risk]: Kritik SQL komutu');
     if (isPublic) lines.push('[Yeşil - Havuzda]: Ortak havuz raporu');
     if (qCount > 0) lines.push(`[Mavi - SQL]: ${qCount} SQL sorgusu`);
@@ -93,10 +162,14 @@ window.FrpListRenderers = window.FrpListRenderers || {};
         const tooltip = getReportColorTooltip(file, reportName);
         const titleColorStyle = hasRisk ? 'color:#ef4444;' : (isPublic ? 'color:#10b981;' : '');
 
+        const syntaxDiag = getReportSyntaxDiagnostic(file);
+        const syntaxBadge = syntaxDiag.badgeHtml || '';
+
         return `
           <td class="col-reportName" style="cursor:pointer;max-width:320px;">
             <div class="file-name" style="display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;">
               <button type="button" class="report-name-title report-title-action" data-list-action="open-detail" data-id="${encodeURIComponent(String(file.id))}" style="font-weight:var(--report-title-weight, 700);font-size:.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${titleColorStyle}" title="${escHtml(tooltip)}" aria-label="${escHtml(reportName)} raporunu aç">${escHtml(reportName)}</button>
+              ${syntaxBadge}
               ${poolBadge}
               ${lockBadge}
               ${riskBadge}

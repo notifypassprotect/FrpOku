@@ -151,8 +151,8 @@
  let beginCount = 0, endCount = 0;
  const beginStack = [];
 
- const NON_SEMICOLON_LINE_STARTERS = /^(BEGIN|THEN|ELSE|DO|TRY|EXCEPT|FINALLY|REPEAT|VAR|CONST|TYPE|USES|INTERFACE|IMPLEMENTATION)\b/i;
- const NON_SEMICOLON_LINE_ENDERS = /(:=|;|,|\(|\+|-\*|\/|\bAND\b|\bOR\b|\bTHEN\b|\bELSE\b|\bDO\b|\bBEGIN\b|\bTRY\b|\bEXCEPT\b|\bFINALLY\b|\bREPEAT\b|\bVAR\b|\bCONST\b|\bTYPE\b)$/i;
+ const NON_SEMICOLON_LINE_STARTERS = /^(BEGIN|THEN|ELSE|DO|TRY|EXCEPT|FINALLY|REPEAT|VAR|CONST|TYPE|USES|INTERFACE|IMPLEMENTATION|IF|CASE|WHILE|FOR|WITH|PROGRAM|UNIT)\b/i;
+ const NON_SEMICOLON_LINE_ENDERS = /(:=|;|,|\(|\+|\-|\*|\/|=|<|>|<=|>=|<>|\bAND\b|\bOR\b|\bNOT\b|\bXOR\b|\bTHEN\b|\bELSE\b|\bDO\b|\bBEGIN\b|\bTRY\b|\bEXCEPT\b|\bFINALLY\b|\bREPEAT\b|\bVAR\b|\bCONST\b|\bTYPE\b|\bOF\b)$/i;
 
  strippedLines.forEach((sLine, lIdx) => {
  const lnum = lIdx + 1;
@@ -211,8 +211,8 @@
  }
  }
 
- // Eğer sonraki satır 'ELSE' veya 'END' veya 'UNTIL' değilse ';' zorunludur
- if (nextNonEmptyTrim &&!/^(ELSE|END|UNTIL)\b/i.test(nextNonEmptyTrim)) {
+ // Eğer sonraki satır 'ELSE', 'END', 'UNTIL', 'THEN', 'DO', 'OF' değilse ';' zorunludur
+ if (nextNonEmptyTrim && !/^(ELSE|END|UNTIL|THEN|DO|OF)\b/i.test(nextNonEmptyTrim)) {
  errors.push({
  text: `Satır ${lnum}: İfade sonunda ';' (noktalı virgül) eksik ➔ '${rawTrim}'`,
  line: lnum,
@@ -304,7 +304,9 @@
    UNTIL: 'until', CASE: 'case', OF: 'of', TRY: 'try', EXCEPT: 'except', FINALLY: 'finally',
    WITH: 'with', USES: 'uses', PROGRAM: 'program', AND: 'and', OR: 'or', NOT: 'not',
    XOR: 'xor', MOD: 'mod', DIV: 'div', TRUE: 'True', FALSE: 'False', NIL: 'nil',
-   NULL: 'Null', UNASSIGNED: 'Unassigned', RESULT: 'Result', SENDER: 'Sender', SELF: 'Self'
+   NULL: 'Null', UNASSIGNED: 'Unassigned', RESULT: 'Result', SENDER: 'Sender', SELF: 'Self',
+   EXIT: 'Exit', BREAK: 'Break', CONTINUE: 'Continue', HALT: 'Halt', ABORT: 'Abort',
+   INHERITED: 'inherited', SHL: 'shl', SHR: 'shr', IN: 'in', IS: 'is', AS: 'as'
  };
 
  const PASCAL_BUILTIN_FUNCS = {
@@ -604,8 +606,29 @@
  const codeLine = rawLine.replace(/\/\/.*$/, '').replace(/\{[^}]*\}/g, '').trim();
  if (!codeLine) return;
  if (/:=\s*;?\s*$/i.test(codeLine)) errors.push({ text: `Satır ${lineNo}: ':=' sonrasında atanacak değer eksik`, line: lineNo, token: ':=', suggestion: 'Atamanın sağına değer veya ifade yazın.' });
- if (/^IF\b/i.test(codeLine) && !/\bTHEN\b/i.test(codeLine)) errors.push({ text: `Satır ${lineNo}: IF koşulunda 'then' eksik`, line: lineNo, token: 'if', suggestion: "Koşulu 'then' ile tamamlayın." });
- if (/^(WHILE|FOR)\b/i.test(codeLine) && !/\bDO\b/i.test(codeLine)) errors.push({ text: `Satır ${lineNo}: Döngü ifadesinde 'do' eksik`, line: lineNo, token: codeLine.split(/\s+/)[0], suggestion: "Döngü koşulunu 'do' ile tamamlayın." });
+ if (/^IF\b/i.test(codeLine)) {
+   let hasThen = false;
+   for (let j = index; j < rawLines.length; j++) {
+     const cur = rawLines[j].replace(/\/\/.*$/, '').replace(/\{[^}]*\}/g, '').trim();
+     if (!cur) continue;
+     if (/\bTHEN\b/i.test(cur)) { hasThen = true; break; }
+     if (j > index && /^(BEGIN|END|PROCEDURE|FUNCTION|VAR|CONST|TYPE|IF|WHILE|FOR|CASE)\b/i.test(cur)) break;
+     if (j > index && cur.endsWith(';')) break;
+   }
+   if (!hasThen) errors.push({ text: `Satır ${lineNo}: IF koşulunda 'then' eksik`, line: lineNo, token: 'if', suggestion: "Koşulu 'then' ile tamamlayın." });
+ }
+ if (/^(WHILE|FOR)\b/i.test(codeLine)) {
+   let hasDo = false;
+   const kw = codeLine.split(/\s+/)[0];
+   for (let j = index; j < rawLines.length; j++) {
+     const cur = rawLines[j].replace(/\/\/.*$/, '').replace(/\{[^}]*\}/g, '').trim();
+     if (!cur) continue;
+     if (/\bDO\b/i.test(cur)) { hasDo = true; break; }
+     if (j > index && /^(BEGIN|END|PROCEDURE|FUNCTION|VAR|CONST|TYPE|IF|WHILE|FOR|CASE)\b/i.test(cur)) break;
+     if (j > index && cur.endsWith(';')) break;
+   }
+   if (!hasDo) errors.push({ text: `Satır ${lineNo}: Döngü ifadesinde 'do' eksik`, line: lineNo, token: kw, suggestion: "Döngü koşulunu 'do' ile tamamlayın." });
+ }
  if (/STRINGREPLACE\s*\([^\n]*\[\s*RFREPLACEALL\s*\]/i.test(codeLine)) errors.push({ text: `Satır ${lineNo}: Bu FastReport ortamında [rfReplaceAll] desteklenmiyor`, line: lineNo, token: 'StringReplace', suggestion: 'StringReplace(source, old, new) biçimini kullanın.' });
  const quoteLine = rawLine.replace(/\/\/.*$/, '').replace(/\{[^}]*\}/g, '');
  let quoteOpen = false;

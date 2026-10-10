@@ -40,6 +40,11 @@ window.FrpListRenderers.renderCards = function(files, container) {
     const tooltip = window.FrpListRenderers?.getReportColorTooltip ? window.FrpListRenderers.getReportColorTooltip(file, reportName) : reportName;
     const titleColorStyle = hasRisk ? 'color:#ef4444;' : (isPublic ? 'color:#10b981;' : '');
 
+    const syntaxDiag = window.FrpListRenderers?.getReportSyntaxDiagnostic
+      ? window.FrpListRenderers.getReportSyntaxDiagnostic(file)
+      : { badgeHtml: '' };
+    const syntaxBadge = syntaxDiag.badgeHtml || '';
+
     const lockInfo = window.activeReportLocks ? window.activeReportLocks[file.id] : null;
     const currentUserId = String(window.FrpAuth?.getUser?.()?.id || '');
     const isLockedByOther = lockInfo && String(lockInfo.userId) !== currentUserId;
@@ -60,6 +65,7 @@ window.FrpListRenderers.renderCards = function(files, container) {
           <div style="min-width:0;flex:1;overflow:hidden;">
             <div class="card-title" style="font-weight:var(--heading-weight, 800);font-size:.92rem;color:var(--text-primary);line-height:1.35;word-break:break-word;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;">
               <button type="button" class="report-title-action" data-list-action="open-detail" data-id="${encodedId}" style="${titleColorStyle}" title="${escHtml(tooltip)}" aria-label="${escHtml(reportName)} raporunu aç">${escHtml(reportName)}</button>
+              ${syntaxBadge}
               ${poolBadge}
               ${riskBadge}
               ${lockBadge}

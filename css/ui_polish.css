@@ -2174,6 +2174,38 @@ body:has(#workspaceSwitcher) #resultCount {
   50% { opacity: 0.85; border-color: #f59e0b; }
 }
 
+/* Rapor Listesi Sözdizimi Hatası (Kırmızı Ünlem) Rozeti */
+.report-syntax-error-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  min-width: 17px;
+  min-height: 17px;
+  border-radius: 50%;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 0 7px rgba(239, 68, 68, 0.55);
+  cursor: help;
+  user-select: none;
+  vertical-align: middle;
+  flex-shrink: 0;
+  transition: transform .15s ease, box-shadow .15s ease;
+  animation: pulseSyntaxError 2.5s ease-in-out infinite;
+}
+.report-syntax-error-badge:hover {
+  transform: scale(1.18);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.85);
+}
+@keyframes pulseSyntaxError {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 6px rgba(239, 68, 68, 0.5); }
+  50% { transform: scale(1.08); box-shadow: 0 0 9px rgba(239, 68, 68, 0.8); }
+}
+
 /* Detay Sayfası Kilit Uyarısı */
 .detail-lock-banner {
   display: flex;

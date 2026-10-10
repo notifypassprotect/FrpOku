@@ -134,7 +134,14 @@ function levenshteinDist(a, b) {
   return v0[lb];
 }
 
-function findFuzzyTypoMatch(word, lang = 'pascal') {
+const PAS_MEMBER_ONLY_PROPS = new Set([
+  'TEXT', 'FONT', 'COLOR', 'BRUSH', 'PEN', 'FRAME', 'CAPTION', 'VALUE', 
+  'LINES', 'MEMO', 'WIDTH', 'HEIGHT', 'TOP', 'LEFT', 'TAG', 'HINT', 'PARENT', 
+  'ALIGN', 'ALIGNMENT', 'ITEMINDEX', 'ROWCOUNT', 'COLCOUNT', 'CHECKED', 
+  'SQLTEXT', 'KEYVALUE', 'DISPLAYFORMAT', 'FORMATSTR', 'WORDWRAP'
+]);
+
+function findFuzzyTypoMatch(word, lang = 'pascal', isMember = false) {
   const up = word.toUpperCase();
   if (up.length < 3) return null;
 
@@ -158,6 +165,7 @@ function findFuzzyTypoMatch(word, lang = 'pascal') {
     let minDistance = 999;
 
     for (const kw of PAS_KEYWORD_LIST) {
+      if (!isMember && PAS_MEMBER_ONLY_PROPS.has(kw)) continue;
       const lenDiff = Math.abs(up.length - kw.length);
       const maxLenDiff = kw.length >= 10 ? 2 : 1;
       if (lenDiff > maxLenDiff) continue;
@@ -479,6 +487,37 @@ function findSyntaxErrors(code, lang = 'sql') {
     return result.replace(/\{[^\r\n]*\}/g, match => ' '.repeat(match.length));
   }
 
+  const declaredPascalIdentifiers = new Set();
+  if (lang === 'pascal') {
+    const strippedAll = code.replace(/'(?:''|[^'\r\n])*'/g, "''").replace(/\/\/[^\r\n]*/g, '').replace(/\{[^\r\n]*\}/g, '');
+    for (const match of strippedAll.matchAll(/\b(?:procedure|function)\s+([a-zA-Z_]\w*)/gi)) {
+      declaredPascalIdentifiers.add(match[1].toUpperCase());
+    }
+    const varMatches = strippedAll.matchAll(/\b(?:var|const)\s+([\s\S]*?)(?=\bbegin\b|\bprocedure\b|\bfunction\b|\bvar\b|\bconst\b|$)/gi);
+    for (const vm of varMatches) {
+      const decls = vm[1].split(';');
+      decls.forEach(d => {
+        const colonIdx = d.indexOf(':');
+        if (colonIdx === -1) return;
+        d.slice(0, colonIdx).split(',').forEach(n => {
+          const cn = n.trim().toUpperCase();
+          if (cn) declaredPascalIdentifiers.add(cn);
+        });
+      });
+    }
+    const paramMatches = strippedAll.matchAll(/\b(?:procedure|function)\s+[a-zA-Z_]\w*\s*\(([\s\S]*?)\)/gi);
+    for (const pm of paramMatches) {
+      pm[1].split(';').forEach(pGroup => {
+        const colonIdx = pGroup.indexOf(':');
+        const namesPart = colonIdx === -1 ? pGroup : pGroup.slice(0, colonIdx);
+        namesPart.replace(/\b(?:var|const|out)\b/gi, '').split(',').forEach(n => {
+          const cn = n.trim().toUpperCase();
+          if (cn) declaredPascalIdentifiers.add(cn);
+        });
+      });
+    }
+  }
+
   lines.forEach((lineText, lineIdx) => {
     const lineNum = lineIdx + 1;
 
@@ -494,14 +533,34 @@ function findSyntaxErrors(code, lang = 'sql') {
     let wm;
     while ((wm = wordRx.exec(cleanLineText)) !== null) {
       const w = wm[0];
+      const upperW = w.toUpperCase();
+      let isMember = false;
+
       // Pascal nesne ve bileşen adları (örn: qCase., Query1.) anahtar kelime sayılmaz.
       if (lang === 'pascal') {
         const afterChar = cleanLineText[wm.index + w.length] || '';
         if (afterChar === '.') continue;
+
+        const beforePart = cleanLineText.slice(0, wm.index);
+        const prevNonSpaceChar = beforePart.trim().slice(-1);
+        if (prevNonSpaceChar === '.') {
+          isMember = true;
+        }
+
+        // Prosedür/Fonksiyon bildirim adı kontrolü (örn: procedure Test)
+        if (/\b(?:PROCEDURE|FUNCTION|PROGRAM|UNIT)\s+$/i.test(beforePart)) continue;
+
+        // Parametre veya değişken tanım sol tarafı (örn: (Sender: TfrxComponent), var x: Integer)
+        const afterStr = cleanLineText.slice(wm.index + w.length).trim();
+        if (afterStr.startsWith(':') && !afterStr.startsWith(':=')) continue;
+
+        // Tanımlı metod/değişken ise atla
+        if (declaredPascalIdentifiers.has(upperW)) continue;
       }
-      const match = findFuzzyTypoMatch(w, lang);
+
+      const match = findFuzzyTypoMatch(w, lang, isMember);
       if (match) {
-        if (!errors.some(e => e.line === lineNum && e.token.toUpperCase() === w.toUpperCase())) {
+        if (!errors.some(e => e.line === lineNum && e.token.toUpperCase() === upperW)) {
           errors.push({
             line: lineNum,
             col: wm.index + 1,
@@ -1086,8 +1145,29 @@ function findSyntaxErrors(code, lang = 'sql') {
       const lineNo = index + 1;
       const emptyAssignment = /:=\s*;?\s*$/i.exec(rawLine.replace(/\/\/.*$/, '').trim());
       if (emptyAssignment) addDiagnostic(lineNo, clean.lastIndexOf(':=') + 1, ':=', 'Atamanın sağına değer veya ifade yazın', "Pascal atama operatörü ':=' sonrasında değer eksik.");
-      if (/^\s*IF\b/i.test(trim) && !/\bTHEN\b/i.test(trim)) addDiagnostic(lineNo, clean.toUpperCase().indexOf('IF') + 1, 'if', 'Koşulu THEN ile tamamlayın', "IF koşulunda 'then' eksik.");
-      if (/^\s*(?:WHILE|FOR)\b/i.test(trim) && !/\bDO\b/i.test(trim)) addDiagnostic(lineNo, 1, trim.split(/\s+/)[0], 'Döngü koşulunu DO ile tamamlayın', "Pascal döngüsünde 'do' eksik.");
+      if (/^\s*IF\b/i.test(trim)) {
+        let hasThen = false;
+        for (let j = index; j < lines.length; j++) {
+          const cur = cleanCodeLine(lines[j], false).trim();
+          if (!cur) continue;
+          if (/\bTHEN\b/i.test(cur)) { hasThen = true; break; }
+          if (j > index && /^(BEGIN|END|PROCEDURE|FUNCTION|VAR|CONST|TYPE|IF|WHILE|FOR|CASE)\b/i.test(cur)) break;
+          if (j > index && cur.endsWith(';')) break;
+        }
+        if (!hasThen) addDiagnostic(lineNo, clean.toUpperCase().indexOf('IF') + 1, 'if', 'Koşulu THEN ile tamamlayın', "IF koşulunda 'then' eksik.");
+      }
+      if (/^\s*(?:WHILE|FOR)\b/i.test(trim)) {
+        let hasDo = false;
+        const kw = trim.split(/\s+/)[0];
+        for (let j = index; j < lines.length; j++) {
+          const cur = cleanCodeLine(lines[j], false).trim();
+          if (!cur) continue;
+          if (/\bDO\b/i.test(cur)) { hasDo = true; break; }
+          if (j > index && /^(BEGIN|END|PROCEDURE|FUNCTION|VAR|CONST|TYPE|IF|WHILE|FOR|CASE)\b/i.test(cur)) break;
+          if (j > index && cur.endsWith(';')) break;
+        }
+        if (!hasDo) addDiagnostic(lineNo, 1, kw, 'Döngü koşulunu DO ile tamamlayın', "Pascal döngüsünde 'do' eksik.");
+      }
       if (/^\s*(?:ELSE|THEN)\s*;\s*$/i.test(trim)) addDiagnostic(lineNo, 1, trim.replace(';', ''), 'Anahtar sözcükten sonra çalıştırılacak ifadeyi yazın', 'Kontrol bloğu boş bırakılmış.');
       if (/STRINGREPLACE\s*\([^\n]*\[\s*RFREPLACEALL\s*\]/i.test(trim)) addDiagnostic(lineNo, clean.toUpperCase().indexOf('STRINGREPLACE') + 1, 'StringReplace', 'StringReplace(source, old, new) biçimini kullanın', 'Bu FastReport ortamında [rfReplaceAll] parametresi desteklenmiyor.');
 

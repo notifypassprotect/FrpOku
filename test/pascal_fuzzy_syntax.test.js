@@ -63,4 +63,24 @@ end;`;
   assert.equal(res3.errors.length, 0, 'Valid Pascal script must have 0 errors');
   const diag3 = ctx.findSyntaxErrors(validScript, 'pascal');
   assert.equal(diag3.length, 0, 'findSyntaxErrors must have 0 errors on valid code');
+
+  // 4. Multiline IF-THEN, case-of, and Exit; must produce zero false positives
+  const scriptMultilineIf = `procedure Button1OnClick(Sender: TfrxComponent);
+begin
+  if (MonthOf(DateEdit1.Date) <> MonthOf(DateEdit2.Date))
+    then
+  begin
+    ShowMessage('Aynı ay olmalıdır!');
+    Exit;
+  end;
+  case ayNo of
+    1: ayAdi := 'OCAK';
+    2: ayAdi := 'ŞUBAT';
+  end;
+end;`;
+
+  const res4 = ctx.FrpSyntaxCheck.checkPascalSyntax(scriptMultilineIf);
+  assert.equal(res4.errors.length, 0, 'Multiline IF-THEN, case-of, and Exit must have 0 errors in checkPascalSyntax');
+  const diag4 = ctx.findSyntaxErrors(scriptMultilineIf, 'pascal');
+  assert.equal(diag4.length, 0, 'Multiline IF-THEN, case-of, and Exit must have 0 errors in findSyntaxErrors');
 });
